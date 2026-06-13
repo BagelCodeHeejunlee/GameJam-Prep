@@ -57,16 +57,52 @@ function tagPills(tags) {
   return `<div class="tag-row">${tags.map((tag) => `<span class="tag ${tag}">${tagNames[tag] || tag}</span>`).join("")}</div>`;
 }
 
+function cardStats(card) {
+  const stats = [];
+  if (card.atk) stats.push(["피해", card.atk]);
+  if (card.dmg) stats.push(["피해", card.dmg]);
+  if (card.strength !== undefined) stats.push(["힘", card.strength]);
+  if (card.shield) stats.push(["방어", card.shield]);
+  if (card.poison) stats.push(["독", card.poison]);
+  if (card.summon) stats.push(["동료", card.summon]);
+  if (card.drone) stats.push(["드론", card.drone]);
+  if (card.heal) stats.push(["회복", card.heal]);
+  if (card.boost) stats.push(["증폭", card.boost]);
+  return stats.slice(0, 3);
+}
+
 function cardMarkup(card, level = 1) {
   const color = artColors[card.tags[0]] || "#147d7a";
+  const stats = cardStats(card);
+  const rune = (tagNames[card.tags[0]] || card.tags[0]).slice(0, 1);
   return `
-    <div class="card-name">
-      <span>${card.name}</span>
-      <span class="level">Lv.${level}</span>
+    <div class="card-frame theme-${card.tags[0]}" style="--art-color:${color}">
+      <div class="card-name">
+        <span>${card.name}</span>
+        <span class="level">Lv.${level}</span>
+      </div>
+      <div class="card-art">
+        <span class="rune-mark">${rune}</span>
+      </div>
+      ${stats.length ? `<div class="stat-chips">${stats.map(([label, value]) => `<span><b>${value}</b>${label}</span>`).join("")}</div>` : ""}
+      <p class="card-text">${card.text}</p>
+      ${tagPills(card.tags)}
     </div>
-    <div class="card-art" style="--art-color:${color}"></div>
-    <p class="muted">${card.text}</p>
-    ${tagPills(card.tags)}
+  `;
+}
+
+function fighterMarkup(kind, title, detail, meta = "") {
+  return `
+    <div class="fighter ${kind}">
+      <div class="avatar ${kind}">
+        <span>${kind === "enemy" ? "EN" : "PL"}</span>
+      </div>
+      <div class="fighter-copy">
+        <small>${meta}</small>
+        <h3>${title}</h3>
+        <p>${detail}</p>
+      </div>
+    </div>
   `;
 }
 
@@ -448,14 +484,8 @@ function renderTree() {
       <section class="stage">
         ${result}
         <div class="battlefield">
-          <div class="fighter">
-            <h3>내 덱</h3>
-            <p class="muted">${tree.deck.length}장 · 평균 Lv.${(tree.deck.reduce((sum, card) => sum + card.level, 0) / tree.deck.length).toFixed(1)}</p>
-          </div>
-          <div class="fighter enemy">
-            <h3>${tree.enemy.name}</h3>
-            <p class="muted">체력 ${tree.enemy.hp} · 공격 ${tree.enemy.atk} · 방어 ${tree.enemy.armor}</p>
-          </div>
+          ${fighterMarkup("player", "내 덱", `${tree.deck.length}장 · 평균 Lv.${(tree.deck.reduce((sum, card) => sum + card.level, 0) / tree.deck.length).toFixed(1)}`, "Builder")}
+          ${fighterMarkup("enemy", tree.enemy.name, `체력 ${tree.enemy.hp} · 공격 ${tree.enemy.atk} · 방어 ${tree.enemy.armor}`, "Rival")}
         </div>
         <div class="actions">${controls[tree.phase] || ""}</div>
         ${controls.reward}${controls.remove}${controls.tree}
@@ -701,14 +731,8 @@ function renderLeague() {
       </aside>
       <section class="stage">
         <div class="battlefield">
-          <div class="fighter">
-            <h3>내 팀</h3>
-            <p class="muted">${league.deck.length}장 · 벤치 한도 5</p>
-          </div>
-          <div class="fighter enemy">
-            <h3>${league.currentOpponent ? league.currentOpponent.name : "결승 상대"}</h3>
-            <p class="muted">${league.currentOpponent ? `${league.currentOpponent.deck.length}장 · 팬 ${league.currentOpponent.fans}` : "상위권 덱"}</p>
-          </div>
+          ${fighterMarkup("player", "내 팀", `${league.deck.length}장 · 벤치 한도 5`, "League")}
+          ${fighterMarkup("enemy", league.currentOpponent ? league.currentOpponent.name : "결승 상대", league.currentOpponent ? `${league.currentOpponent.deck.length}장 · 팬 ${league.currentOpponent.fans}` : "상위권 덱", "Opponent")}
         </div>
         ${phaseControls[league.phase]}
         <h3 style="margin-top:18px">현재 덱</h3>
@@ -986,14 +1010,8 @@ function renderTactic() {
       <section class="stage">
         ${result}
         <div class="battlefield">
-          <div class="fighter">
-            <h3>내 작전</h3>
-            <p class="muted">${Object.values(tactic.slots).filter(Boolean).length}/5 슬롯 장착</p>
-          </div>
-          <div class="fighter enemy">
-            <h3>${tactic.enemy.name}</h3>
-            <p class="muted">체력 ${tactic.enemy.hp} · 공격 ${tactic.enemy.atk}</p>
-          </div>
+          ${fighterMarkup("player", "내 작전", `${Object.values(tactic.slots).filter(Boolean).length}/5 슬롯 장착`, "Loadout")}
+          ${fighterMarkup("enemy", tactic.enemy.name, `체력 ${tactic.enemy.hp} · 공격 ${tactic.enemy.atk}`, "Target")}
         </div>
         <div class="slot-grid">
           ${["lead", "engine", "reaction", "finisher", "reserve"].map(renderSlot).join("")}
