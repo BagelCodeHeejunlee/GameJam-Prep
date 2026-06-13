@@ -841,6 +841,9 @@ function updatePlayer(dt) {
       if (dist(enemy, player) < radius) {
         enemy.slow = Math.max(enemy.slow, 0.42);
         damageEnemy(enemy, (6 + state.stats.frostAura * 3) * dt, { type: "frost", status: "chill" });
+        if (state.stats.executeField > 0 && enemy.hp < enemy.maxHp * (0.12 + state.stats.executeField * 0.05)) {
+          damageEnemy(enemy, enemy.hp + 1, { type: "execute" });
+        }
       }
     }
   }
@@ -1239,7 +1242,53 @@ function generateChoices(rewardType) {
 }
 
 function canOffer(augment) {
-  return (state.owned[augment.id] || 0) < augment.max;
+  if ((state.owned[augment.id] || 0) >= augment.max) return false;
+  if (augment.id === "dashMine" || augment.id === "dashShield") return hasDashSource();
+  if (augment.id === "fieldSize" || augment.id === "gravity" || augment.id === "executeField") return hasFieldSource();
+  if (augment.id === "singularity") return hasFieldSource() && ownsAugment("gravity");
+  if (augment.id === "infiniteCircuit") return hasDashSource() || hasFieldSource();
+  if (augment.id === "frostBurst") return hasChillSource();
+  if (augment.id === "shockSpread" || augment.id === "lightningBurst") return hasShockSource();
+  return true;
+}
+
+function ownsAugment(id) {
+  return (state.owned[id] || 0) > 0;
+}
+
+function hasDashSource() {
+  return state.stats.autoDash > 0 || ownsAugment("autoDash");
+}
+
+function hasFieldSource() {
+  return (
+    state.stats.trail > 0 ||
+    state.stats.frostAura > 0 ||
+    state.stats.dashMine > 0 ||
+    state.stats.infiniteCircuit ||
+    ownsAugment("trail") ||
+    ownsAugment("frostAura") ||
+    ownsAugment("dashMine") ||
+    ownsAugment("infiniteCircuit")
+  );
+}
+
+function hasChillSource() {
+  return (
+    state.stats.chillChance > 0 ||
+    state.stats.frostAura > 0 ||
+    ownsAugment("chillBullet") ||
+    ownsAugment("frostAura") ||
+    state.stats.stormConductor
+  );
+}
+
+function hasShockSource() {
+  return (
+    state.stats.shockChance > 0 ||
+    ownsAugment("shockBullet") ||
+    state.stats.stormConductor
+  );
 }
 
 function pickWeighted(pool, picked, currentTags, rewardType, slot) {
