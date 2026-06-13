@@ -806,7 +806,7 @@ function updatePlayer(dt) {
     const dist = Math.max(1, Math.hypot(dx, dy));
     const keep = state.stats.preferredRange;
     const away = dist < keep ? 1 : -0.45;
-    const orbit = state.stats.infiniteCircuit ? 0.95 : 0.55;
+    const orbit = state.stats.infiniteCircuit ? 0.72 : 0;
     moveX += (dx / dist) * away + (-dy / dist) * orbit;
     moveY += (dy / dist) * away + (dx / dist) * orbit;
   } else {
@@ -827,7 +827,7 @@ function updatePlayer(dt) {
   player.vy = direction.y;
   player.x = clamp(player.x + player.vx * player.speed * dt, bounds.minX, bounds.maxX);
   player.y = clamp(player.y + player.vy * player.speed * dt, bounds.minY, bounds.maxY);
-  updateAimAngle(target);
+  updateAimAngle(target, dt);
 
   if (state.stats.trail > 0 || state.stats.infiniteCircuit) {
     state.stats.trailTimer -= dt;
@@ -888,7 +888,7 @@ function dashPlayer() {
   player.vy = direction.y;
   player.x = clamp(player.x + player.vx * distance, 28, state.width - 28);
   player.y = clamp(player.y + player.vy * distance, 34, state.height - 28);
-  updateAimAngle(currentTarget());
+  updateAimAngle(currentTarget(), 0.033);
   damageLine(sx, sy, player.x, player.y, 38, state.stats.dashDamage + state.stats.autoDash * 6);
   addParticle((sx + player.x) / 2, (sy + player.y) / 2, "dash", "#ffd166", 0.45, distance);
   if (state.stats.dashShield > 0) addShield(state.stats.dashShield);
@@ -904,7 +904,6 @@ function fireAuto(dt) {
   state.fireTimer = state.stats.fireDelay * haste;
   const target = pickTarget();
   if (!target) return;
-  updateAimAngle(target);
 
   state.shotCount += 1;
   const baseAngle = Math.atan2(target.y - state.player.y, target.x - state.player.x);
@@ -1374,9 +1373,11 @@ function pickTarget() {
     state.targetId = null;
     return null;
   }
-  const target = [...state.enemies].sort((a, b) => targetScore(a) - targetScore(b))[0];
-  state.targetId = target.id;
-  return target;
+  const current = currentTarget();
+  if (current) return current;
+  const best = [...state.enemies].sort((a, b) => targetScore(a) - targetScore(b))[0];
+  state.targetId = best.id;
+  return best;
 }
 
 function currentTarget() {
@@ -1384,19 +1385,18 @@ function currentTarget() {
 }
 
 function targetScore(enemy) {
-  let score = (enemy.mark || 0) * -120 + (enemy.boss ? -80 : 0) + dist(enemy, state.player);
-  if (enemy.id === state.targetId) score -= 64;
-  return score;
+  return (enemy.mark || 0) * -120 + (enemy.boss ? -80 : 0) + dist(enemy, state.player);
 }
 
-function updateAimAngle(target) {
+function updateAimAngle(target, dt = 0.033) {
   if (!target) return;
-  state.player.aimAngle = Math.atan2(target.y - state.player.y, target.x - state.player.x);
+  const desired = Math.atan2(target.y - state.player.y, target.x - state.player.x);
+  const delta = angleDelta(desired, state.player.aimAngle);
+  const maxTurn = 5 * dt;
+  state.player.aimAngle += clamp(delta, -maxTurn, maxTurn);
 }
 
 function playerFacingAngle() {
-  const target = currentTarget();
-  if (target) return Math.atan2(target.y - state.player.y, target.x - state.player.x);
   return state.player.aimAngle;
 }
 
@@ -1578,12 +1578,23 @@ function drawPlayer() {
     ctx.arc(0, 0, p.r + 9 + Math.sin(state.time * 8) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.rotate(playerFacingAngle());
   ctx.fillStyle = "#ffd166";
-  polygon(0, 0, p.r + 2, 3);
+  ctx.beginPath();
+  ctx.arc(0, 0, p.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#fff7e6";
   ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.rotate(playerFacingAngle());
+  ctx.fillStyle = "#fff7e6";
+  ctx.beginPath();
+  ctx.moveTo(p.r + 14, 0);
+  ctx.lineTo(2, -7);
+  ctx.lineTo(2, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#101116";
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
   if (state.stats.frostAura > 0) {
@@ -1783,6 +1794,10 @@ function formatTime(value) {
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function angleDelta(to, from) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
 function distanceToSegment(px, py, x1, y1, x2, y2) {
