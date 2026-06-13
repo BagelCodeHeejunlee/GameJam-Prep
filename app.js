@@ -531,6 +531,7 @@ function createState() {
     rewardQueue: [],
     currentChoices: [],
     rerolled: false,
+    targetId: null,
     width: 900,
     height: 620,
     player: {
@@ -543,6 +544,7 @@ function createState() {
       speed: 185,
       vx: 0,
       vy: 0,
+      aimAngle: -Math.PI / 2,
       invuln: 0,
       roomHealUsed: false
     },
@@ -645,6 +647,7 @@ function startRoom(roomNumber) {
   state.phase = "combat";
   state.enemies = [];
   state.pendingSpawns = [];
+  state.targetId = null;
   state.spawnTimer = 0;
   state.bullets = [];
   state.hazards = [];
@@ -824,6 +827,7 @@ function updatePlayer(dt) {
   player.vy = direction.y;
   player.x = clamp(player.x + player.vx * player.speed * dt, bounds.minX, bounds.maxX);
   player.y = clamp(player.y + player.vy * player.speed * dt, bounds.minY, bounds.maxY);
+  updateAimAngle(target);
 
   if (state.stats.trail > 0 || state.stats.infiniteCircuit) {
     state.stats.trailTimer -= dt;
@@ -879,11 +883,12 @@ function dashPlayer() {
   const sx = player.x;
   const sy = player.y;
   const distance = 112 + state.stats.autoDash * 14;
-  const direction = choosePlayerMoveDirection(player.vx, player.vy, pickTarget(), distance);
+  const direction = choosePlayerMoveDirection(player.vx, player.vy, currentTarget() || pickTarget(), distance);
   player.vx = direction.x;
   player.vy = direction.y;
   player.x = clamp(player.x + player.vx * distance, 28, state.width - 28);
   player.y = clamp(player.y + player.vy * distance, 34, state.height - 28);
+  updateAimAngle(currentTarget());
   damageLine(sx, sy, player.x, player.y, 38, state.stats.dashDamage + state.stats.autoDash * 6);
   addParticle((sx + player.x) / 2, (sy + player.y) / 2, "dash", "#ffd166", 0.45, distance);
   if (state.stats.dashShield > 0) addShield(state.stats.dashShield);
@@ -899,6 +904,7 @@ function fireAuto(dt) {
   state.fireTimer = state.stats.fireDelay * haste;
   const target = pickTarget();
   if (!target) return;
+  updateAimAngle(target);
 
   state.shotCount += 1;
   const baseAngle = Math.atan2(target.y - state.player.y, target.x - state.player.x);
@@ -1364,12 +1370,34 @@ function endRun(win) {
 }
 
 function pickTarget() {
-  if (state.enemies.length === 0) return null;
-  return [...state.enemies].sort((a, b) => {
-    const aScore = (a.mark || 0) * -120 + (a.boss ? -80 : 0) + dist(a, state.player);
-    const bScore = (b.mark || 0) * -120 + (b.boss ? -80 : 0) + dist(b, state.player);
-    return aScore - bScore;
-  })[0];
+  if (state.enemies.length === 0) {
+    state.targetId = null;
+    return null;
+  }
+  const target = [...state.enemies].sort((a, b) => targetScore(a) - targetScore(b))[0];
+  state.targetId = target.id;
+  return target;
+}
+
+function currentTarget() {
+  return state.enemies.find((enemy) => enemy.id === state.targetId) || null;
+}
+
+function targetScore(enemy) {
+  let score = (enemy.mark || 0) * -120 + (enemy.boss ? -80 : 0) + dist(enemy, state.player);
+  if (enemy.id === state.targetId) score -= 64;
+  return score;
+}
+
+function updateAimAngle(target) {
+  if (!target) return;
+  state.player.aimAngle = Math.atan2(target.y - state.player.y, target.x - state.player.x);
+}
+
+function playerFacingAngle() {
+  const target = currentTarget();
+  if (target) return Math.atan2(target.y - state.player.y, target.x - state.player.x);
+  return state.player.aimAngle;
 }
 
 function updateUi(force = false) {
@@ -1550,7 +1578,7 @@ function drawPlayer() {
     ctx.arc(0, 0, p.r + 9 + Math.sin(state.time * 8) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.rotate(Math.atan2(p.vy, p.vx));
+  ctx.rotate(playerFacingAngle());
   ctx.fillStyle = "#ffd166";
   polygon(0, 0, p.r + 2, 3);
   ctx.fill();
@@ -1800,12 +1828,20 @@ window.coreRushDebug = {
     enemies: state?.enemies.length,
     hp: Math.round(state?.player.hp || 0),
     shield: Math.round(state?.player.shield || 0),
+    target: state && currentTarget()
+      ? {
+          id: state.targetId,
+          x: Math.round(currentTarget().x),
+          y: Math.round(currentTarget().y)
+        }
+      : null,
     player: state
       ? {
           x: Math.round(state.player.x),
           y: Math.round(state.player.y),
           vx: Number(state.player.vx.toFixed(2)),
-          vy: Number(state.player.vy.toFixed(2))
+          vy: Number(state.player.vy.toFixed(2)),
+          aim: Number(playerFacingAngle().toFixed(3))
         }
       : null,
     choices: state?.currentChoices.map((choice) => choice.name) || [],
