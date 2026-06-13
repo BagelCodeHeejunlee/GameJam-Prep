@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Auto Deck Lab</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Prototype set</p>
+          <h1>Auto Deck Lab</h1>
+        </div>
+        <nav class="tabs" aria-label="game modes">
+          <button class="tab active" type="button" data-mode="tree">트리 드래프트</button>
+          <button class="tab" type="button" data-mode="league">카드 리그</button>
+          <button class="tab" type="button" data-mode="tactic">작전 슬롯</button>
+        </nav>
+      </header>
+
+      <main id="game" class="game-shell"></main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

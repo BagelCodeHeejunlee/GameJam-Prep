@@ -1,0 +1,525 @@
+:root {
+  color-scheme: light;
+  --ink: #1d2329;
+  --muted: #65717f;
+  --line: #d9dee4;
+  --paper: #f7f5ef;
+  --panel: #ffffff;
+  --panel-2: #eef3f1;
+  --teal: #147d7a;
+  --teal-dark: #0c5f5d;
+  --amber: #bd8124;
+  --red: #b95045;
+  --green: #3d7b48;
+  --violet: #7557a6;
+  --blue: #3e6f9d;
+  --shadow: 0 12px 30px rgba(31, 41, 55, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px clamp(16px, 4vw, 42px) 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(28px, 3.8vw, 48px);
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-bottom: 8px;
+  font-size: 24px;
+}
+
+h3 {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tab,
+.primary,
+.secondary,
+.mini,
+.choice,
+.slot,
+.card-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.tab {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-weight: 800;
+}
+
+.tab:hover,
+.primary:hover,
+.secondary:hover,
+.mini:hover,
+.choice:hover,
+.slot:hover,
+.card-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.tab.active,
+.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.game-shell {
+  padding: 22px clamp(16px, 4vw, 42px) 34px;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.side,
+.stage,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(39, 48, 57, 0.08);
+}
+
+.side,
+.stage {
+  padding: 16px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stat {
+  min-height: 66px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.stat b {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.primary,
+.secondary,
+.mini {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-weight: 800;
+}
+
+.secondary {
+  background: var(--panel);
+}
+
+.mini {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 13px;
+}
+
+.cards,
+.choices,
+.deck-list,
+.slot-grid,
+.standings {
+  display: grid;
+  gap: 10px;
+}
+
+.cards {
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+
+.choices {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.deck-list {
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+}
+
+.card,
+.choice,
+.card-button {
+  position: relative;
+  min-height: 154px;
+  padding: 12px;
+  text-align: left;
+  overflow: hidden;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.choice.selected,
+.card-button.selected,
+.slot.selected {
+  outline: 3px solid rgba(20, 125, 122, 0.24);
+  border-color: var(--teal);
+}
+
+.card-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 8px;
+  font-weight: 900;
+}
+
+.level {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+}
+
+.card-art {
+  height: 42px;
+  margin: 6px 0 10px;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.12)),
+    var(--art-color, var(--teal));
+  border: 1px solid rgba(29, 35, 41, 0.12);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 21px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tag.strike { background: var(--red); }
+.tag.shield { background: var(--blue); }
+.tag.summon { background: var(--green); }
+.tag.poison { background: var(--violet); }
+.tag.spark { background: var(--amber); }
+.tag.echo { background: var(--teal); }
+.tag.league { background: #6f6558; }
+.tag.tactic { background: #7a5f2d; }
+
+.meter {
+  height: 10px;
+  margin: 8px 0 12px;
+  border-radius: 999px;
+  background: #e5e2db;
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  width: var(--value);
+  background: var(--teal);
+}
+
+.tree-row {
+  display: grid;
+  gap: 8px;
+}
+
+.tree-node {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.tree-node.active {
+  border-color: rgba(20, 125, 122, 0.6);
+  background: #e8f4f1;
+}
+
+.log {
+  display: grid;
+  gap: 6px;
+  max-height: 310px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.log p {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f2f3f4;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.result-banner {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #f9f4e8;
+}
+
+.battlefield {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fighter {
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbf8;
+}
+
+.fighter.enemy {
+  background: #fbf1ee;
+}
+
+.standings {
+  grid-template-columns: 1fr;
+}
+
+.standing {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f3f2ed;
+}
+
+.standing.me {
+  background: #e8f4f1;
+  font-weight: 900;
+}
+
+.slot-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.slot {
+  min-height: 148px;
+  padding: 12px;
+  text-align: left;
+}
+
+.slot small {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.empty-slot {
+  display: grid;
+  place-items: center;
+  min-height: 82px;
+  border: 1px dashed #aab2bb;
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .game-grid,
+  .battlefield {
+    grid-template-columns: 1fr;
+  }
+
+  .stage {
+    order: 1;
+  }
+
+  .side {
+    order: 2;
+  }
+
+  .mode-tactic .side {
+    order: 1;
+  }
+
+  .mode-tactic .stage {
+    order: 2;
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar {
+    gap: 12px;
+    padding: 14px 12px 12px;
+  }
+
+  .eyebrow {
+    display: none;
+  }
+
+  h1 {
+    font-size: 25px;
+  }
+
+  .game-shell {
+    padding: 12px;
+  }
+
+  .tabs,
+  .actions {
+    width: 100%;
+  }
+
+  .tab,
+  .primary,
+  .secondary {
+    flex: 1 1 auto;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cards,
+  .choices,
+  .deck-list,
+  .slot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tab,
+  .primary,
+  .secondary,
+  .mini,
+  .choice,
+  .slot,
+  .card-button {
+    min-height: 44px;
+  }
+
+  .card,
+  .choice,
+  .card-button,
+  .slot {
+    min-height: 132px;
+  }
+
+  .log {
+    max-height: 220px;
+  }
+}
