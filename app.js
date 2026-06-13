@@ -805,7 +805,10 @@ function updatePlayer(dt) {
     const dy = player.y - target.y;
     const dist = Math.max(1, Math.hypot(dx, dy));
     const keep = state.stats.preferredRange;
-    const away = dist < keep ? 1 : -0.45;
+    const rangeBand = 34;
+    let away = 0;
+    if (dist < keep - rangeBand) away = clamp((keep - rangeBand - dist) / 100, 0, 1);
+    if (dist > keep + rangeBand) away = -clamp((dist - keep - rangeBand) / 150, 0, 0.72);
     const orbit = state.stats.infiniteCircuit ? 0.72 : 0;
     moveX += (dx / dist) * away + (-dy / dist) * orbit;
     moveY += (dy / dist) * away + (dx / dist) * orbit;
@@ -821,13 +824,36 @@ function updatePlayer(dt) {
   const wallPush = getWallPush(player.x, player.y, 92);
   moveX += wallPush.x * (2.2 + wallPush.strength);
   moveY += wallPush.y * (2.2 + wallPush.strength);
-  const direction = choosePlayerMoveDirection(moveX, moveY, target);
+  for (const enemy of state.enemies) {
+    const dx = player.x - enemy.x;
+    const dy = player.y - enemy.y;
+    const distToEnemy = Math.max(1, Math.hypot(dx, dy));
+    const avoidRange = enemy.boss ? 150 : 118;
+    if (distToEnemy < avoidRange) {
+      const push = ((avoidRange - distToEnemy) / avoidRange) * (enemy.boss ? 1.4 : 1);
+      moveX += (dx / distToEnemy) * push;
+      moveY += (dy / distToEnemy) * push;
+    }
+  }
+  const moveIntent = Math.hypot(moveX, moveY);
+  const rawDirection = normalizeVector(moveX, moveY);
+  const direction = moveIntent > 0.18
+    ? wallPush.strength > 0.45
+      ? choosePlayerMoveDirection(moveX, moveY, target)
+      : rawDirection
+    : { x: 0, y: 0 };
   const bounds = getPlayerBounds();
-  player.vx = direction.x;
-  player.vy = direction.y;
+  if (moveIntent <= 0.18) {
+    player.vx = 0;
+    player.vy = 0;
+  } else {
+    const steering = 1 - Math.exp(-dt * 8);
+    player.vx += (direction.x - player.vx) * steering;
+    player.vy += (direction.y - player.vy) * steering;
+  }
   player.x = clamp(player.x + player.vx * player.speed * dt, bounds.minX, bounds.maxX);
   player.y = clamp(player.y + player.vy * player.speed * dt, bounds.minY, bounds.maxY);
-  updateAimAngle(target, dt);
+  updateAimAngle(target);
 
   if (state.stats.trail > 0 || state.stats.infiniteCircuit) {
     state.stats.trailTimer -= dt;
@@ -888,7 +914,7 @@ function dashPlayer() {
   player.vy = direction.y;
   player.x = clamp(player.x + player.vx * distance, 28, state.width - 28);
   player.y = clamp(player.y + player.vy * distance, 34, state.height - 28);
-  updateAimAngle(currentTarget(), 0.033);
+  updateAimAngle(currentTarget());
   damageLine(sx, sy, player.x, player.y, 38, state.stats.dashDamage + state.stats.autoDash * 6);
   addParticle((sx + player.x) / 2, (sy + player.y) / 2, "dash", "#ffd166", 0.45, distance);
   if (state.stats.dashShield > 0) addShield(state.stats.dashShield);
@@ -1388,12 +1414,9 @@ function targetScore(enemy) {
   return (enemy.mark || 0) * -120 + (enemy.boss ? -80 : 0) + dist(enemy, state.player);
 }
 
-function updateAimAngle(target, dt = 0.033) {
+function updateAimAngle(target) {
   if (!target) return;
-  const desired = Math.atan2(target.y - state.player.y, target.x - state.player.x);
-  const delta = angleDelta(desired, state.player.aimAngle);
-  const maxTurn = 5 * dt;
-  state.player.aimAngle += clamp(delta, -maxTurn, maxTurn);
+  state.player.aimAngle = Math.atan2(target.y - state.player.y, target.x - state.player.x);
 }
 
 function playerFacingAngle() {
@@ -1692,14 +1715,18 @@ function choosePlayerMoveDirection(moveX, moveY, target, probeDistance = 82) {
   const wallPush = getWallPush(player.x, player.y, 104);
   const candidates = [
     base,
-    rotateVector(base, 0.58),
-    rotateVector(base, -0.58),
-    rotateVector(base, 1.12),
-    rotateVector(base, -1.12),
     normalizeVector(base.x + wallPush.x * 1.8, base.y + wallPush.y * 1.8),
     normalizeVector(wallPush.x, wallPush.y),
     center
   ].filter(Boolean);
+  if (state.stats.infiniteCircuit || wallPush.strength > 0.65) {
+    candidates.push(
+      rotateVector(base, 0.58),
+      rotateVector(base, -0.58),
+      rotateVector(base, 1.12),
+      rotateVector(base, -1.12)
+    );
+  }
   let best = candidates[0];
   let bestScore = -Infinity;
   for (const candidate of candidates) {
@@ -1719,6 +1746,7 @@ function scoreMoveCandidate(direction, base, target, probeDistance) {
   const y = clamp(player.y + direction.y * probeDistance, bounds.minY, bounds.maxY);
   const moved = Math.hypot(x - player.x, y - player.y);
   let score = direction.x * base.x + direction.y * base.y;
+  score += (direction.x * player.vx + direction.y * player.vy) * 0.9;
   score += moved * 0.018;
   score += (wallDanger(player.x, player.y, 104) - wallDanger(x, y, 104)) * 5.4;
   score -= wallDanger(x, y, 84) * 4.2;
@@ -1794,10 +1822,6 @@ function formatTime(value) {
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function angleDelta(to, from) {
-  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
 function distanceToSegment(px, py, x1, y1, x2, y2) {
