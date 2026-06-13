@@ -1,4 +1,4 @@
-# Auto Deck Lab
+# GameJam-Prep
 
 Mobile-friendly web prototypes for testing casual roguelike auto-battle deckbuilding concepts.
 
