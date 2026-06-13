@@ -1,12 +1,12 @@
 # GameJam-Prep
 
-Mobile-friendly web prototypes for testing casual roguelike auto-battle deckbuilding concepts.
+Mobile-friendly action roguelike defense prototype.
 
-## Prototypes
+## Current Prototype
 
-- Tree Draft: build a small deck and unlock tag synergy nodes.
-- Card League: draft, trim, and fight through a 7-round league.
-- Tactic Slots: assign cards to auto-battle roles before combat.
+- Core Rush: auto-moving, auto-attacking hero defense game.
+- Enemies rush the core in waves.
+- Roguelike choices alter attack patterns, movement behavior, and core defense.
 
 ## GitHub Pages
 
