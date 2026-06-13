@@ -225,6 +225,7 @@ const augments = [
     tags: ["이동", "장판"],
     text: "대시 지점에 지연 폭발 지뢰를 남긴다.",
     max: 3,
+    requires: [{ anyIds: ["autoDash"] }],
     synergy: ["autoDash", "fieldSize", "gravity"],
     apply: (s) => {
       s.stats.dashMine += 1;
@@ -238,6 +239,7 @@ const augments = [
     tags: ["이동", "방어"],
     text: "대시 후 짧은 보호막을 얻는다.",
     max: 3,
+    requires: [{ anyIds: ["autoDash"] }],
     synergy: ["autoDash", "emergencyHeal", "overShield"],
     apply: (s) => {
       s.stats.dashShield += 18;
@@ -251,6 +253,7 @@ const augments = [
     tags: ["장판"],
     text: "모든 장판과 폭발 범위가 넓어진다.",
     max: 3,
+    requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "frostAura", "executeField"],
     apply: (s) => {
       s.stats.fieldScale += 0.18;
@@ -345,6 +348,9 @@ const augments = [
     tags: ["상태", "처치"],
     text: "둔화된 적을 처치하면 냉기 폭발이 발생한다.",
     max: 2,
+    requires: [
+      { anyIds: ["chillBullet", "frostAura", "stormConductor"] }
+    ],
     synergy: ["chillBullet", "frostAura", "fieldSize"],
     apply: (s) => {
       s.stats.frostBurst += 1;
@@ -358,6 +364,7 @@ const augments = [
     tags: ["상태", "처치"],
     text: "감전 피해가 주변 적에게 전파된다.",
     max: 2,
+    requires: [{ anyIds: ["shockBullet", "stormConductor"] }],
     synergy: ["shockBullet", "rapidFire", "stormConductor"],
     apply: (s) => {
       s.stats.shockSpread += 1;
@@ -371,6 +378,7 @@ const augments = [
     tags: ["장판", "제어"],
     text: "적을 가장 강한 장판 중심으로 끌어당긴다.",
     max: 2,
+    requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "dashMine", "executeField", "singularity"],
     apply: (s) => {
       s.stats.gravity += 1;
@@ -384,6 +392,7 @@ const augments = [
     tags: ["장판", "처치"],
     text: "장판 위의 낮은 체력 적을 처형하고 폭발시킨다.",
     max: 2,
+    requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "fieldSize", "gravity"],
     apply: (s) => {
       s.stats.executeField += 1;
@@ -397,6 +406,7 @@ const augments = [
     tags: ["상태", "폭발"],
     text: "감전된 적 처치 시 주변에 번개 폭발이 발생한다.",
     max: 2,
+    requires: [{ anyIds: ["shockBullet", "stormConductor"] }],
     synergy: ["shockBullet", "shockSpread", "stormConductor"],
     apply: (s) => {
       s.stats.lightningBurst += 1;
@@ -450,6 +460,11 @@ const augments = [
     tags: ["상태", "전설"],
     text: "냉기와 감전이 서로 다른 상태를 추가로 유발한다.",
     max: 1,
+    requires: [
+      {
+        anyIds: ["chillBullet", "frostAura", "shockBullet", "frostBurst", "shockSpread", "lightningBurst"]
+      }
+    ],
     synergy: ["shockSpread", "frostBurst", "shockBullet", "chillBullet"],
     apply: (s) => {
       s.stats.stormConductor = true;
@@ -463,6 +478,7 @@ const augments = [
     tags: ["이동", "장판", "전설"],
     text: "자동 이동이 궤도화되고 대시/잔상 효과가 더 자주 발동한다.",
     max: 1,
+    requires: [{ anyIds: ["autoDash"], anyTags: ["장판"] }],
     synergy: ["autoDash", "trail", "dashMine"],
     apply: (s) => {
       s.stats.infiniteCircuit = true;
@@ -478,6 +494,7 @@ const augments = [
     tags: ["장판", "제어", "전설"],
     text: "끌어당김과 장판 피해가 누적되면 큰 폭발이 발생한다.",
     max: 1,
+    requires: [{ anyTags: ["장판"] }, { anyIds: ["gravity"] }],
     synergy: ["gravity", "executeField", "dataBurn"],
     apply: (s) => {
       s.stats.singularity = true;
@@ -1243,52 +1260,28 @@ function generateChoices(rewardType) {
 
 function canOffer(augment) {
   if ((state.owned[augment.id] || 0) >= augment.max) return false;
-  if (augment.id === "dashMine" || augment.id === "dashShield") return hasDashSource();
-  if (augment.id === "fieldSize" || augment.id === "gravity" || augment.id === "executeField") return hasFieldSource();
-  if (augment.id === "singularity") return hasFieldSource() && ownsAugment("gravity");
-  if (augment.id === "infiniteCircuit") return hasDashSource() || hasFieldSource();
-  if (augment.id === "frostBurst") return hasChillSource();
-  if (augment.id === "shockSpread" || augment.id === "lightningBurst") return hasShockSource();
-  return true;
+  return meetsRequirements(augment.requires || []);
+}
+
+function meetsRequirements(requirements) {
+  return requirements.every((requirement) => meetsRequirement(requirement));
+}
+
+function meetsRequirement(requirement) {
+  const ids = requirement.anyIds || [];
+  const tags = requirement.anyTags || [];
+  return ids.some((id) => ownsAugment(id)) || tags.some((tag) => ownsTag(tag));
 }
 
 function ownsAugment(id) {
   return (state.owned[id] || 0) > 0;
 }
 
-function hasDashSource() {
-  return state.stats.autoDash > 0 || ownsAugment("autoDash");
-}
-
-function hasFieldSource() {
-  return (
-    state.stats.trail > 0 ||
-    state.stats.frostAura > 0 ||
-    state.stats.dashMine > 0 ||
-    state.stats.infiniteCircuit ||
-    ownsAugment("trail") ||
-    ownsAugment("frostAura") ||
-    ownsAugment("dashMine") ||
-    ownsAugment("infiniteCircuit")
-  );
-}
-
-function hasChillSource() {
-  return (
-    state.stats.chillChance > 0 ||
-    state.stats.frostAura > 0 ||
-    ownsAugment("chillBullet") ||
-    ownsAugment("frostAura") ||
-    state.stats.stormConductor
-  );
-}
-
-function hasShockSource() {
-  return (
-    state.stats.shockChance > 0 ||
-    ownsAugment("shockBullet") ||
-    state.stats.stormConductor
-  );
+function ownsTag(tag) {
+  return Object.keys(state.owned).some((id) => {
+    if (!ownsAugment(id)) return false;
+    return augmentById[id]?.tags.includes(tag);
+  });
 }
 
 function pickWeighted(pool, picked, currentTags, rewardType, slot) {
