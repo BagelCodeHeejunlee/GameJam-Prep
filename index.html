@@ -3,89 +3,116 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Core Rush</title>
+    <title>Core Rush Prototype</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <div class="game-app">
-      <header class="game-header">
+      <header class="topbar">
         <div>
-          <p class="eyebrow">Auto action defense</p>
+          <p class="eyebrow">Full-auto room roguelike</p>
           <h1>Core Rush</h1>
         </div>
-        <button id="restartButton" class="ghost-button" type="button">재시작</button>
+        <button id="restartButton" class="icon-button" type="button" aria-label="재시작">↻</button>
       </header>
 
-      <main class="play-shell">
-        <section class="arena-panel">
-          <div class="hud">
-            <div class="hud-item">
-              <span>CORE</span>
-              <div class="bar"><i id="coreBar"></i></div>
-              <b id="coreText">100/100</b>
+      <main class="game-layout">
+        <section class="arena-shell" aria-label="전투 화면">
+          <div class="hud-grid">
+            <div class="meter">
+              <span>HP</span>
+              <div class="meter-track"><i id="hpBar"></i></div>
+              <b id="hpText">220/220</b>
             </div>
-            <div class="hud-item">
-              <span>HERO</span>
-              <div class="bar hero"><i id="heroBar"></i></div>
-              <b id="heroText">100/100</b>
+            <div class="meter shield">
+              <span>SHIELD</span>
+              <div class="meter-track"><i id="shieldBar"></i></div>
+              <b id="shieldText">0</b>
             </div>
-            <div class="hud-stat">
-              <span>WAVE</span>
-              <b id="waveText">1</b>
+            <div class="hud-chip">
+              <span>ROOM</span>
+              <b id="roomText">1/15</b>
             </div>
-            <div class="hud-stat">
-              <span>LV</span>
-              <b id="levelText">1</b>
+            <div class="hud-chip">
+              <span>PICKS</span>
+              <b id="pickText">0</b>
             </div>
           </div>
 
-          <div class="canvas-wrap" id="touchSurface">
-            <canvas id="gameCanvas" aria-label="Core Rush game field"></canvas>
-            <div class="vignette"></div>
-            <div class="xp-track"><i id="xpBar"></i></div>
-            <div class="float-status">
-              <span id="timerText">00:00</span>
-              <span id="killText">0 KOs</span>
+          <div class="canvas-stage">
+            <canvas id="gameCanvas" aria-label="자동 전투 필드"></canvas>
+            <div class="arena-glass"></div>
+            <div class="combat-readout">
+              <span id="roomTypeText">NORMAL</span>
+              <span id="enemyText">0 ENEMIES</span>
+              <span id="timeText">00:00</span>
             </div>
-            <div class="joystick" id="joystick">
-              <i id="stick"></i>
-            </div>
+            <div id="roomBanner" class="room-banner"></div>
           </div>
         </section>
 
-        <aside class="side-panel">
-          <div class="mission-card">
-            <span class="label">BUILD</span>
-            <h2 id="buildTitle">루키 레인저</h2>
-            <p id="buildText">자동 사격 · 코어 방어 · 웨이브 생존</p>
-          </div>
-          <div class="perk-list" id="perkList"></div>
+        <aside class="run-panel" aria-label="런 정보">
+          <section class="pilot-card">
+            <span class="label">CHARACTER</span>
+            <h2>표식 사수</h2>
+            <p>원거리 유지 · 표식 누적 · 보스 집중딜</p>
+            <dl>
+              <div>
+                <dt>무기</dt>
+                <dd>자동 석궁</dd>
+              </div>
+              <div>
+                <dt>자동 행동</dt>
+                <dd>거리 유지 후 원형 이동</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="build-panel">
+            <div class="section-head">
+              <span class="label">BUILD</span>
+              <b id="buildSummary">탄환 / 표식</b>
+            </div>
+            <div id="augmentList" class="augment-list"></div>
+          </section>
         </aside>
       </main>
 
       <div id="startOverlay" class="overlay">
-        <div class="modal">
-          <span class="label">DEFENSE RUN</span>
-          <h2>코어를 지켜라</h2>
-          <p>이동과 전투가 자동으로 굴러간다. 드래그로 개입하고, 웨이브마다 공격/이동 방식을 바꾼다.</p>
-          <button id="startButton" class="primary-button" type="button">출격</button>
+        <div class="modal start-modal">
+          <span class="label">PROTOTYPE</span>
+          <h2>15개의 방을 자동으로 돌파한다</h2>
+          <p>
+            전투 중 조작은 없다. 표식 사수가 자동으로 이동, 타겟팅, 공격한다.
+            방을 클리어할 때마다 3개 증강 중 하나를 골라 빌드를 만든다.
+          </p>
+          <div class="rule-row">
+            <span>5방 중간보스</span>
+            <span>10방 중간보스</span>
+            <span>15방 최종보스</span>
+          </div>
+          <button id="startButton" class="primary-button" type="button">시작</button>
         </div>
       </div>
 
-      <div id="upgradeOverlay" class="overlay hidden">
-        <div class="modal wide">
-          <span class="label">LEVEL UP</span>
-          <h2>강화 선택</h2>
-          <div id="upgradeChoices" class="upgrade-grid"></div>
+      <div id="rewardOverlay" class="overlay hidden">
+        <div class="modal reward-modal">
+          <div class="reward-title">
+            <span id="rewardLabel" class="label">ROOM CLEAR</span>
+            <h2 id="rewardTitle">증강 선택</h2>
+            <p id="rewardText">3개 후보 중 1개를 선택한다.</p>
+          </div>
+          <div id="choiceGrid" class="choice-grid"></div>
+          <button id="rerollButton" class="ghost-button" type="button">리롤 1회</button>
         </div>
       </div>
 
-      <div id="gameOverOverlay" class="overlay hidden">
-        <div class="modal">
-          <span class="label">RUN ENDED</span>
-          <h2 id="gameOverTitle">방어 실패</h2>
-          <p id="gameOverText">00:00 · 0 KOs</p>
-          <button id="againButton" class="primary-button" type="button">다시 출격</button>
+      <div id="endOverlay" class="overlay hidden">
+        <div class="modal start-modal">
+          <span id="endLabel" class="label">RUN ENDED</span>
+          <h2 id="endTitle">스테이지 종료</h2>
+          <p id="endText">결과</p>
+          <button id="againButton" class="primary-button" type="button">다시 시작</button>
         </div>
       </div>
     </div>

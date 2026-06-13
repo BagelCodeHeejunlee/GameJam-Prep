@@ -1,1071 +1,1658 @@
 const canvas = document.querySelector("#gameCanvas");
 const ctx = canvas.getContext("2d");
-const touchSurface = document.querySelector("#touchSurface");
-const joystick = document.querySelector("#joystick");
-const stick = document.querySelector("#stick");
 
 const ui = {
   startOverlay: document.querySelector("#startOverlay"),
-  upgradeOverlay: document.querySelector("#upgradeOverlay"),
-  gameOverOverlay: document.querySelector("#gameOverOverlay"),
+  rewardOverlay: document.querySelector("#rewardOverlay"),
+  endOverlay: document.querySelector("#endOverlay"),
   startButton: document.querySelector("#startButton"),
   againButton: document.querySelector("#againButton"),
   restartButton: document.querySelector("#restartButton"),
-  upgradeChoices: document.querySelector("#upgradeChoices"),
-  coreBar: document.querySelector("#coreBar"),
-  heroBar: document.querySelector("#heroBar"),
-  xpBar: document.querySelector("#xpBar"),
-  coreText: document.querySelector("#coreText"),
-  heroText: document.querySelector("#heroText"),
-  waveText: document.querySelector("#waveText"),
-  levelText: document.querySelector("#levelText"),
-  timerText: document.querySelector("#timerText"),
-  killText: document.querySelector("#killText"),
-  perkList: document.querySelector("#perkList"),
-  buildTitle: document.querySelector("#buildTitle"),
-  buildText: document.querySelector("#buildText"),
-  gameOverTitle: document.querySelector("#gameOverTitle"),
-  gameOverText: document.querySelector("#gameOverText")
+  rerollButton: document.querySelector("#rerollButton"),
+  choiceGrid: document.querySelector("#choiceGrid"),
+  hpBar: document.querySelector("#hpBar"),
+  shieldBar: document.querySelector("#shieldBar"),
+  hpText: document.querySelector("#hpText"),
+  shieldText: document.querySelector("#shieldText"),
+  roomText: document.querySelector("#roomText"),
+  pickText: document.querySelector("#pickText"),
+  roomTypeText: document.querySelector("#roomTypeText"),
+  enemyText: document.querySelector("#enemyText"),
+  timeText: document.querySelector("#timeText"),
+  roomBanner: document.querySelector("#roomBanner"),
+  augmentList: document.querySelector("#augmentList"),
+  buildSummary: document.querySelector("#buildSummary"),
+  rewardLabel: document.querySelector("#rewardLabel"),
+  rewardTitle: document.querySelector("#rewardTitle"),
+  rewardText: document.querySelector("#rewardText"),
+  endLabel: document.querySelector("#endLabel"),
+  endTitle: document.querySelector("#endTitle"),
+  endText: document.querySelector("#endText")
 };
 
-const keys = new Set();
-const pointer = {
-  active: false,
-  id: null,
-  originX: 0,
-  originY: 0,
-  x: 0,
-  y: 0
+const rarityLabel = {
+  normal: "노말",
+  rare: "레어",
+  epic: "에픽",
+  legendary: "전설"
 };
 
-const upgradePool = [
+const rarityClass = {
+  normal: "rarity-normal",
+  rare: "rarity-rare",
+  epic: "rarity-epic",
+  legendary: "rarity-legendary"
+};
+
+const rarityWeights = {
+  normal: { normal: 58, rare: 31, epic: 10, legendary: 1 },
+  elite: { normal: 38, rare: 36, epic: 21, legendary: 5 },
+  midboss: { normal: 18, rare: 36, epic: 34, legendary: 12 },
+  rare: { normal: 18, rare: 34, epic: 35, legendary: 13 }
+};
+
+const augments = [
   {
-    id: "rapid",
-    icon: "속",
-    name: "속사 모듈",
-    text: "자동 사격 간격이 짧아진다.",
-    apply: (s) => {
-      s.stats.fireDelay = Math.max(0.13, s.stats.fireDelay * 0.84);
-      s.perks.rapid = (s.perks.rapid || 0) + 1;
-    }
-  },
-  {
-    id: "damage",
+    id: "highPressure",
     icon: "탄",
     name: "고압 탄환",
-    text: "탄환 피해가 증가한다.",
+    rarity: "normal",
+    tags: ["탄환", "피해"],
+    text: "기본 투사체 피해가 증가한다.",
+    max: 4,
+    synergy: ["doubleShot", "pierce", "barrage"],
     apply: (s) => {
       s.stats.damage += 5;
-      s.perks.damage = (s.perks.damage || 0) + 1;
     }
   },
   {
-    id: "multi",
-    icon: "쌍",
-    name: "쌍열 발사",
-    text: "한 번에 발사하는 탄환이 늘어난다.",
+    id: "rapidFire",
+    icon: "속",
+    name: "속사 모듈",
+    rarity: "normal",
+    tags: ["탄환", "속도"],
+    text: "공격 간격이 짧아진다.",
+    max: 4,
+    synergy: ["chillBullet", "shockBullet", "markBullet", "markHunt"],
     apply: (s) => {
-      s.stats.projectiles = Math.min(5, s.stats.projectiles + 1);
-      s.perks.multi = (s.perks.multi || 0) + 1;
+      s.stats.fireDelay = Math.max(0.14, s.stats.fireDelay * 0.86);
     }
   },
   {
     id: "pierce",
     icon: "관",
-    name: "관통 화살",
-    text: "탄환이 적을 더 뚫고 지나간다.",
+    name: "관통 탄환",
+    rarity: "normal",
+    tags: ["탄환", "처치"],
+    text: "투사체가 적을 추가로 관통한다.",
+    max: 3,
+    synergy: ["gravity", "frostAura", "executeField"],
     apply: (s) => {
       s.stats.pierce += 1;
-      s.perks.pierce = (s.perks.pierce || 0) + 1;
     }
   },
   {
-    id: "orb",
-    icon: "궤",
-    name: "수호 궤도검",
-    text: "주위를 도는 검이 근접한 적을 베어낸다.",
-    apply: (s) => {
-      s.stats.orbs = Math.min(5, s.stats.orbs + 1);
-      s.perks.orb = (s.perks.orb || 0) + 1;
-    }
-  },
-  {
-    id: "turret",
-    icon: "탑",
-    name: "코어 포탑",
-    text: "코어가 가장 가까운 적을 자동 공격한다.",
-    apply: (s) => {
-      s.stats.turrets = Math.min(4, s.stats.turrets + 1);
-      s.perks.turret = (s.perks.turret || 0) + 1;
-    }
-  },
-  {
-    id: "frost",
+    id: "chillBullet",
     icon: "냉",
-    name: "냉기장",
-    text: "주변 적을 느리게 만들고 지속 피해를 준다.",
+    name: "냉기 탄환",
+    rarity: "normal",
+    tags: ["탄환", "상태"],
+    text: "공격 적중 시 둔화를 부여한다.",
+    max: 3,
+    synergy: ["frostAura", "frostBurst", "stormConductor"],
     apply: (s) => {
-      s.stats.frost += 1;
-      s.perks.frost = (s.perks.frost || 0) + 1;
+      s.stats.chillChance = Math.min(0.8, s.stats.chillChance + 0.22);
     }
   },
   {
-    id: "repair",
-    icon: "수",
-    name: "긴급 수리",
-    text: "영웅과 코어 체력이 회복되고 최대치가 오른다.",
-    apply: (s) => {
-      s.player.maxHp += 18;
-      s.player.hp = Math.min(s.player.maxHp, s.player.hp + 42);
-      s.core.maxHp += 22;
-      s.core.hp = Math.min(s.core.maxHp, s.core.hp + 48);
-      s.perks.repair = (s.perks.repair || 0) + 1;
-    }
-  },
-  {
-    id: "magnet",
-    icon: "흡",
-    name: "경험치 자석",
-    text: "경험치 코어를 더 먼 거리에서 끌어당긴다.",
-    apply: (s) => {
-      s.stats.magnet += 55;
-      s.perks.magnet = (s.perks.magnet || 0) + 1;
-    }
-  },
-  {
-    id: "speed",
+    id: "boots",
     icon: "신",
     name: "기동 부츠",
-    text: "이동 속도가 오르고 적 사이를 빠르게 빠져나간다.",
+    rarity: "normal",
+    tags: ["이동"],
+    text: "자동 이동 속도와 회피 거리가 증가한다.",
+    max: 3,
+    synergy: ["autoDash", "trail", "infiniteCircuit"],
     apply: (s) => {
-      s.player.speed += 34;
-      s.perks.speed = (s.perks.speed || 0) + 1;
+      s.player.speed += 22;
+      s.stats.preferredRange += 8;
     }
   },
   {
-    id: "dash",
+    id: "autoDash",
     icon: "돌",
     name: "자동 대시",
-    text: "이동 중 주기적으로 짧게 돌진하며 경로의 적을 밀친다.",
+    rarity: "normal",
+    tags: ["이동", "트리거"],
+    text: "일정 주기마다 안전한 방향으로 짧게 대시한다.",
+    max: 3,
+    synergy: ["dashMine", "dashShield", "trail", "infiniteCircuit"],
     apply: (s) => {
-      s.stats.dash += 1;
-      s.player.speed += 10;
-      s.perks.dash = (s.perks.dash || 0) + 1;
+      s.stats.autoDash += 1;
+      s.stats.dashInterval = Math.max(1.25, s.stats.dashInterval - 0.35);
+      s.stats.dashDamage += 12;
     }
   },
   {
     id: "trail",
     icon: "잔",
     name: "플라즈마 잔상",
-    text: "움직인 자리에 잠시 남는 피해 장판을 만든다.",
+    rarity: "normal",
+    tags: ["이동", "장판"],
+    text: "이동 경로에 짧게 남는 피해 장판을 만든다.",
+    max: 3,
+    synergy: ["fieldSize", "executeField", "gravity", "singularity"],
     apply: (s) => {
       s.stats.trail += 1;
-      s.perks.trail = (s.perks.trail || 0) + 1;
+      s.stats.trailDamage += 6;
     }
   },
   {
-    id: "repel",
+    id: "emergencyHeal",
+    icon: "회",
+    name: "긴급 회복",
+    rarity: "normal",
+    tags: ["방어", "회복"],
+    text: "방마다 1회, 체력이 낮아지면 자동 회복한다.",
+    max: 3,
+    synergy: ["overShield", "dashShield"],
+    apply: (s) => {
+      s.stats.emergencyHeal += 1;
+      s.player.maxHp += 18;
+      s.player.hp = Math.min(s.player.maxHp, s.player.hp + 28);
+    }
+  },
+  {
+    id: "shockwave",
     icon: "파",
     name: "충격 파동",
-    text: "이동 중 일정 시간마다 주변 적을 밀어내고 피해를 준다.",
+    rarity: "normal",
+    tags: ["이동", "방어"],
+    text: "가까운 적이 많을 때 자동으로 밀쳐내기 파동을 낸다.",
+    max: 3,
+    synergy: ["boots", "frostAura", "overShield"],
     apply: (s) => {
-      s.stats.repel += 1;
-      s.perks.repel = (s.perks.repel || 0) + 1;
+      s.stats.shockwave += 1;
+      s.stats.shockwaveCooldown = Math.max(1.55, s.stats.shockwaveCooldown - 0.35);
+    }
+  },
+  {
+    id: "dataMagnet",
+    icon: "자",
+    name: "데이터 자석",
+    rarity: "normal",
+    tags: ["경제"],
+    text: "보상 품질이 조금 좋아지고 전술 데이터 계열 효과가 강해진다.",
+    max: 3,
+    synergy: ["dataBurn", "scanner", "tacticalDominance"],
+    apply: (s) => {
+      s.stats.rarityBonus += 0.06;
+      s.stats.dataPower += 1;
+    }
+  },
+  {
+    id: "doubleShot",
+    icon: "쌍",
+    name: "쌍열 발사",
+    rarity: "rare",
+    tags: ["탄환"],
+    text: "기본 공격이 보조 투사체를 추가 발사한다.",
+    max: 3,
+    synergy: ["highPressure", "chillBullet", "barrage"],
+    apply: (s) => {
+      s.stats.projectiles += 1;
+    }
+  },
+  {
+    id: "markBullet",
+    icon: "표",
+    name: "표식 탄환",
+    rarity: "rare",
+    tags: ["탄환", "표식"],
+    text: "같은 적을 여러 번 맞히면 표식을 누적한다.",
+    max: 2,
+    synergy: ["rapidFire", "markHunt", "barrage"],
+    apply: (s) => {
+      s.stats.markEnabled = true;
+      s.stats.markBonus += 0.12;
+    }
+  },
+  {
+    id: "dashMine",
+    icon: "뢰",
+    name: "대시 지뢰",
+    rarity: "rare",
+    tags: ["이동", "장판"],
+    text: "대시 지점에 지연 폭발 지뢰를 남긴다.",
+    max: 3,
+    synergy: ["autoDash", "fieldSize", "gravity"],
+    apply: (s) => {
+      s.stats.dashMine += 1;
+    }
+  },
+  {
+    id: "dashShield",
+    icon: "막",
+    name: "대시 보호막",
+    rarity: "rare",
+    tags: ["이동", "방어"],
+    text: "대시 후 짧은 보호막을 얻는다.",
+    max: 3,
+    synergy: ["autoDash", "emergencyHeal", "overShield"],
+    apply: (s) => {
+      s.stats.dashShield += 18;
+    }
+  },
+  {
+    id: "fieldSize",
+    icon: "확",
+    name: "장판 확장",
+    rarity: "rare",
+    tags: ["장판"],
+    text: "모든 장판과 폭발 범위가 넓어진다.",
+    max: 3,
+    synergy: ["trail", "frostAura", "executeField"],
+    apply: (s) => {
+      s.stats.fieldScale += 0.18;
+    }
+  },
+  {
+    id: "frostAura",
+    icon: "빙",
+    name: "냉기장",
+    rarity: "rare",
+    tags: ["상태", "장판"],
+    text: "캐릭터 주변에 둔화와 지속 피해 영역을 만든다.",
+    max: 3,
+    synergy: ["chillBullet", "pierce", "frostBurst"],
+    apply: (s) => {
+      s.stats.frostAura += 1;
+      s.stats.frostRadius += 18;
+    }
+  },
+  {
+    id: "shockBullet",
+    icon: "전",
+    name: "감전 탄환",
+    rarity: "rare",
+    tags: ["탄환", "상태"],
+    text: "공격 적중 시 감전을 부여한다.",
+    max: 3,
+    synergy: ["rapidFire", "shockSpread", "stormConductor"],
+    apply: (s) => {
+      s.stats.shockChance = Math.min(0.75, s.stats.shockChance + 0.22);
+    }
+  },
+  {
+    id: "markHunt",
+    icon: "사",
+    name: "표식 사냥",
+    rarity: "rare",
+    tags: ["표식", "처치"],
+    text: "표식 적에게 주는 피해가 증가하고 처치 시 공격 속도가 오른다.",
+    max: 2,
+    synergy: ["markBullet", "rapidFire", "barrage"],
+    apply: (s) => {
+      s.stats.markDamage += 0.22;
+      s.stats.markHaste += 0.18;
+    }
+  },
+  {
+    id: "rerollKit",
+    icon: "굴",
+    name: "리롤 장치",
+    rarity: "rare",
+    tags: ["경제", "드래프트"],
+    text: "보상 리롤 품질이 좋아진다.",
+    max: 2,
+    synergy: ["scanner", "tacticalDominance"],
+    apply: (s) => {
+      s.stats.rerollQuality += 1;
+      s.stats.rarityBonus += 0.04;
+    }
+  },
+  {
+    id: "scanner",
+    icon: "탐",
+    name: "전술 스캐너",
+    rarity: "rare",
+    tags: ["경제", "드래프트"],
+    text: "현재 보유 태그와 직접 연결되는 후보가 더 잘 등장한다.",
+    max: 2,
+    synergy: ["dataMagnet", "rerollKit", "tacticalDominance"],
+    apply: (s) => {
+      s.stats.synergyBias += 1;
+    }
+  },
+  {
+    id: "tripleShot",
+    icon: "삼",
+    name: "삼연 발사",
+    rarity: "epic",
+    tags: ["탄환"],
+    text: "일정 공격마다 3방향 투사체를 발사한다.",
+    max: 2,
+    synergy: ["doubleShot", "highPressure", "barrage"],
+    apply: (s) => {
+      s.stats.tripleShot += 1;
+    }
+  },
+  {
+    id: "frostBurst",
+    icon: "파",
+    name: "냉기 파열",
+    rarity: "epic",
+    tags: ["상태", "처치"],
+    text: "둔화된 적을 처치하면 냉기 폭발이 발생한다.",
+    max: 2,
+    synergy: ["chillBullet", "frostAura", "fieldSize"],
+    apply: (s) => {
+      s.stats.frostBurst += 1;
+    }
+  },
+  {
+    id: "shockSpread",
+    icon: "전",
+    name: "감전 전이",
+    rarity: "epic",
+    tags: ["상태", "처치"],
+    text: "감전 피해가 주변 적에게 전파된다.",
+    max: 2,
+    synergy: ["shockBullet", "rapidFire", "stormConductor"],
+    apply: (s) => {
+      s.stats.shockSpread += 1;
+    }
+  },
+  {
+    id: "gravity",
+    icon: "중",
+    name: "중력장",
+    rarity: "epic",
+    tags: ["장판", "제어"],
+    text: "적을 가장 강한 장판 중심으로 끌어당긴다.",
+    max: 2,
+    synergy: ["trail", "dashMine", "executeField", "singularity"],
+    apply: (s) => {
+      s.stats.gravity += 1;
+    }
+  },
+  {
+    id: "executeField",
+    icon: "처",
+    name: "장판 처형",
+    rarity: "epic",
+    tags: ["장판", "처치"],
+    text: "장판 위의 낮은 체력 적을 처형하고 폭발시킨다.",
+    max: 2,
+    synergy: ["trail", "fieldSize", "gravity"],
+    apply: (s) => {
+      s.stats.executeField += 1;
+    }
+  },
+  {
+    id: "lightningBurst",
+    icon: "폭",
+    name: "번개 폭발",
+    rarity: "epic",
+    tags: ["상태", "폭발"],
+    text: "감전된 적 처치 시 주변에 번개 폭발이 발생한다.",
+    max: 2,
+    synergy: ["shockBullet", "shockSpread", "stormConductor"],
+    apply: (s) => {
+      s.stats.lightningBurst += 1;
+    }
+  },
+  {
+    id: "dataBurn",
+    icon: "연",
+    name: "데이터 연소",
+    rarity: "epic",
+    tags: ["경제", "폭발"],
+    text: "다음 방 시작 시 전술 데이터 폭발을 일으킨다.",
+    max: 2,
+    synergy: ["dataMagnet", "scanner", "tacticalDominance"],
+    apply: (s) => {
+      s.stats.dataBurn += 1;
+      s.stats.dataBurnDamage += 36;
+    }
+  },
+  {
+    id: "overShield",
+    icon: "과",
+    name: "과충전 보호막",
+    rarity: "epic",
+    tags: ["방어", "피해"],
+    text: "회복과 보호막 획득 일부가 주변 피해로 변환된다.",
+    max: 2,
+    synergy: ["emergencyHeal", "dashShield", "shockwave"],
+    apply: (s) => {
+      s.stats.overShield += 1;
+    }
+  },
+  {
+    id: "barrage",
+    icon: "탄",
+    name: "탄막 과부하",
+    rarity: "legendary",
+    tags: ["탄환", "전설"],
+    text: "일정 공격마다 보유한 탄환 효과를 복제 발동한다.",
+    max: 1,
+    synergy: ["highPressure", "doubleShot", "tripleShot"],
+    apply: (s) => {
+      s.stats.barrage = true;
+    }
+  },
+  {
+    id: "stormConductor",
+    icon: "폭",
+    name: "폭풍 전도체",
+    rarity: "legendary",
+    tags: ["상태", "전설"],
+    text: "냉기와 감전이 서로 다른 상태를 추가로 유발한다.",
+    max: 1,
+    synergy: ["shockSpread", "frostBurst", "shockBullet", "chillBullet"],
+    apply: (s) => {
+      s.stats.stormConductor = true;
+    }
+  },
+  {
+    id: "infiniteCircuit",
+    icon: "궤",
+    name: "무한 궤도",
+    rarity: "legendary",
+    tags: ["이동", "장판", "전설"],
+    text: "자동 이동이 궤도화되고 대시/잔상 효과가 더 자주 발동한다.",
+    max: 1,
+    synergy: ["autoDash", "trail", "dashMine"],
+    apply: (s) => {
+      s.stats.infiniteCircuit = true;
+      s.stats.dashInterval = Math.max(0.95, s.stats.dashInterval - 0.55);
+      s.stats.trail += 1;
+    }
+  },
+  {
+    id: "singularity",
+    icon: "붕",
+    name: "특이점 붕괴",
+    rarity: "legendary",
+    tags: ["장판", "제어", "전설"],
+    text: "끌어당김과 장판 피해가 누적되면 큰 폭발이 발생한다.",
+    max: 1,
+    synergy: ["gravity", "executeField", "dataBurn"],
+    apply: (s) => {
+      s.stats.singularity = true;
+    }
+  },
+  {
+    id: "tacticalDominance",
+    icon: "지",
+    name: "전술 지배",
+    rarity: "legendary",
+    tags: ["경제", "드래프트", "전설"],
+    text: "다음 보상에서 현재 핵심 태그가 더 강하게 보장된다.",
+    max: 1,
+    synergy: ["dataMagnet", "scanner", "rerollKit"],
+    apply: (s) => {
+      s.stats.tacticalDominance += 3;
+      s.stats.rarityBonus += 0.12;
     }
   }
 ];
 
-const perkLabels = {
-  rapid: ["속사", "발사 간격 감소"],
-  damage: ["고압탄", "피해 증가"],
-  multi: ["쌍열", "탄환 수 증가"],
-  pierce: ["관통", "관통 횟수 증가"],
-  orb: ["궤도검", "근접 자동 공격"],
-  turret: ["포탑", "코어 자동 공격"],
-  frost: ["냉기장", "둔화와 지속 피해"],
-  repair: ["수리", "체력과 코어 보강"],
-  magnet: ["자석", "경험치 흡수 범위"],
-  speed: ["기동", "기본 이동 속도 증가"],
-  dash: ["대시", "주기적 돌진과 넉백"],
-  trail: ["잔상", "이동 경로 피해 장판"],
-  repel: ["파동", "이동 중 광역 밀치기"]
-};
+const augmentById = Object.fromEntries(augments.map((augment) => [augment.id, augment]));
 
 let state;
-let lastTime = 0;
+let lastFrame = 0;
 
-function resetGame() {
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.max(320, rect.width || 900);
-  const h = Math.max(360, rect.height || 600);
-  state = {
-    running: false,
-    paused: true,
-    ended: false,
+function createState() {
+  return {
+    phase: "start",
     time: 0,
-    wave: 1,
-    waveClock: 0,
-    spawnTimer: 0,
-    fireTimer: 0,
-    turretTimer: 0,
-    dashCooldown: 0,
-    trailTimer: 0,
-    repelTimer: 0,
-    level: 1,
-    xp: 0,
-    nextXp: 12,
+    room: 0,
+    picks: 0,
     kills: 0,
-    width: w,
-    height: h,
+    rewardQueue: [],
+    currentChoices: [],
+    rerolled: false,
+    width: 900,
+    height: 620,
     player: {
-      x: w * 0.5,
-      y: h * 0.58,
+      x: 450,
+      y: 360,
       r: 15,
-      hp: 150,
-      maxHp: 150,
-      speed: 210,
-      invuln: 0
-    },
-    core: {
-      x: w * 0.5,
-      y: h * 0.5,
-      r: 30,
-      hp: 320,
-      maxHp: 320
+      hp: 220,
+      maxHp: 220,
+      shield: 0,
+      speed: 185,
+      vx: 0,
+      vy: 0,
+      invuln: 0,
+      roomHealUsed: false
     },
     stats: {
-      damage: 20,
+      damage: 22,
       fireDelay: 0.32,
       projectiles: 1,
       pierce: 0,
-      orbs: 0,
-      turrets: 1,
-      frost: 0,
-      magnet: 165,
-      dash: 0,
+      chillChance: 0,
+      shockChance: 0,
+      markEnabled: true,
+      markBonus: 0.12,
+      markDamage: 0.1,
+      markHaste: 0,
+      preferredRange: 185,
+      autoDash: 0,
+      dashInterval: 2.8,
+      dashCooldown: 1.8,
+      dashDamage: 32,
+      dashShield: 0,
+      dashMine: 0,
       trail: 0,
-      repel: 0
+      trailDamage: 12,
+      trailTimer: 0,
+      fieldScale: 1,
+      emergencyHeal: 0,
+      shockwave: 0,
+      shockwaveCooldown: 3.8,
+      shockwaveTimer: 2.2,
+      frostAura: 0,
+      frostRadius: 92,
+      tripleShot: 0,
+      frostBurst: 0,
+      shockSpread: 0,
+      gravity: 0,
+      gravityTimer: 0,
+      executeField: 0,
+      lightningBurst: 0,
+      dataBurn: 0,
+      dataBurnDamage: 0,
+      dataPower: 0,
+      overShield: 0,
+      barrage: false,
+      stormConductor: false,
+      infiniteCircuit: false,
+      singularity: false,
+      tacticalDominance: 0,
+      synergyBias: 0,
+      rerollQuality: 0,
+      rarityBonus: 0
     },
-    perks: {},
+    owned: {},
+    ownedOrder: [],
     enemies: [],
+    pendingSpawns: [],
+    spawnTimer: 0,
     bullets: [],
-    gems: [],
-    trails: [],
+    hazards: [],
     particles: [],
-    messages: [{ text: "WAVE 1", time: 1.6 }]
+    texts: [],
+    roomInfo: null,
+    fireTimer: 0,
+    shotCount: 0,
+    hasteTimer: 0,
+    messageTimer: 0
   };
-  updateUi();
-  renderPerks();
-  ui.gameOverOverlay.classList.add("hidden");
-  ui.upgradeOverlay.classList.add("hidden");
-}
-
-function startGame() {
-  if (!state) resetGame();
-  state.running = true;
-  state.paused = false;
-  state.ended = false;
-  ui.startOverlay.classList.add("hidden");
-  ui.gameOverOverlay.classList.add("hidden");
-  lastTime = performance.now();
 }
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.floor(rect.width * dpr);
-  canvas.height = Math.floor(rect.height * dpr);
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const width = Math.max(320, Math.floor(rect.width));
+  const height = Math.max(360, Math.floor(rect.height));
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (state) {
-    const oldW = state.width || rect.width;
-    const oldH = state.height || rect.height;
-    state.width = rect.width;
-    state.height = rect.height;
-    const sx = rect.width / oldW;
-    const sy = rect.height / oldH;
-    [state.player, state.core, ...state.enemies, ...state.bullets, ...state.gems].forEach((item) => {
-      item.x *= sx;
-      item.y *= sy;
-    });
+    const oldW = state.width || width;
+    const oldH = state.height || height;
+    state.width = width;
+    state.height = height;
+    state.player.x = clamp(state.player.x * (width / oldW), 30, width - 30);
+    state.player.y = clamp(state.player.y * (height / oldH), 30, height - 30);
   }
 }
 
-function rand(min, max) {
-  return min + Math.random() * (max - min);
+function startRun() {
+  state = createState();
+  resizeCanvas();
+  ui.startOverlay.classList.add("hidden");
+  ui.endOverlay.classList.add("hidden");
+  ui.rewardOverlay.classList.add("hidden");
+  state.phase = "combat";
+  startRoom(1);
+  updateUi(true);
 }
 
-function dist(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function startRoom(roomNumber) {
+  state.room = roomNumber;
+  state.phase = "combat";
+  state.enemies = [];
+  state.pendingSpawns = [];
+  state.spawnTimer = 0;
+  state.bullets = [];
+  state.hazards = [];
+  state.texts = [];
+  state.player.roomHealUsed = false;
+  state.player.x = state.width * 0.5;
+  state.player.y = state.height * 0.58;
+  state.fireTimer = 0.12;
+  state.roomInfo = getRoomInfo(roomNumber);
+  spawnRoom(state.roomInfo);
+  showBanner(`${state.roomInfo.title}`);
+  if (state.stats.dataBurn > 0) {
+    setTimeout(() => {
+      if (state && state.phase === "combat") {
+        explode(state.width * 0.5, state.height * 0.52, 120, state.stats.dataBurnDamage + state.stats.dataPower * 16, "data");
+      }
+    }, 350);
+  }
 }
 
-function normalize(x, y) {
-  const len = Math.hypot(x, y);
-  if (!len) return { x: 0, y: 0 };
-  return { x: x / len, y: y / len };
+function getRoomInfo(room) {
+  if (room === 15) {
+    return { room, type: "final", title: "ROOM 15 · 최종 보스", rewardType: "final" };
+  }
+  if (room === 5 || room === 10) {
+    return { room, type: "midboss", title: `ROOM ${room} · 중간보스`, rewardType: "midboss" };
+  }
+  if ([4, 8, 12, 14].includes(room)) {
+    return { room, type: "elite", title: `ROOM ${room} · 엘리트`, rewardType: "elite" };
+  }
+  return { room, type: "normal", title: `ROOM ${room}`, rewardType: "normal" };
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function spawnRoom(info) {
+  const room = info.room;
+  if (info.type === "final") {
+    spawnEnemy("finalBoss", state.width * 0.5, 90, room);
+    queueSpawns(26, (i) => (i % 5 === 0 ? "brute" : i % 2 === 0 ? "runner" : "normal"));
+    releaseSpawns(7);
+    return;
+  }
+  if (info.type === "midboss") {
+    spawnEnemy("midboss", state.width * 0.5, 85, room);
+    queueSpawns(12 + Math.floor(room * 0.8), (i) => (i % 4 === 0 ? "brute" : i % 2 ? "runner" : "normal"));
+    releaseSpawns(5);
+    return;
+  }
+  const count = Math.floor(11 + room * 2.2 + (info.type === "elite" ? 6 : 0));
+  queueSpawns(count, (i) => {
+    const roll = Math.random();
+    if (info.type === "elite" && i < 3) return "brute";
+    if (roll > 0.8) return "brute";
+    if (roll > 0.52) return "runner";
+    return "normal";
+  });
+  releaseSpawns(info.type === "elite" ? 7 : 6);
 }
 
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = Math.floor(seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
+function queueSpawns(count, getType) {
+  for (let i = 0; i < count; i += 1) {
+    state.pendingSpawns.push(getType(i));
+  }
 }
 
-function spawnEnemy() {
+function releaseSpawns(count) {
+  for (let i = 0; i < count && state.pendingSpawns.length > 0; i += 1) {
+    spawnAtEdge(state.pendingSpawns.shift(), state.room);
+  }
+}
+
+function spawnAtEdge(type, room) {
+  const pad = 36;
   const side = Math.floor(Math.random() * 4);
-  const pad = 30;
-  let x = 0;
-  let y = 0;
-  if (side === 0) {
-    x = rand(-pad, state.width + pad);
-    y = -pad;
-  } else if (side === 1) {
-    x = state.width + pad;
-    y = rand(-pad, state.height + pad);
-  } else if (side === 2) {
-    x = rand(-pad, state.width + pad);
-    y = state.height + pad;
-  } else {
-    x = -pad;
-    y = rand(-pad, state.height + pad);
-  }
+  let x = pad + Math.random() * (state.width - pad * 2);
+  let y = pad + Math.random() * (state.height - pad * 2);
+  if (side === 0) y = pad;
+  if (side === 1) x = state.width - pad;
+  if (side === 2) y = state.height - pad;
+  if (side === 3) x = pad;
+  spawnEnemy(type, x, y, room);
+}
 
-  const roll = Math.random();
-  const boss = state.wave % 5 === 0 && state.enemies.filter((e) => e.boss).length < 1 && roll > 0.78;
-  const runner = !boss && roll < 0.22;
-  const brute = !boss && roll > 0.78;
-  const scale = 1 + state.wave * 0.13;
+function spawnEnemy(type, x, y, room) {
+  const scale = 1 + room * 0.09;
+  const base = {
+    normal: { hp: 44, speed: 70, r: 13, damage: 8, color: "#ff6b68" },
+    runner: { hp: 32, speed: 114, r: 10, damage: 6, color: "#ff9f45" },
+    brute: { hp: 90, speed: 50, r: 18, damage: 12, color: "#b998ff" },
+    midboss: { hp: 500 + room * 38, speed: 46, r: 30, damage: 16, color: "#ffd166", boss: true },
+    finalBoss: { hp: 1140, speed: 40, r: 38, damage: 22, color: "#fff7e6", boss: true, final: true }
+  }[type];
   state.enemies.push({
+    id: cryptoRandom(),
+    type,
     x,
     y,
-    r: boss ? 34 : brute ? 23 : runner ? 13 : 17,
-    hp: boss ? 180 * scale : brute ? 55 * scale : runner ? 18 * scale : 30 * scale,
-    maxHp: boss ? 180 * scale : brute ? 55 * scale : runner ? 18 * scale : 30 * scale,
-    speed: boss ? 45 : brute ? 54 : runner ? 105 : 72,
-    damage: boss ? 14 : brute ? 8 : runner ? 3 : 5,
-    hitTimer: 0,
+    r: base.r,
+    hp: base.hp * scale,
+    maxHp: base.hp * scale,
+    speed: base.speed,
+    damage: base.damage,
+    color: base.color,
+    boss: !!base.boss,
+    final: !!base.final,
     slow: 0,
-    boss,
-    runner,
-    brute
+    shock: 0,
+    mark: 0,
+    hitFlash: 0,
+    contactTimer: 0,
+    specialTimer: base.boss ? 2.8 : 0
   });
 }
 
-function findNearestEnemy(origin, maxRange = Infinity) {
-  let best = null;
-  let bestDistance = maxRange;
-  for (const enemy of state.enemies) {
-    const d = dist(origin, enemy);
-    if (d < bestDistance) {
-      best = enemy;
-      bestDistance = d;
+function gameLoop(now) {
+  const dt = Math.min(0.033, (now - lastFrame) / 1000 || 0);
+  lastFrame = now;
+  if (state && state.phase === "combat") updateCombat(dt);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+function updateCombat(dt) {
+  state.time += dt;
+  updateSpawns(dt);
+  state.player.invuln = Math.max(0, state.player.invuln - dt);
+  state.hasteTimer = Math.max(0, state.hasteTimer - dt);
+  state.messageTimer = Math.max(0, state.messageTimer - dt);
+  updatePlayer(dt);
+  updateEnemies(dt);
+  updateBullets(dt);
+  updateHazards(dt);
+  updateParticles(dt);
+  updateTexts(dt);
+  if (state.enemies.length === 0 && state.pendingSpawns.length === 0) completeRoom();
+  updateUi();
+}
+
+function updateSpawns(dt) {
+  if (state.pendingSpawns.length === 0) return;
+  state.spawnTimer -= dt;
+  const pressureLimit = state.roomInfo?.type === "final" ? 16 : state.roomInfo?.type === "midboss" ? 12 : 10;
+  if (state.spawnTimer <= 0 && state.enemies.length < pressureLimit) {
+    state.spawnTimer = state.roomInfo?.type === "elite" ? 0.72 : 0.62;
+    releaseSpawns(state.roomInfo?.type === "normal" ? 2 : 1);
+  }
+}
+
+function updatePlayer(dt) {
+  const player = state.player;
+  const target = pickTarget();
+  let moveX = 0;
+  let moveY = 0;
+  if (target) {
+    const dx = player.x - target.x;
+    const dy = player.y - target.y;
+    const dist = Math.max(1, Math.hypot(dx, dy));
+    const keep = state.stats.preferredRange;
+    const away = dist < keep ? 1 : -0.45;
+    const orbit = state.stats.infiniteCircuit ? 0.95 : 0.55;
+    moveX += (dx / dist) * away + (-dy / dist) * orbit;
+    moveY += (dy / dist) * away + (dx / dist) * orbit;
+  } else {
+    moveX = state.width * 0.5 - player.x;
+    moveY = state.height * 0.55 - player.y;
+  }
+  const edge = 58;
+  if (player.x < edge) moveX += 1.8;
+  if (player.x > state.width - edge) moveX -= 1.8;
+  if (player.y < edge) moveY += 1.8;
+  if (player.y > state.height - edge) moveY -= 1.8;
+  const len = Math.hypot(moveX, moveY) || 1;
+  player.vx = moveX / len;
+  player.vy = moveY / len;
+  player.x = clamp(player.x + player.vx * player.speed * dt, 24, state.width - 24);
+  player.y = clamp(player.y + player.vy * player.speed * dt, 34, state.height - 24);
+
+  if (state.stats.trail > 0 || state.stats.infiniteCircuit) {
+    state.stats.trailTimer -= dt;
+    const interval = state.stats.infiniteCircuit ? 0.075 : 0.12;
+    if (state.stats.trailTimer <= 0) {
+      state.stats.trailTimer = interval;
+      addHazard("trail", player.x, player.y, 34 * state.stats.fieldScale, 1.15, state.stats.trailDamage + state.stats.trail * 4);
     }
+  }
+
+  if (state.stats.autoDash > 0) {
+    state.stats.dashCooldown -= dt;
+    if (state.stats.dashCooldown <= 0) {
+      state.stats.dashCooldown = state.stats.dashInterval;
+      dashPlayer();
+    }
+  }
+
+  if (state.stats.shockwave > 0) {
+    state.stats.shockwaveTimer -= dt;
+    const nearby = state.enemies.filter((enemy) => dist(enemy, player) < 104).length;
+    if (state.stats.shockwaveTimer <= 0 && nearby >= 2) {
+      state.stats.shockwaveTimer = state.stats.shockwaveCooldown;
+      explode(player.x, player.y, 92 + state.stats.shockwave * 16, 28 + state.stats.shockwave * 12, "shockwave", true);
+      addText(player.x, player.y - 30, "충격 파동", "#58d7ff");
+    }
+  }
+
+  if (state.stats.frostAura > 0) {
+    const radius = (state.stats.frostRadius + state.stats.frostAura * 12) * state.stats.fieldScale;
+    for (const enemy of state.enemies) {
+      if (dist(enemy, player) < radius) {
+        enemy.slow = Math.max(enemy.slow, 0.42);
+        damageEnemy(enemy, (6 + state.stats.frostAura * 3) * dt, { type: "frost", status: "chill" });
+      }
+    }
+  }
+
+  if (state.stats.emergencyHeal > 0 && !player.roomHealUsed && player.hp < player.maxHp * 0.34) {
+    player.roomHealUsed = true;
+    healPlayer(44 + state.stats.emergencyHeal * 18);
+    addText(player.x, player.y - 34, "긴급 회복", "#7ee08a");
+  }
+
+  fireAuto(dt);
+}
+
+function dashPlayer() {
+  const player = state.player;
+  const sx = player.x;
+  const sy = player.y;
+  const distance = 112 + state.stats.autoDash * 14;
+  player.x = clamp(player.x + player.vx * distance, 28, state.width - 28);
+  player.y = clamp(player.y + player.vy * distance, 34, state.height - 28);
+  damageLine(sx, sy, player.x, player.y, 38, state.stats.dashDamage + state.stats.autoDash * 6);
+  addParticle((sx + player.x) / 2, (sy + player.y) / 2, "dash", "#ffd166", 0.45, distance);
+  if (state.stats.dashShield > 0) addShield(state.stats.dashShield);
+  if (state.stats.dashMine > 0) {
+    addHazard("mine", sx, sy, 44 * state.stats.fieldScale, 2.2, 44 + state.stats.dashMine * 18);
+  }
+}
+
+function fireAuto(dt) {
+  state.fireTimer -= dt;
+  if (state.fireTimer > 0) return;
+  const haste = state.hasteTimer > 0 ? 1 - Math.min(0.45, state.stats.markHaste) : 1;
+  state.fireTimer = state.stats.fireDelay * haste;
+  const target = pickTarget();
+  if (!target) return;
+
+  state.shotCount += 1;
+  const baseAngle = Math.atan2(target.y - state.player.y, target.x - state.player.x);
+  let count = state.stats.projectiles;
+  if (state.stats.tripleShot > 0 && state.shotCount % Math.max(2, 5 - state.stats.tripleShot) === 0) count += 2;
+  if (state.stats.barrage && state.shotCount % 5 === 0) count += 2;
+  const spread = count === 1 ? 0 : Math.min(0.55, 0.14 * (count - 1));
+  for (let i = 0; i < count; i += 1) {
+    const t = count === 1 ? 0 : i / (count - 1) - 0.5;
+    spawnBullet(baseAngle + t * spread);
+  }
+}
+
+function spawnBullet(angle) {
+  const speed = 620;
+  state.bullets.push({
+    x: state.player.x + Math.cos(angle) * 18,
+    y: state.player.y + Math.sin(angle) * 18,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r: 4,
+    life: 1.45,
+    damage: state.stats.damage,
+    pierce: state.stats.pierce,
+    chill: Math.random() < state.stats.chillChance,
+    shock: Math.random() < state.stats.shockChance,
+    mark: state.stats.markEnabled
+  });
+}
+
+function updateEnemies(dt) {
+  const player = state.player;
+  for (const enemy of [...state.enemies]) {
+    enemy.hitFlash = Math.max(0, enemy.hitFlash - dt * 5);
+    enemy.slow = Math.max(0, enemy.slow - dt);
+    enemy.shock = Math.max(0, enemy.shock - dt);
+    enemy.contactTimer = Math.max(0, enemy.contactTimer - dt);
+    enemy.specialTimer = Math.max(0, enemy.specialTimer - dt);
+    if (enemy.boss && enemy.specialTimer <= 0) {
+      enemy.specialTimer = enemy.final ? 2.45 : 3.15;
+      bossPulse(enemy);
+    }
+    const dx = player.x - enemy.x;
+    const dy = player.y - enemy.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    let speed = enemy.speed * (enemy.slow > 0 ? 0.52 : 1);
+    if (enemy.shock > 0) speed *= 0.82;
+    enemy.x += (dx / d) * speed * dt;
+    enemy.y += (dy / d) * speed * dt;
+    if (d < enemy.r + player.r + 2 && enemy.contactTimer <= 0) {
+      enemy.contactTimer = 0.78;
+      hurtPlayer(enemy.damage);
+    }
+  }
+  if (state.stats.gravity > 0) updateGravity(dt);
+}
+
+function bossPulse(enemy) {
+  const radius = enemy.final ? 128 : 96;
+  explode(enemy.x, enemy.y, radius, enemy.final ? 42 : 30, "boss", true);
+  addText(enemy.x, enemy.y - enemy.r - 18, enemy.final ? "최종 보스 패턴" : "중간보스 패턴", "#ffd166");
+  if (enemy.final) {
+    for (let i = 0; i < 3; i += 1) spawnAtEdge(i % 2 ? "runner" : "normal", state.room);
+  }
+}
+
+function updateGravity(dt) {
+  state.stats.gravityTimer -= dt;
+  if (state.stats.gravityTimer > 0) return;
+  state.stats.gravityTimer = state.stats.singularity ? 1.45 : 1.9;
+  const anchor = strongestHazard() || state.player;
+  for (const enemy of state.enemies) {
+    const dx = anchor.x - enemy.x;
+    const dy = anchor.y - enemy.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    if (d < 260) {
+      enemy.x += (dx / d) * 30 * state.stats.gravity;
+      enemy.y += (dy / d) * 30 * state.stats.gravity;
+    }
+  }
+  addParticle(anchor.x, anchor.y, "ring", "#b998ff", 0.55, 140);
+  if (state.stats.singularity) {
+    explode(anchor.x, anchor.y, 92 * state.stats.fieldScale, 46, "singularity");
+  }
+}
+
+function strongestHazard() {
+  let best = null;
+  for (const hazard of state.hazards) {
+    if (!best || hazard.r > best.r) best = hazard;
   }
   return best;
 }
 
-function shootFrom(origin, target, source = "player") {
-  if (!target) return;
-  const aim = normalize(target.x - origin.x, target.y - origin.y);
-  const count = source === "player" ? state.stats.projectiles : 1;
-  const spread = count > 1 ? 0.18 : 0;
-  for (let i = 0; i < count; i += 1) {
-    const offset = (i - (count - 1) / 2) * spread;
-    const angle = Math.atan2(aim.y, aim.x) + offset;
-    state.bullets.push({
-      x: origin.x,
-      y: origin.y,
-      vx: Math.cos(angle) * (source === "player" ? 520 : 430),
-      vy: Math.sin(angle) * (source === "player" ? 520 : 430),
-      r: source === "player" ? 5 : 6,
-      damage: source === "player" ? state.stats.damage : 9 + state.wave * 1.5,
-      life: 1.25,
-      pierce: source === "player" ? state.stats.pierce : 0,
-      source
-    });
-  }
-}
-
-function getMoveVector() {
-  let x = 0;
-  let y = 0;
-  let manual = false;
-  if (keys.has("ArrowLeft") || keys.has("a")) x -= 1;
-  if (keys.has("ArrowRight") || keys.has("d")) x += 1;
-  if (keys.has("ArrowUp") || keys.has("w")) y -= 1;
-  if (keys.has("ArrowDown") || keys.has("s")) y += 1;
-  if (x || y) manual = true;
-  if (pointer.active) {
-    x += pointer.x;
-    y += pointer.y;
-    manual = true;
-  }
-  if (!manual) return getAutoMoveVector();
-  return normalize(x, y);
-}
-
-function getAutoMoveVector() {
-  const p = state.player;
-  const c = state.core;
-  const nearest = findNearestEnemy(p, 240);
-  const fromCore = normalize(p.x - c.x, p.y - c.y);
-  const toCore = normalize(c.x - p.x, c.y - p.y);
-  const orbit = { x: -fromCore.y || 1, y: fromCore.x || 0 };
-  const coreDistance = dist(p, c);
-  let x = orbit.x * 0.48;
-  let y = orbit.y * 0.48;
-
-  if (nearest) {
-    const away = normalize(p.x - nearest.x, p.y - nearest.y);
-    x += away.x * 0.95;
-    y += away.y * 0.95;
-  }
-
-  if (coreDistance > 180) {
-    x += toCore.x * 1.25;
-    y += toCore.y * 1.25;
-  } else if (coreDistance < 74) {
-    x += fromCore.x * 0.8;
-    y += fromCore.y * 0.8;
-  }
-
-  if (state.stats.dash > 0) {
-    x += orbit.x * 0.25;
-    y += orbit.y * 0.25;
-  }
-  if (state.stats.trail > 0) {
-    x += orbit.x * 0.2;
-    y += orbit.y * 0.2;
-  }
-  if (state.stats.repel > 0 && nearest) {
-    const toward = normalize(nearest.x - p.x, nearest.y - p.y);
-    x += toward.x * 0.18;
-    y += toward.y * 0.18;
-  }
-
-  return normalize(x, y);
-}
-
-function update(dt) {
-  if (!state.running || state.paused || state.ended) return;
-
-  state.time += dt;
-  state.waveClock += dt;
-  state.wave = Math.max(1, Math.floor(state.time / 28) + 1);
-  if (state.waveClock >= 28) {
-    state.waveClock = 0;
-    state.messages.push({ text: `WAVE ${state.wave}`, time: 1.7 });
-    state.core.hp = Math.min(state.core.maxHp, state.core.hp + 10);
-  }
-
-  const move = getMoveVector();
-  state.player.x = clamp(state.player.x + move.x * state.player.speed * dt, state.player.r, state.width - state.player.r);
-  state.player.y = clamp(state.player.y + move.y * state.player.speed * dt, state.player.r, state.height - state.player.r);
-  state.player.invuln = Math.max(0, state.player.invuln - dt);
-  updateMovementTech(dt, move);
-
-  state.spawnTimer -= dt;
-  const spawnDelay = Math.max(0.24, 1.48 - state.wave * 0.075);
-  if (state.spawnTimer <= 0) {
-    const amount = state.wave > 4 && Math.random() > 0.72 ? 2 : 1;
-    for (let i = 0; i < amount; i += 1) spawnEnemy();
-    state.spawnTimer = spawnDelay;
-  }
-
-  state.fireTimer -= dt;
-  if (state.fireTimer <= 0) {
-    shootFrom(state.player, findNearestEnemy(state.player, 520), "player");
-    state.fireTimer = state.stats.fireDelay;
-  }
-
-  state.turretTimer -= dt;
-  if (state.stats.turrets && state.turretTimer <= 0) {
-    for (let i = 0; i < state.stats.turrets; i += 1) {
-      const angle = (Math.PI * 2 * i) / state.stats.turrets + state.time * 0.7;
-      const origin = {
-        x: state.core.x + Math.cos(angle) * 36,
-        y: state.core.y + Math.sin(angle) * 36
-      };
-      shootFrom(origin, findNearestEnemy(origin, 460), "core");
-    }
-    state.turretTimer = Math.max(0.28, 0.85 - state.stats.turrets * 0.06);
-  }
-
-  updateEnemies(dt);
-  updateBullets(dt);
-  updateTrails(dt);
-  updateGems(dt);
-  updateOrbs(dt);
-  updateParticles(dt);
-  state.messages.forEach((message) => { message.time -= dt; });
-  state.messages = state.messages.filter((message) => message.time > 0);
-
-  if (state.core.hp <= 0 || state.player.hp <= 0) {
-    endGame(false);
-  } else if (state.time >= 180) {
-    endGame(true);
-  }
-  updateUi();
-}
-
-function updateEnemies(dt) {
-  for (const enemy of state.enemies) {
-    enemy.hitTimer = Math.max(0, enemy.hitTimer - dt);
-    enemy.slow = Math.max(0, enemy.slow - dt);
-    const playerDistance = dist(enemy, state.player);
-    const coreDistance = dist(enemy, state.core);
-    const target = playerDistance < 86 && playerDistance + 18 < coreDistance ? state.player : state.core;
-    const dir = normalize(target.x - enemy.x, target.y - enemy.y);
-    const speedFactor = enemy.slow > 0 ? 0.5 : 1;
-    enemy.x += dir.x * enemy.speed * speedFactor * dt;
-    enemy.y += dir.y * enemy.speed * speedFactor * dt;
-
-    if (state.stats.frost > 0 && dist(enemy, state.player) < 82 + state.stats.frost * 18) {
-      enemy.slow = 0.4;
-      enemy.hp -= state.stats.frost * 5 * dt;
-      if (Math.random() < 0.06) {
-        state.particles.push({ x: enemy.x, y: enemy.y, r: 4, life: 0.32, color: "#8ce8ff" });
-      }
-    }
-
-    if (dist(enemy, target) < enemy.r + target.r) {
-      enemy.hitTimer -= dt;
-      if (enemy.hitTimer <= 0) {
-        target.hp -= enemy.damage;
-        enemy.hitTimer = 0.55;
-        state.particles.push({ x: target.x, y: target.y, r: 16, life: 0.22, color: target === state.core ? "#ffd166" : "#ff6b6b" });
-      }
-    }
-  }
-  state.enemies = state.enemies.filter((enemy) => {
-    if (enemy.hp > 0) return true;
-    killEnemy(enemy);
-    return false;
-  });
-}
-
-function updateMovementTech(dt, move) {
-  const moving = Math.abs(move.x) + Math.abs(move.y) > 0.1;
-  state.dashCooldown = Math.max(0, state.dashCooldown - dt);
-  state.trailTimer = Math.max(0, state.trailTimer - dt);
-  state.repelTimer = Math.max(0, state.repelTimer - dt);
-
-  if (state.stats.trail > 0 && moving && state.trailTimer <= 0) {
-    state.trails.push({
-      x: state.player.x,
-      y: state.player.y,
-      r: 34 + state.stats.trail * 7,
-      damage: 10 + state.stats.trail * 4,
-      life: 1,
-      maxLife: 1
-    });
-    state.trailTimer = Math.max(0.08, 0.16 - state.stats.trail * 0.015);
-  }
-
-  if (state.stats.dash > 0 && moving && state.dashCooldown <= 0) {
-    const distance = 74 + state.stats.dash * 24;
-    state.player.x = clamp(state.player.x + move.x * distance, state.player.r, state.width - state.player.r);
-    state.player.y = clamp(state.player.y + move.y * distance, state.player.r, state.height - state.player.r);
-    state.dashCooldown = Math.max(1.35, 3.2 - state.stats.dash * 0.36);
-    state.particles.push({ x: state.player.x, y: state.player.y, r: 28 + state.stats.dash * 5, life: 0.35, color: "#ffd166" });
-    for (const enemy of state.enemies) {
-      if (dist(enemy, state.player) > 72 + state.stats.dash * 12) continue;
-      const push = normalize(enemy.x - state.player.x, enemy.y - state.player.y);
-      enemy.x += push.x * (34 + state.stats.dash * 11);
-      enemy.y += push.y * (34 + state.stats.dash * 11);
-      enemy.hp -= 18 + state.stats.dash * 7;
-      enemy.slow = 0.32;
-    }
-  }
-
-  if (state.stats.repel > 0 && moving && state.repelTimer <= 0) {
-    const radius = 96 + state.stats.repel * 18;
-    for (const enemy of state.enemies) {
-      if (dist(enemy, state.player) > radius) continue;
-      const push = normalize(enemy.x - state.player.x, enemy.y - state.player.y);
-      enemy.x += push.x * (46 + state.stats.repel * 10);
-      enemy.y += push.y * (46 + state.stats.repel * 10);
-      enemy.hp -= 15 + state.stats.repel * 5;
-      enemy.slow = 0.38;
-    }
-    state.particles.push({ x: state.player.x, y: state.player.y, r: radius, life: 0.28, color: "#53d7ff" });
-    state.repelTimer = Math.max(1.25, 2.9 - state.stats.repel * 0.28);
-  }
-}
-
-function updateTrails(dt) {
-  for (const trail of state.trails) {
-    trail.life -= dt;
-    for (const enemy of state.enemies) {
-      if (dist(enemy, trail) > enemy.r + trail.r) continue;
-      enemy.hp -= trail.damage * dt;
-      enemy.slow = 0.2;
-    }
-  }
-  state.trails = state.trails.filter((trail) => trail.life > 0);
-}
-
 function updateBullets(dt) {
-  for (const bullet of state.bullets) {
+  for (const bullet of [...state.bullets]) {
+    bullet.life -= dt;
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
-    bullet.life -= dt;
-    for (const enemy of state.enemies) {
-      if (enemy.hp <= 0 || dist(bullet, enemy) > bullet.r + enemy.r) continue;
-      enemy.hp -= bullet.damage;
-      enemy.slow = bullet.source === "core" ? 0.18 : enemy.slow;
-      bullet.pierce -= 1;
-      bullet.life = bullet.pierce >= 0 ? bullet.life : -1;
-      state.particles.push({ x: enemy.x, y: enemy.y, r: 10, life: 0.18, color: bullet.source === "core" ? "#ffd166" : "#53d7ff" });
-      break;
-    }
-  }
-  state.bullets = state.bullets.filter((bullet) => bullet.life > 0 && bullet.x > -40 && bullet.x < state.width + 40 && bullet.y > -40 && bullet.y < state.height + 40);
-}
-
-function updateGems(dt) {
-  for (const gem of state.gems) {
-    const d = dist(gem, state.player);
-    if (d < state.stats.magnet) {
-      const dir = normalize(state.player.x - gem.x, state.player.y - gem.y);
-      gem.x += dir.x * (280 + state.stats.magnet) * dt;
-      gem.y += dir.y * (280 + state.stats.magnet) * dt;
-    }
-    if (d < state.player.r + 12) {
-      gem.collected = true;
-      gainXp(gem.value);
-      state.particles.push({ x: gem.x, y: gem.y, r: 12, life: 0.28, color: "#a980ff" });
-    }
-  }
-  state.gems = state.gems.filter((gem) => !gem.collected);
-}
-
-function updateOrbs(dt) {
-  if (!state.stats.orbs) return;
-  for (let i = 0; i < state.stats.orbs; i += 1) {
-    const angle = state.time * 2.5 + (Math.PI * 2 * i) / state.stats.orbs;
-    const orb = {
-      x: state.player.x + Math.cos(angle) * 56,
-      y: state.player.y + Math.sin(angle) * 56,
-      r: 12
-    };
-    for (const enemy of state.enemies) {
-      if (dist(orb, enemy) < orb.r + enemy.r) {
-        enemy.hp -= (28 + state.stats.damage * 0.6) * dt;
-        enemy.slow = 0.16;
+    for (const enemy of [...state.enemies]) {
+      if (dist(bullet, enemy) <= bullet.r + enemy.r) {
+        const extra = enemy.mark > 0 ? 1 + enemy.mark * state.stats.markBonus + state.stats.markDamage : 1;
+        damageEnemy(enemy, bullet.damage * extra, {
+          type: "bullet",
+          chill: bullet.chill,
+          shock: bullet.shock,
+          mark: bullet.mark
+        });
+        bullet.pierce -= 1;
+        if (bullet.pierce < 0) {
+          bullet.life = 0;
+          break;
+        }
       }
     }
+    if (bullet.life <= 0 || bullet.x < -20 || bullet.x > state.width + 20 || bullet.y < -20 || bullet.y > state.height + 20) {
+      removeItem(state.bullets, bullet);
+    }
+  }
+}
+
+function updateHazards(dt) {
+  for (const hazard of [...state.hazards]) {
+    hazard.life -= dt;
+    if (hazard.type === "mine") {
+      const trigger = state.enemies.find((enemy) => dist(enemy, hazard) < enemy.r + hazard.r * 0.65);
+      if (trigger) {
+        explode(hazard.x, hazard.y, hazard.r * 1.35, hazard.damage, "mine");
+        hazard.life = 0;
+      }
+    } else {
+      for (const enemy of [...state.enemies]) {
+        if (dist(enemy, hazard) < enemy.r + hazard.r) {
+          damageEnemy(enemy, hazard.damage * dt, { type: "hazard" });
+          if (state.stats.executeField > 0 && enemy.hp < enemy.maxHp * (0.12 + state.stats.executeField * 0.05)) {
+            damageEnemy(enemy, enemy.hp + 1, { type: "execute" });
+          }
+        }
+      }
+    }
+    if (hazard.life <= 0) removeItem(state.hazards, hazard);
   }
 }
 
 function updateParticles(dt) {
-  state.particles.forEach((p) => {
-    p.life -= dt;
-    p.r += 28 * dt;
-  });
-  state.particles = state.particles.filter((p) => p.life > 0);
+  for (const particle of [...state.particles]) {
+    particle.life -= dt;
+    particle.x += (particle.vx || 0) * dt;
+    particle.y += (particle.vy || 0) * dt;
+    if (particle.life <= 0) removeItem(state.particles, particle);
+  }
 }
 
-function killEnemy(enemy) {
+function updateTexts(dt) {
+  for (const text of [...state.texts]) {
+    text.life -= dt;
+    text.y -= 22 * dt;
+    if (text.life <= 0) removeItem(state.texts, text);
+  }
+}
+
+function damageEnemy(enemy, amount, meta = {}) {
+  if (!state.enemies.includes(enemy)) return;
+  if (meta.chill || meta.status === "chill") {
+    enemy.slow = Math.max(enemy.slow, 1.3);
+    if (state.stats.stormConductor) enemy.shock = Math.max(enemy.shock, 1.0);
+  }
+  if (meta.shock || meta.status === "shock") {
+    enemy.shock = Math.max(enemy.shock, 1.4);
+    if (state.stats.stormConductor) enemy.slow = Math.max(enemy.slow, 1.0);
+    if (state.stats.shockSpread > 0) shockSpread(enemy, amount * 0.24);
+  }
+  if (meta.mark) enemy.mark = Math.min(6, enemy.mark + 1);
+  enemy.hp -= amount;
+  enemy.hitFlash = 1;
+  if (enemy.hp <= 0) killEnemy(enemy, meta);
+}
+
+function killEnemy(enemy, meta = {}) {
+  if (!state.enemies.includes(enemy)) return;
+  removeItem(state.enemies, enemy);
   state.kills += 1;
-  const value = enemy.boss ? 12 : enemy.brute ? 5 : enemy.runner ? 2 : 3;
-  for (let i = 0; i < (enemy.boss ? 7 : enemy.brute ? 3 : 1); i += 1) {
-    state.gems.push({
-      x: enemy.x + rand(-12, 12),
-      y: enemy.y + rand(-12, 12),
-      r: 5,
-      value
-    });
+  addParticle(enemy.x, enemy.y, "burst", enemy.color, 0.55, enemy.r * 2.4);
+  if (enemy.mark > 0 && state.stats.markHaste > 0) state.hasteTimer = 2.5;
+  if (enemy.slow > 0 && state.stats.frostBurst > 0) {
+    explode(enemy.x, enemy.y, 72 * state.stats.fieldScale, 28 + state.stats.frostBurst * 12, "frost");
   }
-  state.particles.push({ x: enemy.x, y: enemy.y, r: enemy.r, life: 0.35, color: enemy.boss ? "#ffd166" : "#ff6b6b" });
-}
-
-function gainXp(value) {
-  state.xp += value;
-  while (state.xp >= state.nextXp) {
-    state.xp -= state.nextXp;
-    state.level += 1;
-    state.nextXp = Math.floor(state.nextXp * 1.23 + 5);
-    openUpgrade();
+  if (enemy.shock > 0 && state.stats.lightningBurst > 0) {
+    explode(enemy.x, enemy.y, 82 * state.stats.fieldScale, 34 + state.stats.lightningBurst * 14, "lightning");
+  }
+  if (meta.type === "execute") {
+    explode(enemy.x, enemy.y, 58 * state.stats.fieldScale, 22 + state.stats.executeField * 10, "execute");
   }
 }
 
-function openUpgrade() {
-  state.paused = true;
-  const choices = sampleUpgrades(3);
-  ui.upgradeChoices.innerHTML = choices.map((upgrade, index) => `
-    <button class="upgrade-button" type="button" data-index="${index}">
-      <i>${upgrade.icon}</i>
-      <b>${upgrade.name}</b>
-      <span>${upgrade.text}</span>
-    </button>
-  `).join("");
-  ui.upgradeChoices.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      choices[Number(button.dataset.index)].apply(state);
-      state.paused = false;
-      ui.upgradeOverlay.classList.add("hidden");
-      renderPerks();
-      updateUi();
-    });
-  });
-  ui.upgradeOverlay.classList.remove("hidden");
-}
-
-function sampleUpgrades(count) {
-  const pool = upgradePool.filter((upgrade) => {
-    if (upgrade.id === "multi" && state.stats.projectiles >= 5) return false;
-    if (upgrade.id === "orb" && state.stats.orbs >= 5) return false;
-    if (upgrade.id === "turret" && state.stats.turrets >= 4) return false;
-    return true;
-  });
-  const movementIds = new Set(["speed", "dash", "trail", "repel", "magnet"]);
-  const attackIds = new Set(["rapid", "damage", "multi", "pierce", "orb", "turret", "frost"]);
-  const out = [];
-  const movementPool = pool.filter((upgrade) => movementIds.has(upgrade.id));
-  const attackPool = pool.filter((upgrade) => attackIds.has(upgrade.id));
-  if (movementPool.length) out.push(movementPool[Math.floor(Math.random() * movementPool.length)]);
-  if (attackPool.length) out.push(attackPool[Math.floor(Math.random() * attackPool.length)]);
-  while (pool.length && out.length < count) {
-    const [next] = pool.splice(Math.floor(Math.random() * pool.length), 1);
-    if (!out.some((upgrade) => upgrade.id === next.id)) out.push(next);
+function shockSpread(source, amount) {
+  for (const enemy of state.enemies) {
+    if (enemy !== source && dist(source, enemy) < 92) {
+      enemy.shock = Math.max(enemy.shock, 0.8);
+      enemy.hp -= amount;
+      enemy.hitFlash = 1;
+      if (enemy.hp <= 0) killEnemy(enemy, { type: "shock" });
+    }
   }
-  return out;
 }
 
-function endGame(win) {
-  state.ended = true;
-  state.running = false;
-  state.paused = true;
-  ui.gameOverTitle.textContent = win ? "코어 방어 성공" : "코어 붕괴";
-  ui.gameOverText.textContent = `${formatTime(state.time)} · ${state.kills} KOs · Wave ${state.wave}`;
-  ui.gameOverOverlay.classList.remove("hidden");
+function damageLine(x1, y1, x2, y2, radius, damage) {
+  for (const enemy of [...state.enemies]) {
+    if (distanceToSegment(enemy.x, enemy.y, x1, y1, x2, y2) < radius + enemy.r) {
+      damageEnemy(enemy, damage, { type: "dash" });
+      const dx = enemy.x - x1;
+      const dy = enemy.y - y1;
+      const len = Math.hypot(dx, dy) || 1;
+      enemy.x += (dx / len) * 18;
+      enemy.y += (dy / len) * 18;
+    }
+  }
 }
 
-function updateUi() {
-  if (!state) return;
-  const corePct = clamp(state.core.hp / state.core.maxHp, 0, 1);
-  const heroPct = clamp(state.player.hp / state.player.maxHp, 0, 1);
-  const xpPct = clamp(state.xp / state.nextXp, 0, 1);
-  ui.coreBar.style.width = `${corePct * 100}%`;
-  ui.heroBar.style.width = `${heroPct * 100}%`;
-  ui.xpBar.style.width = `${xpPct * 100}%`;
-  ui.coreText.textContent = `${Math.ceil(Math.max(0, state.core.hp))}/${state.core.maxHp}`;
-  ui.heroText.textContent = `${Math.ceil(Math.max(0, state.player.hp))}/${state.player.maxHp}`;
-  ui.waveText.textContent = state.wave;
-  ui.levelText.textContent = state.level;
-  ui.timerText.textContent = formatTime(state.time);
-  ui.killText.textContent = `${state.kills} KOs`;
-  const build = buildName();
-  ui.buildTitle.textContent = build.title;
-  ui.buildText.textContent = build.text;
+function explode(x, y, radius, damage, type = "blast", knockback = false) {
+  const scaledRadius = radius * state.stats.fieldScale;
+  addParticle(x, y, "ring", colorForType(type), 0.48, scaledRadius);
+  for (const enemy of [...state.enemies]) {
+    const d = dist(enemy, { x, y });
+    if (d < scaledRadius + enemy.r) {
+      damageEnemy(enemy, damage * (1 - Math.min(0.65, d / (scaledRadius * 1.6))), { type, shock: type === "lightning" });
+      if (knockback) {
+        const dx = enemy.x - x;
+        const dy = enemy.y - y;
+        const len = Math.hypot(dx, dy) || 1;
+        enemy.x += (dx / len) * 24;
+        enemy.y += (dy / len) * 24;
+      }
+    }
+  }
+  if (type === "boss" && dist(state.player, { x, y }) < scaledRadius + state.player.r) {
+    hurtPlayer(damage * 0.38);
+  }
 }
 
-function buildName() {
-  const perks = state.perks;
-  if ((perks.turret || 0) >= 2 && (perks.frost || 0) >= 1) return { title: "빙결 포탑 수비대", text: "코어 사격과 둔화장으로 길목을 잠근다." };
-  if ((perks.orb || 0) >= 2 && (perks.multi || 0) >= 2) return { title: "근접 탄막 레인저", text: "궤도검과 다중 탄환으로 밀집 웨이브를 정리한다." };
-  if ((perks.dash || 0) >= 1 && (perks.trail || 0) >= 1) return { title: "잔상 돌격자", text: "대시와 피해 장판으로 전장을 가로지른다." };
-  if ((perks.repel || 0) >= 2) return { title: "파동 수호자", text: "움직임 자체가 광역 방어 수단이 된다." };
-  if ((perks.damage || 0) >= 2 && (perks.pierce || 0) >= 1) return { title: "관통 저격수", text: "한 줄로 몰려오는 적을 뚫어낸다." };
-  return { title: "루키 레인저", text: "자동 사격 · 코어 방어 · 웨이브 생존" };
+function addHazard(type, x, y, r, life, damage) {
+  state.hazards.push({ type, x, y, r, life, maxLife: life, damage });
 }
 
-function renderPerks() {
-  const entries = Object.entries(state.perks);
-  if (!entries.length) {
-    ui.perkList.innerHTML = `<div class="perk"><div class="perk-icon">0</div><div><b>강화 없음</b><span>레벨업 후 빌드가 열린다.</span></div></div>`;
+function healPlayer(amount) {
+  const before = state.player.hp;
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + amount);
+  const healed = state.player.hp - before;
+  if (healed > 0 && state.stats.overShield > 0) {
+    explode(state.player.x, state.player.y, 78, healed * (0.55 + state.stats.overShield * 0.25), "heal");
+  }
+}
+
+function addShield(amount) {
+  state.player.shield = Math.min(150, state.player.shield + amount);
+  if (state.stats.overShield > 0) {
+    explode(state.player.x, state.player.y, 72, amount * (0.5 + state.stats.overShield * 0.2), "shield");
+  }
+}
+
+function hurtPlayer(amount) {
+  if (state.player.invuln > 0) return;
+  state.player.invuln = 0.18;
+  let remaining = amount;
+  const shieldHit = Math.min(state.player.shield, remaining);
+  state.player.shield -= shieldHit;
+  remaining -= shieldHit;
+  state.player.hp -= remaining;
+  addParticle(state.player.x, state.player.y, "hit", "#ff6b68", 0.28, 42);
+  if (state.player.hp <= 0) endRun(false);
+}
+
+function completeRoom() {
+  if (state.phase !== "combat") return;
+  if (state.room >= 15) {
+    endRun(true);
     return;
   }
-  ui.perkList.innerHTML = entries.map(([id, count]) => {
-    const [name, text] = perkLabels[id] || [id, "강화됨"];
-    return `<div class="perk"><div class="perk-icon">${count}</div><div><b>${name}</b><span>${text}</span></div></div>`;
-  }).join("");
+  healPlayer(18 + state.room * 2);
+  addShield(8);
+  state.phase = "reward";
+  const queue = state.room === 5 || state.room === 10 ? ["midboss", "rare"] : [state.roomInfo.rewardType];
+  state.rewardQueue = queue;
+  showReward();
 }
 
-function draw() {
+function showReward() {
+  const rewardType = state.rewardQueue[0] || "normal";
+  state.rerolled = false;
+  state.currentChoices = generateChoices(rewardType);
+  ui.rewardOverlay.classList.remove("hidden");
+  ui.rewardLabel.textContent = rewardType === "midboss" ? "MID BOSS CLEAR" : rewardType === "elite" ? "ELITE CLEAR" : "ROOM CLEAR";
+  ui.rewardTitle.textContent = rewardType === "midboss" ? "중간보스 보상" : "증강 선택";
+  ui.rewardText.textContent = rewardType === "midboss" ? "3지선다를 선택한다. 중간보스는 추가 선택권을 준다." : "3개 후보 중 1개를 선택한다.";
+  ui.rerollButton.disabled = false;
+  ui.rerollButton.textContent = `리롤 ${state.stats.rerollQuality > 0 ? "강화" : "1회"}`;
+  renderChoices();
+}
+
+function renderChoices() {
+  ui.choiceGrid.innerHTML = "";
+  for (const choice of state.currentChoices) {
+    const button = document.createElement("button");
+    button.className = `choice-card ${rarityClass[choice.rarity]}`;
+    button.type = "button";
+    button.innerHTML = `
+      <div class="choice-top">
+        <span class="choice-icon">${choice.icon}</span>
+        <span class="rarity">${rarityLabel[choice.rarity]}</span>
+      </div>
+      <h3>${choice.name}</h3>
+      <p>${choice.text}</p>
+      <div class="tag-row">${choice.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
+      <div class="synergy">${choice.reason}</div>
+    `;
+    button.addEventListener("click", () => chooseAugment(choice.id));
+    ui.choiceGrid.appendChild(button);
+  }
+}
+
+function chooseAugment(id) {
+  const augment = augmentById[id];
+  if (!augment) return;
+  state.owned[id] = (state.owned[id] || 0) + 1;
+  if (!state.ownedOrder.includes(id)) state.ownedOrder.unshift(id);
+  augment.apply(state);
+  state.picks += 1;
+  state.rewardQueue.shift();
+  if (state.stats.tacticalDominance > 0) state.stats.tacticalDominance -= 1;
+  addText(state.player.x, state.player.y - 34, augment.name, "#ffd166");
+  updateUi(true);
+  if (state.rewardQueue.length > 0) {
+    showReward();
+    return;
+  }
+  ui.rewardOverlay.classList.add("hidden");
+  startRoom(state.room + 1);
+}
+
+function generateChoices(rewardType) {
+  const picked = [];
+  const pool = augments.filter((augment) => canOffer(augment));
+  const currentTags = topTags();
+  const slots = ["direct", "pivot", "utility"];
+  for (const slot of slots) {
+    const candidate = pickWeighted(pool, picked, currentTags, rewardType, slot);
+    if (candidate) picked.push(candidate);
+  }
+  while (picked.length < 3) {
+    const candidate = pickWeighted(pool, picked, currentTags, rewardType, "wild");
+    if (!candidate) break;
+    picked.push(candidate);
+  }
+  return picked.map((augment) => ({
+    ...augment,
+    reason: synergyReason(augment, currentTags)
+  }));
+}
+
+function canOffer(augment) {
+  return (state.owned[augment.id] || 0) < augment.max;
+}
+
+function pickWeighted(pool, picked, currentTags, rewardType, slot) {
+  const pickedIds = new Set(picked.map((item) => item.id));
+  const candidates = pool.filter((augment) => !pickedIds.has(augment.id));
+  if (candidates.length === 0) return null;
+  const weights = candidates.map((augment) => {
+    let weight = rarityWeight(augment.rarity, rewardType);
+    const tagHit = augment.tags.some((tag) => currentTags.includes(tag));
+    const synergyHit = augment.synergy.some((id) => state.owned[id]);
+    if (slot === "direct" && (tagHit || synergyHit)) weight *= 3.4 + state.stats.synergyBias;
+    if (slot === "pivot" && !tagHit) weight *= 1.8;
+    if (slot === "utility" && (augment.tags.includes("경제") || augment.tags.includes("방어"))) weight *= 2.2;
+    if (state.stats.tacticalDominance > 0 && tagHit) weight *= 2.8;
+    if (augment.rarity === "legendary" && rewardType === "normal") weight *= 0.55;
+    return Math.max(0.1, weight);
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < candidates.length; i += 1) {
+    roll -= weights[i];
+    if (roll <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1];
+}
+
+function rarityWeight(rarity, rewardType) {
+  const table = rarityWeights[rewardType] || rarityWeights.normal;
+  const bonus = state.stats.rarityBonus + (state.stats.rerollQuality * 0.03);
+  if (rarity === "epic") return table[rarity] * (1 + bonus * 2.5);
+  if (rarity === "legendary") return table[rarity] * (1 + bonus * 4.5);
+  return table[rarity];
+}
+
+function topTags() {
+  const counts = {};
+  for (const id of Object.keys(state.owned)) {
+    const augment = augmentById[id];
+    if (!augment) continue;
+    for (const tag of augment.tags) {
+      if (tag === "전설") continue;
+      counts[tag] = (counts[tag] || 0) + state.owned[id];
+    }
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([tag]) => tag);
+}
+
+function synergyReason(augment, currentTags) {
+  const ownedNames = augment.synergy
+    .filter((id) => state.owned[id])
+    .map((id) => augmentById[id]?.name)
+    .filter(Boolean);
+  const tagHits = augment.tags.filter((tag) => currentTags.includes(tag));
+  if (ownedNames.length > 0) return `시너지: ${ownedNames.slice(0, 2).join(", ")} 보유`;
+  if (tagHits.length > 0) return `시너지: 현재 ${tagHits[0]} 빌드와 연결`;
+  if (augment.tags.includes("경제")) return "시너지: 이후 보상 품질을 조정";
+  if (augment.tags.includes("방어")) return "시너지: 자동 전투 안정성 증가";
+  return "시너지: 새 빌드 축을 열 수 있음";
+}
+
+function rerollChoices() {
+  if (state.rerolled) return;
+  state.rerolled = true;
+  const rewardType = state.rewardQueue[0] || "normal";
+  state.currentChoices = generateChoices(state.stats.rerollQuality > 0 ? "rare" : rewardType);
+  ui.rerollButton.disabled = true;
+  ui.rerollButton.textContent = "리롤 사용됨";
+  renderChoices();
+}
+
+function endRun(win) {
+  state.phase = "ended";
+  ui.endOverlay.classList.remove("hidden");
+  ui.endLabel.textContent = win ? "STAGE CLEAR" : "RUN ENDED";
+  ui.endTitle.textContent = win ? "최종 보스 격파" : "사망";
+  ui.endText.textContent = `${formatTime(state.time)} · ${state.kills} KOs · 증강 ${state.picks}회 선택`;
+}
+
+function pickTarget() {
+  if (state.enemies.length === 0) return null;
+  return [...state.enemies].sort((a, b) => {
+    const aScore = (a.mark || 0) * -120 + (a.boss ? -80 : 0) + dist(a, state.player);
+    const bScore = (b.mark || 0) * -120 + (b.boss ? -80 : 0) + dist(b, state.player);
+    return aScore - bScore;
+  })[0];
+}
+
+function updateUi(force = false) {
+  if (!state) return;
+  ui.hpText.textContent = `${Math.max(0, Math.ceil(state.player.hp))}/${state.player.maxHp}`;
+  ui.hpBar.style.width = `${clamp((state.player.hp / state.player.maxHp) * 100, 0, 100)}%`;
+  ui.shieldText.textContent = `${Math.ceil(state.player.shield)}`;
+  ui.shieldBar.style.width = `${clamp((state.player.shield / 150) * 100, 0, 100)}%`;
+  ui.roomText.textContent = `${Math.max(1, state.room)}/15`;
+  ui.pickText.textContent = `${state.picks}`;
+  ui.roomTypeText.textContent = state.roomInfo ? state.roomInfo.type.toUpperCase() : "READY";
+  ui.enemyText.textContent = `${state.enemies.length + state.pendingSpawns.length} LEFT`;
+  ui.timeText.textContent = formatTime(state.time);
+  if (force) renderAugments();
+}
+
+function renderAugments() {
+  const top = topTags();
+  ui.buildSummary.textContent = top.length ? top.join(" / ") : "탄환 / 표식";
+  ui.augmentList.innerHTML = "";
+  if (state.ownedOrder.length === 0) {
+    ui.augmentList.innerHTML = `<div class="augment-pill"><strong>선택지 없음</strong><span>방을 클리어하면 3지선다 증강이 열린다.</span></div>`;
+    return;
+  }
+  for (const id of state.ownedOrder) {
+    const augment = augmentById[id];
+    const item = document.createElement("div");
+    item.className = "augment-pill";
+    item.innerHTML = `<strong>${augment.name} ${state.owned[id] > 1 ? `x${state.owned[id]}` : ""}</strong><span>${augment.tags.join(" / ")}</span>`;
+    ui.augmentList.appendChild(item);
+  }
+}
+
+function showBanner(text) {
+  ui.roomBanner.textContent = text;
+  ui.roomBanner.classList.add("show");
+  clearTimeout(showBanner.timer);
+  showBanner.timer = setTimeout(() => ui.roomBanner.classList.remove("show"), 1150);
+}
+
+function render() {
   if (!state) return;
   ctx.clearRect(0, 0, state.width, state.height);
-  drawGrid();
-  drawCore();
-  drawFrost();
-  drawTrails();
-  drawOrbs();
-  drawGems();
+  drawFloor();
+  drawHazards();
   drawBullets();
   drawEnemies();
   drawPlayer();
   drawParticles();
-  drawMessages();
+  drawTexts();
 }
 
-function drawGrid() {
+function drawFloor() {
   ctx.save();
+  ctx.fillStyle = "#111821";
+  ctx.fillRect(0, 0, state.width, state.height);
   ctx.strokeStyle = "rgba(255,255,255,0.045)";
   ctx.lineWidth = 1;
-  const step = 44;
-  const offset = (state.time * 14) % step;
-  for (let x = -step + offset; x < state.width + step; x += step) {
+  const gap = 44;
+  for (let x = (state.time * 10) % gap; x < state.width; x += gap) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, state.height);
+    ctx.lineTo(x - state.height * 0.28, state.height);
     ctx.stroke();
   }
-  for (let y = -step + offset; y < state.height + step; y += step) {
+  for (let y = 0; y < state.height; y += gap) {
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(state.width, y);
+    ctx.lineTo(state.width, y + state.width * 0.18);
     ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(255,209,102,0.16)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(18, 22, state.width - 36, state.height - 44);
+  ctx.restore();
+}
+
+function drawHazards() {
+  for (const hazard of state.hazards) {
+    const alpha = clamp(hazard.life / hazard.maxLife, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = 0.18 + alpha * 0.3;
+    ctx.fillStyle = hazard.type === "mine" ? "#ffd166" : "#58d7ff";
+    ctx.beginPath();
+    ctx.arc(hazard.x, hazard.y, hazard.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = hazard.type === "mine" ? "#ff9f45" : "#58d7ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(hazard.x, hazard.y, hazard.r * (0.82 + Math.sin(state.time * 8) * 0.05), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawBullets() {
+  ctx.save();
+  for (const bullet of state.bullets) {
+    ctx.fillStyle = bullet.shock ? "#ffd166" : bullet.chill ? "#aeefff" : "#58d7ff";
+    ctx.beginPath();
+    ctx.arc(bullet.x, bullet.y, bullet.r, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }
 
-function drawCore() {
-  const c = state.core;
-  ctx.save();
-  ctx.translate(c.x, c.y);
-  ctx.rotate(state.time * 0.45);
-  ctx.fillStyle = "rgba(255, 209, 102, 0.12)";
-  ctx.beginPath();
-  ctx.arc(0, 0, 72, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255, 209, 102, 0.42)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = "#ffd166";
-  crystal(0, 0, c.r);
-  ctx.restore();
+function drawEnemies() {
+  for (const enemy of state.enemies) {
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+    const hp = clamp(enemy.hp / enemy.maxHp, 0, 1);
+    ctx.globalAlpha = enemy.hitFlash > 0 ? 0.95 : 0.86;
+    ctx.fillStyle = enemy.hitFlash > 0 ? "#fff7e6" : enemy.color;
+    if (enemy.boss) {
+      ctx.rotate(state.time * 0.6);
+      polygon(0, 0, enemy.r, enemy.final ? 8 : 6);
+      ctx.fill();
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    } else if (enemy.type === "runner") {
+      ctx.rotate(Math.atan2(state.player.y - enemy.y, state.player.x - enemy.x) + Math.PI / 2);
+      polygon(0, 0, enemy.r, 3);
+      ctx.fill();
+    } else {
+      polygon(0, 0, enemy.r, enemy.type === "brute" ? 6 : 4);
+      ctx.fill();
+    }
+    if (enemy.mark > 0) {
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.r + 5 + enemy.mark, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (enemy.slow > 0) {
+      ctx.strokeStyle = "#58d7ff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.r + 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (enemy.shock > 0) {
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-enemy.r, -enemy.r);
+      ctx.lineTo(enemy.r, enemy.r);
+      ctx.moveTo(enemy.r, -enemy.r);
+      ctx.lineTo(-enemy.r, enemy.r);
+      ctx.stroke();
+    }
+    ctx.restore();
+    drawEnemyHp(enemy, hp);
+  }
 }
 
-function crystal(x, y, r) {
-  ctx.beginPath();
-  ctx.moveTo(x, y - r);
-  ctx.lineTo(x + r * 0.74, y - r * 0.22);
-  ctx.lineTo(x + r * 0.48, y + r * 0.9);
-  ctx.lineTo(x - r * 0.48, y + r * 0.9);
-  ctx.lineTo(x - r * 0.74, y - r * 0.22);
-  ctx.closePath();
-  ctx.fill();
+function drawEnemyHp(enemy, hp) {
+  if (hp >= 0.98 && !enemy.boss) return;
+  const w = enemy.boss ? 72 : 34;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(enemy.x - w / 2, enemy.y - enemy.r - 13, w, 5);
+  ctx.fillStyle = enemy.boss ? "#ffd166" : "#ff6b68";
+  ctx.fillRect(enemy.x - w / 2, enemy.y - enemy.r - 13, w * hp, 5);
+  ctx.restore();
 }
 
 function drawPlayer() {
   const p = state.player;
   ctx.save();
   ctx.translate(p.x, p.y);
-  ctx.fillStyle = "#53d7ff";
-  ctx.beginPath();
-  ctx.arc(0, 0, p.r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#f7f0dc";
-  ctx.beginPath();
-  ctx.moveTo(0, -p.r - 8);
-  ctx.lineTo(8, -2);
-  ctx.lineTo(-8, -2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawEnemies() {
-  for (const e of state.enemies) {
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    ctx.fillStyle = e.boss ? "#ffd166" : e.runner ? "#ff9f45" : e.brute ? "#a980ff" : "#ff6b6b";
+  if (p.shield > 0) {
+    ctx.strokeStyle = "rgba(88,215,255,0.75)";
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(0, 0, e.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.36)";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.82)";
-    ctx.fillRect(-e.r * 0.42, -e.r * 0.18, e.r * 0.26, e.r * 0.22);
-    ctx.fillRect(e.r * 0.16, -e.r * 0.18, e.r * 0.26, e.r * 0.22);
-    ctx.restore();
-    if (e.hp < e.maxHp) {
-      ctx.fillStyle = "rgba(0,0,0,0.42)";
-      ctx.fillRect(e.x - e.r, e.y - e.r - 10, e.r * 2, 4);
-      ctx.fillStyle = "#73e08f";
-      ctx.fillRect(e.x - e.r, e.y - e.r - 10, e.r * 2 * clamp(e.hp / e.maxHp, 0, 1), 4);
-    }
-  }
-}
-
-function drawBullets() {
-  for (const b of state.bullets) {
-    ctx.fillStyle = b.source === "core" ? "#ffd166" : "#8ce8ff";
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function drawGems() {
-  for (const g of state.gems) {
-    ctx.fillStyle = "#a980ff";
-    ctx.beginPath();
-    ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.arc(0, 0, p.r + 9 + Math.sin(state.time * 8) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
-}
-
-function drawOrbs() {
-  if (!state.stats.orbs) return;
-  for (let i = 0; i < state.stats.orbs; i += 1) {
-    const angle = state.time * 2.5 + (Math.PI * 2 * i) / state.stats.orbs;
-    const x = state.player.x + Math.cos(angle) * 56;
-    const y = state.player.y + Math.sin(angle) * 56;
-    ctx.fillStyle = "#ffd166";
-    ctx.beginPath();
-    ctx.arc(x, y, 9, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function drawFrost() {
-  if (!state.stats.frost) return;
-  ctx.save();
-  ctx.strokeStyle = "rgba(83,215,255,0.2)";
-  ctx.fillStyle = "rgba(83,215,255,0.055)";
+  ctx.rotate(Math.atan2(p.vy, p.vx));
+  ctx.fillStyle = "#ffd166";
+  polygon(0, 0, p.r + 2, 3);
+  ctx.fill();
+  ctx.strokeStyle = "#fff7e6";
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(state.player.x, state.player.y, 82 + state.stats.frost * 18, 0, Math.PI * 2);
-  ctx.fill();
   ctx.stroke();
   ctx.restore();
-}
-
-function drawTrails() {
-  for (const trail of state.trails) {
+  if (state.stats.frostAura > 0) {
     ctx.save();
-    ctx.globalAlpha = clamp(trail.life / trail.maxLife, 0, 1) * 0.58;
-    ctx.fillStyle = "#a980ff";
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#58d7ff";
     ctx.beginPath();
-    ctx.arc(trail.x, trail.y, trail.r, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, (state.stats.frostRadius + state.stats.frostAura * 12) * state.stats.fieldScale, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
     ctx.restore();
   }
 }
 
 function drawParticles() {
-  for (const p of state.particles) {
+  for (const particle of state.particles) {
+    const t = clamp(particle.life / particle.maxLife, 0, 1);
     ctx.save();
-    ctx.globalAlpha = clamp(p.life * 3, 0, 1);
-    ctx.strokeStyle = p.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.globalAlpha = t;
+    ctx.strokeStyle = particle.color;
+    ctx.fillStyle = particle.color;
+    if (particle.kind === "ring") {
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size * (1 - t * 0.2), 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (particle.kind === "dash") {
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size * 0.45, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size * (1 - t), 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 }
 
-function drawMessages() {
-  if (!state.messages.length) return;
+function drawTexts() {
   ctx.save();
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "900 34px system-ui, sans-serif";
-  for (const message of state.messages) {
-    ctx.globalAlpha = clamp(message.time, 0, 1);
-    ctx.fillStyle = "#ffd166";
-    ctx.strokeStyle = "rgba(0,0,0,0.48)";
-    ctx.lineWidth = 6;
-    ctx.strokeText(message.text, state.width / 2, 84);
-    ctx.fillText(message.text, state.width / 2, 84);
+  ctx.font = "800 13px system-ui";
+  for (const text of state.texts) {
+    ctx.globalAlpha = clamp(text.life / text.maxLife, 0, 1);
+    ctx.fillStyle = text.color;
+    ctx.fillText(text.text, text.x, text.y);
   }
   ctx.restore();
 }
 
-function loop(time) {
-  const dt = Math.min(0.033, (time - lastTime) / 1000 || 0);
-  lastTime = time;
-  update(dt);
-  draw();
-  requestAnimationFrame(loop);
+function addParticle(x, y, kind, color, life, size) {
+  state.particles.push({
+    x,
+    y,
+    kind,
+    color,
+    life,
+    maxLife: life,
+    size,
+    vx: (Math.random() - 0.5) * 20,
+    vy: (Math.random() - 0.5) * 20
+  });
 }
 
-function setPointerVector(clientX, clientY) {
-  const dx = clientX - pointer.originX;
-  const dy = clientY - pointer.originY;
-  const max = 42;
-  const len = Math.hypot(dx, dy);
-  const scale = len > max ? max / len : 1;
-  const sx = dx * scale;
-  const sy = dy * scale;
-  pointer.x = sx / max;
-  pointer.y = sy / max;
-  stick.style.setProperty("--stick-x", `${sx}px`);
-  stick.style.setProperty("--stick-y", `${sy}px`);
+function addText(x, y, text, color) {
+  state.texts.push({ x, y, text, color, life: 1.0, maxLife: 1.0 });
 }
 
-touchSurface.addEventListener("pointerdown", (event) => {
-  pointer.active = true;
-  pointer.id = event.pointerId;
-  pointer.originX = event.clientX;
-  pointer.originY = event.clientY;
-  setPointerVector(event.clientX, event.clientY);
-  touchSurface.setPointerCapture(event.pointerId);
-});
-
-touchSurface.addEventListener("pointermove", (event) => {
-  if (!pointer.active || pointer.id !== event.pointerId) return;
-  setPointerVector(event.clientX, event.clientY);
-});
-
-function releasePointer(event) {
-  if (pointer.id !== event.pointerId) return;
-  pointer.active = false;
-  pointer.id = null;
-  pointer.x = 0;
-  pointer.y = 0;
-  stick.style.setProperty("--stick-x", "0px");
-  stick.style.setProperty("--stick-y", "0px");
-}
-
-touchSurface.addEventListener("pointerup", releasePointer);
-touchSurface.addEventListener("pointercancel", releasePointer);
-
-window.addEventListener("keydown", (event) => keys.add(event.key.toLowerCase()));
-window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
-window.addEventListener("resize", () => {
-  resizeCanvas();
-  updateUi();
-});
-
-ui.startButton.addEventListener("click", startGame);
-ui.againButton.addEventListener("click", () => {
-  resetGame();
-  startGame();
-});
-ui.restartButton.addEventListener("click", () => {
-  resetGame();
-  startGame();
-});
-
-function init() {
-  resizeCanvas();
-  resetGame();
-  lastTime = performance.now();
-  requestAnimationFrame(loop);
-}
-
-function sample(list, count) {
-  const copy = [...list];
-  const out = [];
-  while (copy.length && out.length < count) {
-    out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+function polygon(x, y, r, sides) {
+  ctx.beginPath();
+  for (let i = 0; i < sides; i += 1) {
+    const a = -Math.PI / 2 + (i / sides) * Math.PI * 2;
+    const px = x + Math.cos(a) * r;
+    const py = y + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
   }
-  return out;
+  ctx.closePath();
 }
 
-init();
+function colorForType(type) {
+  if (type === "frost") return "#58d7ff";
+  if (type === "lightning") return "#ffd166";
+  if (type === "heal" || type === "shield") return "#7ee08a";
+  if (type === "boss") return "#ff6b68";
+  if (type === "singularity") return "#b998ff";
+  return "#ff9f45";
+}
+
+function formatTime(value) {
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function distanceToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = clamp(((px - x1) * dx + (py - y1) * dy) / len2, 0, 1);
+  const x = x1 + t * dx;
+  const y = y1 + t * dy;
+  return Math.hypot(px - x, py - y);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function removeItem(list, item) {
+  const index = list.indexOf(item);
+  if (index >= 0) list.splice(index, 1);
+}
+
+function cryptoRandom() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+ui.startButton.addEventListener("click", startRun);
+ui.againButton.addEventListener("click", startRun);
+ui.restartButton.addEventListener("click", startRun);
+ui.rerollButton.addEventListener("click", rerollChoices);
+window.addEventListener("resize", resizeCanvas);
+window.coreRushDebug = {
+  start: startRun,
+  snapshot: () => ({
+    phase: state?.phase,
+    room: state?.room,
+    picks: state?.picks,
+    enemies: state?.enemies.length,
+    hp: Math.round(state?.player.hp || 0),
+    shield: Math.round(state?.player.shield || 0),
+    choices: state?.currentChoices.map((choice) => choice.name) || [],
+    time: Math.round(state?.time || 0)
+  })
+};
+
+state = createState();
+resizeCanvas();
+updateUi(true);
+requestAnimationFrame((time) => {
+  lastFrame = time;
+  requestAnimationFrame(gameLoop);
+});
