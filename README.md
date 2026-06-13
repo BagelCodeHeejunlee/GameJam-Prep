@@ -11,6 +11,7 @@ Mobile-friendly action roguelike defense prototype.
 ## Design Doc
 
 - [Core Rush 게임 기획서](docs/core-rush-game-design.md)
+- [로그라이크 선택지 시너지 설계](docs/choice-synergy-design.md)
 
 ## GitHub Pages
 
