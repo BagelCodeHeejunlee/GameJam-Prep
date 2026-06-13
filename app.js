@@ -60,6 +60,7 @@ const augments = [
     tags: ["탄환", "피해"],
     text: "기본 투사체 피해가 증가한다.",
     max: 4,
+    repeatable: true,
     synergy: ["doubleShot", "pierce", "barrage"],
     apply: (s) => {
       s.stats.damage += 5;
@@ -73,6 +74,7 @@ const augments = [
     tags: ["탄환", "속도"],
     text: "공격 간격이 짧아진다.",
     max: 4,
+    repeatable: true,
     synergy: ["chillBullet", "shockBullet", "markBullet", "markHunt"],
     apply: (s) => {
       s.stats.fireDelay = Math.max(0.14, s.stats.fireDelay * 0.86);
@@ -86,6 +88,7 @@ const augments = [
     tags: ["탄환", "처치"],
     text: "투사체가 적을 추가로 관통한다.",
     max: 3,
+    repeatable: true,
     synergy: ["gravity", "frostAura", "executeField"],
     apply: (s) => {
       s.stats.pierce += 1;
@@ -99,6 +102,7 @@ const augments = [
     tags: ["탄환", "상태"],
     text: "공격 적중 시 둔화를 부여한다.",
     max: 3,
+    repeatable: true,
     synergy: ["frostAura", "frostBurst", "stormConductor"],
     apply: (s) => {
       s.stats.chillChance = Math.min(0.8, s.stats.chillChance + 0.22);
@@ -112,6 +116,7 @@ const augments = [
     tags: ["이동"],
     text: "자동 이동 속도와 회피 거리가 증가한다.",
     max: 3,
+    repeatable: true,
     synergy: ["autoDash", "trail", "infiniteCircuit"],
     apply: (s) => {
       s.player.speed += 22;
@@ -126,6 +131,7 @@ const augments = [
     tags: ["이동", "트리거"],
     text: "일정 주기마다 안전한 방향으로 짧게 대시한다.",
     max: 3,
+    repeatable: true,
     synergy: ["dashMine", "dashShield", "trail", "infiniteCircuit"],
     apply: (s) => {
       s.stats.autoDash += 1;
@@ -141,6 +147,7 @@ const augments = [
     tags: ["이동", "장판"],
     text: "이동 경로에 짧게 남는 피해 장판을 만든다.",
     max: 3,
+    repeatable: true,
     synergy: ["fieldSize", "executeField", "gravity", "singularity"],
     apply: (s) => {
       s.stats.trail += 1;
@@ -155,6 +162,7 @@ const augments = [
     tags: ["방어", "회복"],
     text: "방마다 1회, 체력이 낮아지면 자동 회복한다.",
     max: 3,
+    repeatable: true,
     synergy: ["overShield", "dashShield"],
     apply: (s) => {
       s.stats.emergencyHeal += 1;
@@ -170,6 +178,7 @@ const augments = [
     tags: ["이동", "방어"],
     text: "가까운 적이 많을 때 자동으로 밀쳐내기 파동을 낸다.",
     max: 3,
+    repeatable: true,
     synergy: ["boots", "frostAura", "overShield"],
     apply: (s) => {
       s.stats.shockwave += 1;
@@ -184,6 +193,7 @@ const augments = [
     tags: ["경제"],
     text: "보상 품질이 조금 좋아지고 전술 데이터 계열 효과가 강해진다.",
     max: 3,
+    repeatable: true,
     synergy: ["dataBurn", "scanner", "tacticalDominance"],
     apply: (s) => {
       s.stats.rarityBonus += 0.06;
@@ -198,6 +208,7 @@ const augments = [
     tags: ["탄환"],
     text: "기본 공격이 보조 투사체를 추가 발사한다.",
     max: 3,
+    repeatable: true,
     synergy: ["highPressure", "chillBullet", "barrage"],
     apply: (s) => {
       s.stats.projectiles += 1;
@@ -211,6 +222,7 @@ const augments = [
     tags: ["탄환", "표식"],
     text: "같은 적을 여러 번 맞히면 표식을 누적한다.",
     max: 2,
+    repeatable: true,
     synergy: ["rapidFire", "markHunt", "barrage"],
     apply: (s) => {
       s.stats.markEnabled = true;
@@ -225,6 +237,7 @@ const augments = [
     tags: ["이동", "장판"],
     text: "대시 지점에 지연 폭발 지뢰를 남긴다.",
     max: 3,
+    repeatable: true,
     requires: [{ anyIds: ["autoDash"] }],
     synergy: ["autoDash", "fieldSize", "gravity"],
     apply: (s) => {
@@ -239,6 +252,7 @@ const augments = [
     tags: ["이동", "방어"],
     text: "대시 후 짧은 보호막을 얻는다.",
     max: 3,
+    repeatable: true,
     requires: [{ anyIds: ["autoDash"] }],
     synergy: ["autoDash", "emergencyHeal", "overShield"],
     apply: (s) => {
@@ -253,6 +267,7 @@ const augments = [
     tags: ["장판"],
     text: "모든 장판과 폭발 범위가 넓어진다.",
     max: 3,
+    repeatable: true,
     requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "frostAura", "executeField"],
     apply: (s) => {
@@ -267,6 +282,7 @@ const augments = [
     tags: ["상태", "장판"],
     text: "캐릭터 주변에 둔화와 지속 피해 영역을 만든다.",
     max: 3,
+    repeatable: true,
     synergy: ["chillBullet", "pierce", "frostBurst"],
     apply: (s) => {
       s.stats.frostAura += 1;
@@ -281,6 +297,7 @@ const augments = [
     tags: ["탄환", "상태"],
     text: "공격 적중 시 감전을 부여한다.",
     max: 3,
+    repeatable: true,
     synergy: ["rapidFire", "shockSpread", "stormConductor"],
     apply: (s) => {
       s.stats.shockChance = Math.min(0.75, s.stats.shockChance + 0.22);
@@ -294,6 +311,7 @@ const augments = [
     tags: ["표식", "처치"],
     text: "표식 적에게 주는 피해가 증가하고 처치 시 공격 속도가 오른다.",
     max: 2,
+    repeatable: true,
     synergy: ["markBullet", "rapidFire", "barrage"],
     apply: (s) => {
       s.stats.markDamage += 0.22;
@@ -308,6 +326,7 @@ const augments = [
     tags: ["경제", "드래프트"],
     text: "보상 리롤 품질이 좋아진다.",
     max: 2,
+    repeatable: true,
     synergy: ["scanner", "tacticalDominance"],
     apply: (s) => {
       s.stats.rerollQuality += 1;
@@ -322,6 +341,7 @@ const augments = [
     tags: ["경제", "드래프트"],
     text: "현재 보유 태그와 직접 연결되는 후보가 더 잘 등장한다.",
     max: 2,
+    repeatable: true,
     synergy: ["dataMagnet", "rerollKit", "tacticalDominance"],
     apply: (s) => {
       s.stats.synergyBias += 1;
@@ -335,6 +355,7 @@ const augments = [
     tags: ["탄환"],
     text: "일정 공격마다 3방향 투사체를 발사한다.",
     max: 2,
+    repeatable: true,
     synergy: ["doubleShot", "highPressure", "barrage"],
     apply: (s) => {
       s.stats.tripleShot += 1;
@@ -348,6 +369,7 @@ const augments = [
     tags: ["상태", "처치"],
     text: "둔화된 적을 처치하면 냉기 폭발이 발생한다.",
     max: 2,
+    repeatable: true,
     requires: [
       { anyIds: ["chillBullet", "frostAura", "stormConductor"] }
     ],
@@ -364,6 +386,7 @@ const augments = [
     tags: ["상태", "처치"],
     text: "감전 피해가 주변 적에게 전파된다.",
     max: 2,
+    repeatable: true,
     requires: [{ anyIds: ["shockBullet", "stormConductor"] }],
     synergy: ["shockBullet", "rapidFire", "stormConductor"],
     apply: (s) => {
@@ -378,6 +401,7 @@ const augments = [
     tags: ["장판", "제어"],
     text: "적을 가장 강한 장판 중심으로 끌어당긴다.",
     max: 2,
+    repeatable: true,
     requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "dashMine", "executeField", "singularity"],
     apply: (s) => {
@@ -392,6 +416,7 @@ const augments = [
     tags: ["장판", "처치"],
     text: "장판 위의 낮은 체력 적을 처형하고 폭발시킨다.",
     max: 2,
+    repeatable: true,
     requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "fieldSize", "gravity"],
     apply: (s) => {
@@ -406,6 +431,7 @@ const augments = [
     tags: ["상태", "폭발"],
     text: "감전된 적 처치 시 주변에 번개 폭발이 발생한다.",
     max: 2,
+    repeatable: true,
     requires: [{ anyIds: ["shockBullet", "stormConductor"] }],
     synergy: ["shockBullet", "shockSpread", "stormConductor"],
     apply: (s) => {
@@ -420,6 +446,7 @@ const augments = [
     tags: ["경제", "폭발"],
     text: "다음 방 시작 시 전술 데이터 폭발을 일으킨다.",
     max: 2,
+    repeatable: true,
     synergy: ["dataMagnet", "scanner", "tacticalDominance"],
     apply: (s) => {
       s.stats.dataBurn += 1;
@@ -434,6 +461,7 @@ const augments = [
     tags: ["방어", "피해"],
     text: "회복과 보호막 획득 일부가 주변 피해로 변환된다.",
     max: 2,
+    repeatable: true,
     synergy: ["emergencyHeal", "dashShield", "shockwave"],
     apply: (s) => {
       s.stats.overShield += 1;
@@ -447,6 +475,7 @@ const augments = [
     tags: ["탄환", "전설"],
     text: "일정 공격마다 보유한 탄환 효과를 복제 발동한다.",
     max: 1,
+    repeatable: false,
     synergy: ["highPressure", "doubleShot", "tripleShot"],
     apply: (s) => {
       s.stats.barrage = true;
@@ -460,6 +489,7 @@ const augments = [
     tags: ["상태", "전설"],
     text: "냉기와 감전이 서로 다른 상태를 추가로 유발한다.",
     max: 1,
+    repeatable: false,
     requires: [
       {
         anyIds: ["chillBullet", "frostAura", "shockBullet", "frostBurst", "shockSpread", "lightningBurst"]
@@ -478,6 +508,7 @@ const augments = [
     tags: ["이동", "장판", "전설"],
     text: "자동 이동이 궤도화되고 대시/잔상 효과가 더 자주 발동한다.",
     max: 1,
+    repeatable: false,
     requires: [{ anyIds: ["autoDash"], anyTags: ["장판"] }],
     synergy: ["autoDash", "trail", "dashMine"],
     apply: (s) => {
@@ -494,6 +525,7 @@ const augments = [
     tags: ["장판", "제어", "전설"],
     text: "끌어당김과 장판 피해가 누적되면 큰 폭발이 발생한다.",
     max: 1,
+    repeatable: false,
     requires: [{ anyTags: ["장판"] }, { anyIds: ["gravity"] }],
     synergy: ["gravity", "executeField", "dataBurn"],
     apply: (s) => {
@@ -508,6 +540,7 @@ const augments = [
     tags: ["경제", "드래프트", "전설"],
     text: "다음 보상에서 현재 핵심 태그가 더 강하게 보장된다.",
     max: 1,
+    repeatable: false,
     synergy: ["dataMagnet", "scanner", "rerollKit"],
     apply: (s) => {
       s.stats.tacticalDominance += 3;
@@ -1243,6 +1276,7 @@ function renderChoices() {
       <h3>${choice.name}</h3>
       <p>${choice.text}</p>
       <div class="tag-row">${choice.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
+      <div class="stack-rule">${choiceStackText(choice)}</div>
       <div class="synergy">${choice.reason}</div>
     `;
     button.addEventListener("click", () => chooseAugment(choice.id));
@@ -1290,8 +1324,20 @@ function generateChoices(rewardType) {
 }
 
 function canOffer(augment) {
-  if ((state.owned[augment.id] || 0) >= augment.max) return false;
+  const owned = state.owned[augment.id] || 0;
+  if (owned > 0 && !augment.repeatable) return false;
+  if (owned >= maxStacks(augment)) return false;
   return meetsRequirements(augment.requires || []);
+}
+
+function maxStacks(augment) {
+  return augment.repeatable ? augment.max : 1;
+}
+
+function choiceStackText(augment) {
+  if (!augment.repeatable) return "일회성 선택지";
+  const owned = state.owned[augment.id] || 0;
+  return `반복 가능 ${owned}/${maxStacks(augment)}`;
 }
 
 function meetsRequirements(requirements) {

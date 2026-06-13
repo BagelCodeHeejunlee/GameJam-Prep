@@ -27,11 +27,16 @@
 구현 규격:
 
 ```js
+repeatable: true
+max: 3
 requires: [{ anyTags: ["장판"] }]
 requires: [{ anyIds: ["autoDash"] }]
 requires: [{ anyTags: ["장판"] }, { anyIds: ["gravity"] }]
 ```
 
+- `repeatable: true`인 선택지만 이미 선택한 뒤에도 다시 후보에 등장할 수 있다.
+- `repeatable: false`인 선택지는 한 번 선택하면 이후 보상 후보에서 제외된다.
+- `max`는 반복 가능 선택지의 최대 중첩 수다.
 - `requires` 배열 안의 조건들은 모두 만족해야 한다.
 - 한 조건 안의 `anyIds`, `anyTags`는 하나만 만족해도 통과한다.
 - 사전 조건을 만족하지 못한 선택지는 보상 후보 3개에 들어가지 않는다.
