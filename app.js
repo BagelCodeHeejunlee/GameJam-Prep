@@ -798,11 +798,15 @@ function updatePlayer(dt) {
   if (player.x > state.width - edge) moveX -= 1.8;
   if (player.y < edge) moveY += 1.8;
   if (player.y > state.height - edge) moveY -= 1.8;
-  const len = Math.hypot(moveX, moveY) || 1;
-  player.vx = moveX / len;
-  player.vy = moveY / len;
-  player.x = clamp(player.x + player.vx * player.speed * dt, 24, state.width - 24);
-  player.y = clamp(player.y + player.vy * player.speed * dt, 34, state.height - 24);
+  const wallPush = getWallPush(player.x, player.y, 92);
+  moveX += wallPush.x * (2.2 + wallPush.strength);
+  moveY += wallPush.y * (2.2 + wallPush.strength);
+  const direction = choosePlayerMoveDirection(moveX, moveY, target);
+  const bounds = getPlayerBounds();
+  player.vx = direction.x;
+  player.vy = direction.y;
+  player.x = clamp(player.x + player.vx * player.speed * dt, bounds.minX, bounds.maxX);
+  player.y = clamp(player.y + player.vy * player.speed * dt, bounds.minY, bounds.maxY);
 
   if (state.stats.trail > 0 || state.stats.infiniteCircuit) {
     state.stats.trailTimer -= dt;
@@ -855,6 +859,9 @@ function dashPlayer() {
   const sx = player.x;
   const sy = player.y;
   const distance = 112 + state.stats.autoDash * 14;
+  const direction = choosePlayerMoveDirection(player.vx, player.vy, pickTarget(), distance);
+  player.vx = direction.x;
+  player.vy = direction.y;
   player.x = clamp(player.x + player.vx * distance, 28, state.width - 28);
   player.y = clamp(player.y + player.vy * distance, 34, state.height - 28);
   damageLine(sx, sy, player.x, player.y, 38, state.stats.dashDamage + state.stats.autoDash * 6);
@@ -1597,6 +1604,107 @@ function colorForType(type) {
   return "#ff9f45";
 }
 
+function choosePlayerMoveDirection(moveX, moveY, target, probeDistance = 82) {
+  const player = state.player;
+  const center = normalizeVector(state.width * 0.5 - player.x, state.height * 0.55 - player.y);
+  const base = normalizeVector(moveX, moveY) || center || { x: 1, y: 0 };
+  const wallPush = getWallPush(player.x, player.y, 104);
+  const candidates = [
+    base,
+    rotateVector(base, 0.58),
+    rotateVector(base, -0.58),
+    rotateVector(base, 1.12),
+    rotateVector(base, -1.12),
+    normalizeVector(base.x + wallPush.x * 1.8, base.y + wallPush.y * 1.8),
+    normalizeVector(wallPush.x, wallPush.y),
+    center
+  ].filter(Boolean);
+  let best = candidates[0];
+  let bestScore = -Infinity;
+  for (const candidate of candidates) {
+    const score = scoreMoveCandidate(candidate, base, target, probeDistance);
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function scoreMoveCandidate(direction, base, target, probeDistance) {
+  const player = state.player;
+  const bounds = getPlayerBounds();
+  const x = clamp(player.x + direction.x * probeDistance, bounds.minX, bounds.maxX);
+  const y = clamp(player.y + direction.y * probeDistance, bounds.minY, bounds.maxY);
+  const moved = Math.hypot(x - player.x, y - player.y);
+  let score = direction.x * base.x + direction.y * base.y;
+  score += moved * 0.018;
+  score += (wallDanger(player.x, player.y, 104) - wallDanger(x, y, 104)) * 5.4;
+  score -= wallDanger(x, y, 84) * 4.2;
+  score -= Math.hypot(x - state.width * 0.5, y - state.height * 0.55) * 0.002;
+  if (moved < probeDistance * 0.32) score -= 2.4;
+  if (target) {
+    const targetDist = Math.hypot(x - target.x, y - target.y);
+    const keep = state.stats.preferredRange;
+    score -= Math.abs(targetDist - keep) * 0.014;
+    if (targetDist < 112) score -= (112 - targetDist) * 0.07;
+  }
+  for (const enemy of state.enemies) {
+    const enemyDist = Math.hypot(x - enemy.x, y - enemy.y);
+    if (enemyDist < 172) score -= (172 - enemyDist) * (enemy.boss ? 0.028 : 0.019);
+    if (enemyDist < enemy.r + player.r + 18) score -= 4.5;
+  }
+  return score;
+}
+
+function getPlayerBounds() {
+  return {
+    minX: 24,
+    maxX: state.width - 24,
+    minY: 34,
+    maxY: state.height - 24
+  };
+}
+
+function getWallPush(x, y, margin) {
+  const bounds = getPlayerBounds();
+  let pushX = 0;
+  let pushY = 0;
+  if (x < bounds.minX + margin) pushX += (bounds.minX + margin - x) / margin;
+  if (x > bounds.maxX - margin) pushX -= (x - (bounds.maxX - margin)) / margin;
+  if (y < bounds.minY + margin) pushY += (bounds.minY + margin - y) / margin;
+  if (y > bounds.maxY - margin) pushY -= (y - (bounds.maxY - margin)) / margin;
+  return {
+    x: pushX,
+    y: pushY,
+    strength: Math.min(2, Math.hypot(pushX, pushY))
+  };
+}
+
+function wallDanger(x, y, margin) {
+  const bounds = getPlayerBounds();
+  const left = clamp((bounds.minX + margin - x) / margin, 0, 1);
+  const right = clamp((x - (bounds.maxX - margin)) / margin, 0, 1);
+  const top = clamp((bounds.minY + margin - y) / margin, 0, 1);
+  const bottom = clamp((y - (bounds.maxY - margin)) / margin, 0, 1);
+  return left * left + right * right + top * top + bottom * bottom;
+}
+
+function normalizeVector(x, y) {
+  const length = Math.hypot(x, y);
+  if (length < 0.001) return null;
+  return { x: x / length, y: y / length };
+}
+
+function rotateVector(vector, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return {
+    x: vector.x * cos - vector.y * sin,
+    y: vector.x * sin + vector.y * cos
+  };
+}
+
 function formatTime(value) {
   const minutes = Math.floor(value / 60);
   const seconds = Math.floor(value % 60);
@@ -1637,6 +1745,12 @@ ui.rerollButton.addEventListener("click", rerollChoices);
 window.addEventListener("resize", resizeCanvas);
 window.coreRushDebug = {
   start: startRun,
+  forcePlayer: (x, y) => {
+    if (!state) return;
+    const bounds = getPlayerBounds();
+    state.player.x = clamp(x, bounds.minX, bounds.maxX);
+    state.player.y = clamp(y, bounds.minY, bounds.maxY);
+  },
   snapshot: () => ({
     phase: state?.phase,
     room: state?.room,
@@ -1644,6 +1758,14 @@ window.coreRushDebug = {
     enemies: state?.enemies.length,
     hp: Math.round(state?.player.hp || 0),
     shield: Math.round(state?.player.shield || 0),
+    player: state
+      ? {
+          x: Math.round(state.player.x),
+          y: Math.round(state.player.y),
+          vx: Number(state.player.vx.toFixed(2)),
+          vy: Number(state.player.vy.toFixed(2))
+        }
+      : null,
     choices: state?.currentChoices.map((choice) => choice.name) || [],
     time: Math.round(state?.time || 0)
   })
