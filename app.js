@@ -130,8 +130,8 @@ const augments = [
     rarity: "normal",
     tags: ["이동", "트리거"],
     text: "일정 주기마다 안전한 방향으로 짧게 대시한다.",
-    max: 3,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["dashMine", "dashShield", "trail", "infiniteCircuit"],
     apply: (s) => {
       s.stats.autoDash += 1;
@@ -146,8 +146,8 @@ const augments = [
     rarity: "normal",
     tags: ["이동", "장판"],
     text: "이동 경로에 짧게 남는 피해 장판을 만든다.",
-    max: 3,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["fieldSize", "executeField", "gravity", "singularity"],
     apply: (s) => {
       s.stats.trail += 1;
@@ -161,8 +161,8 @@ const augments = [
     rarity: "normal",
     tags: ["방어", "회복"],
     text: "방마다 1회, 체력이 낮아지면 자동 회복한다.",
-    max: 3,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["overShield", "dashShield"],
     apply: (s) => {
       s.stats.emergencyHeal += 1;
@@ -177,8 +177,8 @@ const augments = [
     rarity: "normal",
     tags: ["이동", "방어"],
     text: "가까운 적이 많을 때 자동으로 밀쳐내기 파동을 낸다.",
-    max: 3,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["boots", "frostAura", "overShield"],
     apply: (s) => {
       s.stats.shockwave += 1;
@@ -221,8 +221,8 @@ const augments = [
     rarity: "rare",
     tags: ["탄환", "표식"],
     text: "같은 적을 여러 번 맞히면 표식을 누적한다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["rapidFire", "markHunt", "barrage"],
     apply: (s) => {
       s.stats.markEnabled = true;
@@ -236,8 +236,8 @@ const augments = [
     rarity: "rare",
     tags: ["이동", "장판"],
     text: "대시 지점에 지연 폭발 지뢰를 남긴다.",
-    max: 3,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     requires: [{ anyIds: ["autoDash"] }],
     synergy: ["autoDash", "fieldSize", "gravity"],
     apply: (s) => {
@@ -281,8 +281,8 @@ const augments = [
     rarity: "rare",
     tags: ["상태", "장판"],
     text: "캐릭터 주변에 둔화와 지속 피해 영역을 만든다.",
-    max: 3,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["chillBullet", "pierce", "frostBurst"],
     apply: (s) => {
       s.stats.frostAura += 1;
@@ -354,8 +354,8 @@ const augments = [
     rarity: "epic",
     tags: ["탄환"],
     text: "일정 공격마다 3방향 투사체를 발사한다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["doubleShot", "highPressure", "barrage"],
     apply: (s) => {
       s.stats.tripleShot += 1;
@@ -368,8 +368,8 @@ const augments = [
     rarity: "epic",
     tags: ["상태", "처치"],
     text: "둔화된 적을 처치하면 냉기 폭발이 발생한다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     requires: [
       { anyIds: ["chillBullet", "frostAura", "stormConductor"] }
     ],
@@ -385,8 +385,8 @@ const augments = [
     rarity: "epic",
     tags: ["상태", "처치"],
     text: "감전 피해가 주변 적에게 전파된다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     requires: [{ anyIds: ["shockBullet", "stormConductor"] }],
     synergy: ["shockBullet", "rapidFire", "stormConductor"],
     apply: (s) => {
@@ -400,8 +400,8 @@ const augments = [
     rarity: "epic",
     tags: ["장판", "제어"],
     text: "적을 가장 강한 장판 중심으로 끌어당긴다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "dashMine", "executeField", "singularity"],
     apply: (s) => {
@@ -415,8 +415,8 @@ const augments = [
     rarity: "epic",
     tags: ["장판", "처치"],
     text: "장판 위의 낮은 체력 적을 처형하고 폭발시킨다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     requires: [{ anyTags: ["장판"] }],
     synergy: ["trail", "fieldSize", "gravity"],
     apply: (s) => {
@@ -430,8 +430,8 @@ const augments = [
     rarity: "epic",
     tags: ["상태", "폭발"],
     text: "감전된 적 처치 시 주변에 번개 폭발이 발생한다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     requires: [{ anyIds: ["shockBullet", "stormConductor"] }],
     synergy: ["shockBullet", "shockSpread", "stormConductor"],
     apply: (s) => {
@@ -445,8 +445,8 @@ const augments = [
     rarity: "epic",
     tags: ["경제", "폭발"],
     text: "다음 방 시작 시 전술 데이터 폭발을 일으킨다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["dataMagnet", "scanner", "tacticalDominance"],
     apply: (s) => {
       s.stats.dataBurn += 1;
@@ -460,8 +460,8 @@ const augments = [
     rarity: "epic",
     tags: ["방어", "피해"],
     text: "회복과 보호막 획득 일부가 주변 피해로 변환된다.",
-    max: 2,
-    repeatable: true,
+    max: 1,
+    repeatable: false,
     synergy: ["emergencyHeal", "dashShield", "shockwave"],
     apply: (s) => {
       s.stats.overShield += 1;
