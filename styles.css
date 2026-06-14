@@ -213,6 +213,14 @@ h2 {
   transform: translate(-50%, -50%) scale(1.16);
 }
 
+.entity.moving {
+  transition:
+    left 220ms ease-in-out,
+    top 220ms ease-in-out,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
 .damage-pop {
   position: absolute;
   z-index: 20;

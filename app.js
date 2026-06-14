@@ -337,11 +337,11 @@ async function executeCard(actor, cardData) {
 
 async function executeAction(actor, action, cardData) {
   if (action.type === "move") {
-    moveActor(actor, action, cardData);
+    await moveActor(actor, action, cardData);
     return;
   }
   if (action.type === "flee") {
-    moveActor(actor, { ...action, flee: true }, cardData);
+    await moveActor(actor, { ...action, flee: true }, cardData);
     return;
   }
   if (action.type === "attack") {
@@ -465,7 +465,7 @@ function selectTargets(actor, action) {
   return candidates.slice(0, action.targets ?? 1);
 }
 
-function moveActor(actor, action, cardData) {
+async function moveActor(actor, action, cardData) {
   if (actor.temporary?.cannotMove) {
     log(`${actor.name} 이동 불가`);
     return;
@@ -491,10 +491,83 @@ function moveActor(actor, action, cardData) {
     return;
   }
 
-  actor.q = destination.q;
-  actor.r = destination.r;
+  const path = findMovePath(actor, destination, action.jump);
+  await animateActorPath(actor, path.length ? path : [destination]);
   log(`${actor.name} 이동 (${actor.q}, ${actor.r})`);
   triggerTrap(actor);
+}
+
+function findMovePath(actor, destination, jump = false) {
+  const start = { q: actor.q, r: actor.r };
+  const startKey = hexKey(start);
+  const destinationKey = hexKey(destination);
+  const queue = [start];
+  const parentByKey = new Map([[startKey, null]]);
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (hexKey(current) === destinationKey) break;
+
+    for (const dir of directions) {
+      const next = { q: current.q + dir.q, r: current.r + dir.r };
+      const key = hexKey(next);
+      if (!isTile(next) || parentByKey.has(key)) continue;
+      if (!jump && blocksPath(next, actor)) continue;
+      parentByKey.set(key, current);
+      queue.push(next);
+    }
+  }
+
+  if (!parentByKey.has(destinationKey)) return [];
+
+  const path = [];
+  let current = destination;
+  while (current && hexKey(current) !== startKey) {
+    path.unshift({ q: current.q, r: current.r });
+    current = parentByKey.get(hexKey(current));
+  }
+  return path;
+}
+
+async function animateActorPath(actor, path) {
+  for (const step of path) {
+    if (!isAlive(actor)) return;
+    const from = { q: actor.q, r: actor.r };
+    await slideActorTo(actor, from, step);
+    actor.q = step.q;
+    actor.r = step.r;
+    renderBoard();
+    await sleep(35);
+  }
+}
+
+async function slideActorTo(actor, from, to) {
+  renderBoard();
+  const bounds = boardBounds();
+  const entityElement = elements.board.querySelector(`[data-entity-id="${actor.id}"]`);
+  if (!entityElement) {
+    actor.q = to.q;
+    actor.r = to.r;
+    renderBoard();
+    return;
+  }
+
+  const fromPoint = hexToPixel(from, bounds);
+  const toPoint = hexToPixel(to, bounds);
+  entityElement.classList.remove("moving");
+  entityElement.style.transition = "none";
+  entityElement.style.left = `${fromPoint.x}px`;
+  entityElement.style.top = `${fromPoint.y}px`;
+  entityElement.getBoundingClientRect();
+
+  await nextFrame();
+  entityElement.style.transition = "";
+  entityElement.classList.add("moving");
+  entityElement.getBoundingClientRect();
+  await nextFrame();
+  entityElement.style.left = `${toPoint.x}px`;
+  entityElement.style.top = `${toPoint.y}px`;
+  await sleep(240);
 }
 
 function nextAttackAction(cardData, currentAction) {
@@ -885,6 +958,7 @@ function renderBoard() {
     const point = hexToPixel(entity, bounds);
     const div = document.createElement("div");
     div.className = `entity ${entity.side}`;
+    div.dataset.entityId = entity.id;
     div.textContent = entity.side === "player" ? "궁" : entity.monsterIndex;
     div.title = `${entity.name} ${entity.hp}/${entity.maxHp}`;
     div.style.left = `${point.x}px`;
@@ -1158,6 +1232,10 @@ function shuffle(items) {
 
 function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function nextFrame() {
+  return new Promise((resolve) => window.requestAnimationFrame(resolve));
 }
 
 function log(message) {
