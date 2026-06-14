@@ -2,6 +2,8 @@ const SQRT3 = Math.sqrt(3);
 const HEX_SIZE = 39;
 const BOARD_PADDING = 90;
 const TURN_DELAY = 540;
+const WAVE_INTRO_DELAY = 1300;
+const CAMERA_FOCUS_DELAY = 360;
 
 const directions = [
   { q: 1, r: 0 },
@@ -117,35 +119,7 @@ const enemyCards = [
   ),
 ];
 
-const waves = [
-  {
-    walls: [],
-    enemies: [
-      { q: -2, r: -1, hp: 20 },
-      { q: 2, r: -2, hp: 20 },
-    ],
-  },
-  {
-    walls: [{ q: 0, r: 0 }],
-    enemies: [
-      { q: -3, r: 0, hp: 24 },
-      { q: 3, r: -2, hp: 24 },
-      { q: 1, r: -3, hp: 24 },
-    ],
-  },
-  {
-    walls: [
-      { q: 0, r: 0 },
-      { q: -1, r: 1 },
-    ],
-    enemies: [
-      { q: -3, r: 1, hp: 28 },
-      { q: 3, r: -2, hp: 28 },
-      { q: 0, r: -3, hp: 36 },
-      { q: 2, r: 1, hp: 28 },
-    ],
-  },
-];
+const waves = buildWaves();
 
 let state;
 
@@ -174,6 +148,8 @@ function newRun() {
     currentTimeline: [],
     activeTimelineIndex: -1,
     completedTimelineCount: 0,
+    cameraMode: "overview",
+    cameraTransitionScheduled: false,
     log: [],
   };
 
@@ -186,15 +162,19 @@ function newRun() {
 function startWave(index) {
   const wave = waves[index];
   state.turn = 0;
+  state.tiles = makeMap(wave.radius ?? 3);
   state.walls = wave.walls.map((item) => ({ ...item }));
   state.obstacles = [];
+  state.cameraMode = "overview";
+  state.cameraTransitionScheduled = false;
+  const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
   state.entities = [
     {
       id: "archer",
       name: "궁수",
       side: "player",
-      q: 0,
-      r: 2,
+      q: start.q,
+      r: start.r,
       hp: state.entities.find((entity) => entity.id === "archer")?.hp ?? 70,
       maxHp: 70,
       baseAtk: 10,
@@ -210,16 +190,17 @@ function startWave(index) {
     const indexNumber = state.nextEnemyIndex++;
     state.entities.push({
       id: `enemy-${indexNumber}`,
-      name: `적 ${indexNumber}`,
+      name: enemy.name ?? (enemy.boss ? `보스 ${indexNumber}` : `적 ${indexNumber}`),
       side: "enemy",
       q: enemy.q,
       r: enemy.r,
       hp: enemy.hp,
       maxHp: enemy.hp,
-      baseAtk: 3,
+      baseAtk: enemy.baseAtk ?? (enemy.boss ? 5 : 3),
       baseRange: 1,
       baseMove: 2,
       monsterIndex: indexNumber,
+      boss: Boolean(enemy.boss),
       charge: 0,
       permanent: {},
       temporary: {},
@@ -246,6 +227,120 @@ function expandCards(cards) {
   });
 }
 
+function buildWaves() {
+  return [
+    wave(3, [], [
+      enemy(-2, -1, 20),
+      enemy(2, -2, 20),
+    ]),
+    wave(3, [{ q: 0, r: 0 }], [
+      enemy(-3, 0, 24),
+      enemy(3, -2, 24),
+      enemy(1, -3, 24),
+    ]),
+    wave(4, [{ q: 0, r: 0 }, { q: -1, r: 1 }], [
+      enemy(-3, 1, 28),
+      enemy(3, -2, 28),
+      enemy(0, -4, 32),
+      enemy(2, 1, 28),
+    ]),
+    wave(4, [{ q: 0, r: -1 }, { q: 1, r: -1 }], [
+      enemy(-4, 1, 30),
+      enemy(-2, -2, 30),
+      enemy(3, -3, 30),
+      enemy(3, 0, 30),
+    ]),
+    wave(4, [{ q: -1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: 1 }], [
+      enemy(0, -4, 80, { boss: true, name: "보스 1", baseAtk: 5 }),
+      enemy(-3, 0, 28),
+      enemy(3, -2, 28),
+    ]),
+    wave(4, [{ q: 0, r: 0 }, { q: -2, r: 2 }], [
+      enemy(-4, 2, 34),
+      enemy(-2, -2, 34),
+      enemy(2, -4, 34),
+      enemy(4, -2, 34),
+    ]),
+    wave(5, [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 1, r: -2 }], [
+      enemy(-5, 2, 36),
+      enemy(-3, -1, 36),
+      enemy(0, -5, 42),
+      enemy(4, -4, 36),
+      enemy(4, 0, 36),
+    ]),
+    wave(5, [{ q: -2, r: 1 }, { q: 0, r: 0 }, { q: 2, r: -2 }], [
+      enemy(-5, 3, 38),
+      enemy(-4, 0, 38),
+      enemy(0, -5, 38),
+      enemy(3, -5, 38),
+      enemy(5, -2, 38),
+    ]),
+    wave(5, [{ q: -1, r: 1 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
+      enemy(-5, 1, 40),
+      enemy(-3, -2, 40),
+      enemy(0, -5, 46),
+      enemy(3, -4, 40),
+      enemy(5, -3, 40),
+      enemy(4, 0, 40),
+    ]),
+    wave(5, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 1, r: 1 }], [
+      enemy(0, -5, 130, { boss: true, name: "보스 2", baseAtk: 6 }),
+      enemy(-4, 1, 42),
+      enemy(4, -3, 42),
+      enemy(5, -1, 42),
+    ]),
+    wave(5, [{ q: -1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -2 }], [
+      enemy(-5, 3, 44),
+      enemy(-4, -1, 44),
+      enemy(-1, -4, 44),
+      enemy(2, -5, 44),
+      enemy(5, -3, 44),
+      enemy(5, 0, 44),
+    ]),
+    wave(6, [{ q: -2, r: 1 }, { q: -1, r: 2 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
+      enemy(-6, 3, 48),
+      enemy(-5, 0, 48),
+      enemy(-2, -4, 48),
+      enemy(1, -6, 48),
+      enemy(5, -5, 48),
+      enemy(6, -2, 48),
+    ]),
+    wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 3, r: -4 }], [
+      enemy(-6, 2, 52),
+      enemy(-5, -1, 52),
+      enemy(-2, -4, 52),
+      enemy(2, -6, 52),
+      enemy(5, -5, 52),
+      enemy(6, -3, 52),
+      enemy(4, 1, 52),
+    ]),
+    wave(6, [{ q: -3, r: 2 }, { q: -1, r: 1 }, { q: 1, r: -1 }, { q: 3, r: -3 }], [
+      enemy(-6, 4, 56),
+      enemy(-6, 1, 56),
+      enemy(-3, -3, 56),
+      enemy(0, -6, 62),
+      enemy(4, -6, 56),
+      enemy(6, -4, 56),
+      enemy(6, -1, 56),
+    ]),
+    wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 1, r: 1 }, { q: -1, r: -1 }], [
+      enemy(0, -6, 200, { boss: true, name: "최종 보스", baseAtk: 7 }),
+      enemy(-6, 2, 60),
+      enemy(-4, -1, 60),
+      enemy(4, -5, 60),
+      enemy(6, -3, 60),
+    ]),
+  ];
+}
+
+function wave(radius, walls, enemies) {
+  return { radius, playerStart: { q: 0, r: Math.min(2, radius - 1) }, walls, enemies, boss: enemies.some((item) => item.boss) };
+}
+
+function enemy(q, r, hp, options = {}) {
+  return { q, r, hp, ...options };
+}
+
 function makeMap(radius) {
   const tiles = [];
   for (let q = -radius; q <= radius; q += 1) {
@@ -260,6 +355,18 @@ function makeMap(radius) {
 
 function scheduleTurn() {
   if (state.paused || state.busy || state.waitingReward || state.finished) return;
+  if (state.cameraMode === "overview") {
+    if (state.cameraTransitionScheduled) return;
+    state.cameraTransitionScheduled = true;
+    window.setTimeout(() => {
+      state.cameraTransitionScheduled = false;
+      if (state.paused || state.busy || state.waitingReward || state.finished) return;
+      state.cameraMode = "focus";
+      renderBoard();
+      window.setTimeout(() => scheduleTurn(), CAMERA_FOCUS_DELAY);
+    }, WAVE_INTRO_DELAY);
+    return;
+  }
   window.setTimeout(() => runTurn(), TURN_DELAY);
 }
 
@@ -1005,10 +1112,10 @@ function renderBoard() {
   for (const entity of state.entities.filter(isAlive)) {
     const point = hexToPixel(entity, bounds);
     const div = document.createElement("div");
-    div.className = `entity ${entity.side}`;
+    div.className = `entity ${entity.side} ${entity.boss ? "boss" : ""}`;
     div.dataset.entityId = entity.id;
     div.innerHTML = `
-      <span class="entity-label">${entity.side === "player" ? "궁" : entity.monsterIndex}</span>
+      <span class="entity-label">${entity.side === "player" ? "궁" : entity.boss ? "보" : entity.monsterIndex}</span>
       <span class="hp-readout">${entity.hp}/${entity.maxHp}</span>
       <span class="hp-bar" aria-hidden="true"><i style="width: ${hpPercent(entity)}%"></i></span>
     `;
@@ -1024,7 +1131,7 @@ function renderHud() {
   const player = getPlayer();
   elements.runSummary.textContent = state.finished
     ? "런 종료"
-    : `웨이브 ${state.waveIndex + 1} / 턴 ${state.turn}`;
+    : `웨이브 ${state.waveIndex + 1}/${waves.length}${waves[state.waveIndex]?.boss ? " 보스" : ""} / 턴 ${state.turn}`;
   elements.playerHp.textContent = player ? `${player.hp} / ${player.maxHp}` : "0 / 70";
   elements.deckCount.textContent = state.deck.length;
   elements.discardCount.textContent = state.discard.length;
@@ -1324,9 +1431,20 @@ function fitBoardToPanel(bounds = boardBounds()) {
   const panel = elements.board.parentElement;
   const panelWidth = Math.max(1, panel.clientWidth);
   const panelHeight = Math.max(1, panel.clientHeight);
-  const scale = Math.min(panelWidth / logicalWidth, panelHeight / logicalHeight);
-  const offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
-  const offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
+  const fitScale = Math.min(panelWidth / logicalWidth, panelHeight / logicalHeight);
+  let scale = fitScale;
+  let offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
+  let offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
+
+  if (state.cameraMode === "focus") {
+    const player = getPlayer();
+    scale = Math.max(fitScale, Math.min(1.02, fitScale * 2.25));
+    if (player) {
+      const focusPoint = hexToPixel(player, bounds);
+      offsetX = panelWidth / 2 - focusPoint.x * scale;
+      offsetY = panelHeight * 0.56 - focusPoint.y * scale;
+    }
+  }
 
   elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
   elements.board.style.setProperty("--board-height", `${logicalHeight}px`);

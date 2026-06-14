@@ -148,6 +148,10 @@ h2 {
   height: var(--board-height, 620px);
   transform: scale(var(--board-scale, 1));
   transform-origin: top left;
+  transition:
+    left 360ms ease,
+    top 360ms ease,
+    transform 360ms ease;
 }
 
 .hex {
@@ -208,6 +212,15 @@ h2 {
 .entity.enemy {
   background: var(--enemy);
   color: #2f100b;
+}
+
+.entity.boss {
+  width: 52px;
+  height: 52px;
+  border-color: rgba(255, 222, 122, 0.92);
+  box-shadow:
+    0 0 0 4px rgba(240, 202, 100, 0.2),
+    0 0 26px rgba(240, 202, 100, 0.42);
 }
 
 .entity.hit {
