@@ -16,6 +16,7 @@ const directions = [
 
 const elements = {
   board: document.querySelector("#board"),
+  boardPanel: document.querySelector(".board-panel"),
   runSummary: document.querySelector("#runSummary"),
   playerHp: document.querySelector("#playerHp"),
   deckCount: document.querySelector("#deckCount"),
@@ -1095,6 +1096,7 @@ function renderBoard() {
   [...elements.board.children].forEach((child) => {
     if (!child.classList.contains("damage-pop")) child.remove();
   });
+  elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
 
@@ -1125,6 +1127,81 @@ function renderBoard() {
     elements.board.append(div);
   }
 
+  renderOffscreenEnemyIndicators(bounds);
+}
+
+function renderOffscreenEnemyIndicators(bounds) {
+  if (state.cameraMode !== "focus") return;
+  const player = getPlayer();
+  if (!player) return;
+
+  const panelWidth = elements.boardPanel.clientWidth;
+  const panelHeight = elements.boardPanel.clientHeight;
+  const scale = Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || 1;
+  const offsetX = Number.parseFloat(elements.board.style.left) || 0;
+  const offsetY = Number.parseFloat(elements.board.style.top) || 0;
+  const playerPoint = screenPointForHex(player, bounds, scale, offsetX, offsetY);
+  const visible = {
+    left: 60,
+    right: panelWidth - 60,
+    top: Math.min(panelHeight - 72, Math.max(132, panelHeight * 0.16)),
+    bottom: panelHeight - 50,
+  };
+  const occupied = [];
+
+  aliveEnemies().forEach((enemy) => {
+    const enemyPoint = screenPointForHex(enemy, bounds, scale, offsetX, offsetY);
+    if (isPointInside(enemyPoint, visible)) return;
+
+    const dx = enemyPoint.x - playerPoint.x;
+    const dy = enemyPoint.y - playerPoint.y;
+    const position = placeOffscreenIndicator(enemyPoint, visible, occupied);
+    const indicator = document.createElement("div");
+    indicator.className = `offscreen-indicator ${enemy.boss ? "boss" : ""}`;
+    indicator.style.left = `${position.x}px`;
+    indicator.style.top = `${position.y}px`;
+    indicator.innerHTML = `
+      <span class="offscreen-arrow">${directionArrow(dx, dy)}</span>
+      <span class="offscreen-enemy">${enemy.boss ? "보" : enemy.monsterIndex}</span>
+      <span class="offscreen-distance">${axialDistance(player, enemy)}</span>
+      <span class="offscreen-unit">칸</span>
+    `;
+    elements.boardPanel.append(indicator);
+  });
+}
+
+function screenPointForHex(hex, bounds, scale, offsetX, offsetY) {
+  const point = hexToPixel(hex, bounds);
+  return {
+    x: offsetX + point.x * scale,
+    y: offsetY + point.y * scale,
+  };
+}
+
+function isPointInside(point, bounds) {
+  return point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom;
+}
+
+function placeOffscreenIndicator(point, visible, occupied) {
+  const position = {
+    x: Math.max(visible.left, Math.min(visible.right, point.x)),
+    y: Math.max(visible.top, Math.min(visible.bottom, point.y)),
+  };
+  for (let tries = 0; tries < 8; tries += 1) {
+    const overlaps = occupied.some((item) => Math.abs(item.x - position.x) < 58 && Math.abs(item.y - position.y) < 36);
+    if (!overlaps) break;
+    position.y = Math.min(visible.bottom, position.y + 34);
+    if (position.y >= visible.bottom) position.y = Math.max(visible.top, position.y - 68);
+  }
+  occupied.push({ ...position });
+  return position;
+}
+
+function directionArrow(dx, dy) {
+  const angle = Math.atan2(dy, dx);
+  const arrows = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
+  const index = Math.round(angle / (Math.PI / 4));
+  return arrows[(index + 8) % 8];
 }
 
 function renderHud() {

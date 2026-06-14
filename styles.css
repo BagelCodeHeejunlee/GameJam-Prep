@@ -223,6 +223,60 @@ h2 {
     0 0 26px rgba(240, 202, 100, 0.42);
 }
 
+.offscreen-indicator {
+  position: absolute;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 66px;
+  padding: 5px 7px;
+  border: 1px solid rgba(240, 124, 100, 0.68);
+  border-radius: 999px;
+  background: rgba(17, 20, 18, 0.82);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+}
+
+.offscreen-indicator.boss {
+  border-color: rgba(240, 202, 100, 0.86);
+}
+
+.offscreen-arrow {
+  color: #f0ca64;
+  font-size: 16px;
+}
+
+.offscreen-enemy {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  background: var(--enemy);
+  color: #2f100b;
+  font-size: 11px;
+}
+
+.offscreen-indicator.boss .offscreen-enemy {
+  background: #f0ca64;
+}
+
+.offscreen-distance {
+  min-width: 12px;
+  text-align: right;
+}
+
+.offscreen-unit {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .entity.hit {
   animation: entity-hit 280ms ease;
   box-shadow:
