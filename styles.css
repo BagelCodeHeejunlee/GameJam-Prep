@@ -617,14 +617,108 @@ h2 {
   word-break: keep-all;
 }
 
-.action-list {
+.reveal-card .action-list,
+.reward-card .action-list {
   display: grid;
-  gap: 4px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-.action-line {
-  display: block;
+.reveal-card .action-line,
+.reward-card .action-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin-top: 0;
+}
+
+.reveal-card .action-stat,
+.reward-card .action-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 3px 7px 3px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.reveal-card .action-icon,
+.reward-card .action-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.reveal-card .action-icon.attack,
+.reward-card .action-icon.attack {
+  color: #ffb7a6;
+}
+
+.reveal-card .action-icon.move,
+.reveal-card .action-icon.move-flee,
+.reward-card .action-icon.move,
+.reward-card .action-icon.move-flee {
+  color: #9fd0ff;
+}
+
+.reveal-card .action-icon.range,
+.reward-card .action-icon.range {
+  color: #cfc8ff;
+}
+
+.reveal-card .action-note,
+.reward-card .action-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reveal-card .pattern-icon,
+.reward-card .pattern-icon {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 28px;
+}
+
+.reveal-card .pattern-icon i,
+.reward-card .pattern-icon i {
+  position: absolute;
+  top: 3px;
+  width: 24px;
+  height: 22px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: rgba(217, 185, 110, 0.22);
+  border: 1px solid rgba(217, 185, 110, 0.8);
+}
+
+.reveal-card .pattern-icon i:first-child,
+.reward-card .pattern-icon i:first-child {
+  left: 0;
+}
+
+.reveal-card .pattern-icon i:last-child,
+.reward-card .pattern-icon i:last-child {
+  left: 19px;
 }
 
 .reveal-card .priority {

@@ -1135,8 +1135,54 @@ function describeCard(cardData) {
 
 function renderActionList(cardData) {
   return `<span class="action-list">${cardData.actions
-    .map((action) => `<span class="action-line">${describeAction(action)}</span>`)
+    .map(renderActionLine)
     .join("")}</span>`;
+}
+
+function renderActionLine(action) {
+  if (action.type === "move") {
+    return `<span class="action-line">${actionStat("move", "이동", action.amount)}</span>`;
+  }
+  if (action.type === "flee") {
+    return `<span class="action-line">${actionStat("move flee", "도망", action.amount)}<span class="action-note">도망</span></span>`;
+  }
+  if (action.type === "attack") {
+    const targetStat = action.targets ? actionStat("target", "타겟 수", action.targets) : "";
+    const pushStat = action.push ? `<span class="action-note">밀기 ${action.push}</span>` : "";
+    return `<span class="action-line">${actionStat("attack", "공격", action.mult)}${actionStat("range", "사거리", action.range)}${targetStat}${pushStat}</span>`;
+  }
+  if (action.type === "patternAttack") {
+    return `<span class="action-line">${patternIcon(action.pattern)}${actionStat("attack", "공격", action.mult)}${actionStat("range", "사거리", action.range)}</span>`;
+  }
+  if (action.type === "charge") {
+    return `<span class="action-line">${actionStat("charge", "차지", action.amount)}<span class="action-note">차지</span></span>`;
+  }
+  if (action.type === "permanent") {
+    return `<span class="action-line"><span class="action-note">영구 효과</span></span>`;
+  }
+  if (action.type === "placeObstacle") {
+    return `<span class="action-line">${actionStat("range", "사거리", action.range)}<span class="action-note">장애물 설치</span></span>`;
+  }
+  return `<span class="action-line"><span class="action-note">${action.type}</span></span>`;
+}
+
+function actionStat(kind, label, value) {
+  const icon = {
+    attack: "⚔",
+    move: "↗",
+    "move flee": "↙",
+    range: "◎",
+    target: "×",
+    charge: "+",
+  }[kind] ?? "?";
+  return `<span class="action-stat" title="${label}"><span class="action-icon ${kind.replaceAll(" ", "-")}">${icon}</span><b>${value}</b></span>`;
+}
+
+function patternIcon(pattern) {
+  if (pattern === "adjacent-pair") {
+    return `<span class="pattern-icon adjacent-pair" title="붙은 두 칸"><i></i><i></i></span>`;
+  }
+  return "";
 }
 
 function describeAction(action) {
