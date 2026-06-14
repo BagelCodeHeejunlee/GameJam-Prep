@@ -1159,8 +1159,8 @@ function renderActionLine(action) {
     const attackKind = action.melee || action.range <= 1 ? "melee" : "ranged";
     const parts = [
       actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult),
-      actionStat("range", "사거리", action.range),
     ];
+    if (attackKind !== "melee") parts.push(actionStat("range", "사거리", action.range));
     if (action.targets) parts.push(actionStat("target", "타겟 수", action.targets));
     if (action.push) parts.push(actionNote(`밀기 ${action.push}`));
     return `<span class="action-line">${actionGroup("attack", parts)}</span>`;
