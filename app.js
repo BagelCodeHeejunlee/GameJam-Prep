@@ -1195,14 +1195,14 @@ function actionStat(kind, label, value) {
 
 function actionIcon(kind) {
   const icons = {
-    melee: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5 20.5 8.5 9.7 19.3 4.8 20.4 5.9 15.5 15.5 3.5Z"/><path d="M13.8 5.8 18.2 10.2"/><path d="M7.4 14.2 9.8 16.6"/></svg>`,
+    melee: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 17.5 3.5 6.5V3.5h3l11 11"/><path d="M13 19 19 13"/><path d="M16 16 20 20"/><path d="M19 21 21 19"/></svg>`,
     ranged: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5C12.7 7 12.7 17 6 19.5"/><path d="M7.8 6.2C12.2 8.8 12.2 15.2 7.8 17.8"/><path d="M4 12H19"/><path d="M15.5 8.5 19.5 12 15.5 15.5"/></svg>`,
     move: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5H13L15.5 8.8 20 11.2V15H14.7L12.8 19.5H5.2L7.5 13.8V4.5Z"/><path d="M6.7 13.8H15.2"/><path d="M5.2 19.5H13"/></svg>`,
     "move-flee": `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5H13L15.5 8.8 20 11.2V15H14.7L12.8 19.5H5.2L7.5 13.8V4.5Z"/><path d="M6.7 13.8H15.2"/><path d="M5.2 19.5H13"/></svg>`,
-    range: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M9.2 8.6A4.8 4.8 0 0 1 16.8 12"/><path d="M16.8 12 14.5 10.6"/><path d="M16.8 12 15.3 14.2"/></svg>`,
+    range: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17.5C7.5 10.1 12.9 6.4 19 6.8"/><path d="M16.4 4.4 19 6.8 16.3 9"/><circle cx="5" cy="17.5" r="1.8"/><circle cx="19" cy="6.8" r="1.8"/></svg>`,
     charge: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V19"/><path d="M5 12H19"/></svg>`,
+    target: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2"/></svg>`,
   };
-  if (kind === "target") return '<i></i><i></i>';
   return icons[kind] ?? "?";
 }
 

@@ -767,17 +767,7 @@ h2 {
 
 .reveal-card .action-icon.target,
 .reward-card .action-icon.target {
-  display: flex;
-  gap: 2px;
   color: #d7f2c2;
-}
-
-.reveal-card .action-icon.target i,
-.reward-card .action-icon.target i {
-  width: 7px;
-  height: 7px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
 }
 
 .reveal-card .action-note,
