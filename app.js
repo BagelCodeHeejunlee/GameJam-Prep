@@ -37,20 +37,16 @@ const elements = {
 };
 
 const baseArcherCards = [
-  card("move-1", "이동", "기본", "기본", 68, [{ type: "move", amount: 2 }], 4),
-  card("shot-1", "사격", "기본", "기본", 36, [{ type: "attack", mult: 2, range: 2 }], 4),
-  card(
-    "shot-move-1",
-    "사격 후 이동",
-    "기본",
-    "기본",
-    42,
-    [
-      { type: "attack", mult: 2, range: 2 },
-      { type: "move", amount: 2 },
-    ],
-    1,
-  ),
+  card("advance-shot", "전진 사격", "기본", "기본", 44, [
+    { type: "move", amount: 2 },
+    { type: "attack", mult: 1, range: 2 },
+  ], 3),
+  card("shot-step", "사격 후 이동", "기본", "기본", 42, [
+    { type: "attack", mult: 1, range: 2 },
+    { type: "move", amount: 2 },
+  ], 2),
+  card("aimed-shot", "정조준", "기본", "기본", 34, [{ type: "attack", mult: 2, range: 2 }], 1),
+  card("reposition", "재배치", "기본", "기본", 66, [{ type: "move", amount: 3 }], 1),
   card(
     "paired-hex-shot",
     "붙은 두 칸 공격",
@@ -102,13 +98,21 @@ const rewardPool = [
 ];
 
 const enemyCards = [
-  card("enemy-move", "이동", "적", "기본", 64, [{ type: "move", amount: 2, desiredRange: 1 }], 4),
-  card("enemy-claw", "근접 공격", "적", "기본", 52, [
+  card("enemy-advance-claw", "접근 공격", "적", "기본", 58, [
+    { type: "move", amount: 2, desiredRange: 1 },
+    { type: "attack", mult: 1, range: 1, melee: true },
+  ], 3),
+  card("enemy-claw-step", "공격 후 접근", "적", "기본", 54, [
+    { type: "attack", mult: 1, range: 1, melee: true },
+    { type: "move", amount: 1, desiredRange: 1 },
+  ], 2),
+  card("enemy-move", "이동", "적", "기본", 66, [{ type: "move", amount: 2, desiredRange: 1 }], 1),
+  card("enemy-claw", "근접 공격", "적", "기본", 50, [
     { type: "attack", mult: 2, range: 1, melee: true },
-  ], 4),
+  ], 1),
   card(
     "enemy-move-claw",
-    "이동 후 근접 공격",
+    "강한 접근 공격",
     "적",
     "기본",
     56,
