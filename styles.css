@@ -624,7 +624,7 @@ h2 {
 
 .reveal-card,
 .reward-card {
-  --card-art: url("assets/card-frame.png");
+  --card-art: url("assets/card-normal.png");
   --rarity-color: var(--accent);
 }
 
