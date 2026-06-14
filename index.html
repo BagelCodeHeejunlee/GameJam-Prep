@@ -1,120 +1,95 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Core Rush Prototype</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GameJam Prep - Hex Auto Battle</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="game-app">
-      <header class="topbar">
+    <main class="app-shell">
+      <section class="top-bar">
         <div>
-          <p class="eyebrow">Full-auto room roguelike</p>
-          <h1>Core Rush</h1>
+          <h1>궁수 오토배틀 프로토타입</h1>
+          <p id="runSummary">웨이브 1 / 턴 0</p>
         </div>
-        <button id="restartButton" class="icon-button" type="button" aria-label="재시작">↻</button>
-      </header>
+        <div class="controls">
+          <button id="newRunButton" type="button">새 런</button>
+          <button id="pauseButton" type="button">일시정지</button>
+        </div>
+      </section>
 
-      <main class="game-layout">
-        <section class="arena-shell" aria-label="전투 화면">
-          <div class="hud-grid">
-            <div class="meter">
-              <span>HP</span>
-              <div class="meter-track"><i id="hpBar"></i></div>
-              <b id="hpText">220/220</b>
-            </div>
-            <div class="meter shield">
-              <span>SHIELD</span>
-              <div class="meter-track"><i id="shieldBar"></i></div>
-              <b id="shieldText">0</b>
-            </div>
-            <div class="hud-chip">
-              <span>ROOM</span>
-              <b id="roomText">1/15</b>
-            </div>
-            <div class="hud-chip">
-              <span>PICKS</span>
-              <b id="pickText">0</b>
-            </div>
-          </div>
-
-          <div class="canvas-stage">
-            <canvas id="gameCanvas" aria-label="자동 전투 필드"></canvas>
-            <div class="arena-glass"></div>
-            <div class="combat-readout">
-              <span id="roomTypeText">NORMAL</span>
-              <span id="enemyText">0 ENEMIES</span>
-              <span id="timeText">00:00</span>
-            </div>
-            <div id="roomBanner" class="room-banner"></div>
-          </div>
+      <section class="game-layout">
+        <section class="board-panel">
+          <div id="board" class="board" aria-label="hex battle board"></div>
         </section>
 
-        <aside class="run-panel" aria-label="런 정보">
-          <section class="pilot-card">
-            <span class="label">CHARACTER</span>
-            <h2>표식 사수</h2>
-            <p>원거리 유지 · 표식 누적 · 보스 집중딜</p>
-            <dl>
-              <div>
-                <dt>무기</dt>
-                <dd>자동 석궁</dd>
-              </div>
-              <div>
-                <dt>자동 행동</dt>
-                <dd>거리 유지 후 원형 이동</dd>
-              </div>
-            </dl>
+        <aside class="side-panel">
+          <section class="stat-strip">
+            <div>
+              <span>궁수</span>
+              <strong id="playerHp">70 / 70</strong>
+            </div>
+            <div>
+              <span>덱</span>
+              <strong id="deckCount">10</strong>
+            </div>
+            <div>
+              <span>버림</span>
+              <strong id="discardCount">0</strong>
+            </div>
           </section>
 
-          <section class="build-panel">
-            <div class="section-head">
-              <span class="label">BUILD</span>
-              <b id="buildSummary">탄환 / 표식</b>
-            </div>
-            <div id="augmentList" class="augment-list"></div>
+          <section class="draw-panel">
+            <h2>이번 턴 카드</h2>
+            <div id="drawnCards" class="drawn-cards"></div>
+          </section>
+
+          <section class="timeline-panel">
+            <h2>우선권</h2>
+            <ol id="timeline" class="timeline"></ol>
+          </section>
+
+          <section class="log-panel">
+            <h2>전투 로그</h2>
+            <div id="battleLog" class="battle-log"></div>
           </section>
         </aside>
-      </main>
+      </section>
+    </main>
 
-      <div id="startOverlay" class="overlay">
-        <div class="modal start-modal">
-          <span class="label">PROTOTYPE</span>
-          <h2>15개의 방을 자동으로 돌파한다</h2>
-          <p>
-            전투 중 조작은 없다. 표식 사수가 자동으로 이동, 타겟팅, 공격한다.
-            방을 클리어할 때마다 3개 증강 중 하나를 골라 빌드를 만든다.
-          </p>
-          <div class="rule-row">
-            <span>5방 중간보스</span>
-            <span>10방 중간보스</span>
-            <span>15방 최종보스</span>
+    <div id="rewardOverlay" class="overlay hidden">
+      <section class="reward-modal">
+        <div class="reward-header">
+          <div>
+            <h2>웨이브 클리어</h2>
+            <p>보상 카드 1장을 선택</p>
           </div>
-          <button id="startButton" class="primary-button" type="button">시작</button>
+          <button id="iconHelpButton" class="icon-button" type="button" aria-label="아이콘 설명">?</button>
         </div>
-      </div>
+        <div id="rewardCards" class="reward-cards"></div>
+      </section>
+    </div>
 
-      <div id="rewardOverlay" class="overlay hidden">
-        <div class="modal reward-modal">
-          <div class="reward-title">
-            <span id="rewardLabel" class="label">ROOM CLEAR</span>
-            <h2 id="rewardTitle">증강 선택</h2>
-            <p id="rewardText">3개 후보 중 1개를 선택한다.</p>
-          </div>
-          <div id="choiceGrid" class="choice-grid"></div>
-          <button id="rerollButton" class="ghost-button" type="button">리롤 1회</button>
+    <div id="iconHelpOverlay" class="overlay hidden">
+      <section class="help-modal">
+        <div class="reward-header">
+          <h2>아이콘 설명</h2>
+          <button id="closeHelpButton" class="icon-button" type="button" aria-label="닫기">x</button>
         </div>
-      </div>
-
-      <div id="endOverlay" class="overlay hidden">
-        <div class="modal start-modal">
-          <span id="endLabel" class="label">RUN ENDED</span>
-          <h2 id="endTitle">스테이지 종료</h2>
-          <p id="endText">결과</p>
-          <button id="againButton" class="primary-button" type="button">다시 시작</button>
-        </div>
-      </div>
+        <dl class="icon-help-list">
+          <dt>ATK</dt>
+          <dd>기본 공격력에 곱하는 공격 배수</dd>
+          <dt>RNG</dt>
+          <dd>공격 가능한 사거리</dd>
+          <dt>MOV</dt>
+          <dd>이동 칸 수</dd>
+          <dt>TGT</dt>
+          <dd>동시에 공격 가능한 타겟 수</dd>
+          <dt>PRI</dt>
+          <dd>우선권. 숫자가 낮을수록 먼저 발동</dd>
+        </dl>
+      </section>
     </div>
 
     <script src="app.js"></script>
