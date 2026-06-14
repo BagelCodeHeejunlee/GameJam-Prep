@@ -24,6 +24,8 @@ const elements = {
   playerHp: document.querySelector("#playerHp"),
   deckCount: document.querySelector("#deckCount"),
   discardCount: document.querySelector("#discardCount"),
+  chargeCount: document.querySelector("#chargeCount"),
+  chargeHud: document.querySelector("#chargeHud"),
   drawnCards: document.querySelector("#drawnCards"),
   timeline: document.querySelector("#timeline"),
   battleLog: document.querySelector("#battleLog"),
@@ -101,7 +103,19 @@ const archerRewardPool = [
   card("charge", "차지", "차지", "노말", 30, [{ type: "charge", amount: 1 }]),
   card("charge-2", "차지 2", "차지", "레어", 28, [{ type: "charge", amount: 2 }]),
   card("charged-shot", "차지 샷", "차지", "레어", 34, [
-    { type: "attack", mult: 2, range: 3, consumeCharge: true },
+    { type: "attack", mult: 2, range: 3 },
+  ]),
+  card("charge-retreat", "후퇴 집중", "차지", "레어", 30, [
+    { type: "permanent", effect: "chargeRetreat", amount: 1 },
+  ]),
+  card("charge-range", "긴 조준", "차지", "에픽", 31, [
+    { type: "permanent", effect: "chargeRangePerStack", amount: 1 },
+  ]),
+  card("charge-overkill", "잔여 관통", "차지", "전설", 33, [
+    { type: "permanent", effect: "overkillSplashRange", amount: 3 },
+  ]),
+  card("charge-doubler", "과충전", "차지", "전설", 30, [
+    { type: "permanent", effect: "chargeStackMultiplier", amount: 2 },
   ]),
 ];
 
@@ -646,9 +660,12 @@ async function executeAction(actor, action, cardData) {
   }
   if (action.type === "charge") {
     actor.charge = (actor.charge ?? 0) + action.amount;
+    if (actor.permanent?.chargeRetreat) {
+      await moveActor(actor, { type: "flee", amount: actor.permanent.chargeRetreat, flee: true, ignoreCannotMove: true }, cardData);
+    }
     actor.temporary.cannotMove = true;
     log(`${actor.name} 차지 ${actor.charge}`);
-    return false;
+    return Boolean(actor.permanent?.chargeRetreat);
   }
   if (action.type === "permanent") {
     actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + action.amount;
@@ -754,16 +771,11 @@ function attack(actor, action) {
     return;
   }
 
+  const chargeBonus = consumeChargeForAttack(actor);
   for (const target of targets) {
     if (!isAlive(actor)) return;
     if (!isAlive(target)) continue;
-    let multiplier = action.mult;
-    if (action.consumeCharge && actor.charge) {
-      multiplier += actor.charge;
-      log(`${actor.name} 차지 ${actor.charge} 소비`);
-      actor.charge = 0;
-      actor.temporary.cannotMove = false;
-    }
+    let multiplier = action.mult + chargeBonus;
     if (actor.permanent?.comboDamage) {
       const key = `${actor.id}-${target.id}`;
       state.comboHits = state.comboHits ?? {};
@@ -774,39 +786,46 @@ function attack(actor, action) {
     const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
     const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty));
     const hitPosition = { q: target.q, r: target.r };
+    const beforeHp = target.hp;
     applyDamage(target, damage);
     renderBoard();
     renderHud();
     showHitEffect(target, hitPosition, damage);
     log(`${actor.name} -> ${target.name} ${damage} 피해`);
+    applyOverkillSplash(actor, target, damage - beforeHp);
     if (action.push && isAlive(target)) pushTarget(actor, target, action.push);
     if (action.pull && isAlive(target)) pullTarget(actor, target, action.pull);
   }
 }
 
 function patternAttack(actor, action) {
-  const placement = bestPatternPlacement(action.pattern, actor, action.range, actor.side);
+  const placement = bestPatternPlacement(action.pattern, actor, effectiveActionRange(actor, action), actor.side);
   if (!placement.tiles.length) {
     log(`${actor.name} 공격 실패`);
     return;
   }
 
+  const chargeBonus = consumeChargeForAttack(actor);
   placement.targets.forEach((target) => {
+    if (!isAlive(actor) || !isAlive(target)) return;
     const distance = axialDistance(actor, target);
     const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
-    const damage = Math.max(1, Math.round(actor.baseAtk * action.mult * adjacentPenalty));
+    const damage = Math.max(1, Math.round(actor.baseAtk * (action.mult + chargeBonus) * adjacentPenalty));
     const hitPosition = { q: target.q, r: target.r };
+    const beforeHp = target.hp;
     applyDamage(target, damage);
     renderBoard();
     renderHud();
     showHitEffect(target, hitPosition, damage);
     log(`${actor.name} -> ${target.name} ${damage} 피해`);
+    applyOverkillSplash(actor, target, damage - beforeHp);
   });
 }
 
 function selectTargets(actor, action) {
+  const range = effectiveActionRange(actor, action);
   const candidates = aliveOpponents(actor)
-    .filter((target) => canTarget(actor, target, action.range))
+    .filter((target) => canTarget(actor, target, range))
     .sort((a, b) => {
       if (a.hp !== b.hp) return a.hp - b.hp;
       const distanceA = axialDistance(actor, a);
@@ -819,7 +838,7 @@ function selectTargets(actor, action) {
 }
 
 async function moveActor(actor, action, cardData) {
-  if (actor.temporary?.cannotMove) {
+  if (actor.temporary?.cannotMove && !action.ignoreCannotMove) {
     log(`${actor.name} 이동 불가`);
     return;
   }
@@ -935,7 +954,9 @@ function nextAttackAction(cardData, currentAction) {
 function bestCombatMoveTile(actor, reachable, attackAction) {
   const opponents = aliveOpponents(actor);
   if (!opponents.length) return actor;
-  const desiredRange = attackAction?.range ?? attackAction?.desiredRange ?? actor.baseRange;
+  const desiredRange = attackAction?.type === "attack" || attackAction?.type === "patternAttack"
+    ? effectiveActionRange(actor, attackAction)
+    : (attackAction?.desiredRange ?? actor.baseRange);
   const candidateTiles = isMeleeAttackAction(attackAction) ? [actor, ...reachable] : reachable;
 
   const scored = candidateTiles.map((tile) => {
@@ -976,7 +997,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     return { hitCount: 0, lowestHp: Infinity, lowestIndex: 9999 };
   }
   if (attackAction.type === "patternAttack") {
-    const placement = bestPatternPlacement(attackAction.pattern, tile, attackAction.range, actor.side);
+    const placement = bestPatternPlacement(attackAction.pattern, tile, effectiveActionRange(actor, attackAction), actor.side);
     return {
       hitCount: placement.targets.length,
       lowestHp: placement.lowestHp,
@@ -984,7 +1005,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     };
   }
   const targets = aliveOpponents(actor).filter((target) =>
-    canTargetFromTile(tile, actor.side, target, attackAction.range),
+    canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction)),
   );
   return {
     hitCount: Math.min(targets.length, attackAction.targets ?? 1),
@@ -1083,14 +1104,19 @@ function nextForcedMoveTile(actor, target, current, mode) {
 }
 
 function placeTrap(actor, action) {
+  const opponents = aliveOpponents(actor);
   const reachable = state.tiles
     .filter((tile) => axialDistance(actor, tile) <= action.range)
     .filter((tile) => !sameHex(tile, actor))
     .filter((tile) => canEndMoveAt(tile, actor))
     .filter((tile) => !trapAt(tile))
     .sort((a, b) => {
-      const aNearEnemy = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(a, enemy)));
-      const bNearEnemy = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(b, enemy)));
+      if (!opponents.length) return Math.random() - 0.5;
+      const aBetween = isBetweenActorAndEnemy(actor, a, opponents);
+      const bBetween = isBetweenActorAndEnemy(actor, b, opponents);
+      if (aBetween !== bBetween) return aBetween ? -1 : 1;
+      const aNearEnemy = Math.min(...opponents.map((enemy) => axialDistance(a, enemy)));
+      const bNearEnemy = Math.min(...opponents.map((enemy) => axialDistance(b, enemy)));
       if (aNearEnemy !== bNearEnemy) return aNearEnemy - bNearEnemy;
       return axialDistance(actor, a) - axialDistance(actor, b);
     });
@@ -1113,6 +1139,53 @@ function placeTrap(actor, action) {
     });
   });
   log(`${actor.name} 함정 ${tiles.length}개 설치`);
+}
+
+function isBetweenActorAndEnemy(actor, tile, opponents) {
+  return opponents.some((enemy) => {
+    const actorToEnemy = axialDistance(actor, enemy);
+    return axialDistance(actor, tile) + axialDistance(tile, enemy) === actorToEnemy;
+  });
+}
+
+function effectiveActionRange(actor, action) {
+  const range = action?.range;
+  if (!range) return range;
+  return range + (actor.charge ?? 0) * (actor.permanent?.chargeRangePerStack ?? 0);
+}
+
+function consumeChargeForAttack(actor) {
+  const charge = actor.charge ?? 0;
+  if (!charge) return 0;
+  const multiplier = actor.permanent?.chargeStackMultiplier ?? 1;
+  const bonus = charge * multiplier;
+  log(`${actor.name} 차지 ${charge} 소비`);
+  actor.charge = 0;
+  actor.temporary.cannotMove = false;
+  renderHud();
+  return bonus;
+}
+
+function applyOverkillSplash(actor, defeatedTarget, overkillDamage) {
+  if (overkillDamage <= 0 || !actor.permanent?.overkillSplashRange) return;
+  const range = actor.permanent.overkillSplashRange;
+  const target = aliveOpponents(actor)
+    .filter((enemy) => enemy.id !== defeatedTarget.id)
+    .filter((enemy) => wallAwareDistance(defeatedTarget, enemy) <= range && hasLineOfSight(defeatedTarget, enemy))
+    .sort((a, b) => {
+      if (a.hp !== b.hp) return a.hp - b.hp;
+      const distanceA = axialDistance(defeatedTarget, a);
+      const distanceB = axialDistance(defeatedTarget, b);
+      if (distanceA !== distanceB) return distanceA - distanceB;
+      return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
+    })[0];
+  if (!target) return;
+  const hitPosition = { q: target.q, r: target.r };
+  applyDamage(target, overkillDamage);
+  renderBoard();
+  renderHud();
+  showHitEffect(target, hitPosition, overkillDamage);
+  log(`${actor.name} 잔여 관통 -> ${target.name} ${overkillDamage} 피해`);
 }
 
 function bestPatternPlacement(pattern, origin, range, side = origin.side) {
@@ -1469,6 +1542,8 @@ function renderHud() {
   elements.playerHp.textContent = player ? `${player.hp} / ${player.maxHp}` : `0 / ${character.maxHp}`;
   elements.deckCount.textContent = state.deck.length;
   elements.discardCount.textContent = state.discard.length;
+  elements.chargeCount.textContent = player ? player.charge ?? 0 : 0;
+  elements.chargeHud.textContent = player ? player.charge ?? 0 : 0;
   elements.pauseButton.textContent = state.paused ? "재개" : "일시정지";
   elements.characterButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.character === selectedCharacterId);
@@ -1648,7 +1723,7 @@ function renderActionLine(action) {
     return `<span class="action-line">${actionGroup("special", [actionStat("charge", "차지", action.amount), actionNote("차지")])}</span>`;
   }
   if (action.type === "permanent") {
-    return `<span class="action-line">${actionGroup("special", [actionNote("영구 효과")])}</span>`;
+    return `<span class="action-line">${actionGroup("special", [actionNote(permanentEffectLabel(action))])}</span>`;
   }
   if (action.type === "placeTrap" || action.type === "placeObstacle") {
     const trapName = (action.trap ?? action.obstacle) === "block" ? "봉쇄 함정" : "공격 함정";
@@ -1686,6 +1761,17 @@ function actionNote(text) {
   return `<span class="action-note">${text}</span>`;
 }
 
+function permanentEffectLabel(action) {
+  const labels = {
+    comboDamage: `연타 피해 +${Math.round(action.amount * 100)}%`,
+    chargeRetreat: `차지 시 후퇴 ${action.amount}`,
+    chargeRangePerStack: `차지당 사거리 +${action.amount}`,
+    overkillSplashRange: `처치 잔여 피해 ${action.amount}칸 전이`,
+    chargeStackMultiplier: `차지 스택 x${action.amount}`,
+  };
+  return labels[action.effect] ?? "영구 효과";
+}
+
 function patternIcon(pattern) {
   if (pattern === "adjacent-pair") {
     return `<span class="pattern-icon adjacent-pair" title="붙은 두 칸"><i></i><i></i></span>`;
@@ -1704,7 +1790,7 @@ function describeAction(action) {
   }
   if (action.type === "patternAttack") return `붙은 두 칸 ATK ${action.mult}, RNG ${action.range}`;
   if (action.type === "charge") return `차지 ${action.amount}`;
-  if (action.type === "permanent") return `영구 효과`;
+  if (action.type === "permanent") return permanentEffectLabel(action);
   if (action.type === "placeTrap" || action.type === "placeObstacle") return `함정 설치 RNG ${action.range}`;
   return action.type;
 }
