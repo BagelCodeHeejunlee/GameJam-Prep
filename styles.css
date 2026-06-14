@@ -489,14 +489,19 @@ h2 {
 }
 
 .card-reveal-list.sorted {
-  grid-template-rows: 1fr;
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: center;
+  align-items: center;
   align-content: center;
+  gap: 12px;
 }
 
 .card-reveal-list.sorted .reveal-card {
-  grid-row: 1;
+  flex: 0 0 clamp(150px, 43vw, 176px);
+  grid-row: auto;
   grid-column: auto;
-  justify-self: stretch;
+  justify-self: auto;
 }
 
 .reveal-card:nth-child(2) {
