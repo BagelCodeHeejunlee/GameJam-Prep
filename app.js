@@ -172,6 +172,8 @@ function newRun() {
     enemyDeck: [],
     enemyDiscard: [],
     currentTimeline: [],
+    activeTimelineIndex: -1,
+    completedTimelineCount: 0,
     log: [],
   };
 
@@ -231,6 +233,8 @@ function startWave(index) {
   state.waitingReward = false;
   state.busy = false;
   state.currentTimeline = [];
+  state.activeTimelineIndex = -1;
+  state.completedTimelineCount = 0;
 }
 
 function expandCards(cards) {
@@ -264,6 +268,8 @@ async function runTurn() {
   state.busy = true;
   state.turn += 1;
   state.currentTimeline = [];
+  state.activeTimelineIndex = -1;
+  state.completedTimelineCount = 0;
   state.comboHits = {};
 
   const player = getPlayer();
@@ -283,14 +289,22 @@ async function runTurn() {
 
   const entries = [...drawnEntries].sort(compareTimeline);
   state.currentTimeline = entries;
+  state.activeTimelineIndex = -1;
+  state.completedTimelineCount = 0;
   log(`턴 ${state.turn}: ${entries.map((entry) => entry.card.name).join(", ")}`);
   render();
   await playCardReveal(drawnEntries, entries);
 
   for (let index = 0; index < entries.length; index += 1) {
     if (state.finished || state.waitingReward) break;
+    state.activeTimelineIndex = index;
+    renderDrawnCards();
     renderTimeline(index);
     await executeTimelineEntry(entries[index]);
+    state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
+    state.activeTimelineIndex = -1;
+    renderDrawnCards();
+    renderTimeline();
     await sleep(TURN_DELAY);
     if (checkEndConditions()) break;
   }
@@ -1005,7 +1019,13 @@ function renderDrawnCards() {
   elements.drawnCards.innerHTML = "";
   state.currentTimeline.forEach((entry, index) => {
     const div = document.createElement("div");
-    div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"}`;
+    const statusClass = [
+      index < state.completedTimelineCount ? "done" : "",
+      index === state.activeTimelineIndex ? "active" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
     div.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
     div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? "궁" : "적"}</strong>`;
     elements.drawnCards.append(div);
@@ -1037,11 +1057,11 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   elements.cardRevealOverlay.className = "card-reveal-overlay";
   elements.cardRevealTitle.textContent = "우선권";
   renderRevealCards(drawnEntries);
-  await sleep(2000);
+  await sleep(1000);
 
   settleRevealCards();
   slideSortRevealCards(sortedEntries);
-  await sleep(820);
+  await sleep(2000);
 
   elements.cardRevealOverlay.classList.add("dock");
   await sleep(520);

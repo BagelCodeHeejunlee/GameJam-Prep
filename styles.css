@@ -401,6 +401,10 @@ h2 {
   background: rgba(37, 41, 37, 0.94);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
   overflow: hidden;
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
 }
 
 .order-chip span {
@@ -425,6 +429,16 @@ h2 {
 
 .order-chip.enemy {
   border-color: rgba(240, 124, 100, 0.88);
+}
+
+.order-chip.active {
+  transform: translateY(-2px);
+  filter: brightness(1.18);
+}
+
+.order-chip.done {
+  opacity: 0.34;
+  filter: grayscale(0.7);
 }
 
 .reward-card strong {
