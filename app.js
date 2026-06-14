@@ -458,16 +458,13 @@ function attack(actor, action) {
 }
 
 function patternAttack(actor, action) {
-  const pattern = bestAdjacentPair(actor, action.range);
-  if (!pattern.length) {
+  const placement = bestPatternPlacement(action.pattern, actor, action.range, actor.side);
+  if (!placement.tiles.length) {
     log(`${actor.name} 공격 실패`);
     return;
   }
 
-  const targets = aliveOpponents(actor).filter((target) =>
-    pattern.some((hex) => sameHex(hex, target)),
-  );
-  targets.forEach((target) => {
+  placement.targets.forEach((target) => {
     const damage = Math.max(1, Math.round(actor.baseAtk * action.mult));
     const hitPosition = { q: target.q, r: target.r };
     applyDamage(target, damage);
@@ -643,11 +640,10 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     return { hitCount: 0, lowestIndex: 9999 };
   }
   if (attackAction.type === "patternAttack") {
-    const pair = bestAdjacentPair(tile, attackAction.range, actor.side);
-    const targets = aliveOpponents(actor).filter((target) => pair.some((hex) => sameHex(hex, target)));
+    const placement = bestPatternPlacement(attackAction.pattern, tile, attackAction.range, actor.side);
     return {
-      hitCount: targets.length,
-      lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0), 9999),
+      hitCount: placement.targets.length,
+      lowestIndex: placement.lowestIndex,
     };
   }
   const targets = aliveOpponents(actor).filter((target) =>
@@ -760,7 +756,16 @@ function placeObstacle(actor, action) {
   log(`${actor.name} 장애물 설치 (${tile.q}, ${tile.r})`);
 }
 
+function bestPatternPlacement(pattern, origin, range, side = origin.side) {
+  if (pattern === "adjacent-pair") return bestAdjacentPairPlacement(origin, range, side);
+  return { tiles: [], targets: [], lowestIndex: 9999 };
+}
+
 function bestAdjacentPair(actorOrTile, range, side = actorOrTile.side) {
+  return bestAdjacentPairPlacement(actorOrTile, range, side).tiles;
+}
+
+function bestAdjacentPairPlacement(actorOrTile, range, side = actorOrTile.side) {
   const origin = actorOrTile;
   const candidates = [];
   for (const tile of state.tiles) {
@@ -775,20 +780,21 @@ function bestAdjacentPair(actorOrTile, range, side = actorOrTile.side) {
       });
       if (targets.length) {
         candidates.push({
-          pair,
-          count: targets.length,
-          distance: Math.min(...pair.map((hex) => axialDistance(origin, hex))),
-          index: Math.min(...targets.map((target) => target.monsterIndex ?? 0)),
+          tiles: pair,
+          targets,
+          hitCount: targets.length,
+          distance: Math.min(...pair.map((hex) => wallAwareDistance(origin, hex))),
+          lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0)),
         });
       }
     }
   }
   candidates.sort((a, b) => {
-    if (a.count !== b.count) return b.count - a.count;
+    if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     if (a.distance !== b.distance) return a.distance - b.distance;
-    return a.index - b.index;
+    return a.lowestIndex - b.lowestIndex;
   });
-  return candidates[0]?.pair ?? [];
+  return candidates[0] ?? { tiles: [], targets: [], lowestIndex: 9999 };
 }
 
 function canTarget(actor, target, range) {
