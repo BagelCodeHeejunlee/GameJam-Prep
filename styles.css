@@ -702,7 +702,33 @@ h2 {
 
 .reveal-card .action-icon.range,
 .reward-card .action-icon.range {
+  position: relative;
   color: #cfc8ff;
+}
+
+.reveal-card .action-icon.range i,
+.reward-card .action-icon.range i {
+  position: relative;
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-left-color: transparent;
+  border-radius: 999px;
+  transform: rotate(-36deg);
+}
+
+.reveal-card .action-icon.range i::after,
+.reward-card .action-icon.range i::after {
+  position: absolute;
+  top: -4px;
+  right: -2px;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid currentColor;
+  content: "";
+  transform: rotate(28deg);
 }
 
 .reveal-card .action-icon.target,

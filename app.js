@@ -1185,7 +1185,7 @@ function actionStat(kind, label, value) {
     ranged: "🏹",
     move: "👟",
     "move-flee": "👟",
-    range: "◉",
+    range: "<i></i>",
     target: '<i></i><i></i>',
     charge: "+",
   }[kind] ?? "?";
