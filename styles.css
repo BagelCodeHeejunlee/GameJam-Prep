@@ -192,6 +192,7 @@ h2 {
   transform: translate(-50%, -50%);
   font-size: 12px;
   font-weight: 800;
+  overflow: visible;
   transition:
     left 260ms ease,
     top 260ms ease,
@@ -210,7 +211,10 @@ h2 {
 }
 
 .entity.hit {
-  transform: translate(-50%, -50%) scale(1.16);
+  animation: entity-hit 280ms ease;
+  box-shadow:
+    0 0 0 4px rgba(255, 242, 168, 0.35),
+    0 0 22px rgba(255, 242, 168, 0.55);
 }
 
 .entity.moving {
@@ -221,14 +225,84 @@ h2 {
     opacity 160ms ease;
 }
 
+.entity-label {
+  position: relative;
+  z-index: 2;
+}
+
+.hp-readout {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  z-index: 7;
+  min-width: 44px;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(13, 17, 15, 0.78);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.hp-bar {
+  position: absolute;
+  top: calc(100% + 19px);
+  left: 50%;
+  z-index: 7;
+  width: 46px;
+  height: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  transform: translateX(-50%);
+}
+
+.hp-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #78d27d;
+}
+
+.entity.enemy .hp-bar i {
+  background: #f0a064;
+}
+
 .damage-pop {
   position: absolute;
-  z-index: 20;
+  z-index: 40;
   color: #fff2a8;
+  font-size: 18px;
   font-weight: 900;
   pointer-events: none;
-  text-shadow: 0 1px 4px #000;
-  animation: pop 680ms ease forwards;
+  text-shadow:
+    0 2px 4px #000,
+    0 0 12px rgba(255, 220, 106, 0.62);
+  animation: pop 820ms ease forwards;
+}
+
+@keyframes entity-hit {
+  0% {
+    filter: brightness(1);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  28% {
+    filter: brightness(1.8);
+    transform: translate(calc(-50% - 3px), -50%) scale(1.14);
+  }
+  55% {
+    transform: translate(calc(-50% + 3px), -50%) scale(1.08);
+  }
+  100% {
+    filter: brightness(1);
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 @keyframes pop {

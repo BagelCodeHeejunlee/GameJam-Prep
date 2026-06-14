@@ -328,8 +328,8 @@ async function executeCard(actor, cardData) {
 
   for (const action of cardData.actions) {
     if (!isAlive(actor)) return;
-    await executeAction(actor, action, cardData);
-    render();
+    const rendered = await executeAction(actor, action, cardData);
+    if (!rendered) render();
     await sleep(TURN_DELAY * 0.7);
     if (checkEndConditions()) return;
   }
@@ -338,34 +338,35 @@ async function executeCard(actor, cardData) {
 async function executeAction(actor, action, cardData) {
   if (action.type === "move") {
     await moveActor(actor, action, cardData);
-    return;
+    return true;
   }
   if (action.type === "flee") {
     await moveActor(actor, { ...action, flee: true }, cardData);
-    return;
+    return true;
   }
   if (action.type === "attack") {
     attack(actor, action);
-    return;
+    return true;
   }
   if (action.type === "patternAttack") {
     patternAttack(actor, action);
-    return;
+    return true;
   }
   if (action.type === "charge") {
     actor.charge = (actor.charge ?? 0) + action.amount;
     actor.temporary.cannotMove = true;
     log(`${actor.name} 차지 ${actor.charge}`);
-    return;
+    return false;
   }
   if (action.type === "permanent") {
     actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + action.amount;
     log(`${actor.name} 영구 효과: ${action.effect}`);
-    return;
+    return false;
   }
   if (action.type === "placeObstacle") {
     placeObstacle(actor, action);
   }
+  return false;
 }
 
 function drawPlayerCard() {
@@ -426,8 +427,11 @@ function attack(actor, action) {
     const distance = axialDistance(actor, target);
     const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
     const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty));
+    const hitPosition = { q: target.q, r: target.r };
     applyDamage(target, damage);
-    showDamage(target, damage);
+    renderBoard();
+    renderHud();
+    showHitEffect(target, hitPosition, damage);
     log(`${actor.name} -> ${target.name} ${damage} 피해`);
     if (action.push && isAlive(target)) pushTarget(actor, target, action.push);
   }
@@ -445,8 +449,11 @@ function patternAttack(actor, action) {
   );
   targets.forEach((target) => {
     const damage = Math.max(1, Math.round(actor.baseAtk * action.mult));
+    const hitPosition = { q: target.q, r: target.r };
     applyDamage(target, damage);
-    showDamage(target, damage);
+    renderBoard();
+    renderHud();
+    showHitEffect(target, hitPosition, damage);
     log(`${actor.name} -> ${target.name} ${damage} 피해`);
   });
 }
@@ -688,8 +695,11 @@ function pushTarget(actor, target, amount) {
     if (!isTile(next) || !canEndMoveAt(next, target)) {
       const obstacle = state.obstacles.find((item) => sameHex(item, next));
       if (obstacle?.kind === "spike") {
+        const hitPosition = { q: target.q, r: target.r };
         applyDamage(target, actor.baseAtk * 2);
-        showDamage(target, actor.baseAtk * 2);
+        renderBoard();
+        renderHud();
+        showHitEffect(target, hitPosition, actor.baseAtk * 2);
         log(`${target.name} 가시 장애물 충돌`);
       }
       break;
@@ -939,6 +949,7 @@ function render() {
 }
 
 function renderBoard() {
+  const activeEffects = [...elements.board.querySelectorAll(".damage-pop")];
   elements.board.innerHTML = "";
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
@@ -959,12 +970,18 @@ function renderBoard() {
     const div = document.createElement("div");
     div.className = `entity ${entity.side}`;
     div.dataset.entityId = entity.id;
-    div.textContent = entity.side === "player" ? "궁" : entity.monsterIndex;
+    div.innerHTML = `
+      <span class="entity-label">${entity.side === "player" ? "궁" : entity.monsterIndex}</span>
+      <span class="hp-readout">${entity.hp}/${entity.maxHp}</span>
+      <span class="hp-bar" aria-hidden="true"><i style="width: ${hpPercent(entity)}%"></i></span>
+    `;
     div.title = `${entity.name} ${entity.hp}/${entity.maxHp}`;
     div.style.left = `${point.x}px`;
     div.style.top = `${point.y}px`;
     elements.board.append(div);
   }
+
+  activeEffects.forEach((effect) => elements.board.append(effect));
 }
 
 function renderHud() {
@@ -1109,10 +1126,26 @@ function entryLabel(entry) {
   return entry.actorType === "player" ? "궁수" : "기본 적";
 }
 
-function showDamage(target, damage) {
+function hpPercent(entity) {
+  if (!entity.maxHp) return 0;
+  return Math.max(0, Math.min(100, (entity.hp / entity.maxHp) * 100));
+}
+
+function showHitEffect(target, position, damage) {
+  showDamage(position, damage);
+  const entityElement = elements.board.querySelector(`[data-entity-id="${target.id}"]`);
+  if (!entityElement) return;
+
+  entityElement.classList.remove("hit");
+  entityElement.getBoundingClientRect();
+  entityElement.classList.add("hit");
+  window.setTimeout(() => entityElement.classList.remove("hit"), 280);
+}
+
+function showDamage(position, damage) {
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
-  const point = hexToPixel(target, bounds);
+  const point = hexToPixel(position, bounds);
   const div = document.createElement("div");
   div.className = "damage-pop";
   div.textContent = `-${damage}`;
