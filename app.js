@@ -1072,15 +1072,24 @@ async function playCardReveal(drawnEntries, sortedEntries) {
 function renderRevealCards(entries) {
   elements.cardRevealList.innerHTML = "";
   elements.cardRevealList.className = "card-reveal-list";
+  const sideCounts = entries.reduce(
+    (counts, entry) => {
+      const side = entry.actorType === "player" ? "player" : "enemy";
+      counts[side] += 1;
+      return counts;
+    },
+    { player: 0, enemy: 0 },
+  );
   entries.forEach((entry) => {
+    const side = entry.actorType === "player" ? "player" : "enemy";
     const div = document.createElement("article");
-    div.className = `reveal-card ${entry.actorType === "player" ? "player" : "enemy"}`;
+    div.className = `reveal-card ${side} ${sideCounts[side] === 1 ? "solo-side" : ""}`;
     div.dataset.entryKey = entryKey(entry);
     div.innerHTML = `
-      <strong>${entry.card.name}</strong>
-      <span>${entryLabel(entry)}</span>
-      <span class="priority">PRI ${entry.card.priority}</span>
-      ${renderActionList(entry.card)}
+      <span class="card-priority">${entry.card.priority}</span>
+      <strong class="card-title">${entry.card.name}</strong>
+      <span class="card-owner">${entryLabel(entry)}</span>
+      <span class="card-action-area">${renderActionList(entry.card)}</span>
     `;
     elements.cardRevealList.append(div);
   });

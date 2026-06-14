@@ -549,10 +549,10 @@ h2 {
 .reveal-card {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: 48px 18px minmax(0, 1fr);
   width: clamp(158px, 42vw, 190px);
-  min-height: 260px;
-  padding: 16px;
+  height: 260px;
+  padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
   background: rgba(37, 41, 37, 0.96);
@@ -564,16 +564,17 @@ h2 {
 
 .reveal-card.player {
   grid-row: 2;
-  grid-column: 1 / -1;
-  justify-self: center;
   border-color: rgba(126, 181, 255, 0.5);
 }
 
 .reveal-card.enemy {
   grid-row: 1;
+  border-color: rgba(240, 124, 100, 0.5);
+}
+
+.reveal-card.solo-side {
   grid-column: 1 / -1;
   justify-self: center;
-  border-color: rgba(240, 124, 100, 0.5);
 }
 
 .card-reveal-list.sorted {
@@ -601,27 +602,57 @@ h2 {
   animation: none;
 }
 
-.reveal-card strong {
-  display: block;
-  min-height: 54px;
-  font-size: 19px;
-  line-height: 1.25;
+.card-priority {
+  position: absolute;
+  top: 11px;
+  left: 11px;
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  margin: 0;
+  border: 1px solid rgba(217, 185, 110, 0.75);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1;
 }
 
-.reveal-card span {
+.card-title {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  padding: 0 28px;
+  font-size: 19px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.card-owner {
   display: block;
-  margin-top: 8px;
+  margin-top: 0;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
   word-break: keep-all;
+}
+
+.card-action-area {
+  display: block;
+  min-height: 0;
+  margin-top: 12px;
+  overflow: hidden;
 }
 
 .reveal-card .action-list,
 .reward-card .action-list {
   display: grid;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 0;
 }
 
 .reveal-card .action-line,
@@ -638,8 +669,8 @@ h2 {
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  min-height: 40px;
-  padding: 5px;
+  min-height: 38px;
+  padding: 4px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.2);
@@ -660,7 +691,7 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 28px;
+  min-height: 26px;
   padding: 1px 5px 1px 1px;
   border: 0;
   border-radius: 999px;
@@ -779,11 +810,6 @@ h2 {
 .reveal-card .pattern-icon i:last-child,
 .reward-card .pattern-icon i:last-child {
   left: 22px;
-}
-
-.reveal-card .priority {
-  color: var(--accent);
-  font-weight: 900;
 }
 
 .card-reveal-overlay.dock {
@@ -1017,13 +1043,13 @@ h2 {
 
   .reveal-card {
     width: clamp(150px, 43vw, 176px);
-    min-height: 238px;
+    height: 238px;
     padding: 13px;
   }
 
-  .reveal-card strong {
-    min-height: 48px;
+  .card-title {
     font-size: 17px;
+    line-height: 1.2;
   }
 
   .card-reveal-overlay.dock .card-reveal-stage {
