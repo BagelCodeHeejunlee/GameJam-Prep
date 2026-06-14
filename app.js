@@ -470,7 +470,9 @@ function patternAttack(actor, action) {
   }
 
   placement.targets.forEach((target) => {
-    const damage = Math.max(1, Math.round(actor.baseAtk * action.mult));
+    const distance = axialDistance(actor, target);
+    const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
+    const damage = Math.max(1, Math.round(actor.baseAtk * action.mult * adjacentPenalty));
     const hitPosition = { q: target.q, r: target.r };
     applyDamage(target, damage);
     renderBoard();
