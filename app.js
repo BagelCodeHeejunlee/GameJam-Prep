@@ -140,17 +140,16 @@ const baseWarriorCards = [
 
 const warriorRewardPool = [
   card("warrior-quick-slash", "빠른 베기", "공용", "노말", 42, [{ type: "attack", mult: 1, range: 1, melee: true }]),
-  card("warrior-short-rush", "짧은 돌진", "돌진", "노말", 55, [
-    { type: "rushAttack", amount: 3, mult: 1, range: 1 },
+  card("warrior-long-step", "긴 돌입", "돌진", "노말", 55, [{ type: "move", amount: 4, desiredRange: 1 }]),
+  card("warrior-berserk-cut", "피의 대가", "광전", "노말", 46, [
+    { type: "selfDamagePercent", percent: 0.1 },
+    { type: "attack", mult: 3, range: 1, melee: true },
   ]),
-  card("warrior-berserk-cut", "거친 베기", "광전", "노말", 46, [{ type: "attack", mult: 2, range: 1, melee: true }]),
   card("warrior-push", "밀어붙이기", "범위 공격", "노말", 46, [{ type: "attack", mult: 1, range: 1, melee: true, push: 1 }]),
   card("warrior-cleave-reward", "넓은 휩쓸기", "범위 공격", "레어", 48, [
     { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-pair", melee: true },
   ]),
-  card("warrior-breaking-rush", "분쇄 돌진", "돌진", "레어", 58, [
-    { type: "rushAttack", amount: 4, mult: 1, range: 1 },
-  ]),
+  card("warrior-jump-entry", "점프 진입", "돌진", "레어", 58, [{ type: "move", amount: 4, desiredRange: 1, jump: true }]),
   card("warrior-blood-chain", "피의 연격", "광전", "레어", 44, [
     { type: "attack", mult: 1, range: 1, melee: true },
     { type: "attack", mult: 1, range: 1, melee: true },
@@ -159,17 +158,22 @@ const warriorRewardPool = [
   card("warrior-triangle-cleave", "삼각 휩쓸기", "범위 공격", "에픽", 47, [
     { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
   ]),
-  card("warrior-overrun", "초과 돌파", "돌진", "에픽", 60, [
-    { type: "rushAttack", amount: 5, mult: 2, range: 1 },
+  card("warrior-overrun", "남은 힘 베기", "돌진", "에픽", 60, [
+    { type: "momentumAttack", amount: 5, mult: 1, range: 1 },
   ]),
-  card("warrior-rhythm", "전장의 리듬", "광전", "레어", 44, [
-    { type: "permanent", effect: "comboDamage", amount: 0.1 },
+  card("warrior-berserk-stance", "광전 태세", "광전", "레어", 44, [
+    { type: "permanent", effect: "berserkLostHpDamage", amount: 0.5 },
+  ]),
+  card("warrior-blood-recovery", "피의 회복", "광전", "레어", 40, [
+    { type: "attack", mult: 1, range: 1, melee: true },
+    { type: "healPercent", percent: 0.12 },
   ]),
   card("warrior-whirlwind", "피의 폭풍", "범위 공격", "전설", 45, [
     { type: "patternAttack", mult: 3, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
   ]),
-  card("warrior-endless-charge", "멈추지 않는 돌진", "돌진", "전설", 62, [
-    { type: "rushAttack", amount: 6, mult: 2, range: 1, perUnusedMoveBonus: 2 },
+  card("warrior-endless-charge", "멈추지 않는 돌입", "돌진", "전설", 62, [{ type: "move", amount: 6, desiredRange: 1, jump: true }]),
+  card("warrior-death-edge", "죽음의 칼끝", "광전", "전설", 38, [
+    { type: "permanent", effect: "lowHpDamage", amount: 0.5, threshold: 0.25 },
   ]),
 ];
 
@@ -686,8 +690,8 @@ async function executeAction(actor, action, cardData) {
     attack(actor, action);
     return true;
   }
-  if (action.type === "rushAttack") {
-    await rushAttack(actor, action);
+  if (action.type === "momentumAttack") {
+    await momentumAttack(actor, action);
     return true;
   }
   if (action.type === "patternAttack") {
@@ -705,6 +709,9 @@ async function executeAction(actor, action, cardData) {
   }
   if (action.type === "permanent") {
     actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + action.amount;
+    if (action.effect === "lowHpDamage") {
+      actor.permanent.lowHpDamageThreshold = Math.min(actor.permanent.lowHpDamageThreshold ?? 1, action.threshold ?? 0.25);
+    }
     log(`${actor.name} 영구 효과: ${action.effect}`);
     return false;
   }
@@ -723,6 +730,14 @@ async function executeAction(actor, action, cardData) {
   if (action.type === "detonateRune") {
     detonateRune(actor, action);
     return true;
+  }
+  if (action.type === "selfDamagePercent") {
+    selfDamagePercent(actor, action.percent);
+    return false;
+  }
+  if (action.type === "healPercent") {
+    healPercent(actor, action.percent);
+    return false;
   }
   return false;
 }
@@ -832,7 +847,7 @@ function attack(actor, action) {
     }
     const distance = axialDistance(actor, target);
     const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
-    const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty));
+    const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty * actorDamageMultiplier(actor)));
     const hitPosition = { q: target.q, r: target.r };
     const beforeHp = target.hp;
     applyDamage(target, damage);
@@ -859,7 +874,10 @@ function patternAttack(actor, action) {
     if (!isAlive(actor) || !isAlive(target)) return;
     const distance = axialDistance(actor, target);
     const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
-    const damage = Math.max(1, Math.round(actor.baseAtk * (action.mult + chargeBonus + targetBonus) * adjacentPenalty));
+    const damage = Math.max(
+      1,
+      Math.round(actor.baseAtk * (action.mult + chargeBonus + targetBonus) * adjacentPenalty * actorDamageMultiplier(actor)),
+    );
     const hitPosition = { q: target.q, r: target.r };
     const beforeHp = target.hp;
     applyDamage(target, damage);
@@ -923,7 +941,7 @@ async function moveActor(actor, action, cardData) {
   return { moved, unused: Math.max(0, amount - moved) };
 }
 
-async function rushAttack(actor, action) {
+async function momentumAttack(actor, action) {
   const followUpAttack = { type: "attack", mult: action.mult, range: action.range ?? 1, melee: true };
   const moveAction = {
     type: "move",
@@ -942,6 +960,42 @@ async function rushAttack(actor, action) {
     range: action.range ?? 1,
     melee: true,
   });
+}
+
+function actorDamageMultiplier(actor) {
+  if (!actor) return 1;
+  let bonus = 0;
+  if (actor.permanent?.berserkLostHpDamage && actor.maxHp) {
+    const lostHpRatio = Math.max(0, (actor.maxHp - actor.hp) / actor.maxHp);
+    bonus += lostHpRatio * actor.permanent.berserkLostHpDamage;
+  }
+  if (actor.permanent?.lowHpDamage && actor.maxHp) {
+    const hpRatio = actor.hp / actor.maxHp;
+    const threshold = actor.permanent.lowHpDamageThreshold ?? 0.25;
+    if (hpRatio < threshold) bonus += actor.permanent.lowHpDamage;
+  }
+  return 1 + bonus;
+}
+
+function selfDamagePercent(actor, percent) {
+  if (!isAlive(actor)) return;
+  const damage = Math.max(1, Math.round(actor.maxHp * percent));
+  const hitPosition = { q: actor.q, r: actor.r };
+  actor.hp = Math.max(1, actor.hp - damage);
+  renderBoard();
+  renderHud();
+  showHitEffect(actor, hitPosition, damage);
+  log(`${actor.name} 체력 ${damage} 감소`);
+}
+
+function healPercent(actor, percent) {
+  if (!isAlive(actor)) return;
+  const amount = Math.max(1, Math.round(actor.maxHp * percent));
+  const beforeHp = actor.hp;
+  actor.hp = Math.min(actor.maxHp, actor.hp + amount);
+  renderBoard();
+  renderHud();
+  log(`${actor.name} 체력 ${actor.hp - beforeHp} 회복`);
 }
 
 function findMovePath(actor, destination, jump = false) {
@@ -1327,7 +1381,7 @@ function dealActionDamage(actor, target, multiplier, melee = false) {
   if (!isAlive(actor) || !isAlive(target)) return;
   const distance = axialDistance(actor, target);
   const adjacentPenalty = !melee && distance <= 1 ? 0.7 : 1;
-  const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty));
+  const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty * actorDamageMultiplier(actor)));
   const hitPosition = { q: target.q, r: target.r };
   const beforeHp = target.hp;
   applyDamage(target, damage);
@@ -1920,11 +1974,11 @@ function renderActionLine(action) {
     if (action.pull) parts.push(actionNote(`당기기 ${action.pull}`));
     return `<span class="action-line">${actionGroup("attack", parts)}</span>`;
   }
-  if (action.type === "rushAttack") {
+  if (action.type === "momentumAttack") {
     return `<span class="action-line">${actionGroup("attack", [
-      actionStat("move", "돌진 이동", action.amount),
+      actionStat("move", "이동", action.amount),
       actionStat("melee", "근거리 공격", action.mult),
-      actionNote(`남은 이동 x${action.perUnusedMoveBonus ?? 1}`),
+      actionNote(`남은 이동 공격 x${action.perUnusedMoveBonus ?? 1}`),
     ])}</span>`;
   }
   if (action.type === "patternAttack") {
@@ -1966,6 +2020,12 @@ function renderActionLine(action) {
       actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
+  if (action.type === "selfDamagePercent") {
+    return `<span class="action-line">${actionGroup("special", [actionNote(`체력 -${Math.round(action.percent * 100)}%`)])}</span>`;
+  }
+  if (action.type === "healPercent") {
+    return `<span class="action-line">${actionGroup("special", [actionNote(`회복 ${Math.round(action.percent * 100)}%`)])}</span>`;
+  }
   return `<span class="action-line">${actionGroup("special", [actionNote(action.type)])}</span>`;
 }
 
@@ -2002,6 +2062,8 @@ function permanentEffectLabel(action) {
     chargeRangePerStack: `차지당 사거리 +${action.amount}`,
     overkillSplashRange: `처치 잔여 피해 ${action.amount}칸 전이`,
     chargeStackMultiplier: `차지 스택 x${action.amount}`,
+    berserkLostHpDamage: `잃은 체력 비율 / 2 피해 증가`,
+    lowHpDamage: `체력 ${Math.round((action.threshold ?? 0.25) * 100)}% 미만 피해 +${Math.round(action.amount * 100)}%`,
   };
   return labels[action.effect] ?? "영구 효과";
 }
@@ -2026,7 +2088,7 @@ function describeAction(action) {
     const exactText = action.exactRange != null ? `, 정확히 ${action.exactRange}칸` : "";
     return `ATK ${action.mult}, RNG ${action.range}${exactText}${targetText}${pushText}${pullText}`;
   }
-  if (action.type === "rushAttack") return `돌진 ${action.amount}, ATK ${action.mult}, 남은 이동 x${action.perUnusedMoveBonus ?? 1}`;
+  if (action.type === "momentumAttack") return `이동 ${action.amount}, ATK ${action.mult}, 남은 이동 공격 x${action.perUnusedMoveBonus ?? 1}`;
   if (action.type === "patternAttack") {
     const patternText = action.pattern === "adjacent-triple" ? "붙은 세 칸" : "붙은 두 칸";
     return `${patternText} ATK ${action.mult}, RNG ${action.range}`;
@@ -2038,6 +2100,8 @@ function describeAction(action) {
   if (action.type === "fleeToRune") return `룬 쪽 후퇴 ${action.amount}`;
   if (action.type === "runeAttack") return `룬 주변 ATK ${action.mult}`;
   if (action.type === "detonateRune") return `룬 폭파 ATK ${action.mult}`;
+  if (action.type === "selfDamagePercent") return `체력 -${Math.round(action.percent * 100)}%`;
+  if (action.type === "healPercent") return `회복 ${Math.round(action.percent * 100)}%`;
   return action.type;
 }
 
