@@ -385,11 +385,6 @@ h2 {
   margin-top: 7px;
 }
 
-.reward-card {
-  border: 1px solid var(--line);
-  background: #252925;
-}
-
 .order-chip {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -439,19 +434,6 @@ h2 {
 .order-chip.done {
   opacity: 0.34;
   filter: grayscale(0.7);
-}
-
-.reward-card strong {
-  display: block;
-  font-size: 14px;
-}
-
-.reward-card span {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 .timeline {
@@ -546,6 +528,32 @@ h2 {
   display: none;
 }
 
+.reveal-card,
+.reward-card {
+  --card-art: url("assets/card-frame.png");
+  --rarity-color: var(--accent);
+}
+
+.rarity-normal {
+  --card-art: url("assets/card-normal.png");
+  --rarity-color: #c9ced0;
+}
+
+.rarity-rare {
+  --card-art: url("assets/card-rare.png");
+  --rarity-color: #7eb5ff;
+}
+
+.rarity-epic {
+  --card-art: url("assets/card-epic.png");
+  --rarity-color: #c49cff;
+}
+
+.rarity-legendary {
+  --card-art: url("assets/card-legendary.png");
+  --rarity-color: #f0ca64;
+}
+
 .reveal-card {
   position: relative;
   display: grid;
@@ -557,7 +565,7 @@ h2 {
   border-radius: 8px;
   background:
     linear-gradient(rgba(18, 23, 18, 0.2), rgba(11, 14, 12, 0.36)),
-    url("assets/card-frame.png") center / cover no-repeat,
+    var(--card-art) center / cover no-repeat,
     rgba(37, 41, 37, 0.96);
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
   transform: translateY(12px) scale(0.96);
@@ -879,35 +887,66 @@ h2 {
 }
 
 .reward-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: center;
   gap: 12px;
+  overflow-x: auto;
+  padding: 2px 2px 10px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.reward-cards::-webkit-scrollbar {
+  display: none;
 }
 
 .reward-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 190px;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: grid;
+  flex: 0 0 clamp(158px, 30vw, 190px);
+  grid-template-rows: 48px 18px minmax(0, 1fr);
+  width: clamp(158px, 30vw, 190px);
+  height: 260px;
   padding: 14px;
-  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(18, 23, 18, 0.12), rgba(11, 14, 12, 0.28)),
+    var(--card-art) center / cover no-repeat,
+    rgba(37, 41, 37, 0.96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+  color: var(--text);
+  font: inherit;
+  overflow: hidden;
+  scroll-snap-align: center;
+  text-align: center;
 }
 
 .reward-card .rarity {
-  color: var(--accent);
-  font-weight: 800;
+  color: var(--rarity-color);
+  font-weight: 900;
 }
 
 .reward-card .route {
   color: var(--accent-2);
 }
 
-.reward-card .spacer {
-  flex: 1;
+.reward-card .card-action-area {
+  padding-bottom: 20px;
 }
 
 .reward-card .pick {
-  margin-top: 12px;
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  left: 14px;
   color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  opacity: 0.78;
 }
 
 .icon-help-list {
@@ -994,15 +1033,6 @@ h2 {
     margin-top: 6px;
   }
 
-  .reward-card strong {
-    font-size: 12px;
-  }
-
-  .reward-card span {
-    font-size: 10px;
-    line-height: 1.3;
-  }
-
   .timeline {
     gap: 5px;
     margin-top: 6px;
@@ -1034,13 +1064,15 @@ h2 {
   }
 
   .reward-card {
-    min-height: 132px;
-    padding: 11px;
+    flex-basis: clamp(150px, 43vw, 176px);
+    width: clamp(150px, 43vw, 176px);
+    height: 238px;
+    padding: 13px;
   }
 
   .reward-cards {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 10px;
   }
 
   .reveal-card {

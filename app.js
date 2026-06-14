@@ -928,13 +928,12 @@ function showRewards() {
   rewards.forEach((reward) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "reward-card";
+    button.className = `reward-card ${rarityClass(reward.rarity)}`;
     button.innerHTML = `
-      <strong>${reward.name}</strong>
-      <span class="rarity">${reward.rarity}</span>
-      <span class="route">${reward.route}</span>
-      ${renderActionList(reward)}
-      <span class="spacer"></span>
+      <span class="card-priority">${reward.priority}</span>
+      <strong class="card-title">${reward.name}</strong>
+      <span class="card-owner"><span class="rarity">${reward.rarity}</span> · <span class="route">${reward.route}</span></span>
+      <span class="card-action-area">${renderActionList(reward)}</span>
       <span class="pick">선택</span>
     `;
     button.addEventListener("click", () => pickReward(reward));
@@ -1083,7 +1082,7 @@ function renderRevealCards(entries) {
   entries.forEach((entry) => {
     const side = entry.actorType === "player" ? "player" : "enemy";
     const div = document.createElement("article");
-    div.className = `reveal-card ${side} ${sideCounts[side] === 1 ? "solo-side" : ""}`;
+    div.className = `reveal-card ${side} ${rarityClass(entry.card.rarity)} ${sideCounts[side] === 1 ? "solo-side" : ""}`;
     div.dataset.entryKey = entryKey(entry);
     div.innerHTML = `
       <span class="card-priority">${entry.card.priority}</span>
@@ -1093,6 +1092,16 @@ function renderRevealCards(entries) {
     `;
     elements.cardRevealList.append(div);
   });
+}
+
+function rarityClass(rarity) {
+  const classes = {
+    노말: "rarity-normal",
+    레어: "rarity-rare",
+    에픽: "rarity-epic",
+    전설: "rarity-legendary",
+  };
+  return classes[rarity] ?? "";
 }
 
 function slideSortRevealCards(sortedEntries) {
