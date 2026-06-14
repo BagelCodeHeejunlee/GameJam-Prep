@@ -1189,10 +1189,6 @@ function screenPointForHex(hex, bounds, scale, offsetX, offsetY) {
   };
 }
 
-function isPointInside(point, bounds) {
-  return point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom;
-}
-
 function placeOffscreenIndicator(point, visible, occupied) {
   const position = {
     x: Math.max(visible.left, Math.min(visible.right, point.x)),
@@ -1524,14 +1520,12 @@ function fitBoardToPanel(bounds = boardBounds()) {
   let offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
   let offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
 
-  if (state.cameraMode === "focus") {
-    const player = getPlayer();
+  const player = getPlayer();
+  if (state.cameraMode === "focus" && player) {
     scale = Math.max(fitScale, Math.min(1.02, fitScale * 2.25));
-    if (player) {
-      const focusPoint = hexToPixel(player, bounds);
-      offsetX = panelWidth / 2 - focusPoint.x * scale;
-      offsetY = panelHeight * 0.56 - focusPoint.y * scale;
-    }
+    const focusPoint = hexToPixel(player, bounds);
+    offsetX = panelWidth / 2 - focusPoint.x * scale;
+    offsetY = panelHeight * 0.56 - focusPoint.y * scale;
   }
 
   elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
