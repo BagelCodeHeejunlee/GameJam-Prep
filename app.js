@@ -774,12 +774,14 @@ function bestAdjacentPairPlacement(actorOrTile, range, side = actorOrTile.side) 
   const origin = actorOrTile;
   const candidates = [];
   for (const tile of state.tiles) {
-    if (wallAwareDistance(origin, tile) > range || !hasLineOfSight(origin, tile)) continue;
     for (const dir of directions) {
       const other = { q: tile.q + dir.q, r: tile.r + dir.r };
       if (!isTile(other)) continue;
-      if (wallAwareDistance(origin, other) > range || !hasLineOfSight(origin, other)) continue;
       const pair = [tile, other];
+      const anchorDistances = pair
+        .map((hex) => wallAwareDistance(origin, hex))
+        .filter((distance, index) => distance <= range && hasLineOfSight(origin, pair[index]));
+      if (!anchorDistances.length) continue;
       const targets = state.entities.filter((entity) => {
         return isAlive(entity) && entity.side !== side && pair.some((hex) => sameHex(hex, entity));
       });
@@ -788,7 +790,7 @@ function bestAdjacentPairPlacement(actorOrTile, range, side = actorOrTile.side) 
           tiles: pair,
           targets,
           hitCount: targets.length,
-          distance: Math.min(...pair.map((hex) => wallAwareDistance(origin, hex))),
+          distance: Math.min(...anchorDistances),
           lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0)),
         });
       }
