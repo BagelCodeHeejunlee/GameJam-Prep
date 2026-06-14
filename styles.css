@@ -438,14 +438,27 @@ h2 {
 }
 
 .card-reveal-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
   gap: 12px;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 4px 2px 12px;
+  scrollbar-width: none;
+}
+
+.card-reveal-list::-webkit-scrollbar {
+  display: none;
 }
 
 .reveal-card {
   position: relative;
-  min-height: 156px;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  flex: 0 0 clamp(158px, 42vw, 190px);
+  width: clamp(158px, 42vw, 190px);
+  min-height: 260px;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
@@ -475,7 +488,9 @@ h2 {
 
 .reveal-card strong {
   display: block;
-  font-size: 20px;
+  min-height: 54px;
+  font-size: 19px;
+  line-height: 1.25;
 }
 
 .reveal-card span {
@@ -484,6 +499,7 @@ h2 {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
+  word-break: keep-all;
 }
 
 .reveal-card .priority {
@@ -720,16 +736,15 @@ h2 {
     gap: 8px;
   }
 
-  .card-reveal-list {
-    grid-template-columns: 1fr;
-  }
-
   .reveal-card {
-    min-height: 122px;
+    flex-basis: clamp(150px, 43vw, 176px);
+    width: clamp(150px, 43vw, 176px);
+    min-height: 248px;
     padding: 13px;
   }
 
   .reveal-card strong {
+    min-height: 48px;
     font-size: 17px;
   }
 

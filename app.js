@@ -1014,7 +1014,7 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   elements.cardRevealOverlay.className = "card-reveal-overlay";
   elements.cardRevealTitle.textContent = "우선권";
   renderRevealCards(drawnEntries);
-  await sleep(1000);
+  await sleep(2000);
 
   settleRevealCards();
   slideSortRevealCards(sortedEntries);
