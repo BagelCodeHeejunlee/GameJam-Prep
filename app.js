@@ -23,6 +23,9 @@ const elements = {
   battleLog: document.querySelector("#battleLog"),
   rewardOverlay: document.querySelector("#rewardOverlay"),
   rewardCards: document.querySelector("#rewardCards"),
+  cardRevealOverlay: document.querySelector("#cardRevealOverlay"),
+  cardRevealTitle: document.querySelector("#cardRevealTitle"),
+  cardRevealList: document.querySelector("#cardRevealList"),
   iconHelpOverlay: document.querySelector("#iconHelpOverlay"),
   iconHelpButton: document.querySelector("#iconHelpButton"),
   closeHelpButton: document.querySelector("#closeHelpButton"),
@@ -266,17 +269,17 @@ async function runTurn() {
   clearTemporaryAtTurnStart(player);
   const playerCard = drawPlayerCard();
   const enemyGroupCard = aliveEnemies().length ? drawEnemyCard() : null;
-  const entries = [{ actorType: "player", actorId: player.id, card: playerCard }];
+  const drawnEntries = [{ actorType: "player", actorId: player.id, card: playerCard }];
 
   if (enemyGroupCard) {
-    entries.push({ actorType: "enemyGroup", actorId: "basic-enemies", card: enemyGroupCard });
+    drawnEntries.push({ actorType: "enemyGroup", actorId: "basic-enemies", card: enemyGroupCard });
   }
 
-  entries.sort(compareTimeline);
+  const entries = [...drawnEntries].sort(compareTimeline);
   state.currentTimeline = entries;
   log(`턴 ${state.turn}: ${entries.map((entry) => entry.card.name).join(", ")}`);
   render();
-  await sleep(TURN_DELAY);
+  await playCardReveal(drawnEntries, entries);
 
   for (let index = 0; index < entries.length; index += 1) {
     if (state.finished || state.waitingReward) break;
@@ -929,6 +932,39 @@ function renderLog() {
     elements.battleLog.append(p);
   });
   elements.battleLog.scrollTop = elements.battleLog.scrollHeight;
+}
+
+async function playCardReveal(drawnEntries, sortedEntries) {
+  document.body.classList.add("revealing-cards");
+  elements.cardRevealOverlay.className = "card-reveal-overlay";
+  elements.cardRevealTitle.textContent = "카드 드로우";
+  renderRevealCards(drawnEntries);
+  await sleep(760);
+
+  elements.cardRevealTitle.textContent = "우선권 정렬";
+  elements.cardRevealOverlay.classList.add("sorting");
+  renderRevealCards(sortedEntries);
+  await sleep(720);
+
+  elements.cardRevealOverlay.classList.add("dock");
+  await sleep(520);
+  elements.cardRevealOverlay.className = "card-reveal-overlay hidden";
+  document.body.classList.remove("revealing-cards");
+}
+
+function renderRevealCards(entries) {
+  elements.cardRevealList.innerHTML = "";
+  entries.forEach((entry) => {
+    const div = document.createElement("article");
+    div.className = "reveal-card";
+    div.innerHTML = `
+      <strong>${entry.card.name}</strong>
+      <span>${entryLabel(entry)}</span>
+      <span class="priority">PRI ${entry.card.priority}</span>
+      <span>${describeCard(entry.card)}</span>
+    `;
+    elements.cardRevealList.append(div);
+  });
 }
 
 function describeCard(cardData) {
