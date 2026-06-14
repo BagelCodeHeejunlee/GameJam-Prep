@@ -718,8 +718,6 @@ h2 {
   place-items: center;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
   color: var(--accent);
   font-size: 13px;
   line-height: 1;
@@ -727,8 +725,8 @@ h2 {
 
 .reveal-card .action-icon svg,
 .reward-card .action-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   overflow: visible;
 }
 
