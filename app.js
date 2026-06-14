@@ -942,7 +942,7 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   renderRevealCards(drawnEntries);
   await sleep(1000);
 
-  elements.cardRevealOverlay.classList.add("sorting");
+  settleRevealCards();
   slideSortRevealCards(sortedEntries);
   await sleep(820);
 
@@ -954,12 +954,11 @@ async function playCardReveal(drawnEntries, sortedEntries) {
 
 function renderRevealCards(entries) {
   elements.cardRevealList.innerHTML = "";
-  entries.forEach((entry, index) => {
+  entries.forEach((entry) => {
     const div = document.createElement("article");
     div.className = `reveal-card ${entry.actorType === "player" ? "player" : "enemy"}`;
     div.dataset.entryKey = entryKey(entry);
     div.innerHTML = `
-      <b class="order-number">${index + 1}</b>
       <strong>${entry.card.name}</strong>
       <span>${entryLabel(entry)}</span>
       <span class="priority">PRI ${entry.card.priority}</span>
@@ -981,8 +980,7 @@ function slideSortRevealCards(sortedEntries) {
     if (cardElement) elements.cardRevealList.append(cardElement);
   });
 
-  [...elements.cardRevealList.children].forEach((cardElement, index) => {
-    cardElement.querySelector(".order-number").textContent = index + 1;
+  [...elements.cardRevealList.children].forEach((cardElement) => {
     const firstRect = firstRects.get(cardElement.dataset.entryKey);
     const lastRect = cardElement.getBoundingClientRect();
     if (!firstRect) return;
@@ -996,6 +994,15 @@ function slideSortRevealCards(sortedEntries) {
       ],
       { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
     );
+  });
+}
+
+function settleRevealCards() {
+  [...elements.cardRevealList.children].forEach((cardElement) => {
+    cardElement.getAnimations().forEach((animation) => animation.cancel());
+    cardElement.classList.add("settled");
+    cardElement.style.opacity = "1";
+    cardElement.style.transform = "translateY(0) scale(1)";
   });
 }
 
