@@ -724,8 +724,9 @@ function bestCombatMoveTile(actor, reachable, attackAction) {
   const opponents = aliveOpponents(actor);
   if (!opponents.length) return actor;
   const desiredRange = attackAction?.range ?? attackAction?.desiredRange ?? actor.baseRange;
+  const candidateTiles = isMeleeAttackAction(attackAction) ? [actor, ...reachable] : reachable;
 
-  const scored = reachable.map((tile) => {
+  const scored = candidateTiles.map((tile) => {
     const targetInfo = scoreTargetsFromTile(actor, tile, attackAction);
     const nearest = Math.min(...opponents.map((enemy) => axialDistance(tile, enemy)));
     const closestToDesired = -Math.abs(nearest - desiredRange);
@@ -754,14 +755,19 @@ function bestCombatMoveTile(actor, reachable, attackAction) {
   return scored[0]?.tile ?? actor;
 }
 
+function isMeleeAttackAction(action) {
+  return action?.type === "attack" && (action.melee || action.range <= 1);
+}
+
 function scoreTargetsFromTile(actor, tile, attackAction) {
   if (!attackAction || (attackAction.type !== "attack" && attackAction.type !== "patternAttack")) {
-    return { hitCount: 0, lowestIndex: 9999 };
+    return { hitCount: 0, lowestHp: Infinity, lowestIndex: 9999 };
   }
   if (attackAction.type === "patternAttack") {
     const placement = bestPatternPlacement(attackAction.pattern, tile, attackAction.range, actor.side);
     return {
       hitCount: placement.targets.length,
+      lowestHp: placement.lowestHp,
       lowestIndex: placement.lowestIndex,
     };
   }
@@ -770,6 +776,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
   );
   return {
     hitCount: Math.min(targets.length, attackAction.targets ?? 1),
+    lowestHp: Math.min(...targets.map((target) => target.hp), Infinity),
     lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0), 9999),
   };
 }
@@ -877,7 +884,7 @@ function placeObstacle(actor, action) {
 
 function bestPatternPlacement(pattern, origin, range, side = origin.side) {
   if (pattern === "adjacent-pair") return bestAdjacentPairPlacement(origin, range, side);
-  return { tiles: [], targets: [], lowestIndex: 9999 };
+  return { tiles: [], targets: [], lowestHp: Infinity, lowestIndex: 9999 };
 }
 
 function bestAdjacentPair(actorOrTile, range, side = actorOrTile.side) {
@@ -905,6 +912,7 @@ function bestAdjacentPairPlacement(actorOrTile, range, side = actorOrTile.side) 
           targets,
           hitCount: targets.length,
           distance: Math.min(...anchorDistances),
+          lowestHp: Math.min(...targets.map((target) => target.hp)),
           lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0)),
         });
       }
@@ -912,10 +920,11 @@ function bestAdjacentPairPlacement(actorOrTile, range, side = actorOrTile.side) 
   }
   candidates.sort((a, b) => {
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+    if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
     if (a.distance !== b.distance) return a.distance - b.distance;
     return a.lowestIndex - b.lowestIndex;
   });
-  return candidates[0] ?? { tiles: [], targets: [], lowestIndex: 9999 };
+  return candidates[0] ?? { tiles: [], targets: [], lowestHp: Infinity, lowestIndex: 9999 };
 }
 
 function canTarget(actor, target, range) {
