@@ -98,18 +98,24 @@ const rewardPool = [
   ]),
 ];
 
-const enemyCard = card(
-  "basic-claw",
-  "이동 후 근접 공격",
-  "적",
-  "기본",
-  52,
-  [
-    { type: "move", amount: 2, desiredRange: 1 },
+const enemyCards = [
+  card("enemy-move", "이동", "적", "기본", 64, [{ type: "move", amount: 2, desiredRange: 1 }], 4),
+  card("enemy-claw", "근접 공격", "적", "기본", 52, [
     { type: "attack", mult: 2, range: 1, melee: true },
-  ],
-  4,
-);
+  ], 4),
+  card(
+    "enemy-move-claw",
+    "이동 후 근접 공격",
+    "적",
+    "기본",
+    56,
+    [
+      { type: "move", amount: 2, desiredRange: 1 },
+      { type: "attack", mult: 2, range: 1, melee: true },
+    ],
+    1,
+  ),
+];
 
 const waves = [
   {
@@ -220,7 +226,7 @@ function startWave(index) {
 
   state.deck = shuffle([...state.playerCards]);
   state.discard = [];
-  state.enemyDeck = shuffle(expandCards([enemyCard]));
+  state.enemyDeck = shuffle(expandCards(enemyCards));
   state.enemyDiscard = [];
   state.waitingReward = false;
   state.busy = false;
@@ -913,7 +919,7 @@ function showRewards() {
       <strong>${reward.name}</strong>
       <span class="rarity">${reward.rarity}</span>
       <span class="route">${reward.route}</span>
-      <span>${describeCard(reward)}</span>
+      ${renderActionList(reward)}
       <span class="spacer"></span>
       <span class="pick">선택</span>
     `;
@@ -1054,7 +1060,7 @@ function renderRevealCards(entries) {
       <strong>${entry.card.name}</strong>
       <span>${entryLabel(entry)}</span>
       <span class="priority">PRI ${entry.card.priority}</span>
-      <span>${describeCard(entry.card)}</span>
+      ${renderActionList(entry.card)}
     `;
     elements.cardRevealList.append(div);
   });
@@ -1104,7 +1110,13 @@ function entryKey(entry) {
 }
 
 function describeCard(cardData) {
-  return cardData.actions.map(describeAction).join(" -> ");
+  return cardData.actions.map(describeAction).join("\n");
+}
+
+function renderActionList(cardData) {
+  return `<span class="action-list">${cardData.actions
+    .map((action) => `<span class="action-line">${describeAction(action)}</span>`)
+    .join("")}</span>`;
 }
 
 function describeAction(action) {

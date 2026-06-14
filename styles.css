@@ -603,6 +603,16 @@ h2 {
   word-break: keep-all;
 }
 
+.action-list {
+  display: grid;
+  gap: 4px;
+}
+
+.action-line {
+  display: block;
+  margin-top: 0;
+}
+
 .reveal-card .priority {
   color: var(--accent);
   font-weight: 900;
