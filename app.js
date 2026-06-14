@@ -334,6 +334,11 @@ async function executeTimelineEntry(entry) {
   }
 
   const enemies = aliveEnemies().sort((a, b) => a.monsterIndex - b.monsterIndex);
+  if (!enemies.length) {
+    checkEndConditions();
+    return;
+  }
+
   for (const enemy of enemies) {
     if (state.finished || state.waitingReward) break;
     if (!isAlive(enemy)) continue;
@@ -924,6 +929,9 @@ function finishRun(win) {
   state.finished = true;
   state.busy = false;
   state.waitingReward = false;
+  elements.rewardOverlay.classList.add("hidden");
+  elements.cardRevealOverlay.className = "card-reveal-overlay hidden";
+  document.body.classList.remove("revealing-cards");
   log(win ? "스테이지 클리어" : "패배");
   render();
 }
@@ -938,7 +946,6 @@ function showRewards() {
     button.innerHTML = `
       <span class="card-priority">${reward.priority}</span>
       <strong class="card-title">${reward.name}</strong>
-      <span class="card-owner"><span class="rarity">${reward.rarity}</span> · <span class="route">${reward.route}</span></span>
       <span class="card-action-area">${renderActionList(reward)}</span>
       <span class="pick">선택</span>
     `;

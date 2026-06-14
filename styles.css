@@ -667,7 +667,7 @@ h2 {
   width: 100%;
   justify-items: center;
   align-content: center;
-  gap: 9px;
+  gap: 5px;
   margin-top: 0;
 }
 
@@ -683,7 +683,7 @@ h2 {
 
 .reveal-card .action-line + .action-line,
 .reward-card .action-line + .action-line {
-  padding-top: 9px;
+  padding-top: 5px;
 }
 
 .reveal-card .action-line + .action-line::before,
@@ -692,7 +692,7 @@ h2 {
   position: absolute;
   top: 1px;
   left: 50%;
-  width: min(92px, 68%);
+  width: min(88px, 64%);
   height: 1px;
   background: rgba(217, 185, 110, 0.42);
   transform: translateX(-50%);
@@ -706,7 +706,7 @@ h2 {
   justify-content: center;
   gap: 6px;
   max-width: 100%;
-  min-height: 38px;
+  min-height: 32px;
   padding: 0 2px;
 }
 
@@ -907,7 +907,7 @@ h2 {
   position: relative;
   display: grid;
   flex: 0 0 clamp(158px, 30vw, 190px);
-  grid-template-rows: 48px 18px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr);
   width: clamp(158px, 30vw, 190px);
   height: 260px;
   padding: 14px;
@@ -935,7 +935,8 @@ h2 {
 }
 
 .reward-card .card-action-area {
-  padding-bottom: 20px;
+  margin-top: 6px;
+  padding-bottom: 18px;
 }
 
 .reward-card .pick {
