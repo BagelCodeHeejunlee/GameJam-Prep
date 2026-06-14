@@ -683,6 +683,24 @@ h2 {
   line-height: 1;
 }
 
+.reveal-card .action-icon svg,
+.reward-card .action-icon svg {
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+}
+
+.reveal-card .action-icon svg path,
+.reveal-card .action-icon svg circle,
+.reward-card .action-icon svg path,
+.reward-card .action-icon svg circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .reveal-card .action-icon.melee,
 .reward-card .action-icon.melee {
   color: #ffb7a6;
@@ -702,33 +720,7 @@ h2 {
 
 .reveal-card .action-icon.range,
 .reward-card .action-icon.range {
-  position: relative;
   color: #cfc8ff;
-}
-
-.reveal-card .action-icon.range i,
-.reward-card .action-icon.range i {
-  position: relative;
-  width: 13px;
-  height: 13px;
-  border: 2px solid currentColor;
-  border-left-color: transparent;
-  border-radius: 999px;
-  transform: rotate(-36deg);
-}
-
-.reveal-card .action-icon.range i::after,
-.reward-card .action-icon.range i::after {
-  position: absolute;
-  top: -4px;
-  right: -2px;
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-left: 6px solid currentColor;
-  content: "";
-  transform: rotate(28deg);
 }
 
 .reveal-card .action-icon.target,
@@ -763,8 +755,8 @@ h2 {
 .reward-card .pattern-icon {
   position: relative;
   display: inline-block;
-  flex: 0 0 44px;
-  width: 44px;
+  flex: 0 0 45px;
+  width: 45px;
   height: 28px;
 }
 
@@ -772,11 +764,11 @@ h2 {
 .reward-card .pattern-icon i {
   position: absolute;
   top: 3px;
-  width: 24px;
+  width: 22px;
   height: 22px;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  background: rgba(217, 185, 110, 0.22);
-  border: 1px solid rgba(217, 185, 110, 0.8);
+  background: rgba(217, 107, 95, 0.78);
+  border: 1px solid rgba(255, 210, 202, 0.65);
 }
 
 .reveal-card .pattern-icon i:first-child,
@@ -786,7 +778,7 @@ h2 {
 
 .reveal-card .pattern-icon i:last-child,
 .reward-card .pattern-icon i:last-child {
-  left: 19px;
+  left: 22px;
 }
 
 .reveal-card .priority {
