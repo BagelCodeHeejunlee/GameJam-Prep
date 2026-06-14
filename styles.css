@@ -207,6 +207,18 @@ h2 {
   background: var(--obstacle);
 }
 
+.hex.trap-attack::after {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(240, 124, 100, 0.86) 0 18%, transparent 19%),
+    repeating-linear-gradient(45deg, rgba(240, 124, 100, 0.32) 0 6px, rgba(58, 34, 31, 0.9) 6px 12px);
+}
+
+.hex.trap-block::after {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(126, 181, 255, 0.82) 0 18%, transparent 19%),
+    repeating-linear-gradient(-45deg, rgba(126, 181, 255, 0.28) 0 6px, rgba(30, 42, 58, 0.92) 6px 12px);
+}
+
 .hex.in-range::after {
   background: #273735;
 }

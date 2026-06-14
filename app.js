@@ -42,22 +42,22 @@ const elements = {
 let selectedCharacterId = "archer";
 
 const baseArcherCards = [
-  card("advance-shot", "전진 사격", "기본", "기본", 44, [
+  card("advance-shot", "전진 사격", "기본", "기본", 54, [
     { type: "move", amount: 2 },
     { type: "attack", mult: 1, range: 2 },
   ], 3),
-  card("retreat-shot", "후퇴 사격", "기본", "기본", 42, [
+  card("retreat-shot", "후퇴 사격", "기본", "기본", 56, [
     { type: "attack", mult: 1, range: 2 },
     { type: "flee", amount: 2 },
   ], 2),
-  card("aimed-shot", "정조준", "기본", "기본", 34, [{ type: "attack", mult: 2, range: 2 }], 1),
-  card("keep-distance", "거리 벌리기", "기본", "기본", 66, [{ type: "flee", amount: 3 }], 1),
+  card("aimed-shot", "정조준", "기본", "기본", 58, [{ type: "attack", mult: 2, range: 2 }], 1),
+  card("keep-distance", "거리 벌리기", "기본", "기본", 28, [{ type: "flee", amount: 3 }], 1),
   card(
     "paired-hex-shot",
     "붙은 두 칸 공격",
     "기본",
     "기본",
-    38,
+    52,
     [{ type: "patternAttack", mult: 2, range: 2, pattern: "adjacent-pair" }],
     1,
   ),
@@ -89,10 +89,13 @@ const archerRewardPool = [
   card("combo-sense", "연타 감각", "다단중첩", "레어", 32, [
     { type: "permanent", effect: "comboDamage", amount: 0.1 },
   ]),
-  card("spike-obstacle", "가시 장애물 설치", "장애물", "노말", 58, [
-    { type: "placeObstacle", range: 2, obstacle: "spike" },
+  card("attack-trap", "공격 함정 설치", "함정", "노말", 58, [
+    { type: "placeTrap", range: 2, trap: "attack", count: 2 },
   ]),
-  card("push-shot", "밀기 사격", "장애물", "레어", 39, [
+  card("block-trap", "봉쇄 함정 설치", "함정", "노말", 60, [
+    { type: "placeTrap", range: 2, trap: "block", count: 2 },
+  ]),
+  card("push-shot", "밀기 사격", "함정", "레어", 39, [
     { type: "attack", mult: 1, range: 2, push: 1 },
   ]),
   card("charge", "차지", "차지", "노말", 30, [{ type: "charge", amount: 1 }]),
@@ -652,8 +655,9 @@ async function executeAction(actor, action, cardData) {
     log(`${actor.name} 영구 효과: ${action.effect}`);
     return false;
   }
-  if (action.type === "placeObstacle") {
-    placeObstacle(actor, action);
+  if (action.type === "placeTrap" || action.type === "placeObstacle") {
+    placeTrap(actor, action);
+    return false;
   }
   return false;
 }
@@ -727,6 +731,7 @@ function expireTemporaryEffectsAtTurnEnd(actor) {
   if (!actor.temporary) return;
   Object.entries(actor.temporary).forEach(([key, effect]) => {
     if (effect?.expiresAfterOwnTurnEnds && effect.expiresAfterOwnTurnEnds <= state.turn) {
+      effect.onExpire?.(actor, effect);
       delete actor.temporary[key];
     }
   });
@@ -775,6 +780,7 @@ function attack(actor, action) {
     showHitEffect(target, hitPosition, damage);
     log(`${actor.name} -> ${target.name} ${damage} 피해`);
     if (action.push && isAlive(target)) pushTarget(actor, target, action.push);
+    if (action.pull && isAlive(target)) pullTarget(actor, target, action.pull);
   }
 }
 
@@ -884,6 +890,8 @@ async function animateActorPath(actor, path) {
     actor.q = step.q;
     actor.r = step.r;
     renderBoard();
+    const triggeredTrap = triggerTrap(actor);
+    if (triggeredTrap === "block" || !isAlive(actor)) break;
     await sleep(35);
   }
 }
@@ -1021,12 +1029,12 @@ function reachableTiles(actor, maxDistance, jump = false) {
 }
 
 function canEndMoveAt(tile, actor) {
-  if (isWall(tile) || isObstacle(tile)) return false;
+  if (isWall(tile)) return false;
   return !state.entities.some((entity) => isAlive(entity) && entity.id !== actor.id && sameHex(entity, tile));
 }
 
 function blocksPath(tile, actor) {
-  if (isWall(tile) || isObstacle(tile)) return true;
+  if (isWall(tile)) return true;
   return state.entities.some((entity) => {
     if (!isAlive(entity) || entity.id === actor.id) return false;
     return sameHex(entity, tile) && entity.side !== actor.side;
@@ -1034,42 +1042,52 @@ function blocksPath(tile, actor) {
 }
 
 function pushTarget(actor, target, amount) {
+  forceMoveTarget(actor, target, amount, "push");
+}
+
+function pullTarget(actor, target, amount) {
+  forceMoveTarget(actor, target, amount, "pull");
+}
+
+function forceMoveTarget(actor, target, amount, mode) {
   let current = { q: target.q, r: target.r };
-  const direction = directionAway(actor, target);
   for (let step = 0; step < amount; step += 1) {
-    const next = { q: current.q + direction.q, r: current.r + direction.r };
-    if (!isTile(next) || !canEndMoveAt(next, target)) {
-      const obstacle = state.obstacles.find((item) => sameHex(item, next));
-      if (obstacle?.kind === "spike") {
-        const hitPosition = { q: target.q, r: target.r };
-        applyDamage(target, actor.baseAtk * 2);
-        renderBoard();
-        renderHud();
-        showHitEffect(target, hitPosition, actor.baseAtk * 2);
-        log(`${target.name} 가시 장애물 충돌`);
-      }
-      break;
-    }
+    const next = nextForcedMoveTile(actor, target, current, mode);
+    if (!next) break;
     current = next;
+    target.q = current.q;
+    target.r = current.r;
+    const triggeredTrap = triggerTrap(target);
+    if (triggeredTrap === "block" || !isAlive(target)) break;
   }
-  target.q = current.q;
-  target.r = current.r;
 }
 
-function directionAway(actor, target) {
-  return directions
-    .map((dir) => {
-      const next = { q: target.q + dir.q, r: target.r + dir.r };
-      return { dir, distance: axialDistance(actor, next) };
-    })
-    .sort((a, b) => b.distance - a.distance)[0].dir;
+function nextForcedMoveTile(actor, target, current, mode) {
+  const currentDistance = axialDistance(actor, current);
+  const candidates = directions
+    .map((dir) => ({ q: current.q + dir.q, r: current.r + dir.r }))
+    .filter((tile) => isTile(tile) && canEndMoveAt(tile, target))
+    .map((tile) => ({ tile, distance: axialDistance(actor, tile), trap: trapAt(tile) }))
+    .filter((item) => (mode === "push" ? item.distance > currentDistance : item.distance < currentDistance));
+
+  if (!candidates.length) return null;
+
+  candidates.sort((a, b) => {
+    if (Boolean(a.trap) !== Boolean(b.trap)) return a.trap ? -1 : 1;
+    if (a.distance !== b.distance) return mode === "push" ? b.distance - a.distance : a.distance - b.distance;
+    if (a.tile.q !== b.tile.q) return a.tile.q - b.tile.q;
+    return a.tile.r - b.tile.r;
+  });
+
+  return candidates[0].tile;
 }
 
-function placeObstacle(actor, action) {
+function placeTrap(actor, action) {
   const reachable = state.tiles
     .filter((tile) => axialDistance(actor, tile) <= action.range)
     .filter((tile) => !sameHex(tile, actor))
     .filter((tile) => canEndMoveAt(tile, actor))
+    .filter((tile) => !trapAt(tile))
     .sort((a, b) => {
       const aNearEnemy = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(a, enemy)));
       const bNearEnemy = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(b, enemy)));
@@ -1077,13 +1095,24 @@ function placeObstacle(actor, action) {
       return axialDistance(actor, a) - axialDistance(actor, b);
     });
 
-  const tile = reachable[0];
-  if (!tile) {
-    log(`${actor.name} 장애물 설치 실패`);
+  const count = action.count ?? 1;
+  const tiles = reachable.slice(0, count);
+  if (!tiles.length) {
+    log(`${actor.name} 함정 설치 실패`);
     return;
   }
-  state.obstacles.push({ q: tile.q, r: tile.r, kind: action.obstacle });
-  log(`${actor.name} 장애물 설치 (${tile.q}, ${tile.r})`);
+  tiles.forEach((tile) => {
+    state.obstacles.push({
+      q: tile.q,
+      r: tile.r,
+      kind: action.trap ?? action.obstacle ?? "attack",
+      ownerId: actor.id,
+      ownerSide: actor.side,
+      power: action.power ?? 2,
+      baseAtk: actor.baseAtk,
+    });
+  });
+  log(`${actor.name} 함정 ${tiles.length}개 설치`);
 }
 
 function bestPatternPlacement(pattern, origin, range, side = origin.side) {
@@ -1322,7 +1351,8 @@ function renderBoard() {
     const div = document.createElement("div");
     div.className = "hex";
     if (isWall(tile)) div.classList.add("wall");
-    if (isObstacle(tile)) div.classList.add("obstacle");
+    const trap = trapAt(tile);
+    if (trap) div.classList.add("trap", `trap-${trap.kind === "spike" ? "attack" : trap.kind}`);
     div.style.left = `${point.x}px`;
     div.style.top = `${point.y}px`;
     elements.board.append(div);
@@ -1603,6 +1633,7 @@ function renderActionLine(action) {
     if (attackKind !== "melee") parts.push(actionStat("range", "사거리", action.range));
     if (action.targets) parts.push(actionStat("target", "타겟 수", action.targets));
     if (action.push) parts.push(actionNote(`밀기 ${action.push}`));
+    if (action.pull) parts.push(actionNote(`당기기 ${action.pull}`));
     return `<span class="action-line">${actionGroup("attack", parts)}</span>`;
   }
   if (action.type === "patternAttack") {
@@ -1619,8 +1650,12 @@ function renderActionLine(action) {
   if (action.type === "permanent") {
     return `<span class="action-line">${actionGroup("special", [actionNote("영구 효과")])}</span>`;
   }
-  if (action.type === "placeObstacle") {
-    return `<span class="action-line">${actionGroup("special", [actionStat("range", "사거리", action.range), actionNote("장애물 설치")])}</span>`;
+  if (action.type === "placeTrap" || action.type === "placeObstacle") {
+    const trapName = (action.trap ?? action.obstacle) === "block" ? "봉쇄 함정" : "공격 함정";
+    return `<span class="action-line">${actionGroup("special", [
+      actionStat("range", "사거리", action.range),
+      actionNote(`${trapName}${action.count ? ` x${action.count}` : ""}`),
+    ])}</span>`;
   }
   return `<span class="action-line">${actionGroup("special", [actionNote(action.type)])}</span>`;
 }
@@ -1664,12 +1699,13 @@ function describeAction(action) {
   if (action.type === "attack") {
     const targetText = action.targets ? `, TGT ${action.targets}` : "";
     const pushText = action.push ? `, 밀기 ${action.push}` : "";
-    return `ATK ${action.mult}, RNG ${action.range}${targetText}${pushText}`;
+    const pullText = action.pull ? `, 당기기 ${action.pull}` : "";
+    return `ATK ${action.mult}, RNG ${action.range}${targetText}${pushText}${pullText}`;
   }
   if (action.type === "patternAttack") return `붙은 두 칸 ATK ${action.mult}, RNG ${action.range}`;
   if (action.type === "charge") return `차지 ${action.amount}`;
   if (action.type === "permanent") return `영구 효과`;
-  if (action.type === "placeObstacle") return `장애물 설치 RNG ${action.range}`;
+  if (action.type === "placeTrap" || action.type === "placeObstacle") return `함정 설치 RNG ${action.range}`;
   return action.type;
 }
 
@@ -1821,7 +1857,39 @@ function isObstacle(hex) {
   return state.obstacles.some((obstacle) => sameHex(obstacle, hex));
 }
 
-function triggerTrap() {}
+function trapAt(hex) {
+  return state.obstacles.find((obstacle) => sameHex(obstacle, hex));
+}
+
+function triggerTrap(actor) {
+  if (!isAlive(actor)) return null;
+  const trap = trapAt(actor);
+  if (!trap || trap.ownerSide === actor.side) return null;
+
+  state.obstacles = state.obstacles.filter((item) => item !== trap);
+  if (trap.kind === "attack" || trap.kind === "spike") {
+    const damage = Math.max(1, Math.round((trap.baseAtk ?? 10) * (trap.power ?? 2)));
+    const hitPosition = { q: actor.q, r: actor.r };
+    applyDamage(actor, damage);
+    renderBoard();
+    renderHud();
+    showHitEffect(actor, hitPosition, damage);
+    log(`${actor.name} 공격 함정 ${damage} 피해`);
+    return "attack";
+  }
+
+  if (trap.kind === "block") {
+    actor.temporary = actor.temporary ?? {};
+    actor.temporary.cannotMove = {
+      source: "trap",
+      expiresAfterOwnTurnEnds: state.turn + 1,
+      onExpire: (target) => log(`${target.name} 이동 불가 해제`),
+    };
+    log(`${actor.name} 봉쇄 함정: 이동 불가`);
+    return "block";
+  }
+  return trap.kind;
+}
 
 function axialDistance(a, b) {
   return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
