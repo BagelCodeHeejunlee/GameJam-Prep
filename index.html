@@ -10,7 +10,7 @@
     <main class="app-shell">
       <section class="top-bar">
         <div>
-          <h1>궁수 오토배틀 프로토타입</h1>
+          <h1 id="gameTitle">오토배틀 프로토타입</h1>
           <p id="runSummary">웨이브 1 / 턴 0</p>
         </div>
         <div class="controls">
@@ -18,6 +18,12 @@
           <button id="pauseButton" type="button">일시정지</button>
         </div>
       </section>
+
+      <nav class="character-select" aria-label="캐릭터 선택">
+        <button type="button" data-character="archer">궁수</button>
+        <button type="button" data-character="warrior">전사</button>
+        <button type="button" data-character="mage">마법사</button>
+      </nav>
 
       <section class="game-layout">
         <section class="board-panel">
@@ -27,7 +33,7 @@
         <aside class="side-panel">
           <section class="stat-strip">
             <div>
-              <span>궁수</span>
+              <span id="playerNameLabel">궁수</span>
               <strong id="playerHp">70 / 70</strong>
             </div>
             <div>

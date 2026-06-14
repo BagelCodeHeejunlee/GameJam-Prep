@@ -113,6 +113,33 @@ h2 {
   backdrop-filter: blur(10px);
 }
 
+.character-select {
+  position: fixed;
+  z-index: 35;
+  top: max(68px, calc(env(safe-area-inset-top) + 58px));
+  left: max(10px, env(safe-area-inset-left));
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.character-select button {
+  min-width: 58px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(32, 35, 34, 0.86);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 760;
+  backdrop-filter: blur(10px);
+}
+
+.character-select button.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(65, 55, 34, 0.92);
+}
+
 .game-layout {
   position: fixed;
   inset: 0;

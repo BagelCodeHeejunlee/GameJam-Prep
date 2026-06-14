@@ -15,9 +15,12 @@ const directions = [
 ];
 
 const elements = {
+  gameTitle: document.querySelector("#gameTitle"),
   board: document.querySelector("#board"),
   boardPanel: document.querySelector(".board-panel"),
+  characterButtons: [...document.querySelectorAll("[data-character]")],
   runSummary: document.querySelector("#runSummary"),
+  playerNameLabel: document.querySelector("#playerNameLabel"),
   playerHp: document.querySelector("#playerHp"),
   deckCount: document.querySelector("#deckCount"),
   discardCount: document.querySelector("#discardCount"),
@@ -35,6 +38,8 @@ const elements = {
   newRunButton: document.querySelector("#newRunButton"),
   pauseButton: document.querySelector("#pauseButton"),
 };
+
+let selectedCharacterId = "archer";
 
 const baseArcherCards = [
   card("advance-shot", "전진 사격", "기본", "기본", 44, [
@@ -58,7 +63,7 @@ const baseArcherCards = [
   ),
 ];
 
-const rewardPool = [
+const archerRewardPool = [
   card("long-shot", "긴 사격", "공용", "노말", 34, [{ type: "attack", mult: 2, range: 3 }]),
   card("retreat-step", "후퇴 발걸음", "공용", "노말", 62, [{ type: "flee", amount: 3 }]),
   card("split-shot", "분산 사격", "공용", "노말", 35, [
@@ -97,42 +102,165 @@ const rewardPool = [
   ]),
 ];
 
-const enemyCards = [
-  card("enemy-advance-claw", "접근 공격", "적", "기본", 58, [
+const baseWarriorCards = [
+  card("warrior-advance-slash", "전진 베기", "기본", "기본", 48, [
     { type: "move", amount: 2, desiredRange: 1 },
     { type: "attack", mult: 1, range: 1, melee: true },
   ], 3),
-  card("enemy-claw-step", "공격 후 접근", "적", "기본", 54, [
+  card("warrior-guard-hit", "막고 치기", "기본", "기본", 38, [
     { type: "attack", mult: 1, range: 1, melee: true },
-    { type: "move", amount: 1, desiredRange: 1 },
   ], 2),
-  card("enemy-move", "이동", "적", "기본", 66, [{ type: "move", amount: 2, desiredRange: 1 }], 1),
-  card("enemy-claw", "근접 공격", "적", "기본", 50, [
+  card("warrior-heavy-hit", "묵직한 일격", "기본", "기본", 52, [
     { type: "attack", mult: 2, range: 1, melee: true },
   ], 1),
-  card(
-    "enemy-move-claw",
-    "강한 접근 공격",
-    "적",
-    "기본",
-    56,
-    [
-      { type: "move", amount: 2, desiredRange: 1 },
-      { type: "attack", mult: 2, range: 1, melee: true },
-    ],
-    1,
-  ),
+  card("warrior-charge", "돌입", "기본", "기본", 62, [
+    { type: "move", amount: 3, desiredRange: 1 },
+  ], 1),
+  card("warrior-cleave", "휩쓸기", "기본", "기본", 50, [
+    { type: "patternAttack", mult: 1, range: 1, pattern: "adjacent-pair", melee: true },
+  ], 1),
 ];
+
+const warriorRewardPool = [
+  card("warrior-quick-slash", "빠른 베기", "공용", "노말", 42, [{ type: "attack", mult: 1, range: 1, melee: true }]),
+  card("warrior-shield-step", "방패 전진", "방패", "노말", 60, [
+    { type: "move", amount: 1, desiredRange: 1 },
+    { type: "attack", mult: 1, range: 1, melee: true },
+  ]),
+  card("warrior-push", "밀어붙이기", "제압", "노말", 46, [{ type: "attack", mult: 1, range: 1, melee: true, push: 1 }]),
+  card("warrior-cleave-reward", "넓은 휩쓸기", "광전", "레어", 48, [
+    { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-pair", melee: true },
+  ]),
+  card("warrior-break", "파쇄", "제압", "레어", 50, [{ type: "attack", mult: 3, range: 1, melee: true }]),
+  card("warrior-rhythm", "전장의 리듬", "광전", "레어", 44, [
+    { type: "permanent", effect: "comboDamage", amount: 0.1 },
+  ]),
+];
+
+const baseMageCards = [
+  card("mage-bolt", "마력탄", "기본", "기본", 32, [{ type: "attack", mult: 1, range: 3 }], 3),
+  card("mage-shift-bolt", "전이 사격", "기본", "기본", 46, [
+    { type: "move", amount: 2 },
+    { type: "attack", mult: 1, range: 3 },
+  ], 2),
+  card("mage-arc", "비전 분산", "기본", "기본", 40, [{ type: "attack", mult: 1, range: 3, targets: 2 }], 1),
+  card("mage-retreat", "마력 후퇴", "기본", "기본", 64, [{ type: "flee", amount: 2 }], 1),
+  card("mage-lance", "마력창", "기본", "기본", 36, [{ type: "attack", mult: 2, range: 3 }], 1),
+];
+
+const mageRewardPool = [
+  card("mage-long-bolt", "장거리 마력탄", "공용", "노말", 34, [{ type: "attack", mult: 1, range: 4 }]),
+  card("mage-fork", "갈래 마력", "연쇄", "노말", 38, [{ type: "attack", mult: 1, range: 3, targets: 3 }]),
+  card("mage-blink", "점멸", "공간", "노말", 58, [{ type: "move", amount: 3, jump: true }]),
+  card("mage-burst", "폭발 룬", "룬", "레어", 42, [
+    { type: "patternAttack", mult: 2, range: 3, pattern: "adjacent-pair" },
+  ]),
+  card("mage-focus", "마력 집중", "연쇄", "레어", 30, [
+    { type: "charge", amount: 1 },
+  ]),
+  card("mage-overflow", "마력 과잉", "룬", "레어", 34, [
+    { type: "permanent", effect: "comboDamage", amount: 0.1 },
+  ]),
+];
+
+const characterDefinitions = {
+  archer: {
+    id: "archer",
+    name: "궁수",
+    shortLabel: "궁",
+    title: "궁수 오토배틀 프로토타입",
+    maxHp: 70,
+    baseAtk: 10,
+    baseRange: 2,
+    baseMove: 2,
+    baseCards: baseArcherCards,
+    rewardPool: archerRewardPool,
+  },
+  warrior: {
+    id: "warrior",
+    name: "전사",
+    shortLabel: "전",
+    title: "전사 오토배틀 프로토타입",
+    maxHp: 100,
+    baseAtk: 8,
+    baseRange: 1,
+    baseMove: 2,
+    baseCards: baseWarriorCards,
+    rewardPool: warriorRewardPool,
+  },
+  mage: {
+    id: "mage",
+    name: "마법사",
+    shortLabel: "마",
+    title: "마법사 오토배틀 프로토타입",
+    maxHp: 55,
+    baseAtk: 12,
+    baseRange: 3,
+    baseMove: 2,
+    baseCards: baseMageCards,
+    rewardPool: mageRewardPool,
+  },
+};
+
+const monsterDefinitions = {
+  brute: { name: "브루트", label: "브", baseAtk: 3, baseRange: 1, baseMove: 2 },
+  skirmisher: { name: "척후병", label: "척", baseAtk: 3, baseRange: 1, baseMove: 3 },
+  shooter: { name: "사수", label: "사", baseAtk: 4, baseRange: 3, baseMove: 2 },
+};
+
+const monsterDecks = {
+  brute: [
+    card("brute-advance-claw", "접근 공격", "브루트", "기본", 58, [
+      { type: "move", amount: 2, desiredRange: 1 },
+      { type: "attack", mult: 1, range: 1, melee: true },
+    ], 3),
+    card("brute-claw-step", "공격 후 접근", "브루트", "기본", 54, [
+      { type: "attack", mult: 1, range: 1, melee: true },
+      { type: "move", amount: 1, desiredRange: 1 },
+    ], 2),
+    card("brute-heavy", "강타", "브루트", "기본", 50, [{ type: "attack", mult: 2, range: 1, melee: true }], 2),
+    card("brute-move", "접근", "브루트", "기본", 66, [{ type: "move", amount: 2, desiredRange: 1 }], 1),
+  ],
+  skirmisher: [
+    card("skirmisher-dash", "파고들기", "척후병", "기본", 44, [
+      { type: "move", amount: 3, desiredRange: 1 },
+      { type: "attack", mult: 1, range: 1, melee: true },
+    ], 3),
+    card("skirmisher-hit-run", "치고 빠지기", "척후병", "기본", 40, [
+      { type: "attack", mult: 1, range: 1, melee: true },
+      { type: "flee", amount: 2 },
+    ], 2),
+    card("skirmisher-feint", "교란", "척후병", "기본", 48, [{ type: "move", amount: 2, desiredRange: 1 }], 2),
+    card("skirmisher-stab", "찌르기", "척후병", "기본", 36, [{ type: "attack", mult: 1, range: 1, melee: true }], 1),
+  ],
+  shooter: [
+    card("shooter-shot", "견제 사격", "사수", "기본", 46, [{ type: "attack", mult: 1, range: 3 }], 3),
+    card("shooter-retreat", "거리 유지", "사수", "기본", 62, [
+      { type: "attack", mult: 1, range: 3 },
+      { type: "flee", amount: 2 },
+    ], 2),
+    card("shooter-aim", "조준 사격", "사수", "기본", 42, [{ type: "attack", mult: 2, range: 3 }], 1),
+    card("shooter-reposition", "사격 위치", "사수", "기본", 58, [
+      { type: "move", amount: 2, desiredRange: 3 },
+      { type: "attack", mult: 1, range: 3 },
+    ], 2),
+  ],
+};
 
 const waves = buildWaves();
 
 let state;
+
+function getSelectedCharacter() {
+  return characterDefinitions[selectedCharacterId] ?? characterDefinitions.archer;
+}
 
 function card(id, name, route, rarity, priority, actions, copies = 1) {
   return { id, name, route, rarity, type: "기본", priority, actions, copies };
 }
 
 function newRun() {
+  const character = getSelectedCharacter();
   state = {
     paused: false,
     busy: false,
@@ -145,12 +273,16 @@ function newRun() {
     walls: [],
     obstacles: [],
     entities: [],
-    playerCards: expandCards(baseArcherCards),
+    characterId: character.id,
+    character,
+    playerCards: expandCards(character.baseCards),
     deck: [],
     discard: [],
     enemyDeck: [],
     enemyDiscard: [],
-    enemySustainedCards: [],
+    enemyDecks: {},
+    enemyDiscards: {},
+    enemySustainedCards: {},
     currentTimeline: [],
     activeTimelineIndex: -1,
     completedTimelineCount: 0,
@@ -160,13 +292,15 @@ function newRun() {
   };
 
   startWave(0);
-  log("새 런을 시작했다.");
+  log(`${character.name} 새 런을 시작했다.`);
   render();
   scheduleTurn();
 }
 
 function startWave(index) {
   const wave = waves[index];
+  const character = getSelectedCharacter();
+  const previousPlayer = state.entities.find((entity) => entity.side === "player");
   state.turn = 0;
   state.tiles = makeMap(wave.radius ?? 3);
   state.walls = wave.walls.map((item) => ({ ...item }));
@@ -176,16 +310,18 @@ function startWave(index) {
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
   state.entities = [
     {
-      id: "archer",
-      name: "궁수",
+      id: character.id,
+      characterId: character.id,
+      name: character.name,
+      label: character.shortLabel,
       side: "player",
       q: start.q,
       r: start.r,
-      hp: state.entities.find((entity) => entity.id === "archer")?.hp ?? 70,
-      maxHp: 70,
-      baseAtk: 10,
-      baseRange: 2,
-      baseMove: 2,
+      hp: previousPlayer?.hp ?? character.maxHp,
+      maxHp: character.maxHp,
+      baseAtk: character.baseAtk,
+      baseRange: character.baseRange,
+      baseMove: character.baseMove,
       charge: 0,
       permanent: {},
       temporary: {},
@@ -195,17 +331,21 @@ function startWave(index) {
 
   wave.enemies.forEach((enemy) => {
     const indexNumber = state.nextEnemyIndex++;
+    const kind = enemy.kind ?? "brute";
+    const monster = monsterDefinitions[kind] ?? monsterDefinitions.brute;
     state.entities.push({
       id: `enemy-${indexNumber}`,
-      name: enemy.name ?? (enemy.boss ? `보스 ${indexNumber}` : `적 ${indexNumber}`),
+      name: enemy.name ?? (enemy.boss ? `보스 ${indexNumber}` : `${monster.name} ${indexNumber}`),
       side: "enemy",
+      kind,
+      label: enemy.boss ? "보" : monster.label,
       q: enemy.q,
       r: enemy.r,
       hp: enemy.hp,
       maxHp: enemy.hp,
-      baseAtk: enemy.baseAtk ?? (enemy.boss ? 5 : 3),
-      baseRange: 1,
-      baseMove: 2,
+      baseAtk: enemy.baseAtk ?? (enemy.boss ? 5 : monster.baseAtk),
+      baseRange: enemy.baseRange ?? monster.baseRange,
+      baseMove: enemy.baseMove ?? monster.baseMove,
       monsterIndex: indexNumber,
       boss: Boolean(enemy.boss),
       charge: 0,
@@ -217,9 +357,14 @@ function startWave(index) {
 
   state.deck = shuffle([...state.playerCards]);
   state.discard = [];
-  state.enemyDeck = shuffle(expandCards(enemyCards));
-  state.enemyDiscard = [];
-  state.enemySustainedCards = [];
+  state.enemyDecks = {};
+  state.enemyDiscards = {};
+  state.enemySustainedCards = {};
+  Object.entries(monsterDecks).forEach(([kind, deck]) => {
+    state.enemyDecks[kind] = shuffle(expandCards(deck));
+    state.enemyDiscards[kind] = [];
+    state.enemySustainedCards[kind] = [];
+  });
   state.waitingReward = false;
   state.busy = false;
   state.currentTimeline = [];
@@ -240,103 +385,103 @@ function buildWaves() {
   return [
     wave(3, [], [
       enemy(-2, -1, 20),
-      enemy(2, -2, 20),
+      enemy(2, -2, 18, { kind: "skirmisher" }),
     ]),
     wave(3, [{ q: 0, r: 0 }], [
       enemy(-3, 0, 24),
-      enemy(3, -2, 24),
-      enemy(1, -3, 24),
+      enemy(3, -2, 20, { kind: "skirmisher" }),
+      enemy(1, -3, 18, { kind: "shooter" }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -1, r: 1 }], [
       enemy(-3, 1, 28),
-      enemy(3, -2, 28),
-      enemy(0, -4, 32),
+      enemy(3, -2, 24, { kind: "skirmisher" }),
+      enemy(0, -4, 24, { kind: "shooter" }),
       enemy(2, 1, 28),
     ]),
     wave(4, [{ q: 0, r: -1 }, { q: 1, r: -1 }], [
       enemy(-4, 1, 30),
-      enemy(-2, -2, 30),
-      enemy(3, -3, 30),
+      enemy(-2, -2, 24, { kind: "shooter" }),
+      enemy(3, -3, 26, { kind: "skirmisher" }),
       enemy(3, 0, 30),
     ]),
     wave(4, [{ q: -1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: 1 }], [
       enemy(0, -4, 80, { boss: true, name: "보스 1", baseAtk: 5 }),
-      enemy(-3, 0, 28),
-      enemy(3, -2, 28),
+      enemy(-3, 0, 24, { kind: "skirmisher" }),
+      enemy(3, -2, 24, { kind: "shooter" }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -2, r: 2 }], [
       enemy(-4, 2, 34),
-      enemy(-2, -2, 34),
-      enemy(2, -4, 34),
+      enemy(-2, -2, 28, { kind: "shooter" }),
+      enemy(2, -4, 30, { kind: "skirmisher" }),
       enemy(4, -2, 34),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 1, r: -2 }], [
       enemy(-5, 2, 36),
-      enemy(-3, -1, 36),
-      enemy(0, -5, 42),
+      enemy(-3, -1, 30, { kind: "skirmisher" }),
+      enemy(0, -5, 30, { kind: "shooter" }),
       enemy(4, -4, 36),
       enemy(4, 0, 36),
     ]),
     wave(5, [{ q: -2, r: 1 }, { q: 0, r: 0 }, { q: 2, r: -2 }], [
       enemy(-5, 3, 38),
-      enemy(-4, 0, 38),
-      enemy(0, -5, 38),
-      enemy(3, -5, 38),
+      enemy(-4, 0, 32, { kind: "skirmisher" }),
+      enemy(0, -5, 32, { kind: "shooter" }),
+      enemy(3, -5, 32, { kind: "shooter" }),
       enemy(5, -2, 38),
     ]),
     wave(5, [{ q: -1, r: 1 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
       enemy(-5, 1, 40),
-      enemy(-3, -2, 40),
-      enemy(0, -5, 46),
-      enemy(3, -4, 40),
-      enemy(5, -3, 40),
+      enemy(-3, -2, 34, { kind: "skirmisher" }),
+      enemy(0, -5, 34, { kind: "shooter" }),
+      enemy(3, -4, 34, { kind: "shooter" }),
+      enemy(5, -3, 34, { kind: "skirmisher" }),
       enemy(4, 0, 40),
     ]),
     wave(5, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 1, r: 1 }], [
       enemy(0, -5, 130, { boss: true, name: "보스 2", baseAtk: 6 }),
-      enemy(-4, 1, 42),
-      enemy(4, -3, 42),
+      enemy(-4, 1, 36, { kind: "skirmisher" }),
+      enemy(4, -3, 36, { kind: "shooter" }),
       enemy(5, -1, 42),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -2 }], [
       enemy(-5, 3, 44),
-      enemy(-4, -1, 44),
-      enemy(-1, -4, 44),
-      enemy(2, -5, 44),
-      enemy(5, -3, 44),
+      enemy(-4, -1, 38, { kind: "skirmisher" }),
+      enemy(-1, -4, 38, { kind: "shooter" }),
+      enemy(2, -5, 38, { kind: "shooter" }),
+      enemy(5, -3, 38, { kind: "skirmisher" }),
       enemy(5, 0, 44),
     ]),
     wave(6, [{ q: -2, r: 1 }, { q: -1, r: 2 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
       enemy(-6, 3, 48),
-      enemy(-5, 0, 48),
-      enemy(-2, -4, 48),
-      enemy(1, -6, 48),
-      enemy(5, -5, 48),
+      enemy(-5, 0, 40, { kind: "skirmisher" }),
+      enemy(-2, -4, 40, { kind: "shooter" }),
+      enemy(1, -6, 40, { kind: "shooter" }),
+      enemy(5, -5, 40, { kind: "skirmisher" }),
       enemy(6, -2, 48),
     ]),
     wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 3, r: -4 }], [
       enemy(-6, 2, 52),
-      enemy(-5, -1, 52),
-      enemy(-2, -4, 52),
-      enemy(2, -6, 52),
-      enemy(5, -5, 52),
+      enemy(-5, -1, 44, { kind: "skirmisher" }),
+      enemy(-2, -4, 44, { kind: "shooter" }),
+      enemy(2, -6, 44, { kind: "shooter" }),
+      enemy(5, -5, 44, { kind: "skirmisher" }),
       enemy(6, -3, 52),
       enemy(4, 1, 52),
     ]),
     wave(6, [{ q: -3, r: 2 }, { q: -1, r: 1 }, { q: 1, r: -1 }, { q: 3, r: -3 }], [
       enemy(-6, 4, 56),
-      enemy(-6, 1, 56),
-      enemy(-3, -3, 56),
-      enemy(0, -6, 62),
-      enemy(4, -6, 56),
+      enemy(-6, 1, 48, { kind: "skirmisher" }),
+      enemy(-3, -3, 48, { kind: "shooter" }),
+      enemy(0, -6, 48, { kind: "shooter" }),
+      enemy(4, -6, 48, { kind: "skirmisher" }),
       enemy(6, -4, 56),
       enemy(6, -1, 56),
     ]),
     wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 1, r: 1 }, { q: -1, r: -1 }], [
       enemy(0, -6, 200, { boss: true, name: "최종 보스", baseAtk: 7 }),
-      enemy(-6, 2, 60),
-      enemy(-4, -1, 60),
-      enemy(4, -5, 60),
+      enemy(-6, 2, 52, { kind: "skirmisher" }),
+      enemy(-4, -1, 52, { kind: "shooter" }),
+      enemy(4, -5, 52, { kind: "skirmisher" }),
       enemy(6, -3, 60),
     ]),
   ];
@@ -395,12 +540,13 @@ async function runTurn() {
   }
 
   const playerCard = drawPlayerCard();
-  const enemyGroupCard = aliveEnemies().length ? drawEnemyCard() : null;
   const drawnEntries = [{ actorType: "player", actorId: player.id, card: playerCard }];
-
-  if (enemyGroupCard) {
-    drawnEntries.push({ actorType: "enemyGroup", actorId: "basic-enemies", card: enemyGroupCard });
-  }
+  const enemyEntries = aliveEnemyKinds().map((kind) => ({
+    actorType: "enemyGroup",
+    actorId: kind,
+    card: drawEnemyCard(kind),
+  }));
+  drawnEntries.push(...enemyEntries);
 
   const entries = [...drawnEntries].sort(compareTimeline);
   state.currentTimeline = entries;
@@ -427,7 +573,7 @@ async function runTurn() {
 
   if (!state.waitingReward && !state.finished) {
     discardResolvedCard(playerCard, player);
-    if (enemyGroupCard) discardEnemyCard(enemyGroupCard);
+    enemyEntries.forEach((entry) => discardEnemyCard(entry.card, entry.actorId));
   }
   state.busy = false;
   render();
@@ -449,7 +595,9 @@ async function executeTimelineEntry(entry) {
     return;
   }
 
-  const enemies = aliveEnemies().sort((a, b) => a.monsterIndex - b.monsterIndex);
+  const enemies = aliveEnemies()
+    .filter((enemy) => enemy.kind === entry.actorId)
+    .sort((a, b) => a.monsterIndex - b.monsterIndex);
   if (!enemies.length) {
     checkEndConditions();
     return;
@@ -518,12 +666,14 @@ function drawPlayerCard() {
   return state.deck.shift();
 }
 
-function drawEnemyCard() {
-  if (!state.enemyDeck.length) {
-    state.enemyDeck = shuffle(state.enemyDiscard);
-    state.enemyDiscard = [];
+function drawEnemyCard(kind) {
+  state.enemyDecks[kind] = state.enemyDecks[kind] ?? shuffle(expandCards(monsterDecks[kind] ?? monsterDecks.brute));
+  state.enemyDiscards[kind] = state.enemyDiscards[kind] ?? [];
+  if (!state.enemyDecks[kind].length) {
+    state.enemyDecks[kind] = shuffle(state.enemyDiscards[kind]);
+    state.enemyDiscards[kind] = [];
   }
-  return state.enemyDeck.shift();
+  return state.enemyDecks[kind].shift();
 }
 
 function discardResolvedCard(cardData, actor) {
@@ -537,15 +687,16 @@ function discardResolvedCard(cardData, actor) {
   state.discard.push(cardData);
 }
 
-function discardEnemyCard(cardData) {
+function discardEnemyCard(cardData, kind) {
   if (!cardData) return;
   if (cardData.actions.some((action) => action.type === "permanent")) return;
+  state.enemyDiscards[kind] = state.enemyDiscards[kind] ?? [];
   if (isSustainCard(cardData)) {
-    state.enemySustainedCards = state.enemySustainedCards ?? [];
-    state.enemySustainedCards.push({ card: cardData, discardAfterTurn: state.turn + 1 });
+    state.enemySustainedCards[kind] = state.enemySustainedCards[kind] ?? [];
+    state.enemySustainedCards[kind].push({ card: cardData, discardAfterTurn: state.turn + 1 });
     return;
   }
-  state.enemyDiscard.push(cardData);
+  state.enemyDiscards[kind].push(cardData);
 }
 
 function isSustainCard(cardData) {
@@ -560,10 +711,10 @@ function expireTurnEndEffects(entry) {
   }
 
   if (entry.actorType === "enemyGroup") {
-    state.entities.filter((entity) => entity.side === "enemy").forEach((enemy) => {
+    state.entities.filter((entity) => entity.side === "enemy" && entity.kind === entry.actorId).forEach((enemy) => {
       expireTemporaryEffectsAtTurnEnd(enemy);
     });
-    releaseExpiredSustainedCards(state.enemySustainedCards, state.enemyDiscard);
+    releaseExpiredSustainedCards(state.enemySustainedCards[entry.actorId], state.enemyDiscards[entry.actorId]);
   }
 }
 
@@ -1134,7 +1285,7 @@ function showRewards() {
 }
 
 function drawRewards() {
-  return shuffle(rewardPool).slice(0, 4).map((entry) => ({
+  return shuffle(getSelectedCharacter().rewardPool).slice(0, 4).map((entry) => ({
     ...entry,
     instanceId: `${entry.id}-${Date.now()}-${Math.random()}`,
   }));
@@ -1183,7 +1334,7 @@ function renderBoard() {
     div.className = `entity ${entity.side} ${entity.boss ? "boss" : ""}`;
     div.dataset.entityId = entity.id;
     div.innerHTML = `
-      <span class="entity-label">${entity.side === "player" ? "궁" : entity.boss ? "보" : entity.monsterIndex}</span>
+      <span class="entity-label">${entity.label ?? (entity.side === "player" ? getSelectedCharacter().shortLabel : entity.monsterIndex)}</span>
       <span class="hp-readout">${entity.hp}/${entity.maxHp}</span>
       <span class="hp-bar" aria-hidden="true"><i style="width: ${hpPercent(entity)}%"></i></span>
     `;
@@ -1228,7 +1379,7 @@ function renderOffscreenEnemyIndicators(bounds) {
     indicator.style.top = `${position.y}px`;
     indicator.innerHTML = `
       <span class="offscreen-arrow">${directionArrow(dx, dy)}</span>
-      <span class="offscreen-enemy">${enemy.boss ? "보" : enemy.monsterIndex}</span>
+      <span class="offscreen-enemy">${enemy.label ?? enemy.monsterIndex}</span>
       <span class="offscreen-distance">${axialDistance(player, enemy)}</span>
       <span class="offscreen-unit">칸</span>
     `;
@@ -1279,13 +1430,19 @@ function directionArrow(dx, dy) {
 
 function renderHud() {
   const player = getPlayer();
+  const character = getSelectedCharacter();
+  elements.gameTitle.textContent = character.title;
+  elements.playerNameLabel.textContent = character.name;
   elements.runSummary.textContent = state.finished
     ? "런 종료"
     : `웨이브 ${state.waveIndex + 1}/${waves.length}${waves[state.waveIndex]?.boss ? " 보스" : ""} / 턴 ${state.turn}`;
-  elements.playerHp.textContent = player ? `${player.hp} / ${player.maxHp}` : "0 / 70";
+  elements.playerHp.textContent = player ? `${player.hp} / ${player.maxHp}` : `0 / ${character.maxHp}`;
   elements.deckCount.textContent = state.deck.length;
   elements.discardCount.textContent = state.discard.length;
   elements.pauseButton.textContent = state.paused ? "재개" : "일시정지";
+  elements.characterButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.character === selectedCharacterId);
+  });
 }
 
 function renderDrawnCards() {
@@ -1300,7 +1457,7 @@ function renderDrawnCards() {
       .join(" ");
     div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
     div.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
-    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? "궁" : "적"}</strong>`;
+    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</strong>`;
     elements.drawnCards.append(div);
   });
 }
@@ -1449,10 +1606,11 @@ function renderActionLine(action) {
     return `<span class="action-line">${actionGroup("attack", parts)}</span>`;
   }
   if (action.type === "patternAttack") {
+    const attackKind = action.melee ? "melee" : "ranged";
     return `<span class="action-line">${actionGroup("attack", [
       patternIcon(action.pattern),
-      actionStat("ranged", "원거리 공격", action.mult),
-      actionStat("range", "사거리", action.range),
+      actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult),
+      ...(attackKind === "melee" ? [] : [actionStat("range", "사거리", action.range)]),
     ])}</span>`;
   }
   if (action.type === "charge") {
@@ -1516,7 +1674,11 @@ function describeAction(action) {
 }
 
 function entryLabel(entry) {
-  return entry.actorType === "player" ? "궁수" : "기본 적";
+  return entry.actorType === "player" ? getSelectedCharacter().name : (monsterDefinitions[entry.actorId]?.name ?? "적");
+}
+
+function monsterLabel(kind) {
+  return monsterDefinitions[kind]?.label ?? "적";
 }
 
 function hpPercent(entity) {
@@ -1635,6 +1797,10 @@ function aliveEnemies() {
   return state.entities.filter((entity) => entity.side === "enemy" && isAlive(entity));
 }
 
+function aliveEnemyKinds() {
+  return [...new Set(aliveEnemies().map((enemy) => enemy.kind ?? "brute"))];
+}
+
 function aliveOpponents(actor) {
   return state.entities.filter((entity) => entity.side !== actor.side && isAlive(entity));
 }
@@ -1691,6 +1857,12 @@ function log(message) {
 }
 
 elements.newRunButton.addEventListener("click", newRun);
+elements.characterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    selectedCharacterId = button.dataset.character;
+    newRun();
+  });
+});
 elements.pauseButton.addEventListener("click", () => {
   state.paused = !state.paused;
   render();
