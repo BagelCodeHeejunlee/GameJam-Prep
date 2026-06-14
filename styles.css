@@ -627,10 +627,32 @@ h2 {
 .reveal-card .action-line,
 .reward-card .action-line {
   display: flex;
+  align-items: center;
+  margin-top: 0;
+}
+
+.reveal-card .action-group,
+.reward-card .action-group {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.reveal-card .action-group.attack,
+.reward-card .action-group.attack {
+  border-color: rgba(255, 183, 166, 0.18);
+}
+
+.reveal-card .action-group.move,
+.reward-card .action-group.move {
+  border-color: rgba(159, 208, 255, 0.18);
 }
 
 .reveal-card .action-stat,
@@ -639,10 +661,10 @@ h2 {
   align-items: center;
   gap: 4px;
   min-height: 28px;
-  padding: 3px 7px 3px 4px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 1px 5px 1px 1px;
+  border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.075);
   color: var(--text);
   font-size: 13px;
   font-weight: 900;
@@ -661,9 +683,14 @@ h2 {
   line-height: 1;
 }
 
-.reveal-card .action-icon.attack,
-.reward-card .action-icon.attack {
+.reveal-card .action-icon.melee,
+.reward-card .action-icon.melee {
   color: #ffb7a6;
+}
+
+.reveal-card .action-icon.ranged,
+.reward-card .action-icon.ranged {
+  color: #d9b96e;
 }
 
 .reveal-card .action-icon.move,
@@ -676,6 +703,21 @@ h2 {
 .reveal-card .action-icon.range,
 .reward-card .action-icon.range {
   color: #cfc8ff;
+}
+
+.reveal-card .action-icon.target,
+.reward-card .action-icon.target {
+  display: flex;
+  gap: 2px;
+  color: #d7f2c2;
+}
+
+.reveal-card .action-icon.target i,
+.reward-card .action-icon.target i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
 }
 
 .reveal-card .action-note,

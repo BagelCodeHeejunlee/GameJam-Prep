@@ -1141,41 +1141,59 @@ function renderActionList(cardData) {
 
 function renderActionLine(action) {
   if (action.type === "move") {
-    return `<span class="action-line">${actionStat("move", "이동", action.amount)}</span>`;
+    return `<span class="action-line">${actionGroup("move", [actionStat("move", "이동", action.amount)])}</span>`;
   }
   if (action.type === "flee") {
-    return `<span class="action-line">${actionStat("move flee", "도망", action.amount)}<span class="action-note">도망</span></span>`;
+    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "도망", action.amount), actionNote("도망")])}</span>`;
   }
   if (action.type === "attack") {
-    const targetStat = action.targets ? actionStat("target", "타겟 수", action.targets) : "";
-    const pushStat = action.push ? `<span class="action-note">밀기 ${action.push}</span>` : "";
-    return `<span class="action-line">${actionStat("attack", "공격", action.mult)}${actionStat("range", "사거리", action.range)}${targetStat}${pushStat}</span>`;
+    const attackKind = action.melee || action.range <= 1 ? "melee" : "ranged";
+    const parts = [
+      actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult),
+      actionStat("range", "사거리", action.range),
+    ];
+    if (action.targets) parts.push(actionStat("target", "타겟 수", action.targets));
+    if (action.push) parts.push(actionNote(`밀기 ${action.push}`));
+    return `<span class="action-line">${actionGroup("attack", parts)}</span>`;
   }
   if (action.type === "patternAttack") {
-    return `<span class="action-line">${patternIcon(action.pattern)}${actionStat("attack", "공격", action.mult)}${actionStat("range", "사거리", action.range)}</span>`;
+    return `<span class="action-line">${actionGroup("attack", [
+      patternIcon(action.pattern),
+      actionStat("ranged", "원거리 공격", action.mult),
+      actionStat("range", "사거리", action.range),
+    ])}</span>`;
   }
   if (action.type === "charge") {
-    return `<span class="action-line">${actionStat("charge", "차지", action.amount)}<span class="action-note">차지</span></span>`;
+    return `<span class="action-line">${actionGroup("special", [actionStat("charge", "차지", action.amount), actionNote("차지")])}</span>`;
   }
   if (action.type === "permanent") {
-    return `<span class="action-line"><span class="action-note">영구 효과</span></span>`;
+    return `<span class="action-line">${actionGroup("special", [actionNote("영구 효과")])}</span>`;
   }
   if (action.type === "placeObstacle") {
-    return `<span class="action-line">${actionStat("range", "사거리", action.range)}<span class="action-note">장애물 설치</span></span>`;
+    return `<span class="action-line">${actionGroup("special", [actionStat("range", "사거리", action.range), actionNote("장애물 설치")])}</span>`;
   }
-  return `<span class="action-line"><span class="action-note">${action.type}</span></span>`;
+  return `<span class="action-line">${actionGroup("special", [actionNote(action.type)])}</span>`;
+}
+
+function actionGroup(kind, parts) {
+  return `<span class="action-group ${kind}">${parts.join("")}</span>`;
 }
 
 function actionStat(kind, label, value) {
   const icon = {
-    attack: "⚔",
-    move: "↗",
-    "move flee": "↙",
-    range: "◎",
-    target: "×",
+    melee: "⚔",
+    ranged: "🏹",
+    move: "👟",
+    "move-flee": "👟",
+    range: "◉",
+    target: '<i></i><i></i>',
     charge: "+",
   }[kind] ?? "?";
   return `<span class="action-stat" title="${label}"><span class="action-icon ${kind.replaceAll(" ", "-")}">${icon}</span><b>${value}</b></span>`;
+}
+
+function actionNote(text) {
+  return `<span class="action-note">${text}</span>`;
 }
 
 function patternIcon(pattern) {
