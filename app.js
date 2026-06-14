@@ -865,7 +865,7 @@ function render() {
 function renderBoard() {
   elements.board.innerHTML = "";
   const bounds = boardBounds();
-  elements.board.style.height = `${Math.max(620, bounds.height + BOARD_PADDING * 2)}px`;
+  fitBoardToPanel(bounds);
 
   for (const tile of state.tiles) {
     const point = hexToPixel(tile, bounds);
@@ -956,6 +956,7 @@ function entryLabel(entry) {
 
 function showDamage(target, damage) {
   const bounds = boardBounds();
+  fitBoardToPanel(bounds);
   const point = hexToPixel(target, bounds);
   const div = document.createElement("div");
   div.className = "damage-pop";
@@ -980,6 +981,23 @@ function boardBounds() {
     width: maxX - minX,
     height: maxY - minY,
   };
+}
+
+function fitBoardToPanel(bounds = boardBounds()) {
+  const logicalWidth = Math.max(620, bounds.width + BOARD_PADDING * 2);
+  const logicalHeight = Math.max(620, bounds.height + BOARD_PADDING * 2);
+  const panel = elements.board.parentElement;
+  const panelWidth = Math.max(1, panel.clientWidth);
+  const panelHeight = Math.max(1, panel.clientHeight);
+  const scale = Math.min(panelWidth / logicalWidth, panelHeight / logicalHeight);
+  const offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
+  const offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
+
+  elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
+  elements.board.style.setProperty("--board-height", `${logicalHeight}px`);
+  elements.board.style.setProperty("--board-scale", `${scale}`);
+  elements.board.style.left = `${offsetX}px`;
+  elements.board.style.top = `${offsetY}px`;
 }
 
 function hexToPixel(hex, bounds) {
@@ -1078,6 +1096,9 @@ elements.iconHelpButton.addEventListener("click", () => {
 });
 elements.closeHelpButton.addEventListener("click", () => {
   elements.iconHelpOverlay.classList.add("hidden");
+});
+window.addEventListener("resize", () => {
+  renderBoard();
 });
 
 newRun();

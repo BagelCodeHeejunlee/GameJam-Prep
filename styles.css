@@ -22,6 +22,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -49,6 +50,7 @@ button:hover {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 20px;
   gap: 16px;
 }
@@ -103,6 +105,7 @@ h2 {
   display: grid;
   grid-template-columns: minmax(520px, 1fr) 360px;
   min-height: 0;
+  flex: 1;
   gap: 16px;
 }
 
@@ -116,14 +119,17 @@ h2 {
 
 .board-panel {
   position: relative;
-  min-height: 640px;
+  min-height: 0;
+  height: min(720px, calc(100dvh - 102px));
   overflow: hidden;
 }
 
 .board {
   position: relative;
-  width: 100%;
-  height: 640px;
+  width: var(--board-width, 620px);
+  height: var(--board-height, 620px);
+  transform: scale(var(--board-scale, 1));
+  transform-origin: top left;
 }
 
 .hex {
@@ -213,7 +219,8 @@ h2 {
 .side-panel {
   display: flex;
   flex-direction: column;
-  min-height: 640px;
+  min-height: 0;
+  max-height: min(720px, calc(100dvh - 102px));
 }
 
 .stat-strip {
@@ -461,22 +468,17 @@ h2 {
   .game-layout {
     grid-template-columns: 1fr;
     gap: 10px;
+    flex: initial;
   }
 
   .board-panel {
-    min-height: 390px;
-    height: 390px;
-  }
-
-  .board {
-    width: 620px;
-    height: 620px !important;
-    transform: scale(0.62);
-    transform-origin: top left;
+    height: clamp(320px, 47dvh, 430px);
+    min-height: 0;
   }
 
   .side-panel {
     min-height: 0;
+    max-height: none;
   }
 
   .stat-strip div {
@@ -565,12 +567,7 @@ h2 {
 
 @media (max-width: 430px) {
   .board-panel {
-    height: 360px;
-    min-height: 360px;
-  }
-
-  .board {
-    transform: scale(0.57);
+    height: clamp(340px, 46dvh, 390px);
   }
 }
 
@@ -592,11 +589,46 @@ h2 {
   }
 
   .board-panel {
-    height: 340px;
-    min-height: 340px;
+    height: clamp(318px, 44dvh, 360px);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .app-shell {
+    padding: 8px;
+    gap: 8px;
   }
 
-  .board {
-    transform: scale(0.53);
+  .top-bar {
+    align-items: center;
+  }
+
+  h1 {
+    font-size: 16px;
+  }
+
+  #runSummary {
+    font-size: 12px;
+  }
+
+  .game-layout {
+    grid-template-columns: minmax(360px, 1fr) minmax(300px, 38vw);
+    gap: 8px;
+  }
+
+  .board-panel,
+  .side-panel {
+    height: calc(100dvh - 68px);
+    max-height: none;
+  }
+
+  .draw-panel,
+  .timeline-panel,
+  .log-panel {
+    padding: 8px;
+  }
+
+  .battle-log {
+    max-height: 150px;
   }
 }
