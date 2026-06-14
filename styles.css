@@ -29,6 +29,10 @@ body {
     sans-serif;
 }
 
+html {
+  min-width: 320px;
+}
+
 button {
   border: 1px solid var(--line);
   background: var(--panel-2);
@@ -418,15 +422,181 @@ h2 {
 }
 
 @media (max-width: 960px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .top-bar {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  h1 {
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  #runSummary {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .controls {
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .controls button {
+    min-width: 0;
+    padding: 8px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
   .game-layout {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .board-panel {
+    min-height: 390px;
+    height: 390px;
+  }
+
+  .board {
+    width: 620px;
+    height: 620px !important;
+    transform: scale(0.62);
+    transform-origin: top left;
   }
 
   .side-panel {
-    min-height: 480px;
+    min-height: 0;
+  }
+
+  .stat-strip div {
+    padding: 9px 10px;
+  }
+
+  .stat-strip span {
+    font-size: 11px;
+  }
+
+  .stat-strip strong {
+    font-size: 14px;
+  }
+
+  .draw-panel,
+  .timeline-panel,
+  .log-panel {
+    padding: 10px;
+  }
+
+  .drawn-cards {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .mini-card {
+    padding: 8px 9px;
+  }
+
+  .mini-card strong,
+  .reward-card strong {
+    font-size: 13px;
+  }
+
+  .mini-card span,
+  .reward-card span {
+    font-size: 11px;
+  }
+
+  .timeline {
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .timeline li {
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+
+  .battle-log {
+    max-height: 190px;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .battle-log p {
+    padding-bottom: 6px;
+  }
+
+  .overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .reward-modal,
+  .help-modal {
+    max-height: calc(100vh - 20px);
+    overflow: auto;
+    padding: 12px;
+  }
+
+  .reward-header {
+    margin-bottom: 10px;
+  }
+
+  .reward-card {
+    min-height: 132px;
+    padding: 11px;
   }
 
   .reward-cards {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 430px) {
+  .board-panel {
+    height: 360px;
+    min-height: 360px;
+  }
+
+  .board {
+    transform: scale(0.57);
+  }
+}
+
+@media (max-width: 370px) {
+  .app-shell {
+    padding: 8px;
+  }
+
+  .top-bar {
+    flex-direction: column;
+  }
+
+  .controls {
+    width: 100%;
+  }
+
+  .controls button {
+    flex: 1;
+  }
+
+  .board-panel {
+    height: 340px;
+    min-height: 340px;
+  }
+
+  .board {
+    transform: scale(0.53);
   }
 }
