@@ -906,10 +906,11 @@ function renderHud() {
 
 function renderDrawnCards() {
   elements.drawnCards.innerHTML = "";
-  state.currentTimeline.forEach((entry) => {
+  state.currentTimeline.forEach((entry, index) => {
     const div = document.createElement("div");
-    div.className = "mini-card";
-    div.innerHTML = `<strong>${entry.card.name}</strong><span>${entryLabel(entry)} · PRI ${entry.card.priority}</span><span>${describeCard(entry.card)}</span>`;
+    div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"}`;
+    div.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
+    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? "궁" : "적"}</strong>`;
     elements.drawnCards.append(div);
   });
 }
@@ -939,12 +940,12 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   elements.cardRevealOverlay.className = "card-reveal-overlay";
   elements.cardRevealTitle.textContent = "카드 드로우";
   renderRevealCards(drawnEntries);
-  await sleep(760);
+  await sleep(1000);
 
   elements.cardRevealTitle.textContent = "우선권 정렬";
   elements.cardRevealOverlay.classList.add("sorting");
-  renderRevealCards(sortedEntries);
-  await sleep(720);
+  slideSortRevealCards(sortedEntries);
+  await sleep(820);
 
   elements.cardRevealOverlay.classList.add("dock");
   await sleep(520);
@@ -954,10 +955,12 @@ async function playCardReveal(drawnEntries, sortedEntries) {
 
 function renderRevealCards(entries) {
   elements.cardRevealList.innerHTML = "";
-  entries.forEach((entry) => {
+  entries.forEach((entry, index) => {
     const div = document.createElement("article");
-    div.className = "reveal-card";
+    div.className = `reveal-card ${entry.actorType === "player" ? "player" : "enemy"}`;
+    div.dataset.entryKey = entryKey(entry);
     div.innerHTML = `
+      <b class="order-number">${index + 1}</b>
       <strong>${entry.card.name}</strong>
       <span>${entryLabel(entry)}</span>
       <span class="priority">PRI ${entry.card.priority}</span>
@@ -965,6 +968,40 @@ function renderRevealCards(entries) {
     `;
     elements.cardRevealList.append(div);
   });
+}
+
+function slideSortRevealCards(sortedEntries) {
+  const currentCards = [...elements.cardRevealList.children];
+  const firstRects = new Map(
+    currentCards.map((cardElement) => [cardElement.dataset.entryKey, cardElement.getBoundingClientRect()]),
+  );
+  const cardsByKey = new Map(currentCards.map((cardElement) => [cardElement.dataset.entryKey, cardElement]));
+
+  sortedEntries.forEach((entry) => {
+    const cardElement = cardsByKey.get(entryKey(entry));
+    if (cardElement) elements.cardRevealList.append(cardElement);
+  });
+
+  [...elements.cardRevealList.children].forEach((cardElement, index) => {
+    cardElement.querySelector(".order-number").textContent = index + 1;
+    const firstRect = firstRects.get(cardElement.dataset.entryKey);
+    const lastRect = cardElement.getBoundingClientRect();
+    if (!firstRect) return;
+
+    const x = firstRect.left - lastRect.left;
+    const y = firstRect.top - lastRect.top;
+    cardElement.animate(
+      [
+        { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+      ],
+      { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+  });
+}
+
+function entryKey(entry) {
+  return `${entry.actorType}-${entry.actorId}-${entry.card.instanceId ?? entry.card.id}`;
 }
 
 function describeCard(cardData) {
