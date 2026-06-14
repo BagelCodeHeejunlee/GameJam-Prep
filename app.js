@@ -187,14 +187,23 @@ const baseMageCards = [
 const mageRewardPool = [
   card("mage-long-bolt", "장거리 마력탄", "공용", "노말", 34, [{ type: "attack", mult: 1, range: 4 }]),
   card("mage-fork", "갈래 마력", "연쇄", "노말", 38, [{ type: "attack", mult: 1, range: 3, targets: 3 }]),
-  card("mage-blink", "점멸", "공간", "노말", 58, [{ type: "move", amount: 3, jump: true }]),
-  card("mage-burst", "폭발 룬", "룬", "레어", 42, [
-    { type: "patternAttack", mult: 2, range: 3, pattern: "adjacent-pair" },
+  card("mage-rune-seed", "룬 흩뿌리기", "룬", "노말", 58, [
+    { type: "placeRune", range: 2, count: 2, power: 1 },
+    { type: "fleeToRune", amount: 2 },
   ]),
-  card("mage-focus", "마력 집중", "연쇄", "레어", 30, [
-    { type: "charge", amount: 1 },
+  card("mage-rune-spark", "룬 점화", "룬", "레어", 40, [
+    { type: "runeAttack", mult: 2, radius: 1 },
   ]),
-  card("mage-overflow", "마력 과잉", "룬", "레어", 34, [
+  card("mage-rune-burst", "룬 폭파", "룬", "에픽", 42, [
+    { type: "detonateRune", mult: 3, radius: 1 },
+  ]),
+  card("mage-perfect-line", "완전한 거리", "공간", "레어", 30, [
+    { type: "attack", mult: 4, range: 4, exactRange: 4 },
+  ]),
+  card("mage-singularity", "특이점", "공간", "전설", 26, [
+    { type: "attack", mult: 7, range: 5, exactRange: 5 },
+  ]),
+  card("mage-overflow", "마력 과잉", "연쇄", "레어", 34, [
     { type: "permanent", effect: "comboDamage", amount: 0.1 },
   ]),
 ];
@@ -669,6 +678,10 @@ async function executeAction(actor, action, cardData) {
     await moveActor(actor, { ...action, flee: true }, cardData);
     return true;
   }
+  if (action.type === "fleeToRune") {
+    await moveActor(actor, { ...action, fleeToRune: true }, cardData);
+    return true;
+  }
   if (action.type === "attack") {
     attack(actor, action);
     return true;
@@ -698,6 +711,18 @@ async function executeAction(actor, action, cardData) {
   if (action.type === "placeTrap" || action.type === "placeObstacle") {
     placeTrap(actor, action);
     return false;
+  }
+  if (action.type === "placeRune") {
+    placeRune(actor, action);
+    return false;
+  }
+  if (action.type === "runeAttack") {
+    runeAttack(actor, action);
+    return true;
+  }
+  if (action.type === "detonateRune") {
+    detonateRune(actor, action);
+    return true;
   }
   return false;
 }
@@ -850,6 +875,7 @@ function selectTargets(actor, action) {
   const range = effectiveActionRange(actor, action);
   const candidates = aliveOpponents(actor)
     .filter((target) => canTarget(actor, target, range))
+    .filter((target) => action.exactRange == null || wallAwareDistance(actor, target) === action.exactRange)
     .sort((a, b) => {
       if (a.hp !== b.hp) return a.hp - b.hp;
       const distanceA = axialDistance(actor, a);
@@ -878,6 +904,8 @@ async function moveActor(actor, action, cardData) {
   let destination;
   if (action.flee) {
     destination = bestFleeTile(actor, reachable);
+  } else if (action.fleeToRune) {
+    destination = bestRuneRetreatTile(actor, reachable);
   } else {
     destination = bestCombatMoveTile(actor, reachable, nextAttack ?? action);
   }
@@ -1052,7 +1080,8 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     };
   }
   const targets = aliveOpponents(actor).filter((target) =>
-    canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction)),
+    canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction))
+      && (attackAction.exactRange == null || wallAwareDistance(tile, target) === attackAction.exactRange),
   );
   return {
     hitCount: Math.min(targets.length, attackAction.targets ?? 1),
@@ -1068,6 +1097,20 @@ function bestFleeTile(actor, reachable) {
     const aMin = Math.min(...opponents.map((enemy) => axialDistance(a, enemy)));
     const bMin = Math.min(...opponents.map((enemy) => axialDistance(b, enemy)));
     if (aMin !== bMin) return bMin - aMin;
+    return axialDistance(actor, a) - axialDistance(actor, b);
+  })[0];
+}
+
+function bestRuneRetreatTile(actor, reachable) {
+  const runes = ownedRunes(actor);
+  if (!runes.length) return bestFleeTile(actor, reachable);
+  return [...reachable].sort((a, b) => {
+    const aRuneDistance = Math.min(...runes.map((rune) => axialDistance(a, rune)));
+    const bRuneDistance = Math.min(...runes.map((rune) => axialDistance(b, rune)));
+    if (aRuneDistance !== bRuneDistance) return aRuneDistance - bRuneDistance;
+    const aEnemyDistance = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(a, enemy)), Infinity);
+    const bEnemyDistance = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(b, enemy)), Infinity);
+    if (aEnemyDistance !== bEnemyDistance) return bEnemyDistance - aEnemyDistance;
     return axialDistance(actor, a) - axialDistance(actor, b);
   })[0];
 }
@@ -1186,6 +1229,113 @@ function placeTrap(actor, action) {
     });
   });
   log(`${actor.name} 함정 ${tiles.length}개 설치`);
+}
+
+function placeRune(actor, action) {
+  const opponents = aliveOpponents(actor);
+  const reachable = state.tiles
+    .filter((tile) => axialDistance(actor, tile) <= action.range)
+    .filter((tile) => !sameHex(tile, actor))
+    .filter((tile) => canEndMoveAt(tile, actor))
+    .filter((tile) => !trapAt(tile))
+    .sort((a, b) => {
+      const aEnemyDistance = Math.min(...opponents.map((enemy) => axialDistance(a, enemy)), Infinity);
+      const bEnemyDistance = Math.min(...opponents.map((enemy) => axialDistance(b, enemy)), Infinity);
+      if (aEnemyDistance !== bEnemyDistance) return aEnemyDistance - bEnemyDistance;
+      return axialDistance(actor, a) - axialDistance(actor, b);
+    });
+
+  const tiles = reachable.slice(0, action.count ?? 1);
+  if (!tiles.length) {
+    log(`${actor.name} 룬 설치 실패`);
+    return;
+  }
+  tiles.forEach((tile) => {
+    state.obstacles.push({
+      q: tile.q,
+      r: tile.r,
+      kind: "rune",
+      ownerId: actor.id,
+      ownerSide: actor.side,
+      power: action.power ?? 1,
+      baseAtk: actor.baseAtk,
+    });
+  });
+  log(`${actor.name} 룬 ${tiles.length}개 설치`);
+}
+
+function ownedRunes(actor) {
+  return state.obstacles.filter((obstacle) => obstacle.kind === "rune" && obstacle.ownerId === actor.id);
+}
+
+function runeAttack(actor, action) {
+  const runes = ownedRunes(actor);
+  const targets = targetsNearRunes(actor, runes, action.radius ?? 1);
+  if (!targets.length) {
+    log(`${actor.name} 룬 공격 실패`);
+    return;
+  }
+  targets.forEach((target) => dealActionDamage(actor, target, action.mult, true));
+}
+
+function detonateRune(actor, action) {
+  const runes = ownedRunes(actor);
+  if (!runes.length) {
+    log(`${actor.name} 룬 폭파 실패`);
+    return;
+  }
+  const radius = action.radius ?? 1;
+  const scored = runes.map((rune) => {
+    const targets = targetsNearRunes(actor, [rune], radius);
+    return {
+      rune,
+      targets,
+      lowestHp: Math.min(...targets.map((target) => target.hp), Infinity),
+      nearestEnemy: Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(rune, enemy)), Infinity),
+    };
+  }).sort((a, b) => {
+    if (a.targets.length !== b.targets.length) return b.targets.length - a.targets.length;
+    if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
+    return a.nearestEnemy - b.nearestEnemy;
+  });
+  const best = scored[0];
+  if (!best?.targets.length) {
+    log(`${actor.name} 룬 폭파 실패`);
+    return;
+  }
+  state.obstacles = state.obstacles.filter((obstacle) => obstacle !== best.rune);
+  best.targets.forEach((target) => dealActionDamage(actor, target, action.mult, true));
+  log(`${actor.name} 룬 폭파`);
+}
+
+function targetsNearRunes(actor, runes, radius) {
+  const seen = new Set();
+  return aliveOpponents(actor)
+    .filter((target) => runes.some((rune) => axialDistance(rune, target) <= radius))
+    .filter((target) => {
+      if (seen.has(target.id)) return false;
+      seen.add(target.id);
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.hp !== b.hp) return a.hp - b.hp;
+      return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
+    });
+}
+
+function dealActionDamage(actor, target, multiplier, melee = false) {
+  if (!isAlive(actor) || !isAlive(target)) return;
+  const distance = axialDistance(actor, target);
+  const adjacentPenalty = !melee && distance <= 1 ? 0.7 : 1;
+  const damage = Math.max(1, Math.round(actor.baseAtk * multiplier * adjacentPenalty));
+  const hitPosition = { q: target.q, r: target.r };
+  const beforeHp = target.hp;
+  applyDamage(target, damage);
+  renderBoard();
+  renderHud();
+  showHitEffect(target, hitPosition, damage);
+  log(`${actor.name} -> ${target.name} ${damage} 피해`);
+  applyOverkillSplash(actor, target, damage - beforeHp);
 }
 
 function isBetweenActorAndEnemy(actor, tile, opponents) {
@@ -1755,12 +1905,16 @@ function renderActionLine(action) {
   if (action.type === "flee") {
     return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "후퇴", action.amount), actionNote("후퇴")])}</span>`;
   }
+  if (action.type === "fleeToRune") {
+    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "룬 쪽 후퇴", action.amount), actionNote("룬")])}</span>`;
+  }
   if (action.type === "attack") {
     const attackKind = action.melee || action.range <= 1 ? "melee" : "ranged";
     const parts = [
       actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult),
     ];
     if (attackKind !== "melee") parts.push(actionStat("range", "사거리", action.range));
+    if (action.exactRange != null) parts.push(actionNote(`정확히 ${action.exactRange}칸`));
     if (action.targets) parts.push(actionStat("target", "타겟 수", action.targets));
     if (action.push) parts.push(actionNote(`밀기 ${action.push}`));
     if (action.pull) parts.push(actionNote(`당기기 ${action.pull}`));
@@ -1792,6 +1946,24 @@ function renderActionLine(action) {
     return `<span class="action-line">${actionGroup("special", [
       actionStat("range", "사거리", action.range),
       actionNote(`${trapName}${action.count ? ` x${action.count}` : ""}`),
+    ])}</span>`;
+  }
+  if (action.type === "placeRune") {
+    return `<span class="action-line">${actionGroup("special", [
+      actionStat("range", "사거리", action.range),
+      actionNote(`룬 x${action.count ?? 1}`),
+    ])}</span>`;
+  }
+  if (action.type === "runeAttack") {
+    return `<span class="action-line">${actionGroup("attack", [
+      actionNote("룬 주변"),
+      actionStat("ranged", "원거리 공격", action.mult),
+    ])}</span>`;
+  }
+  if (action.type === "detonateRune") {
+    return `<span class="action-line">${actionGroup("attack", [
+      actionNote("룬 폭파"),
+      actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
   return `<span class="action-line">${actionGroup("special", [actionNote(action.type)])}</span>`;
@@ -1851,7 +2023,8 @@ function describeAction(action) {
     const targetText = action.targets ? `, TGT ${action.targets}` : "";
     const pushText = action.push ? `, 밀기 ${action.push}` : "";
     const pullText = action.pull ? `, 당기기 ${action.pull}` : "";
-    return `ATK ${action.mult}, RNG ${action.range}${targetText}${pushText}${pullText}`;
+    const exactText = action.exactRange != null ? `, 정확히 ${action.exactRange}칸` : "";
+    return `ATK ${action.mult}, RNG ${action.range}${exactText}${targetText}${pushText}${pullText}`;
   }
   if (action.type === "rushAttack") return `돌진 ${action.amount}, ATK ${action.mult}, 남은 이동 x${action.perUnusedMoveBonus ?? 1}`;
   if (action.type === "patternAttack") {
@@ -1861,6 +2034,10 @@ function describeAction(action) {
   if (action.type === "charge") return `차지 ${action.amount}`;
   if (action.type === "permanent") return permanentEffectLabel(action);
   if (action.type === "placeTrap" || action.type === "placeObstacle") return `함정 설치 RNG ${action.range}`;
+  if (action.type === "placeRune") return `룬 설치 RNG ${action.range}`;
+  if (action.type === "fleeToRune") return `룬 쪽 후퇴 ${action.amount}`;
+  if (action.type === "runeAttack") return `룬 주변 ATK ${action.mult}`;
+  if (action.type === "detonateRune") return `룬 폭파 ATK ${action.mult}`;
   return action.type;
 }
 
@@ -2022,15 +2199,15 @@ function triggerTrap(actor) {
   if (!trap || trap.ownerSide === actor.side) return null;
 
   state.obstacles = state.obstacles.filter((item) => item !== trap);
-  if (trap.kind === "attack" || trap.kind === "spike") {
+  if (trap.kind === "attack" || trap.kind === "spike" || trap.kind === "rune") {
     const damage = Math.max(1, Math.round((trap.baseAtk ?? 10) * (trap.power ?? 2)));
     const hitPosition = { q: actor.q, r: actor.r };
     applyDamage(actor, damage);
     renderBoard();
     renderHud();
     showHitEffect(actor, hitPosition, damage);
-    log(`${actor.name} 공격 함정 ${damage} 피해`);
-    return "attack";
+    log(`${actor.name} ${trap.kind === "rune" ? "룬" : "공격 함정"} ${damage} 피해`);
+    return trap.kind === "rune" ? "rune" : "attack";
   }
 
   if (trap.kind === "block") {

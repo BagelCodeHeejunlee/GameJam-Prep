@@ -253,6 +253,13 @@ h2 {
     repeating-linear-gradient(-45deg, rgba(126, 181, 255, 0.28) 0 6px, rgba(30, 42, 58, 0.92) 6px 12px);
 }
 
+.hex.trap-rune::after {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(199, 184, 255, 0.9) 0 16%, transparent 17%),
+    radial-gradient(circle at 50% 50%, rgba(124, 230, 210, 0.34) 0 34%, transparent 35%),
+    linear-gradient(135deg, rgba(65, 50, 95, 0.95), rgba(25, 48, 49, 0.95));
+}
+
 .hex.in-range::after {
   background: #273735;
 }
