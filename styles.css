@@ -260,6 +260,26 @@ h2 {
     linear-gradient(135deg, rgba(65, 50, 95, 0.95), rgba(25, 48, 49, 0.95));
 }
 
+.meteor-marker {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(255, 215, 118, 0.86);
+  border-radius: 50%;
+  background: rgba(82, 41, 29, 0.76);
+  color: #ffe6a3;
+  font-size: 13px;
+  font-weight: 950;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 8px rgba(255, 153, 84, 0.16),
+    0 0 28px rgba(255, 153, 84, 0.42);
+  pointer-events: none;
+}
+
 .hex.in-range::after {
   background: #273735;
 }

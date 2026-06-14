@@ -201,11 +201,11 @@ const mageRewardPool = [
   card("mage-rune-burst", "룬 폭파", "룬", "에픽", 42, [
     { type: "detonateRune", mult: 3, radius: 1 },
   ]),
-  card("mage-perfect-line", "완전한 거리", "공간", "레어", 30, [
-    { type: "attack", mult: 4, range: 4, exactRange: 4 },
+  card("mage-meteor-mark", "운석 예고", "운석", "레어", 30, [
+    { type: "placeMeteor", range: 4, mult: 4, radius: 1, delay: 1 },
   ]),
-  card("mage-singularity", "특이점", "공간", "전설", 26, [
-    { type: "attack", mult: 7, range: 5, exactRange: 5 },
+  card("mage-starfall", "별 추락", "운석", "전설", 26, [
+    { type: "placeMeteor", range: 5, mult: 7, radius: 1, delay: 1 },
   ]),
   card("mage-overflow", "마력 과잉", "연쇄", "레어", 34, [
     { type: "permanent", effect: "comboDamage", amount: 0.1 },
@@ -321,6 +321,7 @@ function newRun() {
     tiles: makeMap(3),
     walls: [],
     obstacles: [],
+    meteors: [],
     entities: [],
     characterId: character.id,
     character,
@@ -354,6 +355,7 @@ function startWave(index) {
   state.tiles = makeMap(wave.radius ?? 3);
   state.walls = wave.walls.map((item) => ({ ...item }));
   state.obstacles = [];
+  state.meteors = [];
   state.cameraMode = "overview";
   state.cameraTransitionScheduled = false;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
@@ -581,6 +583,11 @@ async function runTurn() {
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
   state.comboHits = {};
+  processMeteors();
+  if (checkEndConditions()) {
+    state.busy = false;
+    return;
+  }
 
   const player = getPlayer();
   if (!player) {
@@ -730,6 +737,10 @@ async function executeAction(actor, action, cardData) {
   if (action.type === "detonateRune") {
     detonateRune(actor, action);
     return true;
+  }
+  if (action.type === "placeMeteor") {
+    placeMeteor(actor, action);
+    return false;
   }
   if (action.type === "selfDamagePercent") {
     selfDamagePercent(actor, action.percent);
@@ -893,7 +904,6 @@ function selectTargets(actor, action) {
   const range = effectiveActionRange(actor, action);
   const candidates = aliveOpponents(actor)
     .filter((target) => canTarget(actor, target, range))
-    .filter((target) => action.exactRange == null || wallAwareDistance(actor, target) === action.exactRange)
     .sort((a, b) => {
       if (a.hp !== b.hp) return a.hp - b.hp;
       const distanceA = axialDistance(actor, a);
@@ -1134,8 +1144,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     };
   }
   const targets = aliveOpponents(actor).filter((target) =>
-    canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction))
-      && (attackAction.exactRange == null || wallAwareDistance(tile, target) === attackAction.exactRange),
+    canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction)),
   );
   return {
     hitCount: Math.min(targets.length, attackAction.targets ?? 1),
@@ -1360,6 +1369,74 @@ function detonateRune(actor, action) {
   state.obstacles = state.obstacles.filter((obstacle) => obstacle !== best.rune);
   best.targets.forEach((target) => dealActionDamage(actor, target, action.mult, true));
   log(`${actor.name} 룬 폭파`);
+}
+
+function placeMeteor(actor, action) {
+  const landing = bestMeteorLanding(actor, action);
+  if (!landing) {
+    log(`${actor.name} 운석 예고 실패`);
+    return;
+  }
+  state.meteors.push({
+    q: landing.q,
+    r: landing.r,
+    ownerId: actor.id,
+    ownerSide: actor.side,
+    baseAtk: actor.baseAtk,
+    mult: action.mult,
+    radius: action.radius ?? 1,
+    triggerTurn: state.turn + (action.delay ?? 1),
+  });
+  log(`${actor.name} 운석 예고 (${landing.q}, ${landing.r})`);
+}
+
+function bestMeteorLanding(actor, action) {
+  const range = action.range ?? actor.baseRange;
+  const radius = action.radius ?? 1;
+  const candidates = state.tiles
+    .filter((tile) => wallAwareDistance(actor, tile) <= range && hasLineOfSight(actor, tile))
+    .map((tile) => {
+      const targets = aliveOpponents(actor).filter((enemy) => axialDistance(tile, enemy) <= radius);
+      return {
+        tile,
+        targets,
+        nearestEnemy: Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(tile, enemy)), Infinity),
+        distance: axialDistance(actor, tile),
+        lowestHp: Math.min(...targets.map((target) => target.hp), Infinity),
+      };
+    });
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => {
+    if (a.targets.length !== b.targets.length) return b.targets.length - a.targets.length;
+    if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
+    if (a.nearestEnemy !== b.nearestEnemy) return a.nearestEnemy - b.nearestEnemy;
+    return a.distance - b.distance;
+  });
+  return candidates[0].tile;
+}
+
+function processMeteors() {
+  const due = state.meteors.filter((meteor) => meteor.triggerTurn <= state.turn);
+  if (!due.length) return;
+  state.meteors = state.meteors.filter((meteor) => meteor.triggerTurn > state.turn);
+  due.forEach((meteor) => {
+    const targets = state.entities.filter((entity) => {
+      return isAlive(entity) && entity.side !== meteor.ownerSide && axialDistance(meteor, entity) <= meteor.radius;
+    });
+    if (!targets.length) {
+      log(`운석 빗나감 (${meteor.q}, ${meteor.r})`);
+      return;
+    }
+    targets.forEach((target) => {
+      const damage = Math.max(1, Math.round((meteor.baseAtk ?? 10) * meteor.mult));
+      const hitPosition = { q: target.q, r: target.r };
+      applyDamage(target, damage);
+      renderBoard();
+      renderHud();
+      showHitEffect(target, hitPosition, damage);
+      log(`운석 -> ${target.name} ${damage} 피해`);
+    });
+  });
 }
 
 function targetsNearRunes(actor, runes, radius) {
@@ -1690,6 +1767,16 @@ function renderBoard() {
     elements.board.append(div);
   }
 
+  for (const meteor of state.meteors) {
+    const point = hexToPixel(meteor, bounds);
+    const div = document.createElement("div");
+    div.className = "meteor-marker";
+    div.textContent = meteor.triggerTurn - state.turn;
+    div.style.left = `${point.x}px`;
+    div.style.top = `${point.y}px`;
+    elements.board.append(div);
+  }
+
   for (const entity of state.entities.filter(isAlive)) {
     const point = hexToPixel(entity, bounds);
     const div = document.createElement("div");
@@ -1968,7 +2055,6 @@ function renderActionLine(action) {
       actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult),
     ];
     if (attackKind !== "melee") parts.push(actionStat("range", "사거리", action.range));
-    if (action.exactRange != null) parts.push(actionNote(`정확히 ${action.exactRange}칸`));
     if (action.targets) parts.push(actionStat("target", "타겟 수", action.targets));
     if (action.push) parts.push(actionNote(`밀기 ${action.push}`));
     if (action.pull) parts.push(actionNote(`당기기 ${action.pull}`));
@@ -2017,6 +2103,13 @@ function renderActionLine(action) {
   if (action.type === "detonateRune") {
     return `<span class="action-line">${actionGroup("attack", [
       actionNote("룬 폭파"),
+      actionStat("ranged", "원거리 공격", action.mult),
+    ])}</span>`;
+  }
+  if (action.type === "placeMeteor") {
+    return `<span class="action-line">${actionGroup("attack", [
+      actionStat("range", "사거리", action.range),
+      actionNote(`운석 예고 ${action.delay ?? 1}턴`),
       actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
@@ -2085,8 +2178,7 @@ function describeAction(action) {
     const targetText = action.targets ? `, TGT ${action.targets}` : "";
     const pushText = action.push ? `, 밀기 ${action.push}` : "";
     const pullText = action.pull ? `, 당기기 ${action.pull}` : "";
-    const exactText = action.exactRange != null ? `, 정확히 ${action.exactRange}칸` : "";
-    return `ATK ${action.mult}, RNG ${action.range}${exactText}${targetText}${pushText}${pullText}`;
+    return `ATK ${action.mult}, RNG ${action.range}${targetText}${pushText}${pullText}`;
   }
   if (action.type === "momentumAttack") return `이동 ${action.amount}, ATK ${action.mult}, 남은 이동 공격 x${action.perUnusedMoveBonus ?? 1}`;
   if (action.type === "patternAttack") {
@@ -2100,6 +2192,7 @@ function describeAction(action) {
   if (action.type === "fleeToRune") return `룬 쪽 후퇴 ${action.amount}`;
   if (action.type === "runeAttack") return `룬 주변 ATK ${action.mult}`;
   if (action.type === "detonateRune") return `룬 폭파 ATK ${action.mult}`;
+  if (action.type === "placeMeteor") return `운석 예고 ${action.delay ?? 1}턴, ATK ${action.mult}`;
   if (action.type === "selfDamagePercent") return `체력 -${Math.round(action.percent * 100)}%`;
   if (action.type === "healPercent") return `회복 ${Math.round(action.percent * 100)}%`;
   return action.type;
