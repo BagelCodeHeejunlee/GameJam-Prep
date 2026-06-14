@@ -140,17 +140,36 @@ const baseWarriorCards = [
 
 const warriorRewardPool = [
   card("warrior-quick-slash", "빠른 베기", "공용", "노말", 42, [{ type: "attack", mult: 1, range: 1, melee: true }]),
-  card("warrior-shield-step", "방패 전진", "방패", "노말", 60, [
-    { type: "move", amount: 1, desiredRange: 1 },
-    { type: "attack", mult: 1, range: 1, melee: true },
+  card("warrior-short-rush", "짧은 돌진", "돌진", "노말", 55, [
+    { type: "rushAttack", amount: 3, mult: 1, range: 1 },
   ]),
-  card("warrior-push", "밀어붙이기", "제압", "노말", 46, [{ type: "attack", mult: 1, range: 1, melee: true, push: 1 }]),
-  card("warrior-cleave-reward", "넓은 휩쓸기", "광전", "레어", 48, [
+  card("warrior-berserk-cut", "거친 베기", "광전", "노말", 46, [{ type: "attack", mult: 2, range: 1, melee: true }]),
+  card("warrior-push", "밀어붙이기", "범위 공격", "노말", 46, [{ type: "attack", mult: 1, range: 1, melee: true, push: 1 }]),
+  card("warrior-cleave-reward", "넓은 휩쓸기", "범위 공격", "레어", 48, [
     { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-pair", melee: true },
   ]),
-  card("warrior-break", "파쇄", "제압", "레어", 50, [{ type: "attack", mult: 3, range: 1, melee: true }]),
+  card("warrior-breaking-rush", "분쇄 돌진", "돌진", "레어", 58, [
+    { type: "rushAttack", amount: 4, mult: 1, range: 1 },
+  ]),
+  card("warrior-blood-chain", "피의 연격", "광전", "레어", 44, [
+    { type: "attack", mult: 1, range: 1, melee: true },
+    { type: "attack", mult: 1, range: 1, melee: true },
+    { type: "attack", mult: 1, range: 1, melee: true },
+  ]),
+  card("warrior-triangle-cleave", "삼각 휩쓸기", "범위 공격", "에픽", 47, [
+    { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
+  ]),
+  card("warrior-overrun", "초과 돌파", "돌진", "에픽", 60, [
+    { type: "rushAttack", amount: 5, mult: 2, range: 1 },
+  ]),
   card("warrior-rhythm", "전장의 리듬", "광전", "레어", 44, [
     { type: "permanent", effect: "comboDamage", amount: 0.1 },
+  ]),
+  card("warrior-whirlwind", "피의 폭풍", "범위 공격", "전설", 45, [
+    { type: "patternAttack", mult: 3, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
+  ]),
+  card("warrior-endless-charge", "멈추지 않는 돌진", "돌진", "전설", 62, [
+    { type: "rushAttack", amount: 6, mult: 2, range: 1, perUnusedMoveBonus: 2 },
   ]),
 ];
 
@@ -654,6 +673,10 @@ async function executeAction(actor, action, cardData) {
     attack(actor, action);
     return true;
   }
+  if (action.type === "rushAttack") {
+    await rushAttack(actor, action);
+    return true;
+  }
   if (action.type === "patternAttack") {
     patternAttack(actor, action);
     return true;
@@ -806,11 +829,12 @@ function patternAttack(actor, action) {
   }
 
   const chargeBonus = consumeChargeForAttack(actor);
+  const targetBonus = (placement.targets.length - 1) * (action.perTargetBonus ?? 0);
   placement.targets.forEach((target) => {
     if (!isAlive(actor) || !isAlive(target)) return;
     const distance = axialDistance(actor, target);
     const adjacentPenalty = !action.melee && distance <= 1 ? 0.7 : 1;
-    const damage = Math.max(1, Math.round(actor.baseAtk * (action.mult + chargeBonus) * adjacentPenalty));
+    const damage = Math.max(1, Math.round(actor.baseAtk * (action.mult + chargeBonus + targetBonus) * adjacentPenalty));
     const hitPosition = { q: target.q, r: target.r };
     const beforeHp = target.hp;
     applyDamage(target, damage);
@@ -838,16 +862,16 @@ function selectTargets(actor, action) {
 }
 
 async function moveActor(actor, action, cardData) {
+  const amount = action.amount ?? actor.baseMove;
   if (actor.temporary?.cannotMove && !action.ignoreCannotMove) {
     log(`${actor.name} 이동 불가`);
-    return;
+    return { moved: 0, unused: amount };
   }
 
-  const amount = action.amount ?? actor.baseMove;
   const reachable = reachableTiles(actor, amount, action.jump);
   if (!reachable.length) {
     log(`${actor.name} 이동 실패`);
-    return;
+    return { moved: 0, unused: amount };
   }
 
   const nextAttack = nextAttackAction(cardData, action);
@@ -860,13 +884,36 @@ async function moveActor(actor, action, cardData) {
 
   if (!destination || sameHex(destination, actor)) {
     log(`${actor.name} 제자리`);
-    return;
+    return { moved: 0, unused: amount };
   }
 
   const path = findMovePath(actor, destination, action.jump);
+  const moved = path.length || axialDistance(actor, destination);
   await animateActorPath(actor, path.length ? path : [destination]);
   log(`${actor.name} 이동 (${actor.q}, ${actor.r})`);
   triggerTrap(actor);
+  return { moved, unused: Math.max(0, amount - moved) };
+}
+
+async function rushAttack(actor, action) {
+  const followUpAttack = { type: "attack", mult: action.mult, range: action.range ?? 1, melee: true };
+  const moveAction = {
+    type: "move",
+    amount: action.amount,
+    desiredRange: action.range ?? 1,
+    jump: action.jump,
+  };
+  const result = await moveActor(actor, moveAction, { actions: [moveAction, followUpAttack] });
+  if (!isAlive(actor)) return;
+  const unusedMove = result?.unused ?? 0;
+  const bonusPerMove = action.perUnusedMoveBonus ?? 1;
+  attack(actor, {
+    ...action,
+    type: "attack",
+    mult: action.mult + unusedMove * bonusPerMove,
+    range: action.range ?? 1,
+    melee: true,
+  });
 }
 
 function findMovePath(actor, destination, jump = false) {
@@ -1189,32 +1236,40 @@ function applyOverkillSplash(actor, defeatedTarget, overkillDamage) {
 }
 
 function bestPatternPlacement(pattern, origin, range, side = origin.side) {
-  if (pattern === "adjacent-pair") return bestAdjacentPairPlacement(origin, range, side);
+  if (pattern === "adjacent-pair") return bestAdjacentGroupPlacement(origin, range, side, 2);
+  if (pattern === "adjacent-triple") return bestAdjacentGroupPlacement(origin, range, side, 3);
   return { tiles: [], targets: [], lowestHp: Infinity, lowestIndex: 9999 };
 }
 
 function bestAdjacentPair(actorOrTile, range, side = actorOrTile.side) {
-  return bestAdjacentPairPlacement(actorOrTile, range, side).tiles;
+  return bestAdjacentGroupPlacement(actorOrTile, range, side, 2).tiles;
 }
 
-function bestAdjacentPairPlacement(actorOrTile, range, side = actorOrTile.side) {
+function bestAdjacentGroupPlacement(actorOrTile, range, side = actorOrTile.side, size = 2) {
   const origin = actorOrTile;
   const candidates = [];
+  const seen = new Set();
   for (const tile of state.tiles) {
-    for (const dir of directions) {
-      const other = { q: tile.q + dir.q, r: tile.r + dir.r };
-      if (!isTile(other)) continue;
-      const pair = [tile, other];
-      const anchorDistances = pair
+    for (let directionIndex = 0; directionIndex < directions.length; directionIndex += 1) {
+      const dir = directions[directionIndex];
+      const nextDir = directions[(directionIndex + 1) % directions.length];
+      const group = size === 2
+        ? [tile, { q: tile.q + dir.q, r: tile.r + dir.r }]
+        : [tile, { q: tile.q + dir.q, r: tile.r + dir.r }, { q: tile.q + nextDir.q, r: tile.r + nextDir.r }];
+      if (group.some((hex) => !isTile(hex))) continue;
+      const key = group.map(hexKey).sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const anchorDistances = group
         .map((hex) => wallAwareDistance(origin, hex))
-        .filter((distance, index) => distance <= range && hasLineOfSight(origin, pair[index]));
+        .filter((distance, index) => distance <= range && hasLineOfSight(origin, group[index]));
       if (!anchorDistances.length) continue;
       const targets = state.entities.filter((entity) => {
-        return isAlive(entity) && entity.side !== side && pair.some((hex) => sameHex(hex, entity));
+        return isAlive(entity) && entity.side !== side && group.some((hex) => sameHex(hex, entity));
       });
       if (targets.length) {
         candidates.push({
-          tiles: pair,
+          tiles: group,
           targets,
           hitCount: targets.length,
           distance: Math.min(...anchorDistances),
@@ -1711,6 +1766,13 @@ function renderActionLine(action) {
     if (action.pull) parts.push(actionNote(`당기기 ${action.pull}`));
     return `<span class="action-line">${actionGroup("attack", parts)}</span>`;
   }
+  if (action.type === "rushAttack") {
+    return `<span class="action-line">${actionGroup("attack", [
+      actionStat("move", "돌진 이동", action.amount),
+      actionStat("melee", "근거리 공격", action.mult),
+      actionNote(`남은 이동 x${action.perUnusedMoveBonus ?? 1}`),
+    ])}</span>`;
+  }
   if (action.type === "patternAttack") {
     const attackKind = action.melee ? "melee" : "ranged";
     return `<span class="action-line">${actionGroup("attack", [
@@ -1776,6 +1838,9 @@ function patternIcon(pattern) {
   if (pattern === "adjacent-pair") {
     return `<span class="pattern-icon adjacent-pair" title="붙은 두 칸"><i></i><i></i></span>`;
   }
+  if (pattern === "adjacent-triple") {
+    return `<span class="pattern-icon adjacent-triple" title="붙은 세 칸"><i></i><i></i><i></i></span>`;
+  }
   return "";
 }
 
@@ -1788,7 +1853,11 @@ function describeAction(action) {
     const pullText = action.pull ? `, 당기기 ${action.pull}` : "";
     return `ATK ${action.mult}, RNG ${action.range}${targetText}${pushText}${pullText}`;
   }
-  if (action.type === "patternAttack") return `붙은 두 칸 ATK ${action.mult}, RNG ${action.range}`;
+  if (action.type === "rushAttack") return `돌진 ${action.amount}, ATK ${action.mult}, 남은 이동 x${action.perUnusedMoveBonus ?? 1}`;
+  if (action.type === "patternAttack") {
+    const patternText = action.pattern === "adjacent-triple" ? "붙은 세 칸" : "붙은 두 칸";
+    return `${patternText} ATK ${action.mult}, RNG ${action.range}`;
+  }
   if (action.type === "charge") return `차지 ${action.amount}`;
   if (action.type === "permanent") return permanentEffectLabel(action);
   if (action.type === "placeTrap" || action.type === "placeObstacle") return `함정 설치 RNG ${action.range}`;

@@ -962,6 +962,29 @@ h2 {
   left: 22px;
 }
 
+.reveal-card .pattern-icon.adjacent-triple,
+.reward-card .pattern-icon.adjacent-triple {
+  flex-basis: 55px;
+  width: 55px;
+  height: 34px;
+}
+
+.reveal-card .pattern-icon.adjacent-triple i:nth-child(1),
+.reward-card .pattern-icon.adjacent-triple i:nth-child(1) {
+  left: 4px;
+}
+
+.reveal-card .pattern-icon.adjacent-triple i:nth-child(2),
+.reward-card .pattern-icon.adjacent-triple i:nth-child(2) {
+  left: 26px;
+}
+
+.reveal-card .pattern-icon.adjacent-triple i:nth-child(3),
+.reward-card .pattern-icon.adjacent-triple i:nth-child(3) {
+  top: 13px;
+  left: 15px;
+}
+
 .card-reveal-overlay.dock {
   background: rgba(0, 0, 0, 0);
   opacity: 0;
