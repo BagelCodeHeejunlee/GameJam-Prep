@@ -659,17 +659,35 @@ h2 {
   width: 100%;
   justify-items: center;
   align-content: center;
-  gap: 6px;
+  gap: 9px;
   margin-top: 0;
 }
 
 .reveal-card .action-line,
 .reward-card .action-line {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-top: 0;
   width: 100%;
+}
+
+.reveal-card .action-line + .action-line,
+.reward-card .action-line + .action-line {
+  padding-top: 9px;
+}
+
+.reveal-card .action-line + .action-line::before,
+.reward-card .action-line + .action-line::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  width: min(92px, 68%);
+  height: 1px;
+  background: rgba(217, 185, 110, 0.42);
+  transform: translateX(-50%);
 }
 
 .reveal-card .action-group,
@@ -681,20 +699,7 @@ h2 {
   gap: 6px;
   max-width: 100%;
   min-height: 38px;
-  padding: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.reveal-card .action-group.attack,
-.reward-card .action-group.attack {
-  border-color: rgba(255, 183, 166, 0.18);
-}
-
-.reveal-card .action-group.move,
-.reward-card .action-group.move {
-  border-color: rgba(159, 208, 255, 0.18);
+  padding: 0 2px;
 }
 
 .reveal-card .action-stat,
@@ -703,10 +708,8 @@ h2 {
   align-items: center;
   gap: 4px;
   min-height: 26px;
-  padding: 1px 5px 1px 1px;
+  padding: 0 2px;
   border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.075);
   color: var(--text);
   font-size: 13px;
   font-weight: 900;
