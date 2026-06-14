@@ -41,12 +41,12 @@ const baseArcherCards = [
     { type: "move", amount: 2 },
     { type: "attack", mult: 1, range: 2 },
   ], 3),
-  card("shot-step", "사격 후 이동", "기본", "기본", 42, [
+  card("retreat-shot", "후퇴 사격", "기본", "기본", 42, [
     { type: "attack", mult: 1, range: 2 },
-    { type: "move", amount: 2 },
+    { type: "flee", amount: 2 },
   ], 2),
   card("aimed-shot", "정조준", "기본", "기본", 34, [{ type: "attack", mult: 2, range: 2 }], 1),
-  card("reposition", "재배치", "기본", "기본", 66, [{ type: "move", amount: 3 }], 1),
+  card("keep-distance", "거리 벌리기", "기본", "기본", 66, [{ type: "flee", amount: 3 }], 1),
   card(
     "paired-hex-shot",
     "붙은 두 칸 공격",
@@ -1383,7 +1383,7 @@ function renderActionLine(action) {
     return `<span class="action-line">${actionGroup("move", [actionStat("move", "이동", action.amount)])}</span>`;
   }
   if (action.type === "flee") {
-    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "도망", action.amount), actionNote("도망")])}</span>`;
+    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "후퇴", action.amount), actionNote("후퇴")])}</span>`;
   }
   if (action.type === "attack") {
     const attackKind = action.melee || action.range <= 1 ? "melee" : "ranged";
@@ -1449,7 +1449,7 @@ function patternIcon(pattern) {
 
 function describeAction(action) {
   if (action.type === "move") return `MOV ${action.amount}`;
-  if (action.type === "flee") return `도망 ${action.amount}`;
+  if (action.type === "flee") return `후퇴 ${action.amount}`;
   if (action.type === "attack") {
     const targetText = action.targets ? `, TGT ${action.targets}` : "";
     const pushText = action.push ? `, 밀기 ${action.push}` : "";
