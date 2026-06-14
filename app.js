@@ -985,8 +985,9 @@ function render() {
 }
 
 function renderBoard() {
-  const activeEffects = [...elements.board.querySelectorAll(".damage-pop")];
-  elements.board.innerHTML = "";
+  [...elements.board.children].forEach((child) => {
+    if (!child.classList.contains("damage-pop")) child.remove();
+  });
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
 
@@ -1017,7 +1018,6 @@ function renderBoard() {
     elements.board.append(div);
   }
 
-  activeEffects.forEach((effect) => elements.board.append(effect));
 }
 
 function renderHud() {
@@ -1282,13 +1282,24 @@ function showDamage(position, damage) {
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
   const point = hexToPixel(position, bounds);
+  const key = `${position.q},${position.r}:${damage}`;
+  const now = performance.now();
+  state.recentDamagePops = state.recentDamagePops ?? new Map();
+  const lastShownAt = state.recentDamagePops.get(key) ?? 0;
+  if (now - lastShownAt < 120) return;
+  state.recentDamagePops.set(key, now);
+
   const div = document.createElement("div");
   div.className = "damage-pop";
+  div.dataset.damageKey = key;
   div.textContent = `-${damage}`;
   div.style.left = `${point.x}px`;
   div.style.top = `${point.y}px`;
   elements.board.append(div);
-  window.setTimeout(() => div.remove(), 720);
+  window.setTimeout(() => {
+    div.remove();
+    if (state.recentDamagePops?.get(key) === now) state.recentDamagePops.delete(key);
+  }, 720);
 }
 
 function boardBounds() {
