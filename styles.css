@@ -422,6 +422,9 @@ h2 {
 
 .card-reveal-stage {
   width: min(780px, 100%);
+  height: min(650px, calc(100dvh - 96px));
+  display: grid;
+  grid-template-rows: auto 1fr;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: top left;
   transition:
@@ -438,11 +441,14 @@ h2 {
 }
 
 .card-reveal-list {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, clamp(150px, 42vw, 190px));
+  grid-template-rows: 1fr 1fr;
   justify-content: center;
-  align-items: stretch;
-  gap: 12px;
-  overflow-x: auto;
+  align-items: center;
+  align-content: stretch;
+  gap: 18px 12px;
+  overflow-x: visible;
   overflow-y: visible;
   padding: 4px 2px 12px;
   scrollbar-width: none;
@@ -456,7 +462,6 @@ h2 {
   position: relative;
   display: grid;
   grid-template-rows: auto auto auto 1fr;
-  flex: 0 0 clamp(158px, 42vw, 190px);
   width: clamp(158px, 42vw, 190px);
   min-height: 260px;
   padding: 16px;
@@ -470,11 +475,28 @@ h2 {
 }
 
 .reveal-card.player {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  justify-self: center;
   border-color: rgba(126, 181, 255, 0.5);
 }
 
 .reveal-card.enemy {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  justify-self: center;
   border-color: rgba(240, 124, 100, 0.5);
+}
+
+.card-reveal-list.sorted {
+  grid-template-rows: 1fr;
+  align-content: center;
+}
+
+.card-reveal-list.sorted .reveal-card {
+  grid-row: 1;
+  grid-column: auto;
+  justify-self: stretch;
 }
 
 .reveal-card:nth-child(2) {
@@ -737,9 +759,8 @@ h2 {
   }
 
   .reveal-card {
-    flex-basis: clamp(150px, 43vw, 176px);
     width: clamp(150px, 43vw, 176px);
-    min-height: 248px;
+    min-height: 238px;
     padding: 13px;
   }
 

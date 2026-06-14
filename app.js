@@ -1028,6 +1028,7 @@ async function playCardReveal(drawnEntries, sortedEntries) {
 
 function renderRevealCards(entries) {
   elements.cardRevealList.innerHTML = "";
+  elements.cardRevealList.className = "card-reveal-list";
   entries.forEach((entry) => {
     const div = document.createElement("article");
     div.className = `reveal-card ${entry.actorType === "player" ? "player" : "enemy"}`;
@@ -1049,6 +1050,7 @@ function slideSortRevealCards(sortedEntries) {
   );
   const cardsByKey = new Map(currentCards.map((cardElement) => [cardElement.dataset.entryKey, cardElement]));
 
+  elements.cardRevealList.classList.add("sorted");
   sortedEntries.forEach((entry) => {
     const cardElement = cardsByKey.get(entryKey(entry));
     if (cardElement) elements.cardRevealList.append(cardElement);
