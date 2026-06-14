@@ -956,7 +956,7 @@ function showRewards() {
 }
 
 function drawRewards() {
-  return shuffle(rewardPool).slice(0, 3).map((entry) => ({
+  return shuffle(rewardPool).slice(0, 4).map((entry) => ({
     ...entry,
     instanceId: `${entry.id}-${Date.now()}-${Math.random()}`,
   }));
