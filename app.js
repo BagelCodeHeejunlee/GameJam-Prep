@@ -150,6 +150,7 @@ function newRun() {
     discard: [],
     enemyDeck: [],
     enemyDiscard: [],
+    enemySustainedCards: [],
     currentTimeline: [],
     activeTimelineIndex: -1,
     completedTimelineCount: 0,
@@ -188,6 +189,7 @@ function startWave(index) {
       charge: 0,
       permanent: {},
       temporary: {},
+      sustainedCards: [],
     },
   ];
 
@@ -209,6 +211,7 @@ function startWave(index) {
       charge: 0,
       permanent: {},
       temporary: {},
+      sustainedCards: [],
     });
   });
 
@@ -216,6 +219,7 @@ function startWave(index) {
   state.discard = [];
   state.enemyDeck = shuffle(expandCards(enemyCards));
   state.enemyDiscard = [];
+  state.enemySustainedCards = [];
   state.waitingReward = false;
   state.busy = false;
   state.currentTimeline = [];
@@ -390,7 +394,6 @@ async function runTurn() {
     return;
   }
 
-  clearTemporaryAtTurnStart(player);
   const playerCard = drawPlayerCard();
   const enemyGroupCard = aliveEnemies().length ? drawEnemyCard() : null;
   const drawnEntries = [{ actorType: "player", actorId: player.id, card: playerCard }];
@@ -413,6 +416,7 @@ async function runTurn() {
     renderDrawnCards();
     renderTimeline(index);
     await executeTimelineEntry(entries[index]);
+    expireTurnEndEffects(entries[index]);
     state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
     state.activeTimelineIndex = -1;
     renderDrawnCards();
@@ -422,7 +426,7 @@ async function runTurn() {
   }
 
   if (!state.waitingReward && !state.finished) {
-    discardResolvedCard(playerCard);
+    discardResolvedCard(playerCard, player);
     if (enemyGroupCard) discardEnemyCard(enemyGroupCard);
   }
   state.busy = false;
@@ -522,20 +526,69 @@ function drawEnemyCard() {
   return state.enemyDeck.shift();
 }
 
-function discardResolvedCard(cardData) {
+function discardResolvedCard(cardData, actor) {
   if (!cardData) return;
   if (cardData.actions.some((action) => action.type === "permanent")) return;
+  if (isSustainCard(cardData) && actor) {
+    actor.sustainedCards = actor.sustainedCards ?? [];
+    actor.sustainedCards.push({ card: cardData, discardAfterTurn: state.turn + 1 });
+    return;
+  }
   state.discard.push(cardData);
 }
 
 function discardEnemyCard(cardData) {
   if (!cardData) return;
   if (cardData.actions.some((action) => action.type === "permanent")) return;
+  if (isSustainCard(cardData)) {
+    state.enemySustainedCards = state.enemySustainedCards ?? [];
+    state.enemySustainedCards.push({ card: cardData, discardAfterTurn: state.turn + 1 });
+    return;
+  }
   state.enemyDiscard.push(cardData);
 }
 
-function clearTemporaryAtTurnStart(actor) {
-  actor.temporary = {};
+function isSustainCard(cardData) {
+  return cardData?.type === "지속";
+}
+
+function expireTurnEndEffects(entry) {
+  if (entry.actorType === "player") {
+    const actor = state.entities.find((entity) => entity.id === entry.actorId);
+    if (actor) expireActorTurnEndEffects(actor, state.discard);
+    return;
+  }
+
+  if (entry.actorType === "enemyGroup") {
+    state.entities.filter((entity) => entity.side === "enemy").forEach((enemy) => {
+      expireTemporaryEffectsAtTurnEnd(enemy);
+    });
+    releaseExpiredSustainedCards(state.enemySustainedCards, state.enemyDiscard);
+  }
+}
+
+function expireActorTurnEndEffects(actor, discardPile) {
+  expireTemporaryEffectsAtTurnEnd(actor);
+  releaseExpiredSustainedCards(actor.sustainedCards, discardPile);
+}
+
+function expireTemporaryEffectsAtTurnEnd(actor) {
+  if (!actor.temporary) return;
+  Object.entries(actor.temporary).forEach(([key, effect]) => {
+    if (effect?.expiresAfterOwnTurnEnds && effect.expiresAfterOwnTurnEnds <= state.turn) {
+      delete actor.temporary[key];
+    }
+  });
+}
+
+function releaseExpiredSustainedCards(sustainedCards = [], discardPile) {
+  if (!discardPile) return;
+  for (let index = sustainedCards.length - 1; index >= 0; index -= 1) {
+    if (sustainedCards[index].discardAfterTurn <= state.turn) {
+      discardPile.push(sustainedCards[index].card);
+      sustainedCards.splice(index, 1);
+    }
+  }
 }
 
 function attack(actor, action) {
