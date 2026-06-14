@@ -500,10 +500,6 @@ h2 {
   color: var(--accent-2);
 }
 
-.card-reveal-overlay.sorting .reveal-card {
-  border-color: var(--accent);
-}
-
 .card-reveal-overlay.dock {
   background: rgba(0, 0, 0, 0);
   opacity: 0;
