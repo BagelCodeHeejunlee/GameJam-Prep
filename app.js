@@ -938,11 +938,10 @@ function renderLog() {
 async function playCardReveal(drawnEntries, sortedEntries) {
   document.body.classList.add("revealing-cards");
   elements.cardRevealOverlay.className = "card-reveal-overlay";
-  elements.cardRevealTitle.textContent = "카드 드로우";
+  elements.cardRevealTitle.textContent = "우선권";
   renderRevealCards(drawnEntries);
   await sleep(1000);
 
-  elements.cardRevealTitle.textContent = "우선권 정렬";
   elements.cardRevealOverlay.classList.add("sorting");
   slideSortRevealCards(sortedEntries);
   await sleep(820);

@@ -496,10 +496,6 @@ h2 {
   font-weight: 900;
 }
 
-.card-reveal-overlay.sorting .card-reveal-title {
-  color: var(--accent-2);
-}
-
 .card-reveal-overlay.dock {
   background: rgba(0, 0, 0, 0);
   opacity: 0;
