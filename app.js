@@ -1151,7 +1151,7 @@ function renderOffscreenEnemyIndicators(bounds) {
 
   aliveEnemies().forEach((enemy) => {
     const enemyPoint = screenPointForHex(enemy, bounds, scale, offsetX, offsetY);
-    if (isPointInside(enemyPoint, visible)) return;
+    if (isEnemyElementVisible(enemy)) return;
 
     const dx = enemyPoint.x - playerPoint.x;
     const dy = enemyPoint.y - playerPoint.y;
@@ -1168,6 +1168,17 @@ function renderOffscreenEnemyIndicators(bounds) {
     `;
     elements.boardPanel.append(indicator);
   });
+}
+
+function isEnemyElementVisible(enemy) {
+  const entityElement = elements.board.querySelector(`[data-entity-id="${enemy.id}"]`);
+  if (!entityElement) return false;
+
+  const entityRect = entityElement.getBoundingClientRect();
+  const panelRect = elements.boardPanel.getBoundingClientRect();
+  const visibleWidth = Math.min(entityRect.right, panelRect.right) - Math.max(entityRect.left, panelRect.left);
+  const visibleHeight = Math.min(entityRect.bottom, panelRect.bottom) - Math.max(entityRect.top, panelRect.top);
+  return visibleWidth > 0 && visibleHeight > 0;
 }
 
 function screenPointForHex(hex, bounds, scale, offsetX, offsetY) {
