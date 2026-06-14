@@ -555,11 +555,15 @@ h2 {
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
-  background: rgba(37, 41, 37, 0.96);
+  background:
+    linear-gradient(rgba(18, 23, 18, 0.2), rgba(11, 14, 12, 0.36)),
+    url("assets/card-frame.png") center / cover no-repeat,
+    rgba(37, 41, 37, 0.96);
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
   transform: translateY(12px) scale(0.96);
   opacity: 0;
   animation: reveal-card-in 360ms ease forwards;
+  overflow: hidden;
 }
 
 .reveal-card.player {
@@ -642,7 +646,8 @@ h2 {
 }
 
 .card-action-area {
-  display: block;
+  display: grid;
+  place-items: center;
   min-height: 0;
   margin-top: 12px;
   overflow: hidden;
@@ -651,6 +656,9 @@ h2 {
 .reveal-card .action-list,
 .reward-card .action-list {
   display: grid;
+  width: 100%;
+  justify-items: center;
+  align-content: center;
   gap: 6px;
   margin-top: 0;
 }
@@ -659,7 +667,9 @@ h2 {
 .reward-card .action-line {
   display: flex;
   align-items: center;
+  justify-content: center;
   margin-top: 0;
+  width: 100%;
 }
 
 .reveal-card .action-group,
@@ -667,6 +677,7 @@ h2 {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   max-width: 100%;
   min-height: 38px;
