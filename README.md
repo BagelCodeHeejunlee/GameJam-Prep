@@ -22,10 +22,20 @@
 - [리스크와 추후 결정](docs/10-risks-and-later-decisions.md)
 - [맵 오브젝트와 시야](docs/11-map-objects-and-vision.md)
 - [상태 효과와 전투 효과](docs/12-status-and-combat-effects.md)
+- [몬스터 기획](docs/13-monsters.md)
+- [UI 아이콘과 이미지 필요 목록](docs/14-ui-icons-and-assets.md)
 - [궁수 캐릭터](docs/characters/archer.md)
+- [전사 캐릭터](docs/characters/warrior.md)
+- [마법사 캐릭터](docs/characters/mage.md)
 - [기획 결정 기록](docs/02-design-decisions.md)
 - [아카이브 노트](docs/99-archive-notes.md)
 
 ## GitHub Pages
 
 현재 루트의 `index.html`을 열면 궁수 오토배틀 프로토타입을 실행할 수 있다.
+
+## Testing Note
+
+프로토타입 UI 확인은 GitHub Pages에 반영된 배포 화면을 기준으로 한다.
+
+로컬 브라우저 자동화나 임시 정적 서버는 문법/응답 확인 보조 용도로만 사용하고, 최종 화면 판단은 GitHub Pages에서 직접 테스트한다.

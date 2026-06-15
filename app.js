@@ -34,9 +34,6 @@ const elements = {
   battleLog: document.querySelector("#battleLog"),
   rewardOverlay: document.querySelector("#rewardOverlay"),
   rewardCards: document.querySelector("#rewardCards"),
-  cardRevealOverlay: document.querySelector("#cardRevealOverlay"),
-  cardRevealTitle: document.querySelector("#cardRevealTitle"),
-  cardRevealList: document.querySelector("#cardRevealList"),
   iconHelpOverlay: document.querySelector("#iconHelpOverlay"),
   iconHelpButton: document.querySelector("#iconHelpButton"),
   closeHelpButton: document.querySelector("#closeHelpButton"),
@@ -390,6 +387,7 @@ function newRun() {
     currentTimeline: [],
     activeTimelineIndex: -1,
     completedTimelineCount: 0,
+    priorityRevealMode: "",
     cameraMode: "overview",
     cameraTransitionScheduled: false,
     log: [],
@@ -660,12 +658,16 @@ async function runTurn() {
   drawnEntries.push(...enemyEntries);
 
   const entries = [...drawnEntries].sort(compareTimeline);
-  state.currentTimeline = entries;
+  state.currentTimeline = drawnEntries;
+  state.priorityRevealMode = "drawn";
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
   log(`턴 ${state.turn}: ${entries.map((entry) => entry.card.name).join(", ")}`);
   render();
-  await playCardReveal(drawnEntries, entries);
+  await playPriorityReveal(drawnEntries, entries);
+  state.currentTimeline = entries;
+  state.priorityRevealMode = "";
+  renderPriorityStrip();
 
   for (let index = 0; index < entries.length; index += 1) {
     if (state.finished || state.waitingReward) break;
@@ -1817,8 +1819,7 @@ function finishRun(win) {
   state.busy = false;
   state.waitingReward = false;
   elements.rewardOverlay.classList.add("hidden");
-  elements.cardRevealOverlay.className = "card-reveal-overlay hidden";
-  document.body.classList.remove("revealing-cards");
+  document.body.classList.remove("revealing-priority");
   log(win ? "스테이지 클리어" : "패배");
   render();
 }
@@ -2052,6 +2053,7 @@ function renderEnemySummary() {
 
 function renderPriorityStrip() {
   elements.priorityStrip.innerHTML = "";
+  elements.priorityStrip.className = `priority-strip ${state.priorityRevealMode ? `reveal-${state.priorityRevealMode}` : ""}`;
   if (!state.currentTimeline.length) {
     elements.priorityStrip.innerHTML = `<span class="priority-empty">카드 대기</span>`;
     return;
@@ -2070,6 +2072,7 @@ function renderPriorityStrip() {
     button.innerHTML = `
       <span class="priority-number">${entry.card.priority}</span>
       <strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</strong>
+      <small>${entry.card.name}</small>
     `;
     elements.priorityStrip.append(button);
   });
@@ -2195,145 +2198,23 @@ function renderLog() {
   elements.battleLog.scrollTop = elements.battleLog.scrollHeight;
 }
 
-async function playCardReveal(drawnEntries, sortedEntries) {
-  document.body.classList.add("revealing-cards");
-  elements.cardRevealOverlay.className = "card-reveal-overlay sequential";
-  elements.cardRevealTitle.textContent = "우선권";
-  await playSequentialCardReveal(drawnEntries, sortedEntries);
-  await sleep(500);
+async function playPriorityReveal(drawnEntries, sortedEntries) {
+  document.body.classList.add("revealing-priority");
+  state.currentTimeline = drawnEntries;
+  state.priorityRevealMode = "drawn";
+  state.activeTimelineIndex = -1;
+  state.completedTimelineCount = 0;
+  renderPriorityStrip();
+  renderDrawnCards();
+  await sleep(turnDelay(0.7));
 
-  setRevealDockTarget();
-  elements.cardRevealOverlay.classList.add("dock");
-  await sleep(520);
-  elements.cardRevealOverlay.className = "card-reveal-overlay hidden";
-  document.body.classList.remove("revealing-cards");
-}
+  state.currentTimeline = sortedEntries;
+  state.priorityRevealMode = "sorted";
+  renderPriorityStrip();
+  renderDrawnCards();
+  await sleep(turnDelay(0.9));
 
-function setRevealDockTarget() {
-  const stage = elements.cardRevealOverlay.querySelector(".card-reveal-stage");
-  const target = document.querySelector(".priority-panel");
-  if (!stage || !target) return;
-
-  const stageRect = stage.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  const stageCenterX = stageRect.left + stageRect.width / 2;
-  const stageCenterY = stageRect.top + stageRect.height / 2;
-  const targetCenterX = targetRect.left + targetRect.width / 2;
-  const targetCenterY = targetRect.top + targetRect.height / 2;
-  const scale = Math.max(0.14, Math.min(0.28, targetRect.width / Math.max(stageRect.width, 1) * 0.45));
-
-  elements.cardRevealOverlay.style.setProperty("--dock-x", `${targetCenterX - stageCenterX}px`);
-  elements.cardRevealOverlay.style.setProperty("--dock-y", `${targetCenterY - stageCenterY}px`);
-  elements.cardRevealOverlay.style.setProperty("--dock-scale", `${scale}`);
-}
-
-async function playSequentialCardReveal(drawnEntries, sortedEntries) {
-  elements.cardRevealList.innerHTML = "";
-  elements.cardRevealList.className = "card-reveal-list sequential";
-  const priorityBoard = document.createElement("div");
-  priorityBoard.className = "priority-sort-board";
-  const drawSlot = document.createElement("div");
-  drawSlot.className = "draw-reveal-slot";
-  elements.cardRevealList.append(priorityBoard, drawSlot);
-
-  const playerEntry = drawnEntries.find((entry) => entry.actorType === "player");
-  const enemyEntries = drawnEntries.filter((entry) => entry.actorType !== "player");
-  const placedEntries = [...enemyEntries];
-  renderPriorityTokens(priorityBoard, enemyEntries, sortedEntries, drawnEntries);
-
-  if (playerEntry) {
-    const cardElement = createRevealCard(playerEntry, drawnEntries);
-    drawSlot.replaceChildren(cardElement);
-    await sleep(700);
-    await moveCardToPriorityBoard(cardElement, playerEntry, placedEntries, sortedEntries, priorityBoard);
-    placedEntries.push(playerEntry);
-  } else {
-    renderPriorityTokens(priorityBoard, drawnEntries, sortedEntries, drawnEntries);
-  }
-}
-
-function renderPriorityTokens(priorityBoard, entries, sortedEntries, allEntries) {
-  const entrySet = new Set(entries);
-  priorityBoard.replaceChildren(
-    ...sortedEntries
-      .filter((entry) => entrySet.has(entry))
-      .map((entry) => {
-        const token = createRevealCard(entry, allEntries);
-        token.classList.add("settled", "priority-token");
-        token.style.opacity = "1";
-        token.style.transform = "translate(0, 0) scale(1)";
-        return token;
-      }),
-  );
-}
-
-async function moveCardToPriorityBoard(cardElement, entry, placedEntries, sortedEntries, priorityBoard) {
-  const firstRect = cardElement.getBoundingClientRect();
-  const tokenRects = new Map(
-    [...priorityBoard.children].map((token) => [token.dataset.entryKey, token.getBoundingClientRect()]),
-  );
-  cardElement.classList.add("settled", "priority-token");
-  cardElement.style.opacity = "1";
-  cardElement.style.transform = "translate(0, 0) scale(1)";
-
-  const sortedPlacedEntries = sortedEntries.filter((candidate) => {
-    return candidate === entry || placedEntries.includes(candidate);
-  });
-  const cardsByKey = new Map([...priorityBoard.children].map((token) => [token.dataset.entryKey, token]));
-  cardsByKey.set(entryKey(entry), cardElement);
-  priorityBoard.replaceChildren(
-    ...sortedPlacedEntries.map((candidate) => cardsByKey.get(entryKey(candidate))).filter(Boolean),
-  );
-
-  [...priorityBoard.children].forEach((token) => {
-    const isNewCard = token === cardElement;
-    const startRect = isNewCard ? firstRect : tokenRects.get(token.dataset.entryKey);
-    const lastRect = token.getBoundingClientRect();
-    if (!startRect) return;
-    const x = startRect.left - lastRect.left;
-    const y = startRect.top - lastRect.top;
-    const scale = isNewCard ? startRect.width / Math.max(lastRect.width, 1) : 1;
-    token.animate(
-      [
-        { transform: `translate(${x}px, ${y}px) scale(${scale})`, opacity: 1 },
-        { transform: "translate(0, 0) scale(1)", opacity: 1 },
-      ],
-      { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
-    );
-  });
-  await sleep(560);
-}
-
-function renderRevealCards(entries) {
-  elements.cardRevealList.innerHTML = "";
-  elements.cardRevealList.className = "card-reveal-list";
-  entries.forEach((entry) => {
-    elements.cardRevealList.append(createRevealCard(entry, entries));
-  });
-}
-
-function createRevealCard(entry, entries) {
-  const side = entry.actorType === "player" ? "player" : "enemy";
-  const sideCounts = entries.reduce(
-    (counts, current) => {
-      const currentSide = current.actorType === "player" ? "player" : "enemy";
-      counts[currentSide] += 1;
-      return counts;
-    },
-    { player: 0, enemy: 0 },
-  );
-  const div = document.createElement("article");
-  div.className = `reveal-card ${side} ${rarityClass(entry.card.rarity)} ${sideCounts[side] === 1 ? "solo-side" : ""}`;
-  div.dataset.entryKey = entryKey(entry);
-  div.innerHTML = `
-    <span class="card-priority">${entry.card.priority}</span>
-    <strong class="card-title">${entry.card.name}</strong>
-    <span class="card-owner">${entryLabel(entry)}</span>
-    <span class="card-action-area">${renderActionList(entry.card)}</span>
-    <span class="card-compact-owner">${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</span>
-    <span class="card-compact-actions" aria-hidden="true">${renderCompactActionList(entry.card)}</span>
-  `;
-  return div;
+  document.body.classList.remove("revealing-priority");
 }
 
 function rarityClass(rarity) {
@@ -2344,46 +2225,6 @@ function rarityClass(rarity) {
     전설: "rarity-legendary",
   };
   return classes[rarity] ?? "";
-}
-
-function slideSortRevealCards(sortedEntries) {
-  const currentCards = [...elements.cardRevealList.children];
-  const firstRects = new Map(
-    currentCards.map((cardElement) => [cardElement.dataset.entryKey, cardElement.getBoundingClientRect()]),
-  );
-  const cardsByKey = new Map(currentCards.map((cardElement) => [cardElement.dataset.entryKey, cardElement]));
-
-  elements.cardRevealList.classList.add("sorted");
-  sortedEntries.forEach((entry) => {
-    const cardElement = cardsByKey.get(entryKey(entry));
-    if (cardElement) elements.cardRevealList.append(cardElement);
-  });
-
-  [...elements.cardRevealList.children].forEach((cardElement) => {
-    const firstRect = firstRects.get(cardElement.dataset.entryKey);
-    const lastRect = cardElement.getBoundingClientRect();
-    if (!firstRect) return;
-
-    const x = firstRect.left - lastRect.left;
-    const y = firstRect.top - lastRect.top;
-    const scale = firstRect.width / Math.max(lastRect.width, 1);
-    cardElement.animate(
-      [
-        { transform: `translate(${x}px, ${y}px) scale(${scale})`, opacity: 1 },
-        { transform: "translate(0, 0) scale(1)", opacity: 1 },
-      ],
-      { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
-    );
-  });
-}
-
-function settleRevealCards() {
-  [...elements.cardRevealList.children].forEach((cardElement) => {
-    cardElement.getAnimations().forEach((animation) => animation.cancel());
-    cardElement.classList.add("settled");
-    cardElement.style.opacity = "1";
-    cardElement.style.transform = "translateY(0) scale(1)";
-  });
 }
 
 function entryKey(entry) {
@@ -2688,10 +2529,10 @@ function fitBoardToPanel(bounds = boardBounds()) {
 
   const player = getPlayer();
   if (state.cameraMode === "focus" && player) {
-    scale = Math.max(fitScale, Math.min(1.02, fitScale * 2.25));
+    scale = Math.max(fitScale, Math.min(1.12, fitScale * 2.45));
     const focusPoint = hexToPixel(player, bounds);
     offsetX = panelWidth / 2 - focusPoint.x * scale;
-    offsetY = panelHeight * 0.56 - focusPoint.y * scale;
+    offsetY = panelHeight * 0.58 - focusPoint.y * scale;
   }
 
   elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
