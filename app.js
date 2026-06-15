@@ -1984,14 +1984,10 @@ function renderLog() {
 
 async function playCardReveal(drawnEntries, sortedEntries) {
   document.body.classList.add("revealing-cards");
-  elements.cardRevealOverlay.className = "card-reveal-overlay";
+  elements.cardRevealOverlay.className = "card-reveal-overlay sequential";
   elements.cardRevealTitle.textContent = "우선권";
-  renderRevealCards(drawnEntries);
-  await sleep(1000);
-
-  settleRevealCards();
-  slideSortRevealCards(sortedEntries);
-  await sleep(2000);
+  await playSequentialCardReveal(drawnEntries, sortedEntries);
+  await sleep(900);
 
   elements.cardRevealOverlay.classList.add("dock");
   await sleep(520);
@@ -1999,32 +1995,93 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   document.body.classList.remove("revealing-cards");
 }
 
+async function playSequentialCardReveal(drawnEntries, sortedEntries) {
+  elements.cardRevealList.innerHTML = "";
+  elements.cardRevealList.className = "card-reveal-list sequential";
+  const priorityBoard = document.createElement("div");
+  priorityBoard.className = "priority-sort-board";
+  const drawSlot = document.createElement("div");
+  drawSlot.className = "draw-reveal-slot";
+  elements.cardRevealList.append(priorityBoard, drawSlot);
+
+  const placedEntries = [];
+  for (const entry of drawnEntries) {
+    const cardElement = createRevealCard(entry, drawnEntries);
+    drawSlot.replaceChildren(cardElement);
+    await sleep(760);
+    await moveCardToPriorityBoard(cardElement, entry, placedEntries, sortedEntries, priorityBoard);
+    placedEntries.push(entry);
+    await sleep(180);
+  }
+}
+
+async function moveCardToPriorityBoard(cardElement, entry, placedEntries, sortedEntries, priorityBoard) {
+  const firstRect = cardElement.getBoundingClientRect();
+  const tokenRects = new Map(
+    [...priorityBoard.children].map((token) => [token.dataset.entryKey, token.getBoundingClientRect()]),
+  );
+  cardElement.classList.add("settled", "priority-token");
+  cardElement.style.opacity = "1";
+  cardElement.style.transform = "translate(0, 0) scale(1)";
+
+  const sortedPlacedEntries = sortedEntries.filter((candidate) => {
+    return candidate === entry || placedEntries.includes(candidate);
+  });
+  const cardsByKey = new Map([...priorityBoard.children].map((token) => [token.dataset.entryKey, token]));
+  cardsByKey.set(entryKey(entry), cardElement);
+  priorityBoard.replaceChildren(
+    ...sortedPlacedEntries.map((candidate) => cardsByKey.get(entryKey(candidate))).filter(Boolean),
+  );
+
+  [...priorityBoard.children].forEach((token) => {
+    const isNewCard = token === cardElement;
+    const startRect = isNewCard ? firstRect : tokenRects.get(token.dataset.entryKey);
+    const lastRect = token.getBoundingClientRect();
+    if (!startRect) return;
+    const x = startRect.left - lastRect.left;
+    const y = startRect.top - lastRect.top;
+    const scale = isNewCard ? startRect.width / Math.max(lastRect.width, 1) : 1;
+    token.animate(
+      [
+        { transform: `translate(${x}px, ${y}px) scale(${scale})`, opacity: 1 },
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+      ],
+      { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+  });
+  await sleep(560);
+}
+
 function renderRevealCards(entries) {
   elements.cardRevealList.innerHTML = "";
   elements.cardRevealList.className = "card-reveal-list";
+  entries.forEach((entry) => {
+    elements.cardRevealList.append(createRevealCard(entry, entries));
+  });
+}
+
+function createRevealCard(entry, entries) {
+  const side = entry.actorType === "player" ? "player" : "enemy";
   const sideCounts = entries.reduce(
-    (counts, entry) => {
-      const side = entry.actorType === "player" ? "player" : "enemy";
-      counts[side] += 1;
+    (counts, current) => {
+      const currentSide = current.actorType === "player" ? "player" : "enemy";
+      counts[currentSide] += 1;
       return counts;
     },
     { player: 0, enemy: 0 },
   );
-  entries.forEach((entry) => {
-    const side = entry.actorType === "player" ? "player" : "enemy";
-    const div = document.createElement("article");
-    div.className = `reveal-card ${side} ${rarityClass(entry.card.rarity)} ${sideCounts[side] === 1 ? "solo-side" : ""}`;
-    div.dataset.entryKey = entryKey(entry);
-    div.innerHTML = `
-      <span class="card-priority">${entry.card.priority}</span>
-      <strong class="card-title">${entry.card.name}</strong>
-      <span class="card-owner">${entryLabel(entry)}</span>
-      <span class="card-action-area">${renderActionList(entry.card)}</span>
-      <span class="card-compact-owner">${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</span>
-      <span class="card-compact-actions" aria-hidden="true">${renderCompactActionList(entry.card)}</span>
-    `;
-    elements.cardRevealList.append(div);
-  });
+  const div = document.createElement("article");
+  div.className = `reveal-card ${side} ${rarityClass(entry.card.rarity)} ${sideCounts[side] === 1 ? "solo-side" : ""}`;
+  div.dataset.entryKey = entryKey(entry);
+  div.innerHTML = `
+    <span class="card-priority">${entry.card.priority}</span>
+    <strong class="card-title">${entry.card.name}</strong>
+    <span class="card-owner">${entryLabel(entry)}</span>
+    <span class="card-action-area">${renderActionList(entry.card)}</span>
+    <span class="card-compact-owner">${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</span>
+    <span class="card-compact-actions" aria-hidden="true">${renderCompactActionList(entry.card)}</span>
+  `;
+  return div;
 }
 
 function rarityClass(rarity) {
