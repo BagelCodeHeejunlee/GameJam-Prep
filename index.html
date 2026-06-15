@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GameJam Prep - Hex Auto Battle</title>
-    <link rel="stylesheet" href="styles.css?v=20260615-card-gloom" />
+    <link rel="stylesheet" href="styles.css?v=20260615-battle-hud" />
   </head>
   <body>
     <main class="app-shell">
@@ -16,6 +16,7 @@
         <div class="controls">
           <button id="newRunButton" type="button">새 런</button>
           <button id="pauseButton" type="button">일시정지</button>
+          <button id="speedButton" type="button">x1</button>
         </div>
       </section>
 
@@ -33,6 +34,20 @@
           </div>
           <div id="board" class="board" aria-label="hex battle board"></div>
         </section>
+
+        <section class="battle-top-hud" aria-label="전투 상단 정보">
+          <section class="enemy-summary-panel">
+            <div class="panel-label">적</div>
+            <div id="enemySummary" class="enemy-summary"></div>
+          </section>
+
+          <section class="priority-panel">
+            <h2>우선권</h2>
+            <div id="priorityStrip" class="priority-strip"></div>
+          </section>
+        </section>
+
+        <section id="playerHud" class="player-hud" aria-label="플레이어 정보"></section>
 
         <aside class="side-panel">
           <section class="stat-strip">

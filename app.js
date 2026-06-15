@@ -26,6 +26,9 @@ const elements = {
   discardCount: document.querySelector("#discardCount"),
   chargeCount: document.querySelector("#chargeCount"),
   chargeHud: document.querySelector("#chargeHud"),
+  enemySummary: document.querySelector("#enemySummary"),
+  priorityStrip: document.querySelector("#priorityStrip"),
+  playerHud: document.querySelector("#playerHud"),
   drawnCards: document.querySelector("#drawnCards"),
   timeline: document.querySelector("#timeline"),
   battleLog: document.querySelector("#battleLog"),
@@ -39,9 +42,11 @@ const elements = {
   closeHelpButton: document.querySelector("#closeHelpButton"),
   newRunButton: document.querySelector("#newRunButton"),
   pauseButton: document.querySelector("#pauseButton"),
+  speedButton: document.querySelector("#speedButton"),
 };
 
 let selectedCharacterId = "archer";
+let speedMultiplier = 1;
 
 const baseArcherCards = [
   card("advance-shot", "전진 사격", "기본", "기본", 54, [
@@ -388,6 +393,7 @@ function newRun() {
     cameraMode: "overview",
     cameraTransitionScheduled: false,
     log: [],
+    speedMultiplier,
   };
 
   startWave(0);
@@ -621,7 +627,7 @@ function scheduleTurn() {
     }, WAVE_INTRO_DELAY);
     return;
   }
-  window.setTimeout(() => runTurn(), TURN_DELAY);
+  window.setTimeout(() => runTurn(), turnDelay());
 }
 
 async function runTurn() {
@@ -672,7 +678,7 @@ async function runTurn() {
     state.activeTimelineIndex = -1;
     renderDrawnCards();
     renderTimeline();
-    await sleep(TURN_DELAY);
+    await sleep(turnDelay());
     if (checkEndConditions()) break;
   }
 
@@ -712,7 +718,7 @@ async function executeTimelineEntry(entry) {
     if (state.finished || state.waitingReward) break;
     if (!isAlive(enemy)) continue;
     await executeCard(enemy, entry.card);
-    await sleep(TURN_DELAY * 0.55);
+    await sleep(turnDelay(0.55));
     if (checkEndConditions()) break;
   }
 }
@@ -724,7 +730,7 @@ async function executeCard(actor, cardData) {
     if (!isAlive(actor)) return;
     const rendered = await executeAction(actor, action, cardData);
     if (!rendered) render();
-    await sleep(TURN_DELAY * 0.7);
+    await sleep(turnDelay(0.7));
     if (checkEndConditions()) return;
   }
 }
@@ -1856,6 +1862,9 @@ function pickReward(reward) {
 function render() {
   renderBoard();
   renderHud();
+  renderEnemySummary();
+  renderPriorityStrip();
+  renderPlayerHud();
   renderDrawnCards();
   renderTimeline();
   renderLog();
@@ -1994,20 +2003,159 @@ function directionArrow(dx, dy) {
 function renderHud() {
   const player = getPlayer();
   const character = getSelectedCharacter();
-  elements.gameTitle.textContent = character.title;
+  elements.gameTitle.textContent = state.finished
+    ? "런 종료"
+    : `웨이브 ${state.waveIndex + 1}/${waves.length}`;
   elements.playerNameLabel.textContent = character.name;
   elements.runSummary.textContent = state.finished
     ? "런 종료"
-    : `웨이브 ${state.waveIndex + 1}/${waves.length}${waves[state.waveIndex]?.boss ? " 보스" : ""} / 턴 ${state.turn}`;
+    : `턴 ${state.turn}${waves[state.waveIndex]?.boss ? " / 보스" : ""}`;
   elements.playerHp.textContent = player ? `${player.hp} / ${player.maxHp}` : `0 / ${character.maxHp}`;
   elements.deckCount.textContent = state.deck.length;
   elements.discardCount.textContent = state.discard.length;
   elements.chargeCount.textContent = player ? player.charge ?? 0 : 0;
   elements.chargeHud.textContent = player ? player.charge ?? 0 : 0;
   elements.pauseButton.textContent = state.paused ? "재개" : "일시정지";
+  elements.speedButton.textContent = `x${speedMultiplier}`;
+  elements.speedButton.classList.toggle("active", speedMultiplier > 1);
   elements.characterButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.character === selectedCharacterId);
   });
+}
+
+function renderEnemySummary() {
+  elements.enemySummary.innerHTML = "";
+  const groups = enemyGroups();
+  if (!groups.length) {
+    elements.enemySummary.innerHTML = `<div class="enemy-group empty">적 없음</div>`;
+    return;
+  }
+
+  groups.forEach((group) => {
+    const definition = monsterDefinitions[group.kind] ?? monsterDefinitions.brute;
+    const sample = group.enemies[0];
+    const div = document.createElement("article");
+    div.className = `enemy-group ${sample?.boss ? "boss" : ""}`;
+    div.innerHTML = `
+      <div class="combatant-portrait enemy-portrait">${definition.label ?? sample?.label ?? "적"}</div>
+      <div class="combatant-main">
+        <div class="combatant-heading">
+          <strong>${sample?.boss ? sample.name : definition.name}</strong>
+          <span>x${group.enemies.length}</span>
+        </div>
+        ${renderBaseStats(sample ?? definition)}
+      </div>
+    `;
+    elements.enemySummary.append(div);
+  });
+}
+
+function renderPriorityStrip() {
+  elements.priorityStrip.innerHTML = "";
+  if (!state.currentTimeline.length) {
+    elements.priorityStrip.innerHTML = `<span class="priority-empty">카드 대기</span>`;
+    return;
+  }
+
+  state.currentTimeline.forEach((entry, index) => {
+    const button = document.createElement("div");
+    const statusClass = [
+      index < state.completedTimelineCount ? "done" : "",
+      index === state.activeTimelineIndex ? "active" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    button.className = `priority-item ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
+    button.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
+    button.innerHTML = `
+      <span class="priority-number">${entry.card.priority}</span>
+      <strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</strong>
+    `;
+    elements.priorityStrip.append(button);
+  });
+}
+
+function renderPlayerHud() {
+  const players = state.entities.filter((entity) => entity.side === "player");
+  const alivePlayers = players.filter(isAlive);
+  const visiblePlayers = alivePlayers.length ? alivePlayers : players;
+  elements.playerHud.innerHTML = "";
+  elements.playerHud.classList.toggle("solo", visiblePlayers.length <= 1);
+  elements.playerHud.classList.toggle("duo", visiblePlayers.length >= 2);
+
+  visiblePlayers.slice(0, 2).forEach((player) => {
+    const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
+    const entry = state.currentTimeline.find((item) => item.actorType === "player" && item.actorId === player.id);
+    const cardData = entry?.card;
+    const article = document.createElement("article");
+    article.className = `player-block ${cardData ? "" : "waiting-card"}`;
+    article.innerHTML = `
+      <div class="player-info">
+        <div class="combatant-heading player-heading">
+          <strong>${character.name}</strong>
+        </div>
+        <div class="combatant-portrait player-portrait">${character.shortLabel}</div>
+        ${renderBaseStats(player)}
+        <div class="pile-row">
+          <span title="덱">${pileIcon()}<b>${state.deck.length}</b><em>덱</em></span>
+          <span title="버림">${pileIcon()}<b>${state.discard.length}</b><em>버림</em></span>
+          <span title="차지">${actionIcon("charge")}<b>${player.charge ?? 0}</b><em>차지</em></span>
+        </div>
+      </div>
+      ${renderHudCard(cardData)}
+    `;
+    elements.playerHud.append(article);
+  });
+}
+
+function enemyGroups() {
+  const groups = new Map();
+  aliveEnemies().forEach((enemy) => {
+    const key = enemy.boss ? enemy.id : enemy.kind;
+    if (!groups.has(key)) groups.set(key, { kind: enemy.kind, enemies: [] });
+    groups.get(key).enemies.push(enemy);
+  });
+  return [...groups.values()].sort((a, b) => {
+    const left = monsterDefinitions[a.kind]?.name ?? a.kind;
+    const right = monsterDefinitions[b.kind]?.name ?? b.kind;
+    return left.localeCompare(right, "ko");
+  });
+}
+
+function renderBaseStats(unit) {
+  const attackKind = (unit.baseRange ?? 1) > 1 ? "ranged" : "melee";
+  return `
+    <div class="base-stat-row" aria-label="기본 전투 정보">
+      ${baseStat("move", "이동", unit.baseMove ?? 0)}
+      ${baseStat(attackKind, "공격", unit.baseAtk ?? 0)}
+      ${baseStat("range", "사거리", unit.baseRange ?? 0)}
+    </div>
+  `;
+}
+
+function baseStat(kind, label, value) {
+  return `<span class="base-stat" title="${label}"><span class="action-icon ${kind}">${actionIcon(kind)}</span><b>${value}</b></span>`;
+}
+
+function renderHudCard(cardData) {
+  if (!cardData) {
+    return `
+      <article class="hud-card empty">
+        <span>카드 대기</span>
+      </article>
+    `;
+  }
+  return `
+    <article class="hud-card ${rarityClass(cardData.rarity)}">
+      <span class="hud-card-priority">${cardData.priority}</span>
+      <strong>${cardData.name}</strong>
+      <div class="hud-card-actions">${renderActionList(cardData)}</div>
+    </article>
+  `;
+}
+
+function pileIcon() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5 16.6 3l2.8 12.4-9.6 2.5L7 5.5Z"/><path d="M4.6 8.5 7 19.2l8.2-2.1"/></svg>`;
 }
 
 function renderDrawnCards() {
@@ -2660,6 +2808,10 @@ function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function turnDelay(multiplier = 1) {
+  return (TURN_DELAY * multiplier) / speedMultiplier;
+}
+
 function nextFrame() {
   return new Promise((resolve) => window.requestAnimationFrame(resolve));
 }
@@ -2679,6 +2831,11 @@ elements.pauseButton.addEventListener("click", () => {
   state.paused = !state.paused;
   render();
   scheduleTurn();
+});
+elements.speedButton.addEventListener("click", () => {
+  speedMultiplier = speedMultiplier === 1 ? 2 : 1;
+  if (state) state.speedMultiplier = speedMultiplier;
+  renderHud();
 });
 elements.iconHelpButton.addEventListener("click", () => {
   elements.iconHelpOverlay.classList.remove("hidden");
