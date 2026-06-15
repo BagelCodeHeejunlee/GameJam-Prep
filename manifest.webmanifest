@@ -1,0 +1,20 @@
+{
+  "name": "GameJam Prep Hex Battle",
+  "short_name": "Hex Battle",
+  "description": "Mobile portrait hex auto battle prototype.",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "browser"],
+  "orientation": "portrait",
+  "background_color": "#168197",
+  "theme_color": "#0a7d92",
+  "icons": [
+    {
+      "src": "assets/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
