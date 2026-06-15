@@ -4,6 +4,9 @@ const BOARD_PADDING = 90;
 const TURN_DELAY = 540;
 const WAVE_INTRO_DELAY = 1300;
 const CAMERA_FOCUS_DELAY = 360;
+const MAP_ROOM_SCALE = 2;
+const CAMERA_FOCUS_SCALE_MULTIPLIER = 1.35;
+const CAMERA_FOCUS_MAX_SCALE = 0.96;
 
 const directions = [
   { q: 1, r: 0 },
@@ -326,18 +329,18 @@ const monsterDecks = {
       { type: "move", amount: 3, desiredRange: 1 },
       { type: "attack", mult: 1, range: 1, melee: true },
     ], 3),
-    card("skirmisher-hit-run", "치고 빠지기", "척후병", "기본", 40, [
+    card("skirmisher-hit-run", "연속 찌르기", "척후병", "기본", 40, [
       { type: "attack", mult: 1, range: 1, melee: true },
-      { type: "flee", amount: 2 },
+      { type: "attack", mult: 1, range: 1, melee: true },
     ], 2),
     card("skirmisher-feint", "교란", "척후병", "기본", 48, [{ type: "move", amount: 2, desiredRange: 1 }], 2),
     card("skirmisher-stab", "찌르기", "척후병", "기본", 36, [{ type: "attack", mult: 1, range: 1, melee: true }], 1),
   ],
   shooter: [
     card("shooter-shot", "견제 사격", "사수", "기본", 46, [{ type: "attack", mult: 1, range: 3 }], 3),
-    card("shooter-retreat", "거리 유지", "사수", "기본", 62, [
+    card("shooter-retreat", "연속 사격", "사수", "기본", 62, [
       { type: "attack", mult: 1, range: 3 },
-      { type: "flee", amount: 2 },
+      { type: "attack", mult: 1, range: 3 },
     ], 2),
     card("shooter-aim", "조준 사격", "사수", "기본", 42, [{ type: "attack", mult: 2, range: 3 }], 1),
     card("shooter-reposition", "사격 위치", "사수", "기본", 58, [
@@ -602,15 +605,33 @@ function enemy(q, r, hp, options = {}) {
 }
 
 function makeMap(radius) {
-  const tiles = [];
-  for (let q = -radius; q <= radius; q += 1) {
-    const r1 = Math.max(-radius, -q - radius);
-    const r2 = Math.min(radius, -q + radius);
-    for (let r = r1; r <= r2; r += 1) {
-      tiles.push({ q, r });
+  const expandedRadius = Math.max(radius + 2, radius * MAP_ROOM_SCALE);
+  const tiles = new Map();
+  mapRooms(radius, expandedRadius).forEach((room) => addHexRoom(tiles, room.center, room.radius));
+  return [...tiles.values()].sort((a, b) => a.r - b.r || a.q - b.q);
+}
+
+function mapRooms(radius, expandedRadius) {
+  const sideRoomRadius = Math.max(2, Math.round(radius * 0.55));
+  const smallRoomRadius = Math.max(1, Math.round(radius * 0.4));
+  return [
+    { center: { q: 0, r: 0 }, radius },
+    { center: { q: expandedRadius - sideRoomRadius, r: -Math.round(radius * 0.75) }, radius: sideRoomRadius },
+    { center: { q: -expandedRadius + sideRoomRadius, r: Math.round(radius * 0.55) }, radius: sideRoomRadius },
+    { center: { q: Math.round(radius * 0.45), r: -expandedRadius + sideRoomRadius }, radius: smallRoomRadius + 1 },
+    { center: { q: -Math.round(radius * 0.35), r: expandedRadius - sideRoomRadius }, radius: smallRoomRadius },
+  ];
+}
+
+function addHexRoom(tiles, center, radius) {
+  for (let dq = -radius; dq <= radius; dq += 1) {
+    const dr1 = Math.max(-radius, -dq - radius);
+    const dr2 = Math.min(radius, -dq + radius);
+    for (let dr = dr1; dr <= dr2; dr += 1) {
+      const tile = { q: center.q + dq, r: center.r + dr };
+      tiles.set(hexKey(tile), tile);
     }
   }
-  return tiles;
 }
 
 function scheduleTurn() {
@@ -2537,7 +2558,7 @@ function fitBoardToPanel(bounds = boardBounds()) {
 
   const player = getPlayer();
   if (state.cameraMode === "focus" && player) {
-    scale = Math.max(fitScale, Math.min(1.12, fitScale * 2.45));
+    scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, fitScale * CAMERA_FOCUS_SCALE_MULTIPLIER));
     const focusPoint = hexToPixel(player, bounds);
     const topHudRect = document.querySelector(".battle-top-hud")?.getBoundingClientRect();
     const playerHudRect = elements.playerHud?.getBoundingClientRect();
