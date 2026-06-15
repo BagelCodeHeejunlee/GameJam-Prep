@@ -2052,7 +2052,7 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   elements.cardRevealOverlay.className = "card-reveal-overlay sequential";
   elements.cardRevealTitle.textContent = "우선권";
   await playSequentialCardReveal(drawnEntries, sortedEntries);
-  await sleep(900);
+  await sleep(1000);
 
   elements.cardRevealOverlay.classList.add("dock");
   await sleep(520);
