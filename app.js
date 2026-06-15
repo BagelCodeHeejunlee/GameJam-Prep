@@ -2531,8 +2531,13 @@ function fitBoardToPanel(bounds = boardBounds()) {
   if (state.cameraMode === "focus" && player) {
     scale = Math.max(fitScale, Math.min(1.12, fitScale * 2.45));
     const focusPoint = hexToPixel(player, bounds);
+    const topHudRect = document.querySelector(".battle-top-hud")?.getBoundingClientRect();
+    const playerHudRect = elements.playerHud?.getBoundingClientRect();
+    const playTop = topHudRect?.height ? Math.min(panelHeight * 0.46, topHudRect.bottom + 14) : panelHeight * 0.24;
+    const playBottom = playerHudRect?.height ? Math.max(playTop + 140, playerHudRect.top - 16) : panelHeight * 0.84;
+    const focusY = playTop + (playBottom - playTop) * 0.55;
     offsetX = panelWidth / 2 - focusPoint.x * scale;
-    offsetY = panelHeight * 0.58 - focusPoint.y * scale;
+    offsetY = focusY - focusPoint.y * scale;
   }
 
   elements.board.style.setProperty("--board-width", `${logicalWidth}px`);

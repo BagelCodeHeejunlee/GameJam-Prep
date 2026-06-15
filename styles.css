@@ -29,6 +29,7 @@ body {
   overflow: hidden;
   background:
     linear-gradient(#41c2e8 0 18%, #97df82 54%, #168197 100%);
+  background-color: #168197;
   color: var(--text);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -37,6 +38,8 @@ body {
 
 html {
   min-width: 320px;
+  min-height: 100%;
+  background: #168197;
 }
 
 button {
@@ -1038,7 +1041,7 @@ h2 {
   position: fixed;
   z-index: 34;
   right: max(8px, env(safe-area-inset-right));
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: 0;
   left: max(8px, env(safe-area-inset-left));
   display: grid;
   gap: 8px;
@@ -1108,7 +1111,7 @@ h2 {
 }
 
 .hud-card {
-  --card-art: url("assets/card-normal.png");
+  --card-art: url("assets/card-normal-v2.png");
   position: relative;
   align-self: stretch;
   display: grid;
