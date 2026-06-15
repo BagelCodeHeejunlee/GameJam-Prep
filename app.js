@@ -2052,7 +2052,7 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   elements.cardRevealOverlay.className = "card-reveal-overlay sequential";
   elements.cardRevealTitle.textContent = "우선권";
   await playSequentialCardReveal(drawnEntries, sortedEntries);
-  await sleep(1000);
+  await sleep(500);
 
   elements.cardRevealOverlay.classList.add("dock");
   await sleep(520);
@@ -2069,15 +2069,35 @@ async function playSequentialCardReveal(drawnEntries, sortedEntries) {
   drawSlot.className = "draw-reveal-slot";
   elements.cardRevealList.append(priorityBoard, drawSlot);
 
-  const placedEntries = [];
-  for (const entry of drawnEntries) {
-    const cardElement = createRevealCard(entry, drawnEntries);
+  const playerEntry = drawnEntries.find((entry) => entry.actorType === "player");
+  const enemyEntries = drawnEntries.filter((entry) => entry.actorType !== "player");
+  const placedEntries = [...enemyEntries];
+  renderPriorityTokens(priorityBoard, enemyEntries, sortedEntries, drawnEntries);
+
+  if (playerEntry) {
+    const cardElement = createRevealCard(playerEntry, drawnEntries);
     drawSlot.replaceChildren(cardElement);
-    await sleep(760);
-    await moveCardToPriorityBoard(cardElement, entry, placedEntries, sortedEntries, priorityBoard);
-    placedEntries.push(entry);
-    await sleep(180);
+    await sleep(700);
+    await moveCardToPriorityBoard(cardElement, playerEntry, placedEntries, sortedEntries, priorityBoard);
+    placedEntries.push(playerEntry);
+  } else {
+    renderPriorityTokens(priorityBoard, drawnEntries, sortedEntries, drawnEntries);
   }
+}
+
+function renderPriorityTokens(priorityBoard, entries, sortedEntries, allEntries) {
+  const entrySet = new Set(entries);
+  priorityBoard.replaceChildren(
+    ...sortedEntries
+      .filter((entry) => entrySet.has(entry))
+      .map((entry) => {
+        const token = createRevealCard(entry, allEntries);
+        token.classList.add("settled", "priority-token");
+        token.style.opacity = "1";
+        token.style.transform = "translate(0, 0) scale(1)";
+        return token;
+      }),
+  );
 }
 
 async function moveCardToPriorityBoard(cardElement, entry, placedEntries, sortedEntries, priorityBoard) {
