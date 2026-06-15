@@ -2202,10 +2202,29 @@ async function playCardReveal(drawnEntries, sortedEntries) {
   await playSequentialCardReveal(drawnEntries, sortedEntries);
   await sleep(500);
 
+  setRevealDockTarget();
   elements.cardRevealOverlay.classList.add("dock");
   await sleep(520);
   elements.cardRevealOverlay.className = "card-reveal-overlay hidden";
   document.body.classList.remove("revealing-cards");
+}
+
+function setRevealDockTarget() {
+  const stage = elements.cardRevealOverlay.querySelector(".card-reveal-stage");
+  const target = document.querySelector(".priority-panel");
+  if (!stage || !target) return;
+
+  const stageRect = stage.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const stageCenterX = stageRect.left + stageRect.width / 2;
+  const stageCenterY = stageRect.top + stageRect.height / 2;
+  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const targetCenterY = targetRect.top + targetRect.height / 2;
+  const scale = Math.max(0.14, Math.min(0.28, targetRect.width / Math.max(stageRect.width, 1) * 0.45));
+
+  elements.cardRevealOverlay.style.setProperty("--dock-x", `${targetCenterX - stageCenterX}px`);
+  elements.cardRevealOverlay.style.setProperty("--dock-y", `${targetCenterY - stageCenterY}px`);
+  elements.cardRevealOverlay.style.setProperty("--dock-scale", `${scale}`);
 }
 
 async function playSequentialCardReveal(drawnEntries, sortedEntries) {
