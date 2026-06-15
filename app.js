@@ -2020,6 +2020,8 @@ function renderRevealCards(entries) {
       <strong class="card-title">${entry.card.name}</strong>
       <span class="card-owner">${entryLabel(entry)}</span>
       <span class="card-action-area">${renderActionList(entry.card)}</span>
+      <span class="card-compact-owner">${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</span>
+      <span class="card-compact-actions" aria-hidden="true">${renderCompactActionList(entry.card)}</span>
     `;
     elements.cardRevealList.append(div);
   });
@@ -2086,6 +2088,34 @@ function renderActionList(cardData) {
   return `<span class="action-list">${cardData.actions
     .map(renderActionLine)
     .join("")}</span>`;
+}
+
+function renderCompactActionList(cardData) {
+  return cardData.actions
+    .slice(0, 4)
+    .map((action) => compactActionStat(action))
+    .join("");
+}
+
+function compactActionStat(action) {
+  if (action.type === "move") return actionStat("move", "이동", action.amount);
+  if (action.type === "flee") return actionStat("move-flee", "후퇴", action.amount);
+  if (action.type === "fleeToRune") return actionStat("move-flee", "룬 쪽 후퇴", action.amount);
+  if (action.type === "attack") {
+    const attackKind = action.melee || action.range <= 1 ? "melee" : "ranged";
+    return actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult);
+  }
+  if (action.type === "patternAttack") return patternIcon(action.pattern);
+  if (action.type === "momentumAttack") return actionStat("move", "남은 이동 공격", action.amount);
+  if (action.type === "charge") return actionStat("charge", "차지", action.amount);
+  if (action.type === "placeTrap" || action.type === "placeObstacle") return actionStat("range", "함정", action.count ?? 1);
+  if (action.type === "placeRune") return actionStat("range", "룬", action.count ?? 1);
+  if (action.type === "runeAttack" || action.type === "detonateRune") return actionStat("ranged", "룬 공격", action.mult);
+  if (action.type === "placeMeteor") return actionStat("ranged", "운석", action.mult);
+  if (action.type === "selfDamagePercent") return actionNote(`-${Math.round(action.percent * 100)}%`);
+  if (action.type === "healPercent") return actionNote(`+${Math.round(action.percent * 100)}%`);
+  if (action.type === "permanent") return actionNote("영구");
+  return actionNote(action.type);
 }
 
 function renderActionLine(action) {

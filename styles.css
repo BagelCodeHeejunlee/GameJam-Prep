@@ -737,6 +737,11 @@ h2 {
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
   transform: translateY(12px) scale(0.96);
   opacity: 0;
+  transition:
+    width 320ms ease,
+    height 320ms ease,
+    padding 320ms ease,
+    box-shadow 320ms ease;
   animation: reveal-card-in 360ms ease forwards;
   overflow: hidden;
 }
@@ -762,14 +767,23 @@ h2 {
   justify-content: center;
   align-items: center;
   align-content: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .card-reveal-list.sorted .reveal-card {
-  flex: 0 0 clamp(150px, 43vw, 176px);
+  flex: 0 0 clamp(76px, 21vw, 106px);
   grid-row: auto;
   grid-column: auto;
   justify-self: auto;
+  grid-template-rows: 46px minmax(0, 1fr);
+  width: clamp(76px, 21vw, 106px);
+  height: 138px;
+  padding: 8px;
+  background:
+    linear-gradient(rgba(18, 23, 18, 0.36), rgba(11, 14, 12, 0.52)),
+    var(--card-art) center / cover no-repeat,
+    rgba(37, 41, 37, 0.96);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
 }
 
 .reveal-card:nth-child(2) {
@@ -799,6 +813,14 @@ h2 {
   line-height: 1;
 }
 
+.card-reveal-list.sorted .card-priority {
+  top: 8px;
+  left: 8px;
+  width: 25px;
+  height: 25px;
+  font-size: 12px;
+}
+
 .card-title {
   display: grid;
   align-items: center;
@@ -807,6 +829,15 @@ h2 {
   font-size: 19px;
   line-height: 1.25;
   text-align: center;
+}
+
+.card-reveal-list.sorted .card-title {
+  align-self: end;
+  min-height: 38px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.18;
+  word-break: keep-all;
 }
 
 .card-owner {
@@ -818,6 +849,41 @@ h2 {
   line-height: 1.2;
   text-align: center;
   word-break: keep-all;
+}
+
+.card-compact-owner,
+.card-compact-actions {
+  display: none;
+}
+
+.card-reveal-list.sorted .card-owner,
+.card-reveal-list.sorted .card-action-area {
+  display: none;
+}
+
+.card-reveal-list.sorted .card-compact-owner {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.card-reveal-list.sorted .card-compact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
 }
 
 .card-action-area {
@@ -890,6 +956,13 @@ h2 {
   font-weight: 900;
 }
 
+.card-reveal-list.sorted .action-stat {
+  gap: 2px;
+  min-height: 20px;
+  padding: 0;
+  font-size: 11px;
+}
+
 .reveal-card .action-icon,
 .reward-card .action-icon {
   display: grid;
@@ -901,11 +974,21 @@ h2 {
   line-height: 1;
 }
 
+.card-reveal-list.sorted .action-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .reveal-card .action-icon svg,
 .reward-card .action-icon svg {
   width: 18px;
   height: 18px;
   overflow: visible;
+}
+
+.card-reveal-list.sorted .action-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .reveal-card .action-icon svg path,
@@ -957,6 +1040,12 @@ h2 {
   font-weight: 800;
 }
 
+.card-reveal-list.sorted .action-note {
+  min-height: 18px;
+  padding: 0 1px;
+  font-size: 10px;
+}
+
 .reveal-card .pattern-icon,
 .reward-card .pattern-icon {
   position: relative;
@@ -964,6 +1053,12 @@ h2 {
   flex: 0 0 45px;
   width: 45px;
   height: 28px;
+}
+
+.card-reveal-list.sorted .pattern-icon {
+  flex-basis: 30px;
+  width: 30px;
+  height: 19px;
 }
 
 .reveal-card .pattern-icon i,
@@ -977,6 +1072,12 @@ h2 {
   border: 1px solid rgba(255, 210, 202, 0.65);
 }
 
+.card-reveal-list.sorted .pattern-icon i {
+  top: 2px;
+  width: 15px;
+  height: 15px;
+}
+
 .reveal-card .pattern-icon i:first-child,
 .reward-card .pattern-icon i:first-child {
   left: 0;
@@ -987,6 +1088,10 @@ h2 {
   left: 22px;
 }
 
+.card-reveal-list.sorted .pattern-icon i:last-child {
+  left: 15px;
+}
+
 .reveal-card .pattern-icon.adjacent-triple,
 .reward-card .pattern-icon.adjacent-triple {
   flex-basis: 55px;
@@ -994,9 +1099,19 @@ h2 {
   height: 34px;
 }
 
+.card-reveal-list.sorted .pattern-icon.adjacent-triple {
+  flex-basis: 34px;
+  width: 34px;
+  height: 22px;
+}
+
 .reveal-card .pattern-icon.adjacent-triple i:nth-child(1),
 .reward-card .pattern-icon.adjacent-triple i:nth-child(1) {
   left: 4px;
+}
+
+.card-reveal-list.sorted .pattern-icon.adjacent-triple i:nth-child(1) {
+  left: 2px;
 }
 
 .reveal-card .pattern-icon.adjacent-triple i:nth-child(2),
@@ -1004,10 +1119,19 @@ h2 {
   left: 26px;
 }
 
+.card-reveal-list.sorted .pattern-icon.adjacent-triple i:nth-child(2) {
+  left: 17px;
+}
+
 .reveal-card .pattern-icon.adjacent-triple i:nth-child(3),
 .reward-card .pattern-icon.adjacent-triple i:nth-child(3) {
   top: 13px;
   left: 15px;
+}
+
+.card-reveal-list.sorted .pattern-icon.adjacent-triple i:nth-child(3) {
+  top: 9px;
+  left: 10px;
 }
 
 .card-reveal-overlay.dock {
