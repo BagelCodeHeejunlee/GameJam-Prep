@@ -1243,6 +1243,7 @@ h2 {
 }
 
 .hud-card-actions {
+  grid-row: 2;
   display: grid;
   place-items: center;
   min-height: 0;
@@ -2093,7 +2094,7 @@ h2 {
   position: relative;
   display: grid;
   grid-template-rows: 30% minmax(0, 1fr);
-  width: min(100%, calc(var(--reward-card-height) * 2 / 3));
+  width: min(100%, calc(var(--reward-card-height) * 0.6667));
   aspect-ratio: 2 / 3;
   height: auto;
   justify-self: center;
@@ -2261,7 +2262,7 @@ h2 {
   .reward-card {
     --reward-card-height: 214px;
     width: 100%;
-    max-width: calc(var(--reward-card-height) * 2 / 3);
+    max-width: calc(var(--reward-card-height) * 0.6667);
     height: auto;
     padding: 10px;
   }
