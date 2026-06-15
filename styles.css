@@ -1492,6 +1492,26 @@ h2 {
     padding: 13px;
   }
 
+  .card-reveal-list.sequential {
+    grid-template-rows: 94px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .priority-sort-board {
+    justify-content: center;
+    width: min(100%, calc(100vw - 28px));
+    min-height: 88px;
+    margin: 0 auto;
+    padding: 6px;
+  }
+
+  .priority-sort-board > .priority-token {
+    flex: 0 0 clamp(62px, 18vw, 72px);
+    width: clamp(62px, 18vw, 72px);
+    height: 82px;
+    padding: 6px;
+  }
+
   .card-title {
     font-size: 17px;
     line-height: 1.2;
