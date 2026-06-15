@@ -2057,9 +2057,10 @@ function slideSortRevealCards(sortedEntries) {
 
     const x = firstRect.left - lastRect.left;
     const y = firstRect.top - lastRect.top;
+    const scale = firstRect.width / Math.max(lastRect.width, 1);
     cardElement.animate(
       [
-        { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
+        { transform: `translate(${x}px, ${y}px) scale(${scale})`, opacity: 1 },
         { transform: "translate(0, 0) scale(1)", opacity: 1 },
       ],
       { duration: 560, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },

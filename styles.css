@@ -736,12 +736,8 @@ h2 {
     rgba(37, 41, 37, 0.96);
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
   transform: translateY(12px) scale(0.96);
+  transform-origin: center center;
   opacity: 0;
-  transition:
-    width 320ms ease,
-    height 320ms ease,
-    padding 320ms ease,
-    box-shadow 320ms ease;
   animation: reveal-card-in 360ms ease forwards;
   overflow: hidden;
 }
@@ -767,23 +763,23 @@ h2 {
   justify-content: center;
   align-items: center;
   align-content: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .card-reveal-list.sorted .reveal-card {
-  flex: 0 0 clamp(76px, 21vw, 106px);
+  flex: 0 0 clamp(62px, 18vw, 76px);
   grid-row: auto;
   grid-column: auto;
   justify-self: auto;
-  grid-template-rows: 46px minmax(0, 1fr);
-  width: clamp(76px, 21vw, 106px);
-  height: 138px;
-  padding: 8px;
+  grid-template-rows: 1fr;
+  width: clamp(62px, 18vw, 76px);
+  height: 82px;
+  padding: 6px;
   background:
     linear-gradient(rgba(18, 23, 18, 0.36), rgba(11, 14, 12, 0.52)),
     var(--card-art) center / cover no-repeat,
     rgba(37, 41, 37, 0.96);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
 }
 
 .reveal-card:nth-child(2) {
@@ -814,11 +810,11 @@ h2 {
 }
 
 .card-reveal-list.sorted .card-priority {
-  top: 8px;
-  left: 8px;
-  width: 25px;
-  height: 25px;
-  font-size: 12px;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
 }
 
 .card-title {
@@ -832,12 +828,7 @@ h2 {
 }
 
 .card-reveal-list.sorted .card-title {
-  align-self: end;
-  min-height: 38px;
-  padding: 0 4px;
-  font-size: 12px;
-  line-height: 1.18;
-  word-break: keep-all;
+  display: none;
 }
 
 .card-owner {
@@ -863,26 +854,30 @@ h2 {
 
 .card-reveal-list.sorted .card-compact-owner {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
   display: grid;
   place-items: center;
-  width: 25px;
-  height: 25px;
+  width: 22px;
+  height: 22px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.28);
   color: var(--text);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 950;
 }
 
 .card-reveal-list.sorted .card-compact-actions {
+  position: absolute;
+  right: 4px;
+  bottom: 7px;
+  left: 4px;
   display: flex;
   flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
