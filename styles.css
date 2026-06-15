@@ -438,46 +438,58 @@ h2 {
 
 .hp-readout {
   position: absolute;
-  top: calc(100% + 4px);
+  bottom: calc(100% + 10px);
   left: 50%;
   z-index: 7;
-  min-width: 44px;
-  padding: 2px 5px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  min-width: 32px;
+  padding: 0 4px;
+  border: 0;
   border-radius: 999px;
-  background: rgba(255, 248, 225, 0.92);
-  color: #53351e;
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 1;
+  background: transparent;
+  color: #fff8df;
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.05;
   text-align: center;
   transform: translateX(-50%);
   white-space: nowrap;
+  text-shadow:
+    0 2px 0 rgba(82, 28, 24, 0.88),
+    0 0 4px rgba(82, 28, 24, 0.62);
 }
 
 .hp-bar {
   position: absolute;
-  top: calc(100% + 19px);
+  bottom: calc(100% + 3px);
   left: 50%;
   z-index: 7;
-  width: 46px;
-  height: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  width: 54px;
+  height: 7px;
+  border: 2px solid rgba(255, 248, 225, 0.88);
   border-radius: 999px;
-  background: rgba(91, 57, 26, 0.22);
+  background: rgba(62, 37, 28, 0.4);
   overflow: hidden;
   transform: translateX(-50%);
+  box-shadow:
+    0 2px 0 rgba(68, 39, 26, 0.24),
+    0 3px 8px rgba(68, 39, 26, 0.18);
 }
 
 .hp-bar i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #78d27d;
+  background: linear-gradient(#75d9ff, #2496e8);
 }
 
 .entity.enemy .hp-bar i {
-  background: #f0a064;
+  background: linear-gradient(#ff7b6d, #d93631);
+}
+
+.entity.player .hp-readout {
+  text-shadow:
+    0 2px 0 rgba(13, 73, 122, 0.88),
+    0 0 4px rgba(13, 73, 122, 0.62);
 }
 
 .damage-pop {
@@ -1122,12 +1134,44 @@ h2 {
   display: none;
 }
 
+.hud-card,
+.reveal-card,
+.reward-card {
+  --card-art: url("assets/card-normal-v2.png");
+  --card-overlay: url("assets/card-normal-overlay.png");
+  --rarity-color: var(--accent);
+}
+
+.rarity-normal {
+  --card-art: url("assets/card-normal-v2.png");
+  --card-overlay: url("assets/card-normal-overlay.png");
+  --rarity-color: #5c8c31;
+}
+
+.rarity-rare {
+  --card-art: url("assets/card-rare-v2.png");
+  --card-overlay: url("assets/card-rare-overlay.png");
+  --rarity-color: #2c86d1;
+}
+
+.rarity-epic {
+  --card-art: url("assets/card-epic-v2.png");
+  --card-overlay: url("assets/card-epic-overlay.png");
+  --rarity-color: #8f3acd;
+}
+
+.rarity-legendary {
+  --card-art: url("assets/card-legendary-v2.png");
+  --card-overlay: url("assets/card-legendary-overlay.png");
+  --rarity-color: #d88313;
+}
+
 .hud-card {
   --card-art: url("assets/card-normal-v2.png");
   position: relative;
   align-self: stretch;
   display: grid;
-  grid-template-rows: 38px minmax(0, 1fr);
+  grid-template-rows: 30% minmax(0, 1fr);
   width: min(100%, 86px);
   aspect-ratio: 2 / 3;
   min-height: 126px;
@@ -1137,7 +1181,8 @@ h2 {
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 8px;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 237, 197, 0.36)),
+    var(--card-overlay) center / cover no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 237, 197, 0.22)),
     var(--card-art) center / cover no-repeat,
     #fff0ce;
   box-shadow:
@@ -1158,30 +1203,43 @@ h2 {
 
 .hud-card-priority {
   position: absolute;
-  top: 5px;
-  left: 5px;
+  z-index: 1;
+  top: 10.2%;
+  left: 3.1%;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 2px solid rgba(255, 221, 108, 0.88);
+  width: 17.4%;
+  aspect-ratio: 1;
+  height: auto;
+  border: 0;
   border-radius: 999px;
-  background: #2f3134;
-  color: #ffe471;
+  background: transparent;
+  color: #4a2f1b;
   font-family: var(--card-font);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 .hud-card > strong {
-  align-self: center;
-  padding-left: 22px;
+  position: absolute;
+  z-index: 1;
+  top: 11.5%;
+  right: 3.2%;
+  left: 19%;
+  display: grid;
+  place-items: center;
+  min-height: 8.4%;
+  padding: 0 4px 1px;
   color: #4a2f1b;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 950;
   line-height: 1.15;
   text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
   word-break: keep-all;
+  overflow: hidden;
 }
 
 .hud-card-actions {
@@ -1352,43 +1410,13 @@ h2 {
   display: none;
 }
 
-.reveal-card,
-.reward-card {
-  --card-art: url("assets/card-normal-v2.png");
-  --card-overlay: url("assets/card-normal-overlay.png");
-  --rarity-color: var(--accent);
-}
-
-.rarity-normal {
-  --card-art: url("assets/card-normal-v2.png");
-  --card-overlay: url("assets/card-normal-overlay.png");
-  --rarity-color: #5c8c31;
-}
-
-.rarity-rare {
-  --card-art: url("assets/card-rare-v2.png");
-  --card-overlay: url("assets/card-rare-overlay.png");
-  --rarity-color: #7eb5ff;
-}
-
-.rarity-epic {
-  --card-art: url("assets/card-epic-v2.png");
-  --card-overlay: url("assets/card-epic-overlay.png");
-  --rarity-color: #c49cff;
-}
-
-.rarity-legendary {
-  --card-art: url("assets/card-legendary-v2.png");
-  --card-overlay: url("assets/card-legendary-overlay.png");
-  --rarity-color: #f0ca64;
-}
-
 .reveal-card {
   position: relative;
   display: grid;
-  grid-template-rows: 32px 16px minmax(0, 1fr);
+  grid-template-rows: 30% 7% minmax(0, 1fr);
   width: clamp(158px, 42vw, 190px);
-  height: 260px;
+  aspect-ratio: 2 / 3;
+  height: auto;
   padding: 10px 14px 14px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
@@ -1436,7 +1464,8 @@ h2 {
   justify-self: auto;
   grid-template-rows: 1fr;
   width: clamp(62px, 18vw, 76px);
-  height: 82px;
+  aspect-ratio: 2 / 3;
+  height: auto;
   padding: 6px;
   background:
     var(--card-overlay) center / cover no-repeat,
@@ -1453,7 +1482,8 @@ h2 {
   justify-self: auto;
   grid-template-rows: 1fr;
   width: clamp(62px, 18vw, 76px);
-  height: 82px;
+  aspect-ratio: 2 / 3;
+  height: auto;
   padding: 6px;
   background:
     var(--card-overlay) center / cover no-repeat,
@@ -1475,11 +1505,11 @@ h2 {
 .card-priority {
   position: absolute;
   z-index: 1;
-  top: 8.8%;
-  left: 4.5%;
+  top: 10.2%;
+  left: 3.1%;
   display: grid;
   place-items: center;
-  width: 18%;
+  width: 17.4%;
   aspect-ratio: 1;
   height: auto;
   margin: 0;
@@ -1513,12 +1543,12 @@ h2 {
 .card-title {
   position: absolute;
   z-index: 1;
-  top: 11.2%;
-  right: 6%;
-  left: 23.5%;
+  top: 11.5%;
+  right: 3.2%;
+  left: 19%;
   display: grid;
   place-items: center;
-  min-height: 8%;
+  min-height: 8.4%;
   min-width: 0;
   padding: 1px 10px 3px;
   border: 0;
@@ -2057,13 +2087,16 @@ h2 {
 }
 
 .reward-card {
+  --reward-card-height: clamp(214px, 28vh, 250px);
   -webkit-appearance: none;
   appearance: none;
   position: relative;
   display: grid;
-  grid-template-rows: 38px minmax(0, 1fr);
-  width: 100%;
-  height: clamp(214px, 28vh, 250px);
+  grid-template-rows: 30% minmax(0, 1fr);
+  width: min(100%, calc(var(--reward-card-height) * 2 / 3));
+  aspect-ratio: 2 / 3;
+  height: auto;
+  justify-self: center;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
@@ -2226,8 +2259,10 @@ h2 {
   }
 
   .reward-card {
+    --reward-card-height: 214px;
     width: 100%;
-    height: 214px;
+    max-width: calc(var(--reward-card-height) * 2 / 3);
+    height: auto;
     padding: 10px;
   }
 
@@ -2236,10 +2271,10 @@ h2 {
   }
 
   .card-title {
-    top: 11.2%;
-    right: 6%;
-    left: 23.5%;
-    min-height: 8%;
+    top: 11.5%;
+    right: 3.2%;
+    left: 19%;
+    min-height: 8.4%;
     font-size: 14px;
     line-height: 1.08;
   }
