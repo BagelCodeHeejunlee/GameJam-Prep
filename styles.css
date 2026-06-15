@@ -980,13 +980,7 @@ h2 {
 }
 
 .priority-item.active {
-  transform: translateY(-2px) scale(1.05);
-  border-color: rgba(255, 196, 47, 0.95);
-  filter: none;
-  box-shadow:
-    0 0 0 3px rgba(255, 218, 78, 0.42),
-    0 0 16px rgba(255, 218, 78, 0.36),
-    0 5px 0 rgba(112, 77, 35, 0.14);
+  transform: scale(1.025);
 }
 
 .priority-item.done {
