@@ -672,12 +672,14 @@ async function runTurn() {
   for (let index = 0; index < entries.length; index += 1) {
     if (state.finished || state.waitingReward) break;
     state.activeTimelineIndex = index;
+    renderPriorityStrip();
     renderDrawnCards();
     renderTimeline(index);
     await executeTimelineEntry(entries[index]);
     expireTurnEndEffects(entries[index]);
     state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
     state.activeTimelineIndex = -1;
+    renderPriorityStrip();
     renderDrawnCards();
     renderTimeline();
     await sleep(turnDelay());
