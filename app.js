@@ -146,10 +146,20 @@ const warriorRewardPool = [
     { type: "attack", mult: 3, range: 1, melee: true },
   ]),
   card("warrior-push", "밀어붙이기", "범위 공격", "노말", 46, [{ type: "attack", mult: 1, range: 1, melee: true, push: 1 }]),
+  card("warrior-rush-5", "달려들기", "돌진", "노말", 60, [{ type: "move", amount: 5, desiredRange: 1 }]),
+  card("warrior-advance-cleave", "파고들기", "범위 공격", "노말", 50, [
+    { type: "move", amount: 2, desiredRange: 1 },
+    { type: "patternAttack", mult: 1, range: 1, pattern: "adjacent-pair", melee: true },
+  ]),
+  card("warrior-berserk-heal-small", "숨 고르기", "광전", "노말", 64, [{ type: "healPercent", percent: 0.1 }]),
   card("warrior-cleave-reward", "넓은 휩쓸기", "범위 공격", "레어", 48, [
     { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-pair", melee: true },
   ]),
   card("warrior-jump-entry", "점프 진입", "돌진", "레어", 58, [{ type: "move", amount: 4, desiredRange: 1, jump: true }]),
+  card("warrior-breakthrough", "돌파 베기", "돌진", "레어", 56, [
+    { type: "move", amount: 4, desiredRange: 1 },
+    { type: "attack", mult: 2, range: 1, melee: true, push: 1 },
+  ]),
   card("warrior-blood-chain", "피의 연격", "광전", "레어", 44, [
     { type: "attack", mult: 1, range: 1, melee: true },
     { type: "attack", mult: 1, range: 1, melee: true },
@@ -168,12 +178,24 @@ const warriorRewardPool = [
     { type: "attack", mult: 1, range: 1, melee: true },
     { type: "healPercent", percent: 0.12 },
   ]),
+  card("warrior-blood-combo", "무자비한 연속", "광전", "에픽", 43, [
+    { type: "selfDamagePercent", percent: 0.1 },
+    { type: "attack", mult: 3, range: 1, melee: true },
+    { type: "attack", mult: 2, range: 1, melee: true },
+  ]),
+  card("warrior-surround-hit", "주변 견제", "범위 공격", "에픽", 49, [
+    { type: "attack", mult: 1, range: 1, melee: true, targets: 3 },
+  ]),
   card("warrior-whirlwind", "피의 폭풍", "범위 공격", "전설", 45, [
     { type: "patternAttack", mult: 3, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
   ]),
   card("warrior-endless-charge", "멈추지 않는 돌입", "돌진", "전설", 62, [{ type: "move", amount: 6, desiredRange: 1, jump: true }]),
   card("warrior-death-edge", "죽음의 칼끝", "광전", "전설", 38, [
     { type: "permanent", effect: "lowHpDamage", amount: 0.5, threshold: 0.25 },
+  ]),
+  card("warrior-final-blow", "최후의 일격", "광전", "전설", 36, [
+    { type: "selfDamagePercent", percent: 0.2 },
+    { type: "attack", mult: 6, range: 1, melee: true },
   ]),
 ];
 
@@ -191,25 +213,52 @@ const baseMageCards = [
 const mageRewardPool = [
   card("mage-long-bolt", "장거리 마력탄", "공용", "노말", 34, [{ type: "attack", mult: 1, range: 4 }]),
   card("mage-fork", "갈래 마력", "연쇄", "노말", 38, [{ type: "attack", mult: 1, range: 3, targets: 3 }]),
+  card("mage-chain-bolt", "연쇄 마력탄", "연쇄", "노말", 36, [
+    { type: "attack", mult: 1, range: 3 },
+    { type: "attack", mult: 1, range: 3 },
+  ]),
+  card("mage-triple-bolt", "세 갈래 번개", "연쇄", "레어", 37, [{ type: "attack", mult: 1, range: 3, targets: 3 }]),
   card("mage-rune-seed", "룬 흩뿌리기", "룬", "노말", 58, [
     { type: "placeRune", range: 2, count: 2, power: 1 },
     { type: "fleeToRune", amount: 2 },
   ]),
+  card("mage-rune-back", "룬 뒤로", "룬", "노말", 60, [
+    { type: "flee", amount: 2 },
+    { type: "placeRune", range: 2, count: 1, power: 1 },
+  ]),
   card("mage-rune-spark", "룬 점화", "룬", "레어", 40, [
     { type: "runeAttack", mult: 2, radius: 1 },
+  ]),
+  card("mage-double-rune", "이중 룬", "룬", "레어", 56, [
+    { type: "placeRune", range: 3, count: 2, power: 2 },
   ]),
   card("mage-rune-burst", "룬 폭파", "룬", "에픽", 42, [
     { type: "detonateRune", mult: 3, radius: 1 },
   ]),
+  card("mage-rune-field", "마력 지뢰밭", "룬", "전설", 50, [
+    { type: "placeRune", range: 4, count: 4, power: 2 },
+    { type: "fleeToRune", amount: 3 },
+  ]),
+  card("mage-small-meteor", "작은 운석", "운석", "노말", 33, [
+    { type: "placeMeteor", range: 3, mult: 2, radius: 1, delay: 1 },
+  ]),
   card("mage-meteor-mark", "운석 예고", "운석", "레어", 30, [
     { type: "placeMeteor", range: 4, mult: 4, radius: 1, delay: 1 },
+  ]),
+  card("mage-two-stars", "두 번째 별", "운석", "레어", 32, [
+    { type: "placeMeteor", range: 4, mult: 2, radius: 1, delay: 1 },
+    { type: "placeMeteor", range: 4, mult: 2, radius: 1, delay: 1 },
   ]),
   card("mage-starfall", "별 추락", "운석", "전설", 26, [
     { type: "placeMeteor", range: 5, mult: 7, radius: 1, delay: 1 },
   ]),
+  card("mage-doom-meteor", "종말 예고", "운석", "전설", 24, [
+    { type: "placeMeteor", range: 5, mult: 10, radius: 2, delay: 2 },
+  ]),
   card("mage-overflow", "마력 과잉", "연쇄", "레어", 34, [
     { type: "permanent", effect: "comboDamage", amount: 0.1 },
   ]),
+  card("mage-thunder-ring", "천둥의 고리", "연쇄", "전설", 28, [{ type: "attack", mult: 1, range: 4, targets: 5 }]),
 ];
 
 const characterDefinitions = {
@@ -2110,6 +2159,7 @@ function renderActionLine(action) {
     return `<span class="action-line">${actionGroup("attack", [
       actionStat("range", "사거리", action.range),
       actionNote(`운석 예고 ${action.delay ?? 1}턴`),
+      actionNote(`범위 ${action.radius ?? 1}`),
       actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
@@ -2192,7 +2242,7 @@ function describeAction(action) {
   if (action.type === "fleeToRune") return `룬 쪽 후퇴 ${action.amount}`;
   if (action.type === "runeAttack") return `룬 주변 ATK ${action.mult}`;
   if (action.type === "detonateRune") return `룬 폭파 ATK ${action.mult}`;
-  if (action.type === "placeMeteor") return `운석 예고 ${action.delay ?? 1}턴, ATK ${action.mult}`;
+  if (action.type === "placeMeteor") return `운석 예고 ${action.delay ?? 1}턴, 범위 ${action.radius ?? 1}, ATK ${action.mult}`;
   if (action.type === "selfDamagePercent") return `체력 -${Math.round(action.percent * 100)}%`;
   if (action.type === "healPercent") return `회복 ${Math.round(action.percent * 100)}%`;
   return action.type;
