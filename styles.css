@@ -1215,7 +1215,7 @@ h2 {
 .hud-card-priority {
   position: absolute;
   z-index: 1;
-  top: 10.2%;
+  top: 4%;
   left: 3.1%;
   display: grid;
   place-items: center;
@@ -1236,7 +1236,7 @@ h2 {
 .hud-card > strong {
   position: absolute;
   z-index: 1;
-  top: 11.2%;
+  top: 7.4%;
   right: 3.2%;
   left: 19%;
   display: grid;
@@ -1519,7 +1519,7 @@ h2 {
 .card-priority {
   position: absolute;
   z-index: 1;
-  top: 10.2%;
+  top: 4%;
   left: 3.1%;
   display: grid;
   place-items: center;
@@ -1539,25 +1539,25 @@ h2 {
 }
 
 .card-reveal-list.sorted .card-priority {
-  top: 6px;
-  left: 6px;
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
+  top: 4%;
+  left: 3.1%;
+  width: 17.4%;
+  height: auto;
+  font-size: 8px;
 }
 
 .priority-token .card-priority {
-  top: 6px;
-  left: 6px;
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
+  top: 4%;
+  left: 3.1%;
+  width: 17.4%;
+  height: auto;
+  font-size: 8px;
 }
 
 .card-title {
   position: absolute;
   z-index: 1;
-  top: 11.5%;
+  top: 7.4%;
   right: 3.2%;
   left: 19%;
   display: grid;
@@ -2285,7 +2285,7 @@ h2 {
   }
 
   .card-title {
-    top: 11.5%;
+    top: 7.4%;
     right: 3.2%;
     left: 19%;
     min-height: 8.4%;

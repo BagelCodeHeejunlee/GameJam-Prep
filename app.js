@@ -387,6 +387,7 @@ function newRun() {
     currentTimeline: [],
     activeTimelineIndex: -1,
     completedTimelineCount: 0,
+    completedTimelineIndexes: new Set(),
     priorityRevealMode: "",
     cameraMode: "overview",
     cameraTransitionScheduled: false,
@@ -474,6 +475,7 @@ function startWave(index) {
   state.currentTimeline = [];
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
+  state.completedTimelineIndexes = new Set();
 }
 
 function expandCards(cards) {
@@ -635,6 +637,7 @@ async function runTurn() {
   state.currentTimeline = [];
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
+  state.completedTimelineIndexes = new Set();
   state.comboHits = {};
   processMeteors();
   if (checkEndConditions()) {
@@ -662,6 +665,7 @@ async function runTurn() {
   state.priorityRevealMode = "drawn";
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
+  state.completedTimelineIndexes = new Set();
   log(`턴 ${state.turn}: ${entries.map((entry) => entry.card.name).join(", ")}`);
   render();
   await playPriorityReveal(drawnEntries, entries);
@@ -677,6 +681,7 @@ async function runTurn() {
     renderTimeline(index);
     await executeTimelineEntry(entries[index]);
     expireTurnEndEffects(entries[index]);
+    state.completedTimelineIndexes.add(index);
     state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
     state.activeTimelineIndex = -1;
     renderPriorityStrip();
@@ -2064,7 +2069,7 @@ function renderPriorityStrip() {
   state.currentTimeline.forEach((entry, index) => {
     const button = document.createElement("div");
     const statusClass = [
-      index < state.completedTimelineCount ? "done" : "",
+      state.completedTimelineIndexes?.has(index) ? "done" : "",
       index === state.activeTimelineIndex ? "active" : "",
     ]
       .filter(Boolean)
@@ -2168,7 +2173,7 @@ function renderDrawnCards() {
   state.currentTimeline.forEach((entry, index) => {
     const div = document.createElement("div");
     const statusClass = [
-      index < state.completedTimelineCount ? "done" : "",
+      state.completedTimelineIndexes?.has(index) ? "done" : "",
       index === state.activeTimelineIndex ? "active" : "",
     ]
       .filter(Boolean)
@@ -2206,6 +2211,7 @@ async function playPriorityReveal(drawnEntries, sortedEntries) {
   state.priorityRevealMode = "drawn";
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
+  state.completedTimelineIndexes = new Set();
   renderPriorityStrip();
   renderDrawnCards();
   await sleep(turnDelay(0.7));
