@@ -955,13 +955,18 @@ function selectTargets(actor, action) {
     .filter((target) => canTarget(actor, target, range))
     .sort((a, b) => {
       if (a.hp !== b.hp) return a.hp - b.hp;
-      const distanceA = axialDistance(actor, a);
-      const distanceB = axialDistance(actor, b);
+      const distanceA = targetPriorityDistance(actor, a, action);
+      const distanceB = targetPriorityDistance(actor, b, action);
       if (distanceA !== distanceB) return distanceA - distanceB;
       return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
     });
 
   return candidates.slice(0, action.targets ?? 1);
+}
+
+function targetPriorityDistance(actor, target, action) {
+  if (isMeleeAttackAction(action)) return approachDistanceToTarget(actor, actor, target);
+  return axialDistance(actor, target);
 }
 
 async function moveActor(actor, action, cardData) {
@@ -971,7 +976,8 @@ async function moveActor(actor, action, cardData) {
     return { moved: 0, unused: amount };
   }
 
-  const reachable = reachableTiles(actor, amount, action.jump);
+  const reachable = reachableTiles(actor, amount, action.jump, false)
+    .map((tile) => ({ ...tile, trapRisk: movementTrapRisk(actor, tile, action.jump) }));
   if (!reachable.length) {
     log(`${actor.name} 이동 실패`);
     return { moved: 0, unused: amount };
@@ -1058,10 +1064,16 @@ function healPercent(actor, percent) {
 }
 
 function findMovePath(actor, destination, jump = false) {
-  const start = { q: actor.q, r: actor.r };
+  const safePath = findPathForActor(actor, actor, destination, jump, true);
+  if (safePath.length || sameHex(actor, destination)) return safePath;
+  return findPathForActor(actor, actor, destination, jump, false);
+}
+
+function findPathForActor(actor, start, destination, jump = false, avoidTraps = false) {
+  if (avoidTraps && !sameHex(start, destination) && movementTrapAt(destination)) return [];
   const startKey = hexKey(start);
   const destinationKey = hexKey(destination);
-  const queue = [start];
+  const queue = [{ q: start.q, r: start.r }];
   const parentByKey = new Map([[startKey, null]]);
 
   while (queue.length) {
@@ -1072,7 +1084,7 @@ function findMovePath(actor, destination, jump = false) {
       const next = { q: current.q + dir.q, r: current.r + dir.r };
       const key = hexKey(next);
       if (!isTile(next) || parentByKey.has(key)) continue;
-      if (!jump && blocksPath(next, actor)) continue;
+      if (!jump && blocksPath(next, actor, { avoidTraps })) continue;
       parentByKey.set(key, current);
       queue.push(next);
     }
@@ -1087,6 +1099,21 @@ function findMovePath(actor, destination, jump = false) {
     current = parentByKey.get(hexKey(current));
   }
   return path;
+}
+
+function movementDistanceBetween(actor, start, destination, jump = false, avoidTraps = true) {
+  if (sameHex(start, destination)) return 0;
+  const path = findPathForActor(actor, start, destination, jump, avoidTraps);
+  return path.length ? path.length : Infinity;
+}
+
+function movementTrapRisk(actor, destination, jump = false) {
+  if (sameHex(actor, destination)) return 0;
+  const safePath = findPathForActor(actor, actor, destination, jump, true);
+  if (safePath.length) return 0;
+  const fallbackPath = findPathForActor(actor, actor, destination, jump, false);
+  if (!fallbackPath.length) return 9999;
+  return fallbackPath.filter((step) => movementTrapAt(step)).length;
 }
 
 async function animateActorPath(actor, path) {
@@ -1149,10 +1176,11 @@ function bestCombatMoveTile(actor, reachable, attackAction) {
 
   const scored = candidateTiles.map((tile) => {
     const targetInfo = scoreTargetsFromTile(actor, tile, attackAction);
-    const nearest = Math.min(...opponents.map((enemy) => axialDistance(tile, enemy)));
+    const nearest = nearestOpponentMoveDistance(actor, tile, opponents, attackAction);
     const closestToDesired = -Math.abs(nearest - desiredRange);
     const farthestClosest = nearest;
-    const moveCost = axialDistance(actor, tile);
+    const moveCost = tile.distance ?? axialDistance(actor, tile);
+    const trapRisk = tile.trapRisk ?? 0;
     return {
       tile,
       hitCount: targetInfo.hitCount,
@@ -1160,11 +1188,13 @@ function bestCombatMoveTile(actor, reachable, attackAction) {
       closestToDesired,
       farthestClosest,
       moveCost,
+      trapRisk,
     };
   });
 
   scored.sort((a, b) => {
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+    if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
     if (a.hitCount > 1 && a.farthestClosest !== b.farthestClosest) {
       return b.farthestClosest - a.farthestClosest;
     }
@@ -1178,6 +1208,33 @@ function bestCombatMoveTile(actor, reachable, attackAction) {
 
 function isMeleeAttackAction(action) {
   return action?.type === "attack" && (action.melee || action.range <= 1);
+}
+
+function nearestOpponentMoveDistance(actor, tile, opponents, attackAction) {
+  if (!isMeleeAttackAction(attackAction)) {
+    return Math.min(...opponents.map((enemy) => axialDistance(tile, enemy)));
+  }
+  return Math.min(...opponents.map((enemy) => approachDistanceToTarget(actor, tile, enemy)));
+}
+
+function approachDistanceToTarget(actor, fromTile, target) {
+  if (axialDistance(fromTile, target) <= 1) return 0;
+  const adjacentTiles = directions
+    .map((dir) => ({ q: target.q + dir.q, r: target.r + dir.r }))
+    .filter((tile) => isTile(tile) && canEndMoveAt(tile, actor, { avoidTraps: true }));
+  const safeDistance = Math.min(
+    ...adjacentTiles.map((tile) => movementDistanceBetween(actor, fromTile, tile, false, true)),
+    Infinity,
+  );
+  if (Number.isFinite(safeDistance)) return safeDistance;
+
+  const fallbackTiles = directions
+    .map((dir) => ({ q: target.q + dir.q, r: target.r + dir.r }))
+    .filter((tile) => isTile(tile) && canEndMoveAt(tile, actor, { avoidTraps: false }));
+  return Math.min(
+    ...fallbackTiles.map((tile) => movementDistanceBetween(actor, fromTile, tile, false, false)),
+    Infinity,
+  );
 }
 
 function scoreTargetsFromTile(actor, tile, attackAction) {
@@ -1206,10 +1263,13 @@ function bestFleeTile(actor, reachable) {
   const opponents = aliveOpponents(actor);
   if (!opponents.length) return actor;
   return [...reachable].sort((a, b) => {
+    const aTrapRisk = a.trapRisk ?? 0;
+    const bTrapRisk = b.trapRisk ?? 0;
+    if (aTrapRisk !== bTrapRisk) return aTrapRisk - bTrapRisk;
     const aMin = Math.min(...opponents.map((enemy) => axialDistance(a, enemy)));
     const bMin = Math.min(...opponents.map((enemy) => axialDistance(b, enemy)));
     if (aMin !== bMin) return bMin - aMin;
-    return axialDistance(actor, a) - axialDistance(actor, b);
+    return (a.distance ?? axialDistance(actor, a)) - (b.distance ?? axialDistance(actor, b));
   })[0];
 }
 
@@ -1217,17 +1277,20 @@ function bestRuneRetreatTile(actor, reachable) {
   const runes = ownedRunes(actor);
   if (!runes.length) return bestFleeTile(actor, reachable);
   return [...reachable].sort((a, b) => {
+    const aTrapRisk = a.trapRisk ?? 0;
+    const bTrapRisk = b.trapRisk ?? 0;
+    if (aTrapRisk !== bTrapRisk) return aTrapRisk - bTrapRisk;
     const aRuneDistance = Math.min(...runes.map((rune) => axialDistance(a, rune)));
     const bRuneDistance = Math.min(...runes.map((rune) => axialDistance(b, rune)));
     if (aRuneDistance !== bRuneDistance) return aRuneDistance - bRuneDistance;
     const aEnemyDistance = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(a, enemy)), Infinity);
     const bEnemyDistance = Math.min(...aliveOpponents(actor).map((enemy) => axialDistance(b, enemy)), Infinity);
     if (aEnemyDistance !== bEnemyDistance) return bEnemyDistance - aEnemyDistance;
-    return axialDistance(actor, a) - axialDistance(actor, b);
+    return (a.distance ?? axialDistance(actor, a)) - (b.distance ?? axialDistance(actor, b));
   })[0];
 }
 
-function reachableTiles(actor, maxDistance, jump = false) {
+function reachableTiles(actor, maxDistance, jump = false, avoidTraps = false) {
   const startKey = hexKey(actor);
   const queue = [{ q: actor.q, r: actor.r, distance: 0 }];
   const visited = new Map([[startKey, 0]]);
@@ -1235,14 +1298,14 @@ function reachableTiles(actor, maxDistance, jump = false) {
 
   while (queue.length) {
     const current = queue.shift();
-    if (current.distance > 0 && canEndMoveAt(current, actor)) result.push(current);
+    if (current.distance > 0 && canEndMoveAt(current, actor, { avoidTraps })) result.push(current);
     if (current.distance >= maxDistance) continue;
 
     for (const dir of directions) {
       const next = { q: current.q + dir.q, r: current.r + dir.r };
       const key = hexKey(next);
       if (!isTile(next) || visited.has(key)) continue;
-      if (!jump && blocksPath(next, actor)) continue;
+      if (!jump && blocksPath(next, actor, { avoidTraps })) continue;
       visited.set(key, current.distance + 1);
       queue.push({ ...next, distance: current.distance + 1 });
     }
@@ -1251,13 +1314,15 @@ function reachableTiles(actor, maxDistance, jump = false) {
   return result;
 }
 
-function canEndMoveAt(tile, actor) {
+function canEndMoveAt(tile, actor, options = {}) {
   if (isWall(tile)) return false;
+  if (options.avoidTraps && movementTrapAt(tile)) return false;
   return !state.entities.some((entity) => isAlive(entity) && entity.id !== actor.id && sameHex(entity, tile));
 }
 
-function blocksPath(tile, actor) {
+function blocksPath(tile, actor, options = {}) {
   if (isWall(tile)) return true;
+  if (options.avoidTraps && movementTrapAt(tile)) return true;
   return state.entities.some((entity) => {
     if (!isAlive(entity) || entity.id === actor.id) return false;
     return sameHex(entity, tile) && entity.side !== actor.side;
@@ -2488,10 +2553,19 @@ function trapAt(hex) {
   return state.obstacles.find((obstacle) => sameHex(obstacle, hex));
 }
 
+function movementTrapAt(hex) {
+  return state.obstacles.find((obstacle) => isMovementTrap(obstacle) && sameHex(obstacle, hex));
+}
+
+function isMovementTrap(obstacle) {
+  return obstacle && (obstacle.kind === "attack" || obstacle.kind === "spike" || obstacle.kind === "block");
+}
+
 function triggerTrap(actor) {
   if (!isAlive(actor)) return null;
   const trap = trapAt(actor);
-  if (!trap || trap.ownerSide === actor.side) return null;
+  if (!trap) return null;
+  if (trap.kind === "rune" && trap.ownerSide === actor.side) return null;
 
   state.obstacles = state.obstacles.filter((item) => item !== trap);
   if (trap.kind === "attack" || trap.kind === "spike" || trap.kind === "rune") {
