@@ -1243,7 +1243,7 @@ h2 {
   background: transparent;
   color: #4a2f1b;
   font-family: var(--card-font);
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 950;
   line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.64);
@@ -1252,7 +1252,7 @@ h2 {
 .hud-card > strong {
   position: absolute;
   z-index: 1;
-  top: 11.5%;
+  top: 11.2%;
   right: 3.2%;
   left: 19%;
   display: grid;
@@ -1260,13 +1260,15 @@ h2 {
   min-height: 8.4%;
   padding: 0 4px 1px;
   color: #4a2f1b;
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 950;
-  line-height: 1.15;
+  line-height: 1.05;
   text-align: center;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
   word-break: keep-all;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hud-card-actions {
@@ -1758,12 +1760,12 @@ h2 {
   min-height: 18px;
   padding: 0 1px;
   border: 0;
-  color: #f4ead7;
+  color: #4a2f1b;
   font-family: var(--card-font);
   font-size: 14px;
   font-weight: 900;
   line-height: 1;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.76);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
   white-space: nowrap;
 }
 
@@ -1803,7 +1805,7 @@ h2 {
   color: var(--accent);
   font-size: 16px;
   line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.76));
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.5));
 }
 
 .card-reveal-list.sorted .action-icon,
@@ -1852,68 +1854,68 @@ h2 {
 
 .reveal-card .action-icon.melee,
 .reward-card .action-icon.melee {
-  color: #f0d4bd;
+  color: #8e4a2d;
 }
 
 .reveal-card .action-icon.ranged,
 .reward-card .action-icon.ranged {
-  color: #d9b96e;
+  color: #8b6411;
 }
 
 .reveal-card .action-icon.move,
 .reveal-card .action-icon.move-flee,
 .reward-card .action-icon.move,
 .reward-card .action-icon.move-flee {
-  color: #d6ecff;
+  color: #126fbd;
 }
 
 .reveal-card .action-icon.range,
 .reward-card .action-icon.range {
-  color: #cfddff;
+  color: #3a55b5;
 }
 
 .reveal-card .action-icon.target,
 .reward-card .action-icon.target {
-  color: #d7f2c2;
+  color: #3f7e2a;
 }
 
 .reveal-card .action-icon.trap-attack,
 .reward-card .action-icon.trap-attack {
-  color: #ead084;
+  color: #8a6816;
 }
 
 .reveal-card .action-icon.trap-block,
 .reward-card .action-icon.trap-block {
-  color: #a8d6ff;
+  color: #236caa;
 }
 
 .reveal-card .action-icon.rune,
 .reward-card .action-icon.rune,
 .reveal-card .action-icon.rune-burst,
 .reward-card .action-icon.rune-burst {
-  color: #c6a5ff;
+  color: #7a3db7;
 }
 
 .reveal-card .action-icon.meteor,
 .reward-card .action-icon.meteor,
 .reveal-card .action-icon.area,
 .reward-card .action-icon.area {
-  color: #ffbd8b;
+  color: #b95c22;
 }
 
 .reveal-card .action-icon.heal,
 .reward-card .action-icon.heal {
-  color: #aee8bf;
+  color: #35844b;
 }
 
 .reveal-card .action-icon.self-damage,
 .reward-card .action-icon.self-damage {
-  color: #f0a49a;
+  color: #ab4038;
 }
 
 .reveal-card .action-icon.permanent,
 .reward-card .action-icon.permanent {
-  color: #f1d575;
+  color: #9a7a11;
 }
 
 .reveal-card .action-note,
@@ -1925,7 +1927,7 @@ h2 {
   max-width: 8.8em;
   min-height: 22px;
   padding: 1px 2px;
-  color: rgba(240, 233, 214, 0.9);
+  color: #5f432a;
   font-family: var(--card-font);
   font-size: 10.5px;
   font-weight: 700;
@@ -1933,7 +1935,7 @@ h2 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
 .card-reveal-list.sorted .action-note,
