@@ -687,8 +687,8 @@ h2 {
 
 .enemy-summary-panel {
   position: relative;
-  min-height: 112px;
-  padding: 22px 8px 8px;
+  min-height: 132px;
+  padding: 22px 7px 8px;
 }
 
 .panel-label {
@@ -709,7 +709,7 @@ h2 {
 .enemy-summary {
   display: flex;
   flex-flow: row nowrap;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -730,13 +730,12 @@ h2 {
 
 .enemy-group {
   display: grid;
-  flex: 0 0 154px;
-  grid-template-columns: 50px minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  gap: 5px 8px;
-  align-items: center;
-  min-height: 80px;
-  padding: 8px;
+  flex: 0 0 calc((100% - 12px) / 3);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+  min-height: 98px;
+  padding: 7px;
 }
 
 .enemy-group.empty {
@@ -746,6 +745,14 @@ h2 {
   color: var(--muted);
   font-weight: 900;
   text-align: center;
+}
+
+.enemy-card-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
 }
 
 .combatant-portrait {
@@ -762,10 +769,9 @@ h2 {
 }
 
 .enemy-portrait {
-  grid-row: 1 / span 2;
-  width: 50px;
+  width: 44px;
   background: linear-gradient(#ffac75, #ed6548);
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .player-portrait {
@@ -790,32 +796,38 @@ h2 {
   line-height: 1;
 }
 
-.enemy-group .combatant-main {
-  display: contents;
-}
-
 .enemy-group .combatant-heading {
-  grid-column: 2;
   align-self: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
   font-size: 15px;
+  line-height: 1.05;
 }
 
 .enemy-group .base-stat-row {
-  grid-column: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 7px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-items: center;
+  align-items: center;
+  width: 100%;
+  min-height: 25px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(222, 184, 119, 0.42);
+  gap: 0;
 }
 
 .enemy-group .base-stat {
-  gap: 3px;
-  font-size: 12px;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
 }
 
 .enemy-group .base-stat .action-icon,
 .enemy-group .base-stat .action-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .combatant-heading strong {

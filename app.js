@@ -2038,14 +2038,14 @@ function renderEnemySummary() {
     const div = document.createElement("article");
     div.className = `enemy-group ${sample?.boss ? "boss" : ""}`;
     div.innerHTML = `
-      <div class="combatant-portrait enemy-portrait">${definition.label ?? sample?.label ?? "적"}</div>
-      <div class="combatant-main">
+      <div class="enemy-card-head">
+        <div class="combatant-portrait enemy-portrait">${definition.label ?? sample?.label ?? "적"}</div>
         <div class="combatant-heading">
           <strong>${sample?.boss ? sample.name : definition.name}</strong>
           <span>x${group.enemies.length}</span>
         </div>
-        ${renderBaseStats(sample ?? definition)}
       </div>
+      ${renderBaseStats(sample ?? definition)}
     `;
     elements.enemySummary.append(div);
   });
