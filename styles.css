@@ -660,13 +660,12 @@ h2 {
 .battle-top-hud {
   position: fixed;
   z-index: 32;
-  top: calc(max(8px, env(safe-area-inset-top)) + 70px);
+  top: calc(max(8px, env(safe-area-inset-top)) + 66px);
   right: max(8px, env(safe-area-inset-right));
   left: max(8px, env(safe-area-inset-left));
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(128px, 0.9fr);
-  gap: 6px;
-  align-items: start;
+  grid-template-rows: auto auto;
+  gap: 5px;
   pointer-events: none;
 }
 
@@ -685,13 +684,13 @@ h2 {
 
 .enemy-summary-panel {
   position: relative;
-  min-height: 54px;
-  padding: 7px 6px 6px 35px;
+  min-height: 45px;
+  padding: 5px 6px 5px 34px;
 }
 
 .panel-label {
   position: absolute;
-  top: 8px;
+  top: 7px;
   left: 7px;
   min-width: 22px;
   padding: 3px 5px;
@@ -705,9 +704,17 @@ h2 {
 }
 
 .enemy-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-flow: row nowrap;
   gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.enemy-summary::-webkit-scrollbar {
+  display: none;
 }
 
 .enemy-group,
@@ -720,18 +727,19 @@ h2 {
 
 .enemy-group {
   display: grid;
+  flex: 0 0 104px;
   grid-template-columns: 24px minmax(0, 1fr);
   grid-template-rows: auto;
   gap: 3px;
   align-items: center;
-  min-height: 38px;
+  min-height: 34px;
   padding: 4px;
 }
 
 .enemy-group.empty {
-  grid-column: 1 / -1;
+  flex-basis: 100%;
   display: block;
-  padding: 9px;
+  padding: 8px;
   color: var(--muted);
   font-weight: 900;
   text-align: center;
@@ -876,7 +884,7 @@ h2 {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 6px;
   align-items: center;
-  min-height: 54px;
+  min-height: 47px;
   padding: 5px 6px;
 }
 
