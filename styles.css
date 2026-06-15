@@ -942,6 +942,8 @@ h2 {
   display: flex;
   gap: 7px;
   min-width: 0;
+  margin: -3px -2px;
+  padding: 3px 2px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -1230,12 +1232,12 @@ h2 {
 .hud-card > strong {
   position: absolute;
   z-index: 1;
-  top: 7.4%;
-  right: 3.2%;
-  left: 19%;
+  top: 7.3%;
+  right: 5%;
+  left: 23%;
   display: grid;
   place-items: center;
-  min-height: 8.4%;
+  min-height: 8.8%;
   padding: 0 4px 1px;
   color: #4a2f1b;
   font-size: 8px;
@@ -1552,11 +1554,11 @@ h2 {
   position: absolute;
   z-index: 1;
   top: 7.4%;
-  right: 3.2%;
-  left: 19%;
+  right: 5%;
+  left: 23%;
   display: grid;
   place-items: center;
-  min-height: 8.4%;
+  min-height: 8.8%;
   min-width: 0;
   padding: 1px 10px 3px;
   border: 0;
@@ -2280,9 +2282,9 @@ h2 {
 
   .card-title {
     top: 7.4%;
-    right: 3.2%;
-    left: 19%;
-    min-height: 8.4%;
+    right: 5%;
+    left: 23%;
+    min-height: 8.8%;
     font-size: 14px;
     line-height: 1.08;
   }
