@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&display=swap");
+
 :root {
   color-scheme: dark;
   --bg: #151515;
@@ -13,6 +15,7 @@
   --enemy: #f07c64;
   --wall: #596166;
   --obstacle: #95784d;
+  --card-font: "Noto Serif KR", "Apple SD Gothic Neo", "Malgun Gothic", serif;
 }
 
 * {
@@ -851,6 +854,7 @@ h2 {
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.3);
   color: var(--accent);
+  font-family: var(--card-font);
   font-size: 14px;
   font-weight: 950;
   line-height: 1;
@@ -874,17 +878,29 @@ h2 {
 
 .card-title {
   position: absolute;
-  top: 8px;
-  right: 38px;
-  left: 38px;
+  top: 7px;
+  right: 40px;
+  left: 40px;
   display: grid;
-  align-items: start;
-  justify-items: center;
+  place-items: center;
+  min-height: 28px;
   min-width: 0;
-  padding: 0;
-  font-size: 17px;
+  padding: 1px 8px 3px;
+  border: 1px solid rgba(217, 185, 110, 0.24);
+  background:
+    linear-gradient(90deg, transparent 0 5%, rgba(16, 20, 19, 0.86) 15% 85%, transparent 95%),
+    linear-gradient(rgba(229, 221, 200, 0.08), rgba(0, 0, 0, 0.18));
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0 50%);
+  color: #f5ead5;
+  font-family: var(--card-font);
+  font-size: 15px;
+  font-weight: 900;
   line-height: 1.12;
   text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.78);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-reveal-list.sorted .card-title {
@@ -982,6 +998,7 @@ h2 {
 
 .card-action-area {
   grid-row: 3;
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 0;
@@ -1007,6 +1024,8 @@ h2 {
   justify-content: center;
   margin-top: 0;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .reveal-card .action-line + .action-line,
@@ -1029,26 +1048,44 @@ h2 {
 .reveal-card .action-group,
 .reward-card .action-group {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 6px;
   max-width: 100%;
   min-height: 24px;
   padding: 0 1px;
+  overflow: hidden;
 }
 
 .reveal-card .action-stat,
 .reward-card .action-stat {
+  position: relative;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-height: 18px;
   padding: 0 1px;
   border: 0;
-  color: var(--text);
-  font-size: 10.5px;
+  color: #f4ead7;
+  font-family: var(--card-font);
+  font-size: 14px;
   font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.76);
+  white-space: nowrap;
+}
+
+.reveal-card .action-stat + .action-stat,
+.reveal-card .action-stat + .action-note,
+.reveal-card .action-note + .action-stat,
+.reward-card .action-stat + .action-stat,
+.reward-card .action-stat + .action-note,
+.reward-card .action-note + .action-stat {
+  margin-left: 3px;
+  padding-left: 9px;
+  border-left: 1px solid rgba(217, 185, 110, 0.38);
 }
 
 .card-reveal-list.sorted .action-stat,
@@ -1057,17 +1094,26 @@ h2 {
   min-height: 18px;
   padding: 0;
   font-size: 10px;
+  border-left: 0;
+}
+
+.card-reveal-list.sorted .action-stat + .action-stat,
+.priority-token .action-stat + .action-stat {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
 }
 
 .reveal-card .action-icon,
 .reward-card .action-icon {
   display: grid;
   place-items: center;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   color: var(--accent);
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.76));
 }
 
 .card-reveal-list.sorted .action-icon,
@@ -1078,8 +1124,8 @@ h2 {
 
 .reveal-card .action-icon svg,
 .reward-card .action-icon svg {
-  width: 11px;
-  height: 11px;
+  width: 16px;
+  height: 16px;
   overflow: visible;
 }
 
@@ -1091,18 +1137,32 @@ h2 {
 
 .reveal-card .action-icon svg path,
 .reveal-card .action-icon svg circle,
+.reveal-card .action-icon svg rect,
+.reveal-card .action-icon svg polygon,
+.reveal-card .action-icon svg line,
+.reveal-card .action-icon svg polyline,
 .reward-card .action-icon svg path,
-.reward-card .action-icon svg circle {
+.reward-card .action-icon svg circle,
+.reward-card .action-icon svg rect,
+.reward-card .action-icon svg polygon,
+.reward-card .action-icon svg line,
+.reward-card .action-icon svg polyline {
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.35;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
+.reveal-card .action-icon svg .fill,
+.reward-card .action-icon svg .fill {
+  fill: currentColor;
+  stroke: none;
+}
+
 .reveal-card .action-icon.melee,
 .reward-card .action-icon.melee {
-  color: #ffb7a6;
+  color: #f0d4bd;
 }
 
 .reveal-card .action-icon.ranged,
@@ -1114,12 +1174,12 @@ h2 {
 .reveal-card .action-icon.move-flee,
 .reward-card .action-icon.move,
 .reward-card .action-icon.move-flee {
-  color: #9fd0ff;
+  color: #d6ecff;
 }
 
 .reveal-card .action-icon.range,
 .reward-card .action-icon.range {
-  color: #cfc8ff;
+  color: #cfddff;
 }
 
 .reveal-card .action-icon.target,
@@ -1127,15 +1187,63 @@ h2 {
   color: #d7f2c2;
 }
 
+.reveal-card .action-icon.trap-attack,
+.reward-card .action-icon.trap-attack {
+  color: #ead084;
+}
+
+.reveal-card .action-icon.trap-block,
+.reward-card .action-icon.trap-block {
+  color: #a8d6ff;
+}
+
+.reveal-card .action-icon.rune,
+.reward-card .action-icon.rune,
+.reveal-card .action-icon.rune-burst,
+.reward-card .action-icon.rune-burst {
+  color: #c6a5ff;
+}
+
+.reveal-card .action-icon.meteor,
+.reward-card .action-icon.meteor,
+.reveal-card .action-icon.area,
+.reward-card .action-icon.area {
+  color: #ffbd8b;
+}
+
+.reveal-card .action-icon.heal,
+.reward-card .action-icon.heal {
+  color: #aee8bf;
+}
+
+.reveal-card .action-icon.self-damage,
+.reward-card .action-icon.self-damage {
+  color: #f0a49a;
+}
+
+.reveal-card .action-icon.permanent,
+.reward-card .action-icon.permanent {
+  color: #f1d575;
+}
+
 .reveal-card .action-note,
 .reward-card .action-note {
   display: inline-flex;
   align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 8.8em;
   min-height: 22px;
   padding: 1px 2px;
-  color: rgba(222, 227, 220, 0.82);
-  font-size: 10px;
-  font-weight: 800;
+  color: rgba(240, 233, 214, 0.9);
+  font-family: var(--card-font);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .card-reveal-list.sorted .action-note,
@@ -1524,7 +1632,8 @@ h2 {
     top: 7px;
     right: 34px;
     left: 34px;
-    font-size: 16px;
+    min-height: 26px;
+    font-size: 14px;
     line-height: 1.08;
   }
 

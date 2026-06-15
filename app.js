@@ -2251,10 +2251,11 @@ function compactActionStat(action) {
   if (action.type === "patternAttack") return patternIcon(action.pattern);
   if (action.type === "momentumAttack") return actionStat("move", "남은 이동 공격", action.amount);
   if (action.type === "charge") return actionStat("charge", "차지", action.amount);
-  if (action.type === "placeTrap" || action.type === "placeObstacle") return actionStat("range", "함정", action.count ?? 1);
-  if (action.type === "placeRune") return actionStat("range", "룬", action.count ?? 1);
-  if (action.type === "runeAttack" || action.type === "detonateRune") return actionStat("ranged", "룬 공격", action.mult);
-  if (action.type === "placeMeteor") return actionStat("ranged", "운석", action.mult);
+  if (action.type === "placeTrap" || action.type === "placeObstacle") return actionStat(trapIconKind(action), trapLabel(action), action.count ?? 1);
+  if (action.type === "placeRune") return actionStat("rune", "룬", action.count ?? 1);
+  if (action.type === "runeAttack") return actionStat("rune", "룬 주변 공격", action.mult);
+  if (action.type === "detonateRune") return actionStat("rune-burst", "룬 폭파", action.mult);
+  if (action.type === "placeMeteor") return actionStat("meteor", "운석 예고", action.delay ?? 1);
   if (action.type === "selfDamagePercent") return actionNote(`-${Math.round(action.percent * 100)}%`);
   if (action.type === "healPercent") return actionNote(`+${Math.round(action.percent * 100)}%`);
   if (action.type === "permanent") return actionNote("영구");
@@ -2266,10 +2267,13 @@ function renderActionLine(action) {
     return `<span class="action-line">${actionGroup("move", [actionStat("move", "이동", action.amount)])}</span>`;
   }
   if (action.type === "flee") {
-    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "후퇴", action.amount), actionNote("후퇴")])}</span>`;
+    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "후퇴", action.amount)])}</span>`;
   }
   if (action.type === "fleeToRune") {
-    return `<span class="action-line">${actionGroup("move", [actionStat("move-flee", "룬 쪽 후퇴", action.amount), actionNote("룬")])}</span>`;
+    return `<span class="action-line">${actionGroup("move", [
+      actionStat("move-flee", "룬 쪽 후퇴", action.amount),
+      actionStat("rune", "룬", 1),
+    ])}</span>`;
   }
   if (action.type === "attack") {
     const attackKind = action.melee || action.range <= 1 ? "melee" : "ranged";
@@ -2298,49 +2302,51 @@ function renderActionLine(action) {
     ])}</span>`;
   }
   if (action.type === "charge") {
-    return `<span class="action-line">${actionGroup("special", [actionStat("charge", "차지", action.amount), actionNote("차지")])}</span>`;
+    return `<span class="action-line">${actionGroup("special", [actionStat("charge", "차지", action.amount)])}</span>`;
   }
   if (action.type === "permanent") {
-    return `<span class="action-line">${actionGroup("special", [actionNote(permanentEffectLabel(action))])}</span>`;
+    return `<span class="action-line">${actionGroup("special", [
+      actionStat("permanent", "영구", 1),
+      actionNote(permanentEffectLabel(action), permanentEffectLabel(action)),
+    ])}</span>`;
   }
   if (action.type === "placeTrap" || action.type === "placeObstacle") {
-    const trapName = (action.trap ?? action.obstacle) === "block" ? "봉쇄 함정" : "공격 함정";
     return `<span class="action-line">${actionGroup("special", [
+      actionStat(trapIconKind(action), trapLabel(action), action.count ?? 1),
       actionStat("range", "사거리", action.range),
-      actionNote(`${trapName}${action.count ? ` x${action.count}` : ""}`),
     ])}</span>`;
   }
   if (action.type === "placeRune") {
     return `<span class="action-line">${actionGroup("special", [
+      actionStat("rune", "룬", action.count ?? 1),
       actionStat("range", "사거리", action.range),
-      actionNote(`룬 x${action.count ?? 1}`),
     ])}</span>`;
   }
   if (action.type === "runeAttack") {
     return `<span class="action-line">${actionGroup("attack", [
-      actionNote("룬 주변"),
+      actionStat("rune", "룬 주변", action.radius ?? 1),
       actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
   if (action.type === "detonateRune") {
     return `<span class="action-line">${actionGroup("attack", [
-      actionNote("룬 폭파"),
+      actionStat("rune-burst", "룬 폭파", action.radius ?? 1),
       actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
   if (action.type === "placeMeteor") {
     return `<span class="action-line">${actionGroup("attack", [
+      actionStat("meteor", "운석 예고", action.delay ?? 1),
       actionStat("range", "사거리", action.range),
-      actionNote(`운석 예고 ${action.delay ?? 1}턴`),
-      actionNote(`범위 ${action.radius ?? 1}`),
+      actionStat("area", "범위", action.radius ?? 1),
       actionStat("ranged", "원거리 공격", action.mult),
     ])}</span>`;
   }
   if (action.type === "selfDamagePercent") {
-    return `<span class="action-line">${actionGroup("special", [actionNote(`체력 -${Math.round(action.percent * 100)}%`)])}</span>`;
+    return `<span class="action-line">${actionGroup("special", [actionStat("self-damage", "체력 감소", `${Math.round(action.percent * 100)}%`)])}</span>`;
   }
   if (action.type === "healPercent") {
-    return `<span class="action-line">${actionGroup("special", [actionNote(`회복 ${Math.round(action.percent * 100)}%`)])}</span>`;
+    return `<span class="action-line">${actionGroup("special", [actionStat("heal", "회복", `${Math.round(action.percent * 100)}%`)])}</span>`;
   }
   return `<span class="action-line">${actionGroup("special", [actionNote(action.type)])}</span>`;
 }
@@ -2356,19 +2362,36 @@ function actionStat(kind, label, value) {
 
 function actionIcon(kind) {
   const icons = {
-    melee: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 17.5 3.5 6.5V3.5h3l11 11"/><path d="M13 19 19 13"/><path d="M16 16 20 20"/><path d="M19 21 21 19"/></svg>`,
-    ranged: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5C12.7 7 12.7 17 6 19.5"/><path d="M7.8 6.2C12.2 8.8 12.2 15.2 7.8 17.8"/><path d="M4 12H19"/><path d="M15.5 8.5 19.5 12 15.5 15.5"/></svg>`,
-    move: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 4.2h5.2l1.1 5.2 5.8 3.5c1.1.7 1.8 1.8 1.8 3.1v1.3H5.2v-3.1l2.6-3.8-.6-6.2Z"/><path d="M7 13.2h13.5"/><path d="M5.2 17.3h15.9"/><path d="M10 7.2h3.2"/></svg>`,
-    "move-flee": `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 4.2h5.2l1.1 5.2 5.8 3.5c1.1.7 1.8 1.8 1.8 3.1v1.3H5.2v-3.1l2.6-3.8-.6-6.2Z"/><path d="M7 13.2h13.5"/><path d="M5.2 17.3h15.9"/><path d="M10 7.2h3.2"/></svg>`,
-    range: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17.5C7.5 10.1 12.9 6.4 19 6.8"/><path d="M16.4 4.4 19 6.8 16.3 9"/><circle cx="5" cy="17.5" r="1.5"/><circle cx="19" cy="6.8" r="2.8"/></svg>`,
-    charge: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V19"/><path d="M5 12H19"/></svg>`,
-    target: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2"/></svg>`,
+    melee: `<svg viewBox="0 0 32 32" aria-hidden="true"><path class="fill" d="M22.8 3.2h6L14 19l-4-4L22.8 3.2Z"/><path d="m11.2 18.5-5.8 5.8"/><path d="m6.5 17.1 8.4 8.4"/><path d="m4.5 27.5 3.4-3.4"/></svg>`,
+    ranged: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 4.5c8 3.2 8 19.8 0 23"/><path d="M11.2 7c4.9 4.2 4.9 13.8 0 18"/><path d="M4.5 16h22"/><path d="m21.6 10.8 5 5.2-5 5.2"/></svg>`,
+    move: `<svg viewBox="0 0 32 32" aria-hidden="true"><path class="fill" d="M9.2 4.8h7.1l1.3 7.1 7.1 4.1c1.6.9 2.6 2.6 2.6 4.5v2.4H6.5v-5.2l3.6-5.3-.9-7.6Z"/><path d="M7.2 22.9h19.9"/><path d="M11.2 10h6"/></svg>`,
+    "move-flee": `<svg viewBox="0 0 32 32" aria-hidden="true"><path class="fill" d="M9.2 4.8h7.1l1.3 7.1 7.1 4.1c1.6.9 2.6 2.6 2.6 4.5v2.4H6.5v-5.2l3.6-5.3-.9-7.6Z"/><path d="M7.2 22.9h19.9"/><path d="M11.2 10h6"/><path d="M24.5 7.5h-7"/><path d="m20 4 4.5 3.5L20 11"/></svg>`,
+    range: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 23.5C9.1 14 16.5 8.9 26 8.5"/><path d="m22.4 4.8 3.9 3.7-4.1 3.8"/><circle cx="6" cy="23.5" r="2.2"/><circle cx="26" cy="8.5" r="4.2"/></svg>`,
+    charge: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 6v20"/><path d="M6 16h20"/></svg>`,
+    target: `<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4.4"/></svg>`,
+    "trap-attack": `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 20c2-8.5 18-8.5 20 0"/><path d="M8.5 20h15"/><path d="m8.8 13.2 2.2 4.2"/><path d="m14 11.8.8 4.8"/><path d="m18 11.8-.8 4.8"/><path d="m23.2 13.2-2.2 4.2"/><circle cx="16" cy="21" r="3.3"/></svg>`,
+    "trap-block": `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 20c2-8.5 18-8.5 20 0"/><path d="M8.5 20h15"/><path d="M11 12v7"/><path d="M16 11v8"/><path d="M21 12v7"/><path d="M9 24h14"/></svg>`,
+    rune: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 4 9 12-9 12L7 16 16 4Z"/><path d="M16 9v14"/><path d="M11 16h10"/></svg>`,
+    "rune-burst": `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 4 2.3 8.3L26 8l-4.3 7.7L30 18l-8.3 2.3L26 28l-7.7-4.3L16 32l-2.3-8.3L6 28l4.3-7.7L2 18l8.3-2.3L6 8l7.7 4.3L16 4Z"/></svg>`,
+    meteor: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 5c5 2.3 8.8 5.5 11.3 9.8"/><path d="M4 12c4.4 1.5 7.8 4.2 10.2 8.1"/><circle cx="21.5" cy="22" r="5.8"/></svg>`,
+    area: `<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="4"/><circle cx="16" cy="16" r="10"/><path d="M16 2v4"/><path d="M16 26v4"/><path d="M2 16h4"/><path d="M26 16h4"/></svg>`,
+    "self-damage": `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27S6 21 6 12.7c0-4 2.6-6.7 6.1-6.7 2 0 3.3 1 3.9 2.1.6-1.1 1.9-2.1 3.9-2.1 3.5 0 6.1 2.7 6.1 6.7C26 21 16 27 16 27Z"/><path d="M10 16h12"/></svg>`,
+    heal: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27S6 21 6 12.7c0-4 2.6-6.7 6.1-6.7 2 0 3.3 1 3.9 2.1.6-1.1 1.9-2.1 3.9-2.1 3.5 0 6.1 2.7 6.1 6.7C26 21 16 27 16 27Z"/><path d="M16 11v10"/><path d="M11 16h10"/></svg>`,
+    permanent: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 20 12l8 1.2-5.9 5.7 1.4 8.1L16 23l-7.5 4 1.4-8.1L4 13.2 12 12 16 4Z"/></svg>`,
   };
   return icons[kind] ?? "?";
 }
 
-function actionNote(text) {
-  return `<span class="action-note">${text}</span>`;
+function actionNote(text, title = text) {
+  return `<span class="action-note" title="${title}">${text}</span>`;
+}
+
+function trapIconKind(action) {
+  return (action.trap ?? action.obstacle) === "block" ? "trap-block" : "trap-attack";
+}
+
+function trapLabel(action) {
+  return (action.trap ?? action.obstacle) === "block" ? "봉쇄 함정" : "공격 함정";
 }
 
 function permanentEffectLabel(action) {
