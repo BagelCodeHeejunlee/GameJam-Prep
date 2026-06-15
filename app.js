@@ -91,10 +91,10 @@ const archerRewardPool = [
   card("combo-sense", "연타 감각", "다단중첩", "레어", 32, [
     { type: "permanent", effect: "comboDamage", amount: 0.1 },
   ]),
-  card("attack-trap", "공격 함정 설치", "함정", "노말", 58, [
+  card("attack-trap", "공격 함정 설치", "함정", "노말", 24, [
     { type: "placeTrap", range: 2, trap: "attack", count: 2 },
   ]),
-  card("block-trap", "봉쇄 함정 설치", "함정", "노말", 60, [
+  card("block-trap", "봉쇄 함정 설치", "함정", "노말", 25, [
     { type: "placeTrap", range: 2, trap: "block", count: 2 },
   ]),
   card("push-shot", "밀기 사격", "함정", "레어", 39, [
