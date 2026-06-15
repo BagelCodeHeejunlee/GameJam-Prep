@@ -370,16 +370,17 @@ h2 {
   gap: 5px;
   min-width: 66px;
   padding: 5px 7px;
-  border: 1px solid rgba(240, 124, 100, 0.68);
+  border: 1px solid rgba(255, 221, 154, 0.72);
   border-radius: 999px;
-  background: rgba(17, 20, 18, 0.82);
-  color: var(--text);
+  background: rgba(18, 28, 35, 0.9);
+  color: #fff8df;
   font-size: 12px;
   font-weight: 950;
   line-height: 1;
   pointer-events: none;
   transform: translate(-50%, -50%);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
 }
 
 .offscreen-indicator.boss {
@@ -398,7 +399,7 @@ h2 {
   height: 21px;
   border-radius: 999px;
   background: var(--enemy);
-  color: #2f100b;
+  color: #fff8df;
   font-size: 11px;
 }
 
@@ -408,11 +409,12 @@ h2 {
 
 .offscreen-distance {
   min-width: 12px;
+  color: #fff8df;
   text-align: right;
 }
 
 .offscreen-unit {
-  color: var(--muted);
+  color: #f5d99b;
   font-size: 10px;
 }
 
@@ -985,8 +987,33 @@ h2 {
 }
 
 .priority-item.done {
-  opacity: 0.42;
-  filter: grayscale(0.4);
+  opacity: 0.58;
+  filter: grayscale(0.55);
+  transform: translateY(1px) scale(0.92);
+}
+
+.priority-item.done::after {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgba(255, 248, 223, 0.95);
+  border-radius: 999px;
+  background: #41a65f;
+  color: #fff8df;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
+  content: "✓";
+  box-shadow: 0 2px 5px rgba(64, 43, 24, 0.28);
+}
+
+.priority-item.done .priority-number,
+.priority-item.done strong {
+  opacity: 0.72;
 }
 
 .priority-number {
