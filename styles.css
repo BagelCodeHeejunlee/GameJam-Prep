@@ -755,10 +755,10 @@ h2 {
 .reveal-card {
   position: relative;
   display: grid;
-  grid-template-rows: 48px 18px minmax(0, 1fr);
+  grid-template-rows: 32px 16px minmax(0, 1fr);
   width: clamp(158px, 42vw, 190px);
   height: 260px;
-  padding: 14px;
+  padding: 10px 14px 14px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
   background:
@@ -873,12 +873,17 @@ h2 {
 }
 
 .card-title {
+  position: absolute;
+  top: 8px;
+  right: 38px;
+  left: 38px;
   display: grid;
-  align-items: center;
+  align-items: start;
+  justify-items: center;
   min-width: 0;
-  padding: 0 28px;
-  font-size: 19px;
-  line-height: 1.25;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1.12;
   text-align: center;
 }
 
@@ -891,6 +896,7 @@ h2 {
 }
 
 .card-owner {
+  grid-row: 2;
   display: block;
   margin-top: 0;
   color: var(--muted);
@@ -975,10 +981,11 @@ h2 {
 }
 
 .card-action-area {
+  grid-row: 3;
   display: grid;
   place-items: center;
   min-height: 0;
-  margin-top: 12px;
+  margin-top: 4px;
   overflow: hidden;
 }
 
@@ -988,7 +995,7 @@ h2 {
   width: 100%;
   justify-items: center;
   align-content: center;
-  gap: 5px;
+  gap: 3px;
   margin-top: 0;
 }
 
@@ -1004,7 +1011,7 @@ h2 {
 
 .reveal-card .action-line + .action-line,
 .reward-card .action-line + .action-line {
-  padding-top: 5px;
+  padding-top: 3px;
 }
 
 .reveal-card .action-line + .action-line::before,
@@ -1025,61 +1032,61 @@ h2 {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 3px;
   max-width: 100%;
-  min-height: 32px;
-  padding: 0 2px;
+  min-height: 24px;
+  padding: 0 1px;
 }
 
 .reveal-card .action-stat,
 .reward-card .action-stat {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 26px;
-  padding: 0 2px;
+  gap: 2px;
+  min-height: 18px;
+  padding: 0 1px;
   border: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: 10.5px;
   font-weight: 900;
 }
 
 .card-reveal-list.sorted .action-stat,
 .priority-token .action-stat {
   gap: 2px;
-  min-height: 20px;
+  min-height: 18px;
   padding: 0;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .reveal-card .action-icon,
 .reward-card .action-icon {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 12px;
+  height: 12px;
   color: var(--accent);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
 }
 
 .card-reveal-list.sorted .action-icon,
 .priority-token .action-icon {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
 }
 
 .reveal-card .action-icon svg,
 .reward-card .action-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 11px;
+  height: 11px;
   overflow: visible;
 }
 
 .card-reveal-list.sorted .action-icon svg,
 .priority-token .action-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
 }
 
 .reveal-card .action-icon svg path,
@@ -1124,10 +1131,10 @@ h2 {
 .reward-card .action-note {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 2px 3px;
+  min-height: 22px;
+  padding: 1px 2px;
   color: rgba(222, 227, 220, 0.82);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -1142,24 +1149,24 @@ h2 {
 .reward-card .pattern-icon {
   position: relative;
   display: inline-block;
-  flex: 0 0 45px;
-  width: 45px;
-  height: 28px;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 21px;
 }
 
 .card-reveal-list.sorted .pattern-icon,
 .priority-token .pattern-icon {
-  flex-basis: 30px;
-  width: 30px;
-  height: 19px;
+  flex-basis: 26px;
+  width: 26px;
+  height: 17px;
 }
 
 .reveal-card .pattern-icon i,
 .reward-card .pattern-icon i {
   position: absolute;
   top: 3px;
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   background: rgba(217, 107, 95, 0.78);
   border: 1px solid rgba(255, 210, 202, 0.65);
@@ -1168,8 +1175,8 @@ h2 {
 .card-reveal-list.sorted .pattern-icon i,
 .priority-token .pattern-icon i {
   top: 2px;
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
 }
 
 .reveal-card .pattern-icon i:first-child,
@@ -1179,52 +1186,52 @@ h2 {
 
 .reveal-card .pattern-icon i:last-child,
 .reward-card .pattern-icon i:last-child {
-  left: 22px;
+  left: 16px;
 }
 
 .card-reveal-list.sorted .pattern-icon i:last-child,
 .priority-token .pattern-icon i:last-child {
-  left: 15px;
+  left: 13px;
 }
 
 .reveal-card .pattern-icon.adjacent-triple,
 .reward-card .pattern-icon.adjacent-triple {
-  flex-basis: 55px;
-  width: 55px;
-  height: 34px;
+  flex-basis: 38px;
+  width: 38px;
+  height: 25px;
 }
 
 .card-reveal-list.sorted .pattern-icon.adjacent-triple,
 .priority-token .pattern-icon.adjacent-triple {
-  flex-basis: 34px;
-  width: 34px;
-  height: 22px;
+  flex-basis: 30px;
+  width: 30px;
+  height: 20px;
 }
 
 .reveal-card .pattern-icon.adjacent-triple i:nth-child(1),
 .reward-card .pattern-icon.adjacent-triple i:nth-child(1) {
-  left: 4px;
+  left: 2px;
 }
 
 .card-reveal-list.sorted .pattern-icon.adjacent-triple i:nth-child(1),
 .priority-token .pattern-icon.adjacent-triple i:nth-child(1) {
-  left: 2px;
+  left: 1px;
 }
 
 .reveal-card .pattern-icon.adjacent-triple i:nth-child(2),
 .reward-card .pattern-icon.adjacent-triple i:nth-child(2) {
-  left: 26px;
+  left: 19px;
 }
 
 .card-reveal-list.sorted .pattern-icon.adjacent-triple i:nth-child(2),
 .priority-token .pattern-icon.adjacent-triple i:nth-child(2) {
-  left: 17px;
+  left: 15px;
 }
 
 .reveal-card .pattern-icon.adjacent-triple i:nth-child(3),
 .reward-card .pattern-icon.adjacent-triple i:nth-child(3) {
-  top: 13px;
-  left: 15px;
+  top: 10px;
+  left: 11px;
 }
 
 .card-reveal-list.sorted .pattern-icon.adjacent-triple i:nth-child(3),
@@ -1314,7 +1321,7 @@ h2 {
   appearance: none;
   position: relative;
   display: grid;
-  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-rows: 38px minmax(0, 1fr);
   width: 100%;
   height: clamp(214px, 28vh, 250px);
   padding: 12px;
@@ -1341,6 +1348,7 @@ h2 {
 }
 
 .reward-card .card-action-area {
+  grid-row: 2;
   margin-top: 6px;
   padding-bottom: 18px;
 }
@@ -1489,7 +1497,7 @@ h2 {
   .reveal-card {
     width: clamp(150px, 43vw, 176px);
     height: 238px;
-    padding: 13px;
+    padding: 8px 12px 12px;
   }
 
   .card-reveal-list.sequential {
@@ -1513,8 +1521,11 @@ h2 {
   }
 
   .card-title {
-    font-size: 17px;
-    line-height: 1.2;
+    top: 7px;
+    right: 34px;
+    left: 34px;
+    font-size: 16px;
+    line-height: 1.08;
   }
 
   .card-reveal-overlay.dock .card-reveal-stage {
