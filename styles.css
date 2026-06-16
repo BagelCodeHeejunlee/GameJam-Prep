@@ -655,6 +655,57 @@ h2 {
   white-space: normal;
 }
 
+.turn-cue {
+  position: fixed;
+  z-index: 43;
+  top: 43%;
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.9);
+  transition:
+    opacity 160ms ease,
+    transform 260ms cubic-bezier(0.2, 0.9, 0.25, 1.25);
+}
+
+.turn-cue.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.turn-cue-panel {
+  min-width: 190px;
+  padding: 11px 22px 13px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 42%),
+    linear-gradient(135deg, #49b8f0, #1f7fc4);
+  color: #fff8df;
+  text-align: center;
+  box-shadow:
+    0 0 0 4px rgba(70, 184, 240, 0.22),
+    0 14px 32px rgba(8, 42, 78, 0.38);
+}
+
+.turn-cue-kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: rgba(255, 248, 223, 0.82);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 2.4px;
+}
+
+.turn-cue-panel strong {
+  display: block;
+  font-family: var(--card-font);
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(18, 86, 138, 0.38);
+}
+
 .entity.hit {
   animation: entity-hit 280ms ease;
   box-shadow:

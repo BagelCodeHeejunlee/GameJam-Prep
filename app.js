@@ -703,21 +703,14 @@ async function runTurn() {
 
   for (let index = 0; index < entries.length; index += 1) {
     if (state.finished || state.waitingReward) break;
+    const entry = entries[index];
     state.activeTimelineIndex = index;
     renderPriorityStrip();
     renderDrawnCards();
     renderTimeline(index);
-    showDrawnCardReveal(
-      entries[index].card,
-      entryOwnerLabel(entries[index]),
-      entries[index].actorType === "player" ? "player" : "enemy"
-    );
-    await sleep(360);
-    await sleep(turnDelay(1.85));
-    hideDrawnCardReveal();
-    await sleep(380);
-    await executeTimelineEntry(entries[index]);
-    expireTurnEndEffects(entries[index]);
+    if (entry.actorType === "player") await playPlayerTurnCue(entry);
+    await executeTimelineEntry(entry);
+    expireTurnEndEffects(entry);
     state.completedTimelineIndexes.add(index);
     state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
     state.activeTimelineIndex = -1;
@@ -2575,6 +2568,23 @@ function flyRevealToHud() {
   host.style.transition = "transform 520ms cubic-bezier(0.55, 0, 0.4, 1), opacity 520ms ease";
   host.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.34)`;
   host.style.opacity = "0";
+}
+
+async function playPlayerTurnCue(entry) {
+  const host = document.querySelector("#turnCue");
+  if (!host) return;
+  host.className = "turn-cue";
+  host.innerHTML = `
+    <div class="turn-cue-panel">
+      <span class="turn-cue-kicker">PLAYER TURN</span>
+      <strong>${entryOwnerLabel(entry)} 차례</strong>
+    </div>
+  `;
+  void host.offsetWidth;
+  host.classList.add("show");
+  await sleep(720);
+  host.classList.remove("show");
+  await sleep(140);
 }
 
 function entryOwnerLabel(entry) {
