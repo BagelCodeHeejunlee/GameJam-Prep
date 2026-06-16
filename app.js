@@ -396,6 +396,7 @@ function newRun() {
     cameraTransitionScheduled: false,
     log: [],
     speedMultiplier,
+    suppressPlayerCard: false,
   };
 
   startWave(0);
@@ -687,6 +688,7 @@ async function runTurn() {
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
   state.completedTimelineIndexes = new Set();
+  state.suppressPlayerCard = true;
   log(`턴 ${state.turn}: ${entries.map((entry) => entry.card.name).join(", ")}`);
   render();
   await playPriorityReveal(drawnEntries, entries);
@@ -700,6 +702,15 @@ async function runTurn() {
     renderPriorityStrip();
     renderDrawnCards();
     renderTimeline(index);
+    showDrawnCardReveal(
+      entries[index].card,
+      entryOwnerLabel(entries[index]),
+      entries[index].actorType === "player" ? "player" : "enemy"
+    );
+    await sleep(360);
+    await sleep(turnDelay(1.85));
+    hideDrawnCardReveal();
+    await sleep(380);
     await executeTimelineEntry(entries[index]);
     expireTurnEndEffects(entries[index]);
     state.completedTimelineIndexes.add(index);
@@ -1858,11 +1869,9 @@ function showRewards() {
   rewards.forEach((reward) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `reward-card ${rarityClass(reward.rarity)}`;
+    button.className = `reward-pick ${rarityClass(reward.rarity)}`;
     button.innerHTML = `
-      <span class="card-priority">${reward.priority}</span>
-      <strong class="card-title">${reward.name}</strong>
-      <span class="card-action-area">${renderActionList(reward)}</span>
+      ${cardMount(reward, "reward-mount")}
       <span class="pick">선택</span>
     `;
     button.addEventListener("click", () => pickReward(reward));
@@ -1897,6 +1906,91 @@ function render() {
   renderDrawnCards();
   renderTimeline();
   renderLog();
+}
+
+function intentParts(card) {
+  const parts = [];
+  (card.actions || []).forEach((a) => {
+    switch (a.type) {
+      case "move":
+        parts.push({ kind: "move", val: a.amount, tone: "move" });
+        break;
+      case "flee":
+      case "fleeToRune":
+        parts.push({ kind: "move-flee", val: a.amount, tone: "move" });
+        break;
+      case "attack": {
+        const k = a.melee || a.range <= 1 ? "melee" : "ranged";
+        parts.push({ kind: k, val: "x" + a.mult, tone: "attack" });
+        break;
+      }
+      case "momentumAttack":
+        parts.push({ kind: "move", val: a.amount, tone: "move" });
+        parts.push({ kind: "melee", val: "x" + a.mult, tone: "attack" });
+        break;
+      case "patternAttack":
+        parts.push({ kind: a.melee ? "melee" : "ranged", val: "x" + a.mult, tone: "attack" });
+        break;
+      case "charge":
+        parts.push({ kind: "charge", val: a.amount, tone: "special" });
+        break;
+      case "placeTrap":
+      case "placeObstacle":
+        parts.push({ kind: trapIconKind(a), val: a.count ?? 1, tone: "special" });
+        break;
+      case "placeRune":
+        parts.push({ kind: "rune", val: a.count ?? 1, tone: "special" });
+        break;
+      case "runeAttack":
+        parts.push({ kind: "rune", val: "x" + a.mult, tone: "attack" });
+        break;
+      case "detonateRune":
+        parts.push({ kind: "rune-burst", val: "x" + a.mult, tone: "attack" });
+        break;
+      case "placeMeteor":
+        parts.push({ kind: "meteor", val: a.delay ?? 1, tone: "attack" });
+        break;
+      case "healPercent":
+        parts.push({ kind: "heal", val: "+" + Math.round(a.percent * 100) + "%", tone: "special" });
+        break;
+      case "permanent":
+        parts.push({ kind: "permanent", val: "", tone: "special" });
+        break;
+      default:
+        break;
+    }
+  });
+  return parts.slice(0, 2);
+}
+
+function entityIntentMarkup(entity) {
+  if (entity.side === "player") return "";
+  const timeline = state.currentTimeline;
+  if (!timeline || !timeline.length) return "";
+  const idx = timeline.findIndex(
+    (e) => e.actorType !== "player" && e.actorId === entity.kind
+  );
+  if (idx < 0) return "";
+  const entry = timeline[idx];
+  const card = entry.card;
+  if (!card) return "";
+  const parts = intentParts(card);
+  if (!parts.length) return "";
+  const done = state.completedTimelineIndexes?.has(idx);
+  const active = idx === state.activeTimelineIndex;
+  const tone = parts.some((p) => p.tone === "attack")
+    ? "attack"
+    : parts.some((p) => p.tone === "move")
+      ? "move"
+      : "special";
+  const side = entry.actorType === "player" ? "player" : "enemy";
+  const chips = parts
+    .map(
+      (p) =>
+        `<span class="intent-chip"><span class="action-icon ${p.kind}">${actionIcon(p.kind)}</span>${p.val !== "" ? `<b>${p.val}</b>` : ""}</span>`
+    )
+    .join("");
+  return `<span class="intent-badge tone-${tone} ${side} ${done ? "done" : ""} ${active ? "active" : ""}" aria-hidden="true"><span class="intent-pri">${card.priority}</span>${chips}</span>`;
 }
 
 function renderBoard() {
@@ -1938,6 +2032,7 @@ function renderBoard() {
       <span class="entity-label">${entity.label ?? (entity.side === "player" ? getSelectedCharacter().shortLabel : entity.monsterIndex)}</span>
       <span class="hp-readout">${entity.hp}/${entity.maxHp}</span>
       <span class="hp-bar" aria-hidden="true"><i style="width: ${hpPercent(entity)}%"></i></span>
+      ${entityIntentMarkup(entity)}
     `;
     div.title = `${entity.name} ${entity.hp}/${entity.maxHp}`;
     div.style.left = `${point.x}px`;
@@ -2053,6 +2148,7 @@ function renderHud() {
 }
 
 function renderEnemySummary() {
+  if (!elements.enemySummary) return;
   elements.enemySummary.innerHTML = "";
   const groups = enemyGroups();
   if (!groups.length) {
@@ -2088,21 +2184,26 @@ function renderPriorityStrip() {
   }
 
   state.currentTimeline.forEach((entry, index) => {
-    const button = document.createElement("div");
+    const isPlayer = entry.actorType === "player";
+    const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
+    const boss = groupEnemies.some((e) => e.boss);
+    const count = groupEnemies.length;
+    const emblem = isPlayer ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId);
     const statusClass = [
       state.completedTimelineIndexes?.has(index) ? "done" : "",
       index === state.activeTimelineIndex ? "active" : "",
     ]
       .filter(Boolean)
       .join(" ");
-    button.className = `priority-item ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
-    button.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
-    button.innerHTML = `
-      <span class="priority-number">${entry.card.priority}</span>
-      <strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</strong>
-      <small>${entry.card.name}</small>
+    const card = document.createElement("div");
+    card.className = `priority-item ${isPlayer ? "player" : "enemy"} ${boss ? "boss" : ""} ${statusClass}`;
+    card.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
+    card.innerHTML = `
+      <span class="pc-portrait"><span class="pc-emblem">${emblem}</span></span>
+      <span class="pc-badge">${entry.card.priority}</span>
+      ${count > 1 ? `<span class="pc-count">×${count}</span>` : ""}
     `;
-    elements.priorityStrip.append(button);
+    elements.priorityStrip.append(card);
   });
 }
 
@@ -2117,7 +2218,7 @@ function renderPlayerHud() {
   visiblePlayers.slice(0, 2).forEach((player) => {
     const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
     const entry = state.currentTimeline.find((item) => item.actorType === "player" && item.actorId === player.id);
-    const cardData = entry?.card;
+    const cardData = state.suppressPlayerCard ? null : entry?.card;
     const article = document.createElement("article");
     article.className = `player-block ${cardData ? "" : "waiting-card"}`;
     article.innerHTML = `
@@ -2137,6 +2238,14 @@ function renderPlayerHud() {
     `;
     elements.playerHud.append(article);
   });
+
+  const playerEntry = state.currentTimeline.find((item) => item.actorType === "player");
+  const drawnCardId = playerEntry?.card?.id;
+  if (drawnCardId && elements.playerHud.dataset.cardId !== drawnCardId) {
+    const freshCard = elements.playerHud.querySelector(".player-block:not(.waiting-card) .hud-card");
+    if (freshCard) freshCard.classList.add("card-just-drawn");
+  }
+  elements.playerHud.dataset.cardId = drawnCardId ?? "";
 }
 
 function enemyGroups() {
@@ -2168,21 +2277,28 @@ function baseStat(kind, label, value) {
   return `<span class="base-stat" title="${label}"><span class="action-icon ${kind}">${actionIcon(kind)}</span><b>${value}</b></span>`;
 }
 
+function cardPrefab(card) {
+  if (!card) return "";
+  return `
+    <div class="card-prefab ${rarityClass(card.rarity)}">
+      <div class="cp-bg"></div>
+      <div class="cp-banner"></div>
+      <div class="cp-priority">${card.priority}</div>
+      <div class="cp-name">${card.name}</div>
+      <div class="cp-actions">${renderActionList(card)}</div>
+    </div>
+  `;
+}
+
+function cardMount(card, cls = "") {
+  return `<div class="card-mount ${cls}">${cardPrefab(card)}</div>`;
+}
+
 function renderHudCard(cardData) {
   if (!cardData) {
-    return `
-      <article class="hud-card empty">
-        <span>카드 대기</span>
-      </article>
-    `;
+    return `<div class="card-mount hud-mount is-empty"><span>카드 대기</span></div>`;
   }
-  return `
-    <article class="hud-card ${rarityClass(cardData.rarity)}">
-      <span class="hud-card-priority">${cardData.priority}</span>
-      <strong>${cardData.name}</strong>
-      <div class="hud-card-actions">${renderActionList(cardData)}</div>
-    </article>
-  `;
+  return cardMount(cardData, "hud-mount");
 }
 
 function pileIcon() {
@@ -2228,20 +2344,40 @@ function renderLog() {
 
 async function playPriorityReveal(drawnEntries, sortedEntries) {
   document.body.classList.add("revealing-priority");
-  state.currentTimeline = drawnEntries;
-  state.priorityRevealMode = "drawn";
+  const playerEntry = drawnEntries.find((e) => e.actorType === "player");
+  const enemyEntries = drawnEntries.filter((e) => e.actorType !== "player");
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
   state.completedTimelineIndexes = new Set();
+
+  // 1) 적들의 우선권이 먼저 보드에 등장
+  state.currentTimeline = enemyEntries;
+  state.priorityRevealMode = "drawn";
   renderPriorityStrip();
   renderDrawnCards();
-  await sleep(turnDelay(0.7));
+  renderBoard();
 
+  // 2) 0.5초 대기
+  await sleep(turnDelay(0.9));
+
+  // 3) 내 카드 드로우 — 진짜 카드가 중앙에 완전히 등장
+  showDrawnCardReveal(playerEntry?.card, "내 카드", "player");
+  await sleep(360);
+
+  // 4) 1초 대기 (카드 읽기)
+  await sleep(turnDelay(1.85));
+
+  // 5) 우선권 재정렬 + 카드가 하단 궁수 카드 자리로 날아가 안착
   state.currentTimeline = sortedEntries;
   state.priorityRevealMode = "sorted";
   renderPriorityStrip();
   renderDrawnCards();
-  await sleep(turnDelay(0.9));
+  renderBoard();
+  flyRevealToHud();
+  await sleep(540);
+  state.suppressPlayerCard = false;
+  renderPlayerHud();
+  hideDrawnCardReveal();
 
   document.body.classList.remove("revealing-priority");
 }
@@ -2258,6 +2394,94 @@ function rarityClass(rarity) {
 
 function entryKey(entry) {
   return `${entry.actorType}-${entry.actorId}-${entry.card.instanceId ?? entry.card.id}`;
+}
+
+function friendlyAction(action) {
+  switch (action.type) {
+    case "move":
+      return `${action.amount}칸 이동`;
+    case "flee":
+      return `${action.amount}칸 후퇴`;
+    case "fleeToRune":
+      return `룬 쪽으로 ${action.amount}칸 후퇴`;
+    case "attack": {
+      const kind = action.melee || action.range <= 1 ? "근접" : "원거리";
+      const rng = action.range > 1 ? ` · 사거리 ${action.range}` : "";
+      const tgt = action.targets ? ` · 최대 ${action.targets}명` : "";
+      return `${kind} 공격 x${action.mult}${rng}${tgt}`;
+    }
+    case "momentumAttack":
+      return `${action.amount}칸 이동 후 근접 공격 x${action.mult}`;
+    case "patternAttack": {
+      const pat = action.pattern === "adjacent-triple" ? "앞 3칸" : "앞 2칸";
+      return `${pat} ${action.melee ? "근접" : "원거리"} 공격 x${action.mult}`;
+    }
+    case "charge":
+      return `차지 +${action.amount}`;
+    case "placeTrap":
+    case "placeObstacle":
+      return `${trapLabel(action)} ${action.count ?? 1}개 설치 · 사거리 ${action.range}`;
+    case "placeRune":
+      return `룬 ${action.count ?? 1}개 설치 · 사거리 ${action.range}`;
+    case "runeAttack":
+      return `룬 주변 공격 x${action.mult}`;
+    case "detonateRune":
+      return `룬 폭파 x${action.mult}`;
+    case "placeMeteor":
+      return `운석 예고 ${action.delay ?? 1}턴 · 범위 ${action.radius ?? 1} · x${action.mult}`;
+    case "healPercent":
+      return `체력 ${Math.round(action.percent * 100)}% 회복`;
+    case "selfDamagePercent":
+      return `체력 ${Math.round(action.percent * 100)}% 소모`;
+    case "permanent":
+      return permanentEffectLabel(action);
+    default:
+      return action.type;
+  }
+}
+
+function showDrawnCardReveal(card, ownerLabel = "내 카드", side = "player") {
+  const host = document.querySelector("#drawnCardReveal");
+  if (!host || !card) return;
+  host.removeAttribute("style");
+  host.className = `drawn-reveal ${side}`;
+  host.innerHTML = `
+    <div class="drawn-reveal-tag">${ownerLabel}</div>
+    ${cardMount(card, "reveal-mount")}
+  `;
+  void host.offsetWidth;
+  host.classList.add("show");
+}
+
+function hideDrawnCardReveal() {
+  const host = document.querySelector("#drawnCardReveal");
+  if (host) host.classList.remove("show");
+}
+
+function flyRevealToHud() {
+  const host = document.querySelector("#drawnCardReveal");
+  if (!host) return;
+  const target =
+    document.querySelector("#playerHud .player-block:not(.waiting-card) .card-mount") ||
+    document.querySelector("#playerHud .card-mount") ||
+    document.querySelector("#priorityStrip .priority-item.player") ||
+    document.querySelector("#priorityStrip");
+  if (!target) {
+    hideDrawnCardReveal();
+    return;
+  }
+  const hr = host.getBoundingClientRect();
+  const tr = target.getBoundingClientRect();
+  const dx = tr.left + tr.width / 2 - (hr.left + hr.width / 2);
+  const dy = tr.top + tr.height / 2 - (hr.top + hr.height / 2);
+  host.style.transition = "transform 520ms cubic-bezier(0.55, 0, 0.4, 1), opacity 520ms ease";
+  host.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.34)`;
+  host.style.opacity = "0";
+}
+
+function entryOwnerLabel(entry) {
+  if (entry.actorType === "player") return getSelectedCharacter().name;
+  return monsterDefinitions[entry.actorId]?.name ?? entry.actorId;
 }
 
 function describeCard(cardData) {
