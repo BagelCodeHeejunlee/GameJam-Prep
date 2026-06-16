@@ -374,6 +374,33 @@ h2 {
   box-shadow: 0 6px 0 rgba(167, 66, 40, 0.28);
 }
 
+.entity.has-art {
+  font-size: 0;
+}
+
+.entity-art {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  z-index: 3;
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  pointer-events: none;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 5px 3px rgba(47, 31, 18, 0.32));
+}
+
+.entity.enemy .entity-art {
+  width: 64px;
+  height: 64px;
+}
+
+.entity.boss .entity-art {
+  width: 82px;
+  height: 82px;
+}
+
 .entity.boss {
   width: 52px;
   height: 52px;
@@ -981,6 +1008,14 @@ body.turn-cue-active .turn-scrim {
   text-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
 }
 
+.turn-cue-art {
+  width: 126%;
+  height: 126%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.28));
+}
+
 .turn-cue-body {
   display: flex;
   flex-direction: column;
@@ -1410,6 +1445,14 @@ body.turn-cue-active .turn-scrim {
     0 5px 0 rgba(93, 63, 26, 0.16);
 }
 
+.portrait-art {
+  width: 128%;
+  height: 128%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 2px rgba(71, 43, 20, 0.24));
+}
+
 .enemy-portrait {
   width: 30px;
   border-radius: 50%;
@@ -1608,6 +1651,14 @@ body.turn-cue-active .turn-scrim {
   place-items: center;
   border-radius: 50%;
   overflow: hidden;
+}
+
+.priority-item .pc-art {
+  width: 138%;
+  height: 138%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.24));
 }
 
 .priority-item .pc-emblem {
