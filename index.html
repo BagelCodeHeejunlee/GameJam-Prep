@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="assets/card-normal-v2.png" />
-    <link rel="stylesheet" href="styles.css?v=20260616-camera-cache-opt" />
+    <link rel="stylesheet" href="styles.css?v=20260616-reward-choice-pass" />
   </head>
   <body>
     <main class="app-shell">
@@ -91,17 +91,16 @@
       <div id="drawnCardReveal" class="drawn-reveal" aria-live="polite"></div>
     </main>
 
-    <div id="rewardOverlay" class="overlay hidden">
-      <section class="reward-modal">
-        <div class="reward-header">
-          <div>
-            <h2>웨이브 클리어</h2>
-            <p>보상 카드 1장을 선택</p>
-          </div>
-          <button id="iconHelpButton" class="icon-button" type="button" aria-label="아이콘 설명">?</button>
+    <div id="rewardOverlay" class="overlay reward-overlay hidden">
+      <div class="reward-stage">
+        <div class="reward-banner">
+          <span class="reward-eyebrow">WAVE CLEAR</span>
+          <h2 class="reward-title">전투 승리!</h2>
+          <p class="reward-instr">획득할 카드 <b>1장</b>을 선택하세요</p>
         </div>
         <div id="rewardCards" class="reward-cards"></div>
-      </section>
+        <button id="iconHelpButton" class="reward-help" type="button">아이콘 설명 보기</button>
+      </div>
     </div>
 
     <div id="iconHelpOverlay" class="overlay hidden">
@@ -133,6 +132,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260616-camera-cache-opt"></script>
+    <script src="app.js?v=20260616-reward-choice-pass"></script>
   </body>
 </html>

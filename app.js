@@ -396,6 +396,7 @@ function newRun() {
     cameraTransitionScheduled: false,
     boardTileSignature: "",
     boardTileElements: new Map(),
+    rewardLocked: false,
     log: [],
     speedMultiplier,
     suppressPlayerCard: false,
@@ -1869,6 +1870,7 @@ function finishRun(win) {
 
 function showRewards() {
   const rewards = drawRewards();
+  state.rewardLocked = false;
   elements.rewardCards.innerHTML = "";
   rewards.forEach((reward) => {
     const button = document.createElement("button");
@@ -1876,9 +1878,8 @@ function showRewards() {
     button.className = `reward-pick ${rarityClass(reward.rarity)}`;
     button.innerHTML = `
       ${cardMount(reward, "reward-mount")}
-      <span class="pick">선택</span>
     `;
-    button.addEventListener("click", () => pickReward(reward));
+    button.addEventListener("click", () => pickReward(reward, button));
     elements.rewardCards.append(button);
   });
   elements.rewardOverlay.classList.remove("hidden");
@@ -1891,9 +1892,68 @@ function drawRewards() {
   }));
 }
 
-function pickReward(reward) {
-  state.playerCards.push(reward);
+async function pickReward(reward, button) {
+  if (state.rewardLocked) return;
+  state.rewardLocked = true;
+
+  const mount = button.querySelector(".reward-mount") || button;
+  const startRect = mount.getBoundingClientRect();
+  const cps = getComputedStyle(mount).getPropertyValue("--cps").trim();
+
+  const flyer = document.createElement("div");
+  flyer.className = "reward-flyer";
+  flyer.style.left = `${startRect.left}px`;
+  flyer.style.top = `${startRect.top}px`;
+  flyer.style.width = `${startRect.width}px`;
+  flyer.style.height = `${startRect.height}px`;
+  const clone = mount.cloneNode(true);
+  if (cps) clone.style.setProperty("--cps", cps);
+  flyer.appendChild(clone);
+  document.body.appendChild(flyer);
+
   elements.rewardOverlay.classList.add("hidden");
+  elements.rewardCards.innerHTML = "";
+
+  state.playerCards.push(reward);
+
+  const cardCx = startRect.left + startRect.width / 2;
+  const cardCy = startRect.top + startRect.height / 2;
+  const centerX = window.innerWidth / 2 - cardCx;
+  const centerY = window.innerHeight * 0.4 - cardCy;
+  await nextFrame();
+  flyer.classList.add("to-center");
+  flyer.style.transform = `translate(${centerX}px, ${centerY}px) scale(1.5)`;
+  await sleep(840);
+
+  const deckTarget =
+    document.querySelector('.player-hud .pile-row span[title="덱"]') ||
+    document.querySelector(".player-hud");
+  flyer.classList.remove("to-center");
+  flyer.classList.add("to-deck");
+  if (deckTarget) {
+    const endRect = deckTarget.getBoundingClientRect();
+    const dx = endRect.left + endRect.width / 2 - cardCx;
+    const dy = endRect.top + endRect.height / 2 - cardCy;
+    flyer.style.transform = `translate(${dx}px, ${dy}px) scale(0.07) rotate(-12deg)`;
+    flyer.style.opacity = "0";
+  } else {
+    flyer.style.transform = "translateY(60vh) scale(0.08)";
+    flyer.style.opacity = "0";
+  }
+
+  await sleep(360);
+  state.deck.push(reward);
+  renderPlayerHud();
+  const deckPile = document.querySelector('.player-hud .pile-row span[title="덱"]');
+  if (deckPile) {
+    deckPile.classList.remove("pile-pop");
+    void deckPile.offsetWidth;
+    deckPile.classList.add("pile-pop");
+  }
+  await sleep(440);
+  flyer.remove();
+
+  state.rewardLocked = false;
   log(`보상 선택: ${reward.name}`);
   state.waveIndex += 1;
   startWave(state.waveIndex);
