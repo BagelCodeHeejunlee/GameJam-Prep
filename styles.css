@@ -228,12 +228,10 @@ h2 {
   position: relative;
   width: var(--board-width, 620px);
   height: var(--board-height, 620px);
-  transform: scale(var(--board-scale, 1));
+  transform: translate3d(var(--board-x, 0px), var(--board-y, 0px), 0) scale(var(--board-scale, 1));
   transform-origin: top left;
-  transition:
-    left 360ms ease,
-    top 360ms ease,
-    transform 360ms ease;
+  transition: transform 360ms ease;
+  will-change: transform;
 }
 
 .resource-hud {

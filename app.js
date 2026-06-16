@@ -394,6 +394,8 @@ function newRun() {
     priorityRevealMode: "",
     cameraMode: "overview",
     cameraTransitionScheduled: false,
+    boardTileSignature: "",
+    boardTileElements: new Map(),
     log: [],
     speedMultiplier,
     suppressPlayerCard: false,
@@ -414,6 +416,8 @@ function startWave(index) {
   state.walls = wave.walls.map((item) => ({ ...item }));
   state.obstacles = [];
   state.meteors = [];
+  state.boardTileSignature = "";
+  state.boardTileElements = new Map();
   state.cameraMode = "overview";
   state.cameraTransitionScheduled = false;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
@@ -644,7 +648,7 @@ function scheduleTurn() {
       state.cameraTransitionScheduled = false;
       if (state.paused || state.busy || state.waitingReward || state.finished) return;
       state.cameraMode = "focus";
-      renderBoard();
+      updateBoardCamera(boardBounds(), true);
       window.setTimeout(() => scheduleTurn(), CAMERA_FOCUS_DELAY);
     }, WAVE_INTRO_DELAY);
     return;
@@ -1995,23 +1999,12 @@ function entityIntentMarkup(entity) {
 
 function renderBoard() {
   [...elements.board.children].forEach((child) => {
-    if (!child.classList.contains("damage-pop")) child.remove();
+    if (!child.classList.contains("hex") && !child.classList.contains("damage-pop")) child.remove();
   });
   elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
-
-  for (const tile of state.tiles) {
-    const point = hexToPixel(tile, bounds);
-    const div = document.createElement("div");
-    div.className = "hex";
-    if (isWall(tile)) div.classList.add("wall");
-    const trap = trapAt(tile);
-    if (trap) div.classList.add("trap", `trap-${trap.kind === "spike" ? "attack" : trap.kind}`);
-    div.style.left = `${point.x}px`;
-    div.style.top = `${point.y}px`;
-    elements.board.append(div);
-  }
+  renderBoardTiles(bounds);
 
   for (const meteor of state.meteors) {
     const point = hexToPixel(meteor, bounds);
@@ -2032,7 +2025,6 @@ function renderBoard() {
       <span class="entity-label">${entity.label ?? (entity.side === "player" ? getSelectedCharacter().shortLabel : entity.monsterIndex)}</span>
       <span class="hp-readout">${entity.hp}/${entity.maxHp}</span>
       <span class="hp-bar" aria-hidden="true"><i style="width: ${hpPercent(entity)}%"></i></span>
-      ${entityIntentMarkup(entity)}
     `;
     div.title = `${entity.name} ${entity.hp}/${entity.maxHp}`;
     div.style.left = `${point.x}px`;
@@ -2043,6 +2035,38 @@ function renderBoard() {
   renderOffscreenEnemyIndicators(bounds);
 }
 
+function renderBoardTiles(bounds) {
+  const signature = state.tiles.map(hexKey).join("|");
+  if (state.boardTileSignature !== signature || !state.boardTileElements) {
+    elements.board.querySelectorAll(".hex").forEach((tile) => tile.remove());
+    const tileElements = new Map();
+    const fragment = document.createDocumentFragment();
+    for (const tile of state.tiles) {
+      const point = hexToPixel(tile, bounds);
+      const div = document.createElement("div");
+      const key = hexKey(tile);
+      div.className = "hex";
+      div.dataset.hex = key;
+      div.style.left = `${point.x}px`;
+      div.style.top = `${point.y}px`;
+      tileElements.set(key, div);
+      fragment.append(div);
+    }
+    elements.board.append(fragment);
+    state.boardTileSignature = signature;
+    state.boardTileElements = tileElements;
+  }
+
+  for (const tile of state.tiles) {
+    const div = state.boardTileElements.get(hexKey(tile));
+    if (!div) continue;
+    div.className = "hex";
+    if (isWall(tile)) div.classList.add("wall");
+    const trap = trapAt(tile);
+    if (trap) div.classList.add("trap", `trap-${trap.kind === "spike" ? "attack" : trap.kind}`);
+  }
+}
+
 function renderOffscreenEnemyIndicators(bounds) {
   if (state.cameraMode !== "focus") return;
   const player = getPlayer();
@@ -2051,8 +2075,8 @@ function renderOffscreenEnemyIndicators(bounds) {
   const panelWidth = elements.boardPanel.clientWidth;
   const panelHeight = elements.boardPanel.clientHeight;
   const scale = Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || 1;
-  const offsetX = Number.parseFloat(elements.board.style.left) || 0;
-  const offsetY = Number.parseFloat(elements.board.style.top) || 0;
+  const offsetX = Number.parseFloat(elements.board.style.getPropertyValue("--board-x")) || 0;
+  const offsetY = Number.parseFloat(elements.board.style.getPropertyValue("--board-y")) || 0;
   const playerPoint = screenPointForHex(player, bounds, scale, offsetX, offsetY);
   const visible = {
     left: 60,
@@ -2100,6 +2124,20 @@ function screenPointForHex(hex, bounds, scale, offsetX, offsetY) {
     x: offsetX + point.x * scale,
     y: offsetY + point.y * scale,
   };
+}
+
+function updateBoardCamera(bounds = boardBounds(), refreshAfterTransition = false) {
+  fitBoardToPanel(bounds);
+  elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
+  renderOffscreenEnemyIndicators(bounds);
+  if (refreshAfterTransition) {
+    window.setTimeout(() => {
+      if (!state || state.cameraMode !== "focus") return;
+      const currentBounds = boardBounds();
+      elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
+      renderOffscreenEnemyIndicators(currentBounds);
+    }, 380);
+  }
 }
 
 function placeOffscreenIndicator(point, visible, occupied) {
@@ -2796,8 +2834,8 @@ function fitBoardToPanel(bounds = boardBounds()) {
   elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
   elements.board.style.setProperty("--board-height", `${logicalHeight}px`);
   elements.board.style.setProperty("--board-scale", `${scale}`);
-  elements.board.style.left = `${offsetX}px`;
-  elements.board.style.top = `${offsetY}px`;
+  elements.board.style.setProperty("--board-x", `${offsetX}px`);
+  elements.board.style.setProperty("--board-y", `${offsetY}px`);
 }
 
 function hexToPixel(hex, bounds) {
