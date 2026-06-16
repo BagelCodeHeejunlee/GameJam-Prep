@@ -375,6 +375,9 @@ h2 {
 }
 
 .entity.has-art {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   font-size: 0;
 }
 
@@ -401,6 +404,12 @@ h2 {
   height: 82px;
 }
 
+.entity.has-art.boss {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .entity.boss {
   width: 52px;
   height: 52px;
@@ -418,6 +427,24 @@ h2 {
 
 .entity.player.acting {
   animation-name: entity-acting-pulse-player;
+}
+
+.entity.has-art.acting {
+  border-color: transparent;
+}
+
+.entity.has-art.acting .entity-art {
+  animation: entity-art-acting-bob 1000ms ease-in-out infinite;
+}
+
+@keyframes entity-art-acting-bob {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1.04);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.12);
+  }
 }
 
 @keyframes entity-acting-pulse {

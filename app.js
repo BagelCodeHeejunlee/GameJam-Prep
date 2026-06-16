@@ -638,6 +638,10 @@ function entityImage(entity) {
   return monsterDefinitions[entity.kind]?.image;
 }
 
+function entityDomSelector(id) {
+  return `.entity[data-entity-id="${String(id).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`;
+}
+
 const monsterDecks = {
   brute: [
     card("brute-advance-claw", "접근 공격", "브루트", "기본", 58, [
@@ -2724,8 +2728,11 @@ function entityIntentMarkup(entity) {
 }
 
 function renderBoard() {
+  const aliveEntityIds = new Set(state.entities.filter(isAlive).map((entity) => String(entity.id)));
   [...elements.board.children].forEach((child) => {
-    if (!child.classList.contains("hex") && !child.classList.contains("damage-pop")) child.remove();
+    if (child.classList.contains("hex") || child.classList.contains("damage-pop")) return;
+    if (child.classList.contains("entity") && aliveEntityIds.has(child.dataset.entityId)) return;
+    child.remove();
   });
   elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
   const bounds = boardBounds();
@@ -2752,19 +2759,34 @@ function renderBoard() {
         (activeEntry.actorType !== "player" &&
           entity.side !== "player" &&
           entity.kind === activeEntry.actorId));
-    const div = document.createElement("div");
     const image = entityImage(entity);
-    div.className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${image ? "has-art" : ""}`;
+    const label = entityLabel(entity);
+    let div = elements.board.querySelector(entityDomSelector(entity.id));
+    if (!div) {
+      div = document.createElement("div");
+      div.dataset.entityId = entity.id;
+      elements.board.append(div);
+    }
+    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${image ? "has-art" : ""}`;
+    if (div.className !== className) div.className = className;
     div.dataset.entityId = entity.id;
-    div.innerHTML = `
-      ${image ? spriteImg(image, "entity-art") : `<span class="entity-label">${entityLabel(entity)}</span>`}
-      <span class="hp-readout">${entity.hp}/${entity.maxHp}</span>
-      <span class="hp-bar" aria-hidden="true"><i style="width: ${hpPercent(entity)}%"></i></span>
-    `;
+    if (div.dataset.image !== (image ?? "") || div.dataset.label !== label) {
+      div.dataset.image = image ?? "";
+      div.dataset.label = label;
+      div.innerHTML = `
+        ${image ? spriteImg(image, "entity-art") : `<span class="entity-label">${label}</span>`}
+        <span class="hp-readout"></span>
+        <span class="hp-bar" aria-hidden="true"><i></i></span>
+      `;
+    }
+    const hpText = `${entity.hp}/${entity.maxHp}`;
+    const hpReadout = div.querySelector(".hp-readout");
+    if (hpReadout && hpReadout.textContent !== hpText) hpReadout.textContent = hpText;
+    const hpFill = div.querySelector(".hp-bar i");
+    if (hpFill) hpFill.style.width = `${hpPercent(entity)}%`;
     div.title = `${entity.name} ${entity.hp}/${entity.maxHp}`;
     div.style.left = `${point.x}px`;
     div.style.top = `${point.y}px`;
-    elements.board.append(div);
   }
 
   renderOffscreenEnemyIndicators(bounds);
