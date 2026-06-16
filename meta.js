@@ -1,6 +1,8 @@
 const MAX_LEVEL = 20;
 const STORAGE_KEY = "gamejam-prep-meta-levels-v2";
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
+const EQUIPMENT_STORAGE_KEY = "gamejam-prep-meta-equipment-v1";
+const SELECTED_STAGE_STORAGE_KEY = "gamejam-prep-selected-stage-v1";
 
 const characters = {
   archer: {
@@ -35,6 +37,24 @@ const characters = {
   },
 };
 
+const equipmentOptions = {
+  weapon: [
+    { id: "training-bow", name: "훈련 활", icon: "활", power: 18 },
+    { id: "iron-sword", name: "낡은 검", icon: "검", power: 16 },
+    { id: "spark-staff", name: "불꽃 지팡이", icon: "봉", power: 20 },
+  ],
+  armor: [
+    { id: "leather-vest", name: "가죽 조끼", icon: "갑", power: 24 },
+    { id: "guard-mail", name: "수비 갑옷", icon: "방", power: 30 },
+    { id: "silk-robe", name: "마력 로브", icon: "포", power: 22 },
+  ],
+  boots: [
+    { id: "light-boots", name: "가벼운 신발", icon: "신", power: 10 },
+    { id: "runner-boots", name: "질주 신발", icon: "속", power: 13 },
+    { id: "focus-boots", name: "집중 장화", icon: "집", power: 12 },
+  ],
+};
+
 const elements = {
   accountLevel: document.querySelector("#accountLevel"),
   heroStage: document.querySelector(".hero-stage"),
@@ -54,11 +74,29 @@ const elements = {
   resetButton: document.querySelector("#resetButton"),
   toast: document.querySelector("#levelToast"),
   heroButtons: [...document.querySelectorAll("[data-character]")],
+  equipmentButtons: [...document.querySelectorAll("[data-equipment-slot]")],
+  stageButtons: [...document.querySelectorAll("[data-stage]")],
   tabButtons: [...document.querySelectorAll("[data-tab]")],
   tabPanels: [...document.querySelectorAll("[data-panel]")],
+  equipment: {
+    weapon: {
+      icon: document.querySelector("#weaponIcon"),
+      name: document.querySelector("#weaponName"),
+    },
+    armor: {
+      icon: document.querySelector("#armorIcon"),
+      name: document.querySelector("#armorName"),
+    },
+    boots: {
+      icon: document.querySelector("#bootsIcon"),
+      name: document.querySelector("#bootsName"),
+    },
+  },
 };
 
 let selectedCharacterId = loadSelectedCharacterId();
+let selectedStageId = loadSelectedStageId();
+let equipment = loadEquipment();
 let activeTab = "hero";
 let profile = loadProfile();
 
@@ -91,6 +129,48 @@ function loadSelectedCharacterId() {
 function saveSelectedCharacterId(id) {
   try {
     localStorage.setItem(SELECTED_CHARACTER_STORAGE_KEY, id);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function loadSelectedStageId() {
+  try {
+    const saved = localStorage.getItem(SELECTED_STAGE_STORAGE_KEY);
+    return saved === "1" ? saved : "1";
+  } catch {
+    return "1";
+  }
+}
+
+function saveSelectedStageId(id) {
+  try {
+    localStorage.setItem(SELECTED_STAGE_STORAGE_KEY, id);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function defaultEquipment() {
+  return {
+    weapon: "training-bow",
+    armor: "leather-vest",
+    boots: "light-boots",
+  };
+}
+
+function loadEquipment() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(EQUIPMENT_STORAGE_KEY));
+    return { ...defaultEquipment(), ...saved };
+  } catch {
+    return defaultEquipment();
+  }
+}
+
+function saveEquipment() {
+  try {
+    localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipment));
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
   }
@@ -166,6 +246,25 @@ function selectTab(id) {
   renderTabs();
 }
 
+function selectStage(id) {
+  selectedStageId = id;
+  saveSelectedStageId(id);
+  renderStage();
+  renderStartLink();
+}
+
+function cycleEquipment(slot) {
+  const options = equipmentOptions[slot] ?? [];
+  const currentIndex = Math.max(0, options.findIndex((item) => item.id === equipment[slot]));
+  const next = options[(currentIndex + 1) % options.length];
+  if (!next) return;
+
+  equipment = { ...equipment, [slot]: next.id };
+  saveEquipment();
+  render();
+  showToast(`${next.name}<br>${slotLabel(slot)} 장착`);
+}
+
 function showToast(message) {
   elements.toast.innerHTML = message;
   elements.toast.classList.add("show");
@@ -187,11 +286,10 @@ function render() {
   elements.heroPortrait.textContent = character.shortLabel;
   elements.heroRole.textContent = character.role;
   elements.heroName.textContent = character.name;
-  elements.powerText.textContent = `전투력 ${state.power}`;
+  elements.powerText.textContent = `전투력 ${state.power + equipmentPower()}`;
   elements.atkValue.textContent = state.atk;
   elements.hpValue.textContent = state.hp;
   elements.levelBadge.textContent = `Lv. ${state.level}`;
-  elements.startButton.href = `index.html?character=${encodeURIComponent(character.id)}`;
   elements.xpText.textContent = state.level >= MAX_LEVEL ? "MAX" : `${state.xp} / ${required}`;
   elements.xpFill.style.width = `${Math.round(xpRatio * 100)}%`;
   elements.levelUpButton.disabled = state.level >= MAX_LEVEL || state.xp < required;
@@ -205,7 +303,48 @@ function render() {
     if (levelBadge) levelBadge.textContent = `Lv. ${heroState.level}`;
   });
 
+  renderEquipment();
+  renderStage();
+  renderStartLink();
   renderTabs();
+}
+
+function equipmentPower() {
+  return Object.entries(equipment).reduce((total, [slot, itemId]) => {
+    const item = equipmentOptions[slot]?.find((option) => option.id === itemId);
+    return total + (item?.power ?? 0);
+  }, 0);
+}
+
+function renderEquipment() {
+  Object.entries(elements.equipment).forEach(([slot, nodes]) => {
+    const item = equipmentOptions[slot]?.find((option) => option.id === equipment[slot]) ?? equipmentOptions[slot]?.[0];
+    if (!item) return;
+    nodes.icon.textContent = item.icon;
+    nodes.name.textContent = item.name;
+  });
+}
+
+function renderStage() {
+  elements.stageButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.stage === selectedStageId);
+  });
+}
+
+function renderStartLink() {
+  const params = new URLSearchParams({
+    character: selectedCharacterId,
+    stage: selectedStageId,
+  });
+  elements.startButton.href = `index.html?${params.toString()}`;
+}
+
+function slotLabel(slot) {
+  return {
+    weapon: "무기",
+    armor: "갑옷",
+    boots: "신발",
+  }[slot] ?? "장비";
 }
 
 function renderTabs() {
@@ -225,6 +364,16 @@ elements.heroButtons.forEach((button) => {
 
 elements.tabButtons.forEach((button) => {
   button.addEventListener("click", () => selectTab(button.dataset.tab));
+});
+
+elements.equipmentButtons.forEach((button) => {
+  button.addEventListener("click", () => cycleEquipment(button.dataset.equipmentSlot));
+});
+
+elements.stageButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    if (!button.disabled) selectStage(button.dataset.stage);
+  });
 });
 
 elements.gainSmallButton.addEventListener("click", () => addXp(45));

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#2db7f0" />
     <link rel="icon" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon.svg" />
-    <link rel="stylesheet" href="meta.css?v=20260617-selected-character01" />
+    <link rel="stylesheet" href="meta.css?v=20260617-stage-gear01" />
   </head>
   <body>
     <main class="lobby-shell">
@@ -75,6 +75,30 @@
             <button id="levelUpButton" class="level-up-button" type="button">LEVEL UP</button>
           </div>
 
+          <div class="hero-gear" aria-label="영웅 장비 선택">
+            <div class="subhead">
+              <span>GEAR</span>
+              <strong>장비 선택</strong>
+            </div>
+            <div class="gear-slots">
+              <button class="gear-slot" type="button" data-equipment-slot="weapon">
+                <span id="weaponIcon">활</span>
+                <strong id="weaponName">훈련 활</strong>
+                <em>무기</em>
+              </button>
+              <button class="gear-slot" type="button" data-equipment-slot="armor">
+                <span id="armorIcon">갑</span>
+                <strong id="armorName">가죽 조끼</strong>
+                <em>갑옷</em>
+              </button>
+              <button class="gear-slot" type="button" data-equipment-slot="boots">
+                <span id="bootsIcon">신</span>
+                <strong id="bootsName">가벼운 신발</strong>
+                <em>신발</em>
+              </button>
+            </div>
+          </div>
+
           <div class="hero-select" aria-label="캐릭터 선택">
             <button class="hero-option active" type="button" data-character="archer">
               <span>궁</span>
@@ -113,11 +137,28 @@
           <div class="panel-title">
             <div>
               <span>BATTLE</span>
-              <h2>출전</h2>
+              <h2>스테이지</h2>
             </div>
           </div>
-          <a id="startButton" class="start-button" href="index.html?character=archer">전투 시작</a>
-          <p class="panel-note">현재 전투 프로토타입으로 이동합니다.</p>
+          <div class="stage-list" aria-label="스테이지 선택">
+            <button class="stage-card active" type="button" data-stage="1">
+              <span>STAGE 1</span>
+              <strong>초원 외곽</strong>
+              <em>추천 전투력 150</em>
+            </button>
+            <button class="stage-card locked" type="button" data-stage="2" disabled>
+              <span>STAGE 2</span>
+              <strong>무너진 길목</strong>
+              <em>준비중</em>
+            </button>
+            <button class="stage-card locked" type="button" data-stage="3" disabled>
+              <span>STAGE 3</span>
+              <strong>오염된 숲</strong>
+              <em>준비중</em>
+            </button>
+          </div>
+          <a id="startButton" class="start-button" href="index.html?character=archer&stage=1">선택 스테이지 시작</a>
+          <p class="panel-note">현재는 Stage 1 전투 프로토타입으로 이동합니다.</p>
         </section>
 
         <section class="tab-panel" data-panel="mission">
@@ -174,6 +215,6 @@
     </main>
 
     <div id="levelToast" class="level-toast" aria-live="polite"></div>
-    <script src="meta.js?v=20260617-selected-character01"></script>
+    <script src="meta.js?v=20260617-stage-gear01"></script>
   </body>
 </html>
