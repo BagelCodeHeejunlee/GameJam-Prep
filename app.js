@@ -697,6 +697,8 @@ async function runTurn() {
     return;
   }
 
+  await playTurnStart();
+
   const playerCard = drawPlayerCard();
   const drawnEntries = [{ actorType: "player", actorId: player.id, card: playerCard }];
   const enemyEntries = aliveEnemyKinds().map((kind) => ({
@@ -2650,6 +2652,23 @@ function flyRevealToHud() {
   host.style.transition = "transform 520ms cubic-bezier(0.55, 0, 0.4, 1), opacity 520ms ease";
   host.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.34)`;
   host.style.opacity = "0";
+}
+
+async function playTurnStart() {
+  const host = document.querySelector("#turnStart");
+  if (!host) return;
+  host.innerHTML = `
+    <div class="ts-band">
+      <span class="ts-sweep"></span>
+      <span class="ts-kicker">TURN</span>
+      <span class="ts-num">${state.turn}</span>
+    </div>
+  `;
+  void host.offsetWidth;
+  host.classList.add("show");
+  await sleep(1500); // 등장 후 1.5초 대기 (재생 속도와 무관하게 고정)
+  host.classList.remove("show");
+  await sleep(300); // 사라지는 트랜지션 동안 대기
 }
 
 async function playTurnCue(entry) {

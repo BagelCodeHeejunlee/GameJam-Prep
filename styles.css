@@ -712,16 +712,27 @@ body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::after 
   display: grid;
   justify-items: center;
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.7);
-  transition:
-    opacity 200ms ease,
-    transform 320ms cubic-bezier(0.18, 0.9, 0.24, 1.4);
+  transform: translate(-50%, -50%);
+  perspective: 1300px;
+  transition: opacity 200ms ease;
   pointer-events: none;
 }
 
 .drawn-reveal.show {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+}
+
+/* Card flips face-up on draw instead of flying/zooming in */
+.drawn-reveal .reveal-mount {
+  transform: rotateY(88deg);
+  transform-origin: center center;
+  transition: transform 540ms cubic-bezier(0.2, 0.82, 0.28, 1.04);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.drawn-reveal.show .reveal-mount {
+  transform: rotateY(0deg);
 }
 
 .drawn-reveal-tag {
@@ -786,6 +797,113 @@ body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::after 
 
 body.turn-cue-active .turn-scrim {
   opacity: 1;
+}
+
+/* ── Turn-start intro (one-shot "TURN N" sweep) ──────────────── */
+.turn-start {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.turn-start.show {
+  opacity: 1;
+}
+
+.turn-start .ts-band {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 56px;
+  overflow: hidden;
+  border-top: 2px solid rgba(255, 214, 120, 0.85);
+  border-bottom: 2px solid rgba(255, 214, 120, 0.85);
+  background: linear-gradient(180deg, rgba(28, 40, 54, 0.96), rgba(14, 22, 32, 0.96));
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.45),
+    inset 0 0 36px rgba(0, 0, 0, 0.4);
+}
+
+.turn-start.show .ts-band {
+  animation: ts-band-in 460ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.turn-start .ts-sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 240, 200, 0.32) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+}
+
+.turn-start.show .ts-sweep {
+  animation: ts-sweep 760ms ease 140ms both;
+}
+
+.turn-start .ts-kicker {
+  font-family: var(--card-font);
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: 7px;
+  color: #ffd66e;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.turn-start .ts-num {
+  font-family: var(--card-font);
+  font-size: 62px;
+  font-weight: 950;
+  line-height: 0.9;
+  color: #fff;
+  text-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.35),
+    0 0 22px rgba(255, 214, 120, 0.5);
+}
+
+.turn-start.show .ts-num {
+  animation: ts-num-pop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.5) both;
+}
+
+@keyframes ts-band-in {
+  0% {
+    clip-path: inset(0 50% 0 50%);
+    transform: scaleY(0.5);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: scaleY(1);
+  }
+}
+
+@keyframes ts-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes ts-num-pop {
+  0% {
+    transform: scale(0.4) translateY(8px);
+  }
+  60% {
+    transform: scale(1.12) translateY(0);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
 }
 
 .turn-cue {
