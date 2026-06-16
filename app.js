@@ -7,6 +7,8 @@ const CAMERA_FOCUS_DELAY = 360;
 const MAP_ROOM_SCALE = 2;
 const CAMERA_FOCUS_SCALE_MULTIPLIER = 1.48;
 const CAMERA_FOCUS_MAX_SCALE = 1.02;
+const CAMERA_DEAD_ZONE_WIDTH_RATIO = 0.34;
+const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.34;
 
 const directions = [
   { q: 1, r: 0 },
@@ -394,6 +396,9 @@ function newRun() {
     priorityRevealMode: "",
     cameraMode: "overview",
     cameraTransitionScheduled: false,
+    cameraFocusReady: false,
+    cameraPanelWidth: 0,
+    cameraPanelHeight: 0,
     boardTileSignature: "",
     boardTileElements: new Map(),
     rewardLocked: false,
@@ -421,6 +426,9 @@ function startWave(index) {
   state.boardTileElements = new Map();
   state.cameraMode = "overview";
   state.cameraTransitionScheduled = false;
+  state.cameraFocusReady = false;
+  state.cameraPanelWidth = 0;
+  state.cameraPanelHeight = 0;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
   state.entities = [
     {
@@ -2896,9 +2904,51 @@ function fitBoardToPanel(bounds = boardBounds()) {
     const playerHudRect = elements.playerHud?.getBoundingClientRect();
     const playTop = topHudRect?.height ? Math.min(panelHeight * 0.46, topHudRect.bottom + 14) : panelHeight * 0.24;
     const playBottom = playerHudRect?.height ? Math.max(playTop + 140, playerHudRect.top - 16) : panelHeight * 0.84;
-    const focusY = playTop + (playBottom - playTop) * 0.55;
-    offsetX = panelWidth / 2 - focusPoint.x * scale;
-    offsetY = focusY - focusPoint.y * scale;
+    const focusCenter = {
+      x: panelWidth / 2,
+      y: playTop + (playBottom - playTop) * 0.55,
+    };
+    const currentScale = Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || scale;
+    const panelChanged = state.cameraPanelWidth !== panelWidth || state.cameraPanelHeight !== panelHeight;
+    const shouldCenterCamera =
+      !state.cameraFocusReady ||
+      panelChanged ||
+      Math.abs(currentScale - scale) > 0.001;
+
+    if (shouldCenterCamera) {
+      offsetX = focusCenter.x - focusPoint.x * scale;
+      offsetY = focusCenter.y - focusPoint.y * scale;
+    } else {
+      offsetX = Number.parseFloat(elements.board.style.getPropertyValue("--board-x")) || offsetX;
+      offsetY = Number.parseFloat(elements.board.style.getPropertyValue("--board-y")) || offsetY;
+      const playerScreen = {
+        x: offsetX + focusPoint.x * scale,
+        y: offsetY + focusPoint.y * scale,
+      };
+      const deadZone = {
+        halfWidth: panelWidth * CAMERA_DEAD_ZONE_WIDTH_RATIO * 0.5,
+        halfHeight: (playBottom - playTop) * CAMERA_DEAD_ZONE_HEIGHT_RATIO * 0.5,
+      };
+      if (playerScreen.x < focusCenter.x - deadZone.halfWidth) {
+        offsetX += focusCenter.x - deadZone.halfWidth - playerScreen.x;
+      } else if (playerScreen.x > focusCenter.x + deadZone.halfWidth) {
+        offsetX -= playerScreen.x - (focusCenter.x + deadZone.halfWidth);
+      }
+      if (playerScreen.y < focusCenter.y - deadZone.halfHeight) {
+        offsetY += focusCenter.y - deadZone.halfHeight - playerScreen.y;
+      } else if (playerScreen.y > focusCenter.y + deadZone.halfHeight) {
+        offsetY -= playerScreen.y - (focusCenter.y + deadZone.halfHeight);
+      }
+    }
+    offsetX = clampCameraOffset(offsetX, panelWidth, logicalWidth * scale);
+    offsetY = clampCameraOffset(offsetY, panelHeight, logicalHeight * scale);
+    state.cameraFocusReady = true;
+    state.cameraPanelWidth = panelWidth;
+    state.cameraPanelHeight = panelHeight;
+  } else {
+    state.cameraFocusReady = false;
+    state.cameraPanelWidth = panelWidth;
+    state.cameraPanelHeight = panelHeight;
   }
 
   elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
@@ -2906,6 +2956,11 @@ function fitBoardToPanel(bounds = boardBounds()) {
   elements.board.style.setProperty("--board-scale", `${scale}`);
   elements.board.style.setProperty("--board-x", `${offsetX}px`);
   elements.board.style.setProperty("--board-y", `${offsetY}px`);
+}
+
+function clampCameraOffset(offset, panelSize, contentSize) {
+  if (contentSize <= panelSize) return (panelSize - contentSize) / 2;
+  return Math.min(0, Math.max(panelSize - contentSize, offset));
 }
 
 function hexToPixel(hex, bounds) {
