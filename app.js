@@ -13,6 +13,8 @@ const CAMERA_UI_GAP = 16;
 const CAMERA_PLAYER_EDGE_MARGIN = 72;
 const CAMERA_FOLLOW_DURATION = 220;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
+const WAVE_CLEAR_HEAL_RATIO = 0.2;
+const POST_WAVE_TWO_HP_SCALE = 0.75;
 
 const directions = [
   { q: 1, r: 0 },
@@ -144,17 +146,17 @@ const archerRewardPool = [
   ]),
   card("perfect-distance", "완벽한 거리", "공용", "에픽", 33, [
     {
-      type: "permanent",
+      type: "passive",
       modifiers: [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged", nonAdjacent: true } }],
     },
   ]),
   card("storm-shot", "폭풍 사격", "공용", "전설", 28, [{ type: "attack", mult: 2, range: 3, targets: 4 }]),
   card("hunt-rhythm", "사냥의 리듬", "공용", "전설", 32, [
-    { type: "permanent", effect: "afterAttackMove", amount: 1 },
+    { type: "passive", effect: "afterAttackMove", amount: 1 },
   ]),
   card("absolute-distance", "절대 거리", "공용", "전설", 26, [
     {
-      type: "permanent",
+      type: "passive",
       effect: "ignoreAdjacentPenalty",
       amount: 1,
       modifiers: [{ stat: "range", amount: 1, when: { attackKind: "ranged" } }],
@@ -200,7 +202,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2, preferPreviousTarget: true },
   ]),
   card("combo-sense", "연타 감각", "다단중첩", "레어", 32, [
-    { type: "permanent", effect: "comboDamage", amount: 0.1 },
+    { type: "passive", effect: "comboDamage", amount: 0.1 },
   ]),
   card("fixed-aim", "고정 조준", "다단중첩", "레어", 31, [
     {
@@ -211,7 +213,7 @@ const archerRewardPool = [
     },
   ]),
   card("weakness-stack", "약점 누적", "다단중첩", "레어", 34, [
-    { type: "permanent", effect: "thirdHitDamage", amount: 0.3 },
+    { type: "passive", effect: "thirdHitDamage", amount: 0.3 },
   ]),
   card("prey-mark", "사냥감 표시", "다단중첩", "레어", 33, [
     { type: "attack", mult: 1, range: 3 },
@@ -236,7 +238,7 @@ const archerRewardPool = [
     { type: "attack", mult: 2, range: 3, preferPreviousTarget: true, sameTargetBonus: 0.5 },
   ]),
   card("persistent-hunt", "집요한 사냥", "다단중첩", "에픽", 32, [
-    { type: "permanent", effect: "afterAttackMove", amount: 1 },
+    { type: "passive", effect: "afterAttackMove", amount: 1 },
   ]),
   card("weakness-pierce", "약점 관통", "다단중첩", "에픽", 34, [
     { type: "attack", mult: 1, range: 3 },
@@ -244,7 +246,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 3, preferPreviousTarget: true, thirdHitBonus: 0.2 },
   ]),
   card("endless-barrage", "끝없는 연사", "다단중첩", "전설", 29, [
-    { type: "permanent", effect: "comboDamage", amount: 0.2 },
+    { type: "passive", effect: "comboDamage", amount: 0.2 },
   ]),
   card("hunt-finale", "사냥의 결말", "다단중첩", "전설", 31, [
     { type: "attack", mult: 1, range: 3 },
@@ -262,9 +264,11 @@ const archerRewardPool = [
   ]),
   card("attack-trap", "공격 함정 설치", "함정", "노말", 24, [
     { type: "placeTrap", range: 2, trap: "attack", count: 2 },
+    { type: "attack", mult: 1, range: 2 },
   ]),
   card("block-trap", "봉쇄 함정 설치", "함정", "노말", 25, [
     { type: "placeTrap", range: 2, trap: "block", count: 2 },
+    { type: "attack", mult: 1, range: 2 },
   ]),
   card("push-shot", "밀기 사격", "함정", "레어", 39, [
     { type: "attack", mult: 1, range: 2, push: 1 },
@@ -278,15 +282,18 @@ const archerRewardPool = [
   card("behind-trap", "함정 뒤로", "함정", "노말", 42, [
     { type: "flee", amount: 2 },
     { type: "placeTrap", range: 2, trap: "attack", count: 1 },
+    { type: "attack", mult: 1, range: 2 },
   ]),
   card("interference-trap", "방해 함정", "함정", "노말", 23, [
     { type: "placeTrap", range: 1, trap: "block", count: 2 },
+    { type: "attack", mult: 1, range: 2 },
   ]),
   card("guided-shot", "유도 사격", "함정", "노말", 38, [
     { type: "attack", mult: 1, range: 2, push: 1 },
   ]),
   card("spike-path", "가시 길목", "함정", "노말", 22, [
     { type: "placeTrap", range: 2, trap: "attack", count: 3 },
+    { type: "attack", mult: 1, range: 2 },
   ]),
   card("close-smash", "근접 강타", "함정", "레어", 36, [
     { type: "attack", mult: 1, range: 1, melee: true, push: 2 },
@@ -296,40 +303,58 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2, push: 1 },
   ]),
   card("trap-link", "함정 연계", "함정", "레어", 27, [
-    { type: "permanent", effect: "trapNextAttackDamage", amount: 0.2 },
+    { type: "passive", effect: "trapNextAttackDamage", amount: 0.2 },
   ]),
   card("route-block", "진로 차단", "함정", "레어", 29, [
     { type: "flee", amount: 2 },
     { type: "placeTrap", range: 2, trap: "block", count: 2 },
+    { type: "attack", mult: 1, range: 2 },
   ]),
   card("spike-zone", "가시 지대", "함정", "에픽", 21, [
     { type: "placeTrap", range: 2, trap: "attack", count: 2 },
+    { type: "attack", mult: 1, range: 3 },
   ]),
   card("pressure-shot", "압박 사격", "함정", "에픽", 35, [
     { type: "attack", mult: 2, range: 3, push: 2 },
   ]),
   card("chain-trigger", "연쇄 발동", "함정", "에픽", 25, [
-    { type: "permanent", effect: "trapChainDamage", amount: 1 },
+    { type: "passive", effect: "trapChainDamage", amount: 1 },
   ]),
   card("trap-burst", "함정 폭파", "함정", "에픽", 33, [
     { type: "detonateTrap", mult: 2, radius: 1 },
   ]),
   card("cross-block", "교차 봉쇄", "함정", "에픽", 24, [
     { type: "placeTrap", range: 2, trap: "block", count: 3 },
+    { type: "attack", mult: 1, range: 3 },
   ]),
   card("trap-hunt", "함정 사냥", "함정", "전설", 23, [
-    { type: "permanent", effect: "trapRangedVulnerability", amount: 0.2 },
+    { type: "passive", effect: "trapRangedVulnerability", amount: 0.2 },
   ]),
   card("spike-storm", "쐐기 폭풍", "함정", "전설", 20, [
     { type: "placeTrap", range: 3, trap: "attack", count: 5 },
+    { type: "attack", mult: 2, range: 3 },
   ]),
   card("force-trigger", "강제 발동", "함정", "전설", 30, [
     { type: "placeTrapBehindTarget", range: 3, trap: "attack", count: 1 },
     { type: "attack", mult: 2, range: 3, push: 3 },
   ]),
-  card("charge", "차지", "차지", "노말", 30, [{ type: "charge", amount: 1 }]),
+  card("charge", "차지", "차지", "노말", 30, [
+    {
+      type: "applyEffect",
+      label: "집중 방어",
+      duration: "turn",
+      modifiers: [{ stat: "damageTaken", amount: -0.1 }],
+    },
+    { type: "charge", amount: 1 },
+  ]),
   card("short-focus", "짧은 집중", "차지", "노말", 28, [
     { type: "flee", amount: 1 },
+    {
+      type: "applyEffect",
+      label: "짧은 집중",
+      duration: "turn",
+      modifiers: [{ stat: "damageTaken", amount: -0.1 }],
+    },
     { type: "charge", amount: 1 },
   ]),
   card("aim-breath", "조준 호흡", "차지", "노말", 29, [
@@ -381,27 +406,42 @@ const archerRewardPool = [
       modifiers: [{ stat: "damageDealt", amount: 0.1, when: { singleTarget: true } }],
     },
   ]),
-  card("charge-2", "차지 2", "차지", "레어", 28, [{ type: "charge", amount: 2 }]),
+  card("charge-2", "차지 2", "차지", "레어", 28, [
+    {
+      type: "applyEffect",
+      label: "집중 방어",
+      duration: "turn",
+      modifiers: [{ stat: "damageTaken", amount: -0.2 }],
+    },
+    { type: "charge", amount: 2 },
+  ]),
   card("charged-shot", "차지 샷", "차지", "레어", 34, [
     { type: "attack", mult: 2, range: 3 },
   ]),
   card("steady-breath", "안정된 호흡", "차지", "레어", 30, [
     {
-      type: "permanent",
+      type: "passive",
       modifiers: [{ stat: "damageTaken", amount: -0.2, when: { charged: true } }],
     },
   ]),
   card("compressed-load", "압축 장전", "차지", "레어", 27, [
+    {
+      type: "applyEffect",
+      label: "압축 방어",
+      duration: "turn",
+      modifiers: [{ stat: "damageTaken", amount: -0.2 }],
+    },
     { type: "charge", amount: 1 },
     { type: "charge", amount: 1 },
   ]),
   card("charge-retreat", "후퇴 집중", "차지", "레어", 30, [
-    { type: "permanent", effect: "chargeRetreat", amount: 1 },
+    { type: "passive", effect: "chargeRetreat", amount: 1 },
   ]),
   card("piercing-charged-shot", "관통 차지샷", "차지", "에픽", 32, [
     { type: "attack", mult: 3, range: 4, targets: 2 },
   ]),
   card("full-anchor", "완전 고정", "차지", "에픽", 25, [
+    { type: "charge", amount: 1 },
     {
       type: "applyEffect",
       label: "다음 공격 피해 +50%",
@@ -410,23 +450,23 @@ const archerRewardPool = [
     },
   ]),
   card("charge-range", "긴 조준", "차지", "에픽", 31, [
-    { type: "permanent", effect: "chargeRangePerStack", amount: 1 },
+    { type: "passive", effect: "chargeRangePerStack", amount: 1 },
   ]),
   card("waited-shot", "기다린 한 발", "차지", "에픽", 34, [
     { type: "charge", amount: 2 },
     { type: "attack", mult: 2, range: 3 },
   ]),
   card("breath-hold", "호흡 유지", "차지", "에픽", 29, [
-    { type: "permanent", effect: "chargeOnNoAttack", amount: 1 },
+    { type: "passive", effect: "chargeOnNoAttack", amount: 1 },
   ]),
   card("heart-piercer", "심장 꿰뚫기", "차지", "전설", 33, [
     { type: "attack", mult: 5, range: 4 },
   ]),
   card("charge-overkill", "잔여 관통", "차지", "전설", 33, [
-    { type: "permanent", effect: "overkillSplashRange", amount: 3 },
+    { type: "passive", effect: "overkillSplashRange", amount: 3 },
   ]),
   card("charge-doubler", "과충전", "차지", "전설", 30, [
-    { type: "permanent", effect: "chargeStackMultiplier", amount: 2 },
+    { type: "passive", effect: "chargeStackMultiplier", amount: 2 },
   ]),
 ];
 
@@ -483,7 +523,7 @@ const warriorRewardPool = [
     { type: "momentumAttack", amount: 5, mult: 1, range: 1 },
   ]),
   card("warrior-berserk-stance", "광전 태세", "광전", "레어", 44, [
-    { type: "permanent", effect: "berserkLostHpDamage", amount: 0.5 },
+    { type: "passive", effect: "berserkLostHpDamage", amount: 0.5 },
   ]),
   card("warrior-blood-recovery", "피의 회복", "광전", "레어", 40, [
     { type: "attack", mult: 1, range: 1, melee: true },
@@ -502,7 +542,7 @@ const warriorRewardPool = [
   ]),
   card("warrior-endless-charge", "멈추지 않는 돌입", "돌진", "전설", 62, [{ type: "move", amount: 6, desiredRange: 1, jump: true }]),
   card("warrior-death-edge", "죽음의 칼끝", "광전", "전설", 38, [
-    { type: "permanent", effect: "lowHpDamage", amount: 0.5, threshold: 0.25 },
+    { type: "passive", effect: "lowHpDamage", amount: 0.5, threshold: 0.25 },
   ]),
   card("warrior-final-blow", "최후의 일격", "광전", "전설", 36, [
     { type: "selfDamagePercent", percent: 0.2 },
@@ -567,7 +607,7 @@ const mageRewardPool = [
     { type: "placeMeteor", range: 5, mult: 10, radius: 2, delay: 2 },
   ]),
   card("mage-overflow", "마력 과잉", "연쇄", "레어", 34, [
-    { type: "permanent", effect: "comboDamage", amount: 0.1 },
+    { type: "passive", effect: "comboDamage", amount: 0.1 },
   ]),
   card("mage-thunder-ring", "천둥의 고리", "연쇄", "전설", 28, [{ type: "attack", mult: 1, range: 4, targets: 5 }]),
 ];
@@ -644,7 +684,7 @@ function persistSelectedCharacterId(id) {
 const monsterDefinitions = {
   brute: { name: "브루트", label: "브", image: "assets/characters/brute.png", baseAtk: 3, baseRange: 1, baseMove: 2 },
   skirmisher: { name: "척후병", label: "척", image: "assets/characters/skirmisher.png", baseAtk: 3, baseRange: 1, baseMove: 3 },
-  shooter: { name: "사수", label: "사", image: "assets/characters/shooter.png", baseAtk: 4, baseRange: 3, baseMove: 2 },
+  shooter: { name: "사수", label: "사", image: "assets/characters/shooter.png", baseAtk: 3, baseRange: 3, baseMove: 2 },
 };
 
 function spriteImg(src, className, alt = "") {
@@ -684,16 +724,16 @@ const monsterDecks = {
     card("brute-move", "접근", "브루트", "기본", 66, [{ type: "move", amount: 2, desiredRange: 1 }], 1),
   ],
   skirmisher: [
-    card("skirmisher-dash", "파고들기", "척후병", "기본", 44, [
+    card("skirmisher-dash", "파고들기", "척후병", "기본", 50, [
       { type: "move", amount: 3, desiredRange: 1 },
       { type: "attack", mult: 1, range: 1, melee: true },
     ], 3),
-    card("skirmisher-hit-run", "연속 찌르기", "척후병", "기본", 40, [
+    card("skirmisher-hit-run", "연속 찌르기", "척후병", "기본", 56, [
       { type: "attack", mult: 1, range: 1, melee: true },
       { type: "attack", mult: 1, range: 1, melee: true },
-    ], 2),
-    card("skirmisher-feint", "교란", "척후병", "기본", 48, [{ type: "move", amount: 2, desiredRange: 1 }], 2),
-    card("skirmisher-stab", "찌르기", "척후병", "기본", 36, [{ type: "attack", mult: 1, range: 1, melee: true }], 1),
+    ], 1),
+    card("skirmisher-feint", "교란", "척후병", "기본", 58, [{ type: "move", amount: 2, desiredRange: 1 }], 3),
+    card("skirmisher-stab", "찌르기", "척후병", "기본", 48, [{ type: "attack", mult: 1, range: 1, melee: true }], 1),
   ],
   shooter: [
     card("shooter-shot", "견제 사격", "사수", "기본", 46, [{ type: "attack", mult: 1, range: 3 }], 3),
@@ -709,7 +749,7 @@ const monsterDecks = {
   ],
 };
 
-const waves = buildWaves();
+const waves = buildWaves().map(applyWaveBalance);
 
 let state;
 
@@ -763,6 +803,8 @@ function newRun() {
     boardTileSignature: "",
     boardTileElements: new Map(),
     rewardLocked: false,
+    preStartReward: false,
+    passiveCards: [],
     log: [],
     speedMultiplier,
     suppressPlayerCard: false,
@@ -770,8 +812,10 @@ function newRun() {
 
   startWave(0);
   log(`${character.name} 새 런을 시작했다.`);
+  state.waitingReward = true;
+  state.preStartReward = true;
   render();
-  scheduleTurn();
+  showRewards();
 }
 
 function startWave(index) {
@@ -810,9 +854,9 @@ function startWave(index) {
       baseRange: character.baseRange,
       baseMove: character.baseMove,
       charge: 0,
-      permanent: {},
+      permanent: { ...(previousPlayer?.permanent ?? {}) },
       temporary: {},
-      effects: [],
+      effects: (previousPlayer?.effects ?? []).filter((effect) => effect.duration === "stage"),
       sustainedCards: [],
     },
   ];
@@ -975,6 +1019,17 @@ function buildWaves() {
       enemy(6, -3, 60),
     ]),
   ];
+}
+
+function applyWaveBalance(waveData, index) {
+  if (index < 2) return waveData;
+  return {
+    ...waveData,
+    enemies: waveData.enemies.map((entry) => ({
+      ...entry,
+      hp: Math.max(1, Math.round(entry.hp * POST_WAVE_TWO_HP_SCALE)),
+    })),
+  };
 }
 
 function wave(radius, walls, enemies) {
@@ -1209,20 +1264,8 @@ async function executeAction(actor, action, cardData) {
     applyEffect(actor, action);
     return false;
   }
-  if (action.type === "permanent") {
-    if (action.effect) actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + (action.amount ?? 1);
-    if (action.modifiers?.length) {
-      applyEffect(actor, {
-        type: "applyEffect",
-        label: permanentEffectLabel(action),
-        duration: "wave",
-        modifiers: action.modifiers,
-      });
-    }
-    if (action.effect === "lowHpDamage") {
-      actor.permanent.lowHpDamageThreshold = Math.min(actor.permanent.lowHpDamageThreshold ?? 1, action.threshold ?? 0.25);
-    }
-    log(`${actor.name} 영구 효과: ${permanentEffectLabel(action)}`);
+  if (isPassiveAction(action)) {
+    applyPassiveAction(actor, action);
     return false;
   }
   if (action.type === "placeTrapBehindTarget") {
@@ -1284,7 +1327,7 @@ function drawEnemyCard(kind) {
 
 function discardResolvedCard(cardData, actor) {
   if (!cardData) return;
-  if (cardData.actions.some((action) => action.type === "permanent")) return;
+  if (cardData.actions.some(isPassiveAction)) return;
   if (isSustainCard(cardData) && actor) {
     actor.sustainedCards = actor.sustainedCards ?? [];
     actor.sustainedCards.push({ card: cardData, discardAfterTurn: state.turn + 1 });
@@ -1295,7 +1338,7 @@ function discardResolvedCard(cardData, actor) {
 
 function discardEnemyCard(cardData, kind) {
   if (!cardData) return;
-  if (cardData.actions.some((action) => action.type === "permanent")) return;
+  if (cardData.actions.some(isPassiveAction)) return;
   state.enemyDiscards[kind] = state.enemyDiscards[kind] ?? [];
   if (isSustainCard(cardData)) {
     state.enemySustainedCards[kind] = state.enemySustainedCards[kind] ?? [];
@@ -1365,6 +1408,23 @@ async function resolveCardEndEffects(actor, cardData, cardContext) {
     actor.temporary.cannotMove = true;
     log(`${actor.name} 호흡 유지: 차지 ${actor.charge}`);
   }
+}
+
+function applyPassiveAction(actor, action) {
+  actor.permanent = actor.permanent ?? {};
+  if (action.effect) actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + (action.amount ?? 1);
+  if (action.modifiers?.length) {
+    applyEffect(actor, {
+      type: "applyEffect",
+      label: passiveEffectLabel(action),
+      duration: "stage",
+      modifiers: action.modifiers,
+    });
+  }
+  if (action.effect === "lowHpDamage") {
+    actor.permanent.lowHpDamageThreshold = Math.min(actor.permanent.lowHpDamageThreshold ?? 1, action.threshold ?? 0.25);
+  }
+  log(`${actor.name} 패시브: ${passiveEffectLabel(action)}`);
 }
 
 function applyEffect(actor, action) {
@@ -2536,10 +2596,21 @@ function clearWave() {
     finishRun(true);
     return;
   }
+  healWaveClear();
   state.waitingReward = true;
   state.discard = [];
   state.deck = shuffle([...state.playerCards]);
   showRewards();
+}
+
+function healWaveClear() {
+  const player = getPlayer();
+  if (!player || !isAlive(player)) return;
+  const amount = Math.max(1, Math.round(player.maxHp * WAVE_CLEAR_HEAL_RATIO));
+  const beforeHp = player.hp;
+  player.hp = Math.min(player.maxHp, player.hp + amount);
+  const healed = player.hp - beforeHp;
+  if (healed > 0) log(`${player.name} 웨이브 정비: 체력 ${healed} 회복`);
 }
 
 function finishRun(win) {
@@ -2593,6 +2664,8 @@ function drawRewards() {
 async function pickReward(reward, button) {
   if (state.rewardLocked) return;
   state.rewardLocked = true;
+  const preStartReward = state.preStartReward;
+  const passiveReward = isPassiveCard(reward);
 
   const mount = button.querySelector(".reward-mount") || button;
   const startRect = mount.getBoundingClientRect();
@@ -2612,7 +2685,11 @@ async function pickReward(reward, button) {
   elements.rewardOverlay.classList.add("hidden");
   elements.rewardCards.innerHTML = "";
 
-  state.playerCards.push(reward);
+  if (passiveReward) {
+    applyPassiveReward(reward);
+  } else {
+    state.playerCards.push(reward);
+  }
 
   const cardCx = startRect.left + startRect.width / 2;
   const cardCy = startRect.top + startRect.height / 2;
@@ -2627,23 +2704,31 @@ async function pickReward(reward, button) {
     document.querySelector('.player-hud .pile-row span[title="덱"]') ||
     document.querySelector(".player-hud");
   flyer.classList.remove("to-center");
-  flyer.classList.add("to-deck");
-  if (deckTarget) {
+  if (passiveReward) {
+    flyer.style.transform = `translate(${centerX}px, ${centerY}px) scale(1.35)`;
+    flyer.style.opacity = "0";
+  } else {
+    flyer.classList.add("to-deck");
+  }
+  if (!passiveReward && deckTarget) {
     const endRect = deckTarget.getBoundingClientRect();
     const dx = endRect.left + endRect.width / 2 - cardCx;
     const dy = endRect.top + endRect.height / 2 - cardCy;
     flyer.style.transform = `translate(${dx}px, ${dy}px) scale(0.07) rotate(-12deg)`;
     flyer.style.opacity = "0";
-  } else {
+  } else if (!passiveReward) {
     flyer.style.transform = "translateY(60vh) scale(0.08)";
     flyer.style.opacity = "0";
   }
 
   await sleep(360);
-  state.deck.push(reward);
+  if (!passiveReward) {
+    if (preStartReward) state.deck.unshift(reward);
+    else state.deck.push(reward);
+  }
   renderPlayerHud();
   const deckPile = document.querySelector('.player-hud .pile-row span[title="덱"]');
-  if (deckPile) {
+  if (!passiveReward && deckPile) {
     deckPile.classList.remove("pile-pop");
     void deckPile.offsetWidth;
     deckPile.classList.add("pile-pop");
@@ -2653,10 +2738,31 @@ async function pickReward(reward, button) {
 
   state.rewardLocked = false;
   log(`보상 선택: ${reward.name}`);
-  state.waveIndex += 1;
-  startWave(state.waveIndex);
+  if (preStartReward) {
+    state.preStartReward = false;
+    state.waitingReward = false;
+  } else {
+    state.waveIndex += 1;
+    startWave(state.waveIndex);
+  }
   render();
   scheduleTurn();
+}
+
+function isPassiveAction(action) {
+  return action?.type === "passive" || action?.type === "permanent";
+}
+
+function isPassiveCard(cardData) {
+  return cardData?.actions?.some(isPassiveAction);
+}
+
+function applyPassiveReward(cardData) {
+  const player = getPlayer();
+  if (!player) return;
+  state.passiveCards = state.passiveCards ?? [];
+  state.passiveCards.push(cardData);
+  cardData.actions.filter(isPassiveAction).forEach((action) => applyPassiveAction(player, action));
 }
 
 function render() {
@@ -2715,6 +2821,7 @@ function intentParts(card) {
       case "healPercent":
         parts.push({ kind: "heal", val: "+" + Math.round(a.percent * 100) + "%", tone: "special" });
         break;
+      case "passive":
       case "permanent":
         parts.push({ kind: "permanent", val: "", tone: "special" });
         break;
@@ -3262,8 +3369,9 @@ function friendlyAction(action) {
       return `체력 ${Math.round(action.percent * 100)}% 회복`;
     case "selfDamagePercent":
       return `체력 ${Math.round(action.percent * 100)}% 소모`;
+    case "passive":
     case "permanent":
-      return permanentEffectLabel(action);
+      return passiveEffectLabel(action);
     case "applyEffect":
       return effectActionLabel(action);
     default:
@@ -3394,7 +3502,7 @@ function compactActionStat(action) {
   if (action.type === "placeMeteor") return actionStat("meteor", "운석 예고", action.delay ?? 1);
   if (action.type === "selfDamagePercent") return actionNote(`-${Math.round(action.percent * 100)}%`);
   if (action.type === "healPercent") return actionNote(`+${Math.round(action.percent * 100)}%`);
-  if (action.type === "permanent") return actionNote("영구");
+  if (isPassiveAction(action)) return actionNote("패시브");
   if (action.type === "applyEffect") return actionNote(effectActionLabel(action), effectActionLabel(action));
   return actionNote(action.type);
 }
@@ -3441,10 +3549,10 @@ function renderActionLine(action) {
   if (action.type === "charge") {
     return `<span class="action-line">${actionGroup("special", [actionStat("charge", "차지", action.amount)])}</span>`;
   }
-  if (action.type === "permanent") {
+  if (isPassiveAction(action)) {
     return `<span class="action-line">${actionGroup("special", [
-      actionStat("permanent", "영구", 1),
-      actionNote(permanentEffectLabel(action), permanentEffectLabel(action)),
+      actionStat("permanent", "패시브", 1),
+      actionNote(passiveEffectLabel(action), passiveEffectLabel(action)),
     ])}</span>`;
   }
   if (action.type === "placeTrap" || action.type === "placeObstacle") {
@@ -3558,7 +3666,7 @@ const ICON_HELP = {
   area: { name: "범위", desc: "폭발이 미치는 범위" },
   "self-damage": { name: "체력 소모", desc: "잃는 체력 비율" },
   heal: { name: "회복", desc: "회복하는 체력 비율" },
-  permanent: { name: "영구 효과", desc: "런 내내 유지되는 강화" },
+  permanent: { name: "패시브", desc: "선택 즉시 적용되어 스테이지 동안 유지되는 강화" },
   effect: { name: "일시 효과", desc: "이번 턴이나 다음 공격에 적용되는 강화" },
   pattern: { name: "공격 패턴", desc: "맞붙은 칸을 함께 공격하는 형태" },
 };
@@ -3619,7 +3727,7 @@ function trapLabel(action) {
   return (action.trap ?? action.obstacle) === "block" ? "봉쇄 함정" : "공격 함정";
 }
 
-function permanentEffectLabel(action) {
+function passiveEffectLabel(action) {
   const labels = {
     comboDamage: `연타 피해 +${Math.round(action.amount * 100)}%`,
     thirdHitDamage: `세 번째 명중 피해 +${Math.round(action.amount * 100)}%`,
@@ -3636,7 +3744,7 @@ function permanentEffectLabel(action) {
     berserkLostHpDamage: `잃은 체력 비율 / 2 피해 증가`,
     lowHpDamage: `체력 ${Math.round((action.threshold ?? 0.25) * 100)}% 미만 피해 +${Math.round(action.amount * 100)}%`,
   };
-  return labels[action.effect] ?? action.label ?? modifierLabel(action.modifiers?.[0]) ?? "영구 효과";
+  return labels[action.effect] ?? action.label ?? modifierLabel(action.modifiers?.[0]) ?? "패시브";
 }
 
 function effectActionLabel(action) {
@@ -3698,7 +3806,7 @@ function describeAction(action) {
     return `${patternText} ATK ${action.mult}, RNG ${action.range}`;
   }
   if (action.type === "charge") return `차지 ${action.amount}`;
-  if (action.type === "permanent") return permanentEffectLabel(action);
+  if (isPassiveAction(action)) return passiveEffectLabel(action);
   if (action.type === "applyEffect") return effectActionLabel(action);
   if (action.type === "placeTrap" || action.type === "placeObstacle") return `함정 설치 RNG ${action.range}`;
   if (action.type === "placeTrapBehindTarget") return `대상 뒤 함정 설치 RNG ${action.range}`;
