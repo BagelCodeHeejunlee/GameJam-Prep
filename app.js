@@ -11,6 +11,7 @@ const CAMERA_DEAD_ZONE_WIDTH_RATIO = 0.34;
 const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.28;
 const CAMERA_UI_GAP = 16;
 const CAMERA_PLAYER_EDGE_MARGIN = 72;
+const CAMERA_FOLLOW_DURATION = 220;
 
 const directions = [
   { q: 1, r: 0 },
@@ -399,6 +400,7 @@ function newRun() {
     cameraMode: "overview",
     cameraTransitionScheduled: false,
     cameraFocusReady: false,
+    cameraFollowToken: 0,
     cameraPanelWidth: 0,
     cameraPanelHeight: 0,
     boardTileSignature: "",
@@ -429,6 +431,7 @@ function startWave(index) {
   state.cameraMode = "overview";
   state.cameraTransitionScheduled = false;
   state.cameraFocusReady = false;
+  state.cameraFollowToken = (state.cameraFollowToken ?? 0) + 1;
   state.cameraPanelWidth = 0;
   state.cameraPanelHeight = 0;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
@@ -1211,7 +1214,52 @@ async function slideActorTo(actor, from, to) {
   await nextFrame();
   entityElement.style.left = `${toPoint.x}px`;
   entityElement.style.top = `${toPoint.y}px`;
+  const cameraFollow = animateCameraFollowForActor(actor, from, to);
   await sleep(240);
+  if (cameraFollow) await cameraFollow;
+}
+
+function animateCameraFollowForActor(actor, from, to) {
+  if (actor.side !== "player" || state.cameraMode !== "focus") return null;
+
+  const bounds = boardBounds();
+  const fromPoint = hexToPixel(from, bounds);
+  const toPoint = hexToPixel(to, bounds);
+  const token = (state.cameraFollowToken ?? 0) + 1;
+  const previousTransition = elements.board.style.transition;
+  state.cameraFollowToken = token;
+  elements.board.style.transition = "none";
+
+  return new Promise((resolve) => {
+    const startedAt = performance.now();
+    const finish = () => {
+      if (state?.cameraFollowToken === token) elements.board.style.transition = previousTransition;
+      resolve();
+    };
+    const tick = (now) => {
+      if (!state || state.cameraFollowToken !== token || state.cameraMode !== "focus") {
+        elements.board.style.transition = previousTransition;
+        resolve();
+        return;
+      }
+
+      const progress = Math.min(1, (now - startedAt) / CAMERA_FOLLOW_DURATION);
+      const eased = easeInOut(progress);
+      fitBoardToPanel(bounds, {
+        focusPoint: {
+          x: fromPoint.x + (toPoint.x - fromPoint.x) * eased,
+          y: fromPoint.y + (toPoint.y - fromPoint.y) * eased,
+        },
+      });
+
+      if (progress < 1) {
+        window.requestAnimationFrame(tick);
+      } else {
+        finish();
+      }
+    };
+    window.requestAnimationFrame(tick);
+  });
 }
 
 function nextAttackAction(cardData, currentAction) {
@@ -2887,7 +2935,7 @@ function boardBounds() {
   };
 }
 
-function fitBoardToPanel(bounds = boardBounds()) {
+function fitBoardToPanel(bounds = boardBounds(), options = {}) {
   const logicalWidth = Math.max(620, bounds.width + BOARD_PADDING * 2);
   const logicalHeight = Math.max(620, bounds.height + BOARD_PADDING * 2);
   const panel = elements.board.parentElement;
@@ -2901,7 +2949,7 @@ function fitBoardToPanel(bounds = boardBounds()) {
   const player = getPlayer();
   if (state.cameraMode === "focus" && player) {
     scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, CAMERA_FOCUS_TARGET_SCALE));
-    const focusPoint = hexToPixel(player, bounds);
+    const focusPoint = options.focusPoint ?? hexToPixel(player, bounds);
     const playArea = cameraPlayArea(panelHeight);
     const focusCenter = {
       x: panelWidth / 2,
@@ -2978,6 +3026,12 @@ function clampCameraOffset(offset, visibleStart, visibleEnd, contentSize) {
   const visibleSize = visibleEnd - visibleStart;
   if (contentSize <= visibleSize) return visibleStart + (visibleSize - contentSize) / 2;
   return Math.min(visibleStart, Math.max(visibleEnd - contentSize, offset));
+}
+
+function easeInOut(progress) {
+  return progress < 0.5
+    ? 2 * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 }
 
 function hexToPixel(hex, bounds) {
