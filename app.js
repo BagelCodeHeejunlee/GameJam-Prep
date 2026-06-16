@@ -2364,21 +2364,14 @@ function renderEnemySummary() {
 
 function renderPriorityStrip() {
   elements.priorityStrip.innerHTML = "";
-  const compact = !state.priorityRevealMode;
-  const executing = compact && state.activeTimelineIndex >= 0;
-  elements.priorityStrip.className = `priority-strip ${state.priorityRevealMode ? `reveal-${state.priorityRevealMode}` : ""} ${executing ? "executing" : ""} ${compact ? "compact" : ""}`.trim();
+  const executing = !state.priorityRevealMode && state.activeTimelineIndex >= 0;
+  elements.priorityStrip.className = `priority-strip ${state.priorityRevealMode ? `reveal-${state.priorityRevealMode}` : ""} ${executing ? "executing" : ""}`.trim();
   if (!state.currentTimeline.length) {
     elements.priorityStrip.innerHTML = `<span class="priority-empty">카드 대기</span>`;
     return;
   }
 
-  const items = compact ? compactPriorityItems() : state.currentTimeline.map((entry, index) => ({ entry, index, label: "" }));
-  if (!items.length) {
-    elements.priorityStrip.innerHTML = `<span class="priority-empty">대기</span>`;
-    return;
-  }
-
-  items.forEach(({ entry, index, label }) => {
+  state.currentTimeline.forEach((entry, index) => {
     const isPlayer = entry.actorType === "player";
     const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
     const boss = groupEnemies.some((e) => e.boss);
@@ -2394,32 +2387,12 @@ function renderPriorityStrip() {
     card.className = `priority-item ${isPlayer ? "player" : "enemy"} ${boss ? "boss" : ""} ${statusClass}`;
     card.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
     card.innerHTML = `
-      ${label ? `<span class="pc-role">${label}</span>` : ""}
       <span class="pc-portrait"><span class="pc-emblem">${emblem}</span></span>
       <span class="pc-badge">${entry.card.priority}</span>
       ${count > 1 ? `<span class="pc-count">×${count}</span>` : ""}
     `;
     elements.priorityStrip.append(card);
   });
-}
-
-function compactPriorityItems() {
-  const timeline = state.currentTimeline;
-  if (!timeline.length) return [];
-
-  if (state.activeTimelineIndex >= 0) {
-    const nextIndex = timeline.findIndex((_, index) => index > state.activeTimelineIndex && !state.completedTimelineIndexes?.has(index));
-    return [
-      { entry: timeline[state.activeTimelineIndex], index: state.activeTimelineIndex, label: "현재" },
-      nextIndex >= 0 ? { entry: timeline[nextIndex], index: nextIndex, label: "다음" } : null,
-    ].filter(Boolean);
-  }
-
-  return timeline
-    .map((entry, index) => ({ entry, index }))
-    .filter(({ index }) => !state.completedTimelineIndexes?.has(index))
-    .slice(0, 2)
-    .map((item, order) => ({ ...item, label: order === 0 ? "다음" : "그다음" }));
 }
 
 function renderPlayerHud() {
