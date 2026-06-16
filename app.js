@@ -1312,8 +1312,8 @@ function bestCombatMoveTile(actor, reachable, attackAction) {
   });
 
   scored.sort((a, b) => {
-    if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
+    if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     if (a.hitCount > 1 && a.farthestClosest !== b.farthestClosest) {
       return b.farthestClosest - a.farthestClosest;
     }
