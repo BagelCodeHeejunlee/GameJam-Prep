@@ -43,7 +43,6 @@ const elements = {
   rewardOverlay: document.querySelector("#rewardOverlay"),
   rewardCards: document.querySelector("#rewardCards"),
   iconHelpOverlay: document.querySelector("#iconHelpOverlay"),
-  iconHelpButton: document.querySelector("#iconHelpButton"),
   closeHelpButton: document.querySelector("#closeHelpButton"),
   newRunButton: document.querySelector("#newRunButton"),
   pauseButton: document.querySelector("#pauseButton"),
@@ -1941,14 +1940,28 @@ function showRewards() {
   state.rewardLocked = false;
   elements.rewardCards.innerHTML = "";
   rewards.forEach((reward) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `reward-pick ${rarityClass(reward.rarity)}`;
-    button.innerHTML = `
-      ${cardMount(reward, "reward-mount")}
+    const pick = document.createElement("div");
+    pick.className = `reward-pick ${rarityClass(reward.rarity)}`;
+    pick.setAttribute("role", "button");
+    pick.tabIndex = 0;
+    pick.innerHTML = `
+      <div class="reward-pick-card">
+        ${cardMount(reward, "reward-mount")}
+        <button type="button" class="card-help-btn" aria-label="이 카드 아이콘 설명">?</button>
+      </div>
     `;
-    button.addEventListener("click", () => pickReward(reward, button));
-    elements.rewardCards.append(button);
+    pick.addEventListener("click", () => pickReward(reward, pick));
+    pick.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        pickReward(reward, pick);
+      }
+    });
+    pick.querySelector(".card-help-btn").addEventListener("click", (event) => {
+      event.stopPropagation();
+      openCardIconHelp(reward);
+    });
+    elements.rewardCards.append(pick);
   });
   elements.rewardOverlay.classList.remove("hidden");
 }
@@ -2860,6 +2873,72 @@ function actionIcon(kind) {
   return icons[kind] ?? "?";
 }
 
+// kind → 카드에 등장하는 아이콘 설명 (카드별 ? 버튼이 이 표에서 해당 카드 아이콘만 뽑아 보여준다)
+const ICON_HELP = {
+  PRI: { name: "우선권 (PRI)", desc: "숫자가 낮을수록 먼저 발동" },
+  melee: { name: "근거리 공격", desc: "근거리 공격 배수" },
+  ranged: { name: "원거리 공격", desc: "원거리 공격 배수" },
+  move: { name: "이동", desc: "이동하는 칸 수" },
+  "move-flee": { name: "후퇴", desc: "뒤로 물러나는 칸 수" },
+  range: { name: "사거리", desc: "공격·설치가 닿는 거리" },
+  target: { name: "타겟 수", desc: "동시에 공격하는 대상 수" },
+  charge: { name: "차지", desc: "충전 수치" },
+  "trap-attack": { name: "공격 함정", desc: "설치하는 공격 함정 개수" },
+  "trap-block": { name: "봉쇄 함정", desc: "설치하는 봉쇄 함정 개수" },
+  rune: { name: "룬", desc: "룬 설치 / 룬 주변 공격" },
+  "rune-burst": { name: "룬 폭파", desc: "설치된 룬을 터뜨려 공격" },
+  meteor: { name: "운석", desc: "운석 예고 턴 수" },
+  area: { name: "범위", desc: "폭발이 미치는 범위" },
+  "self-damage": { name: "체력 소모", desc: "잃는 체력 비율" },
+  heal: { name: "회복", desc: "회복하는 체력 비율" },
+  permanent: { name: "영구 효과", desc: "런 내내 유지되는 강화" },
+  pattern: { name: "공격 패턴", desc: "맞붙은 칸을 함께 공격하는 형태" },
+};
+
+// 카드에 실제로 그려지는 아이콘 종류만 (등장 순서대로, 중복 없이) 수집
+function collectCardIconKinds(card) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = renderActionList(card);
+  const kinds = ["PRI"]; // 우선권 배지는 모든 카드에 항상 존재
+  tmp.querySelectorAll(".action-icon").forEach((el) => {
+    const kind = [...el.classList].find((c) => c !== "action-icon");
+    if (kind && ICON_HELP[kind] && !kinds.includes(kind)) kinds.push(kind);
+  });
+  if (tmp.querySelector(".pattern-icon") && !kinds.includes("pattern")) kinds.push("pattern");
+  return kinds;
+}
+
+function helpGlyph(kind) {
+  if (kind === "PRI") return `<span class="help-pri">PRI</span>`;
+  if (kind === "pattern") {
+    return `<span class="pattern-icon adjacent-triple"><i></i><i></i><i></i></span>`;
+  }
+  return `<span class="action-icon ${kind}">${actionIcon(kind)}</span>`;
+}
+
+function openCardIconHelp(card) {
+  const list = document.querySelector("#iconHelpList");
+  const title = document.querySelector("#iconHelpTitle");
+  if (!list) return;
+  const kinds = collectCardIconKinds(card);
+  if (title) title.textContent = `${card.name} · 아이콘 설명`;
+  list.innerHTML = kinds
+    .map((kind) => {
+      const info = ICON_HELP[kind];
+      return `
+        <div class="icon-help-row">
+          <span class="icon-help-glyph">${helpGlyph(kind)}</span>
+          <div class="icon-help-text">
+            <strong>${info.name}</strong>
+            <span>${info.desc}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+  elements.iconHelpOverlay.classList.remove("hidden");
+}
+
 function actionNote(text, title = text) {
   return `<span class="action-note" title="${title}">${text}</span>`;
 }
@@ -3268,11 +3347,13 @@ elements.speedButton.addEventListener("click", () => {
   if (state) state.speedMultiplier = speedMultiplier;
   renderHud();
 });
-elements.iconHelpButton.addEventListener("click", () => {
-  elements.iconHelpOverlay.classList.remove("hidden");
-});
 elements.closeHelpButton.addEventListener("click", () => {
   elements.iconHelpOverlay.classList.add("hidden");
+});
+elements.iconHelpOverlay.addEventListener("click", (event) => {
+  if (event.target === elements.iconHelpOverlay) {
+    elements.iconHelpOverlay.classList.add("hidden");
+  }
 });
 window.addEventListener("resize", () => {
   renderBoard();

@@ -2983,6 +2983,105 @@ body.turn-cue-active .turn-scrim {
   color: var(--muted);
 }
 
+/* Per-card icon help (populated from the clicked reward card's icons) */
+#iconHelpList.icon-help-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  grid-template-columns: none;
+}
+
+.icon-help-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+
+.icon-help-glyph {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--accent);
+}
+
+.icon-help-glyph .action-icon,
+.icon-help-glyph .action-icon svg {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+}
+
+.icon-help-glyph .action-icon svg {
+  overflow: visible;
+}
+
+.icon-help-glyph .action-icon svg path,
+.icon-help-glyph .action-icon svg circle,
+.icon-help-glyph .action-icon svg rect,
+.icon-help-glyph .action-icon svg polygon,
+.icon-help-glyph .action-icon svg line,
+.icon-help-glyph .action-icon svg polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-help-glyph .action-icon svg .fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.help-pri {
+  font-family: var(--card-font);
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+}
+
+.icon-help-glyph .pattern-icon {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 14px;
+}
+.icon-help-glyph .pattern-icon i {
+  position: absolute;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: currentColor;
+}
+.icon-help-glyph .pattern-icon i:nth-child(1) { left: 0; }
+.icon-help-glyph .pattern-icon i:nth-child(2) { left: 9px; }
+.icon-help-glyph .pattern-icon i:nth-child(3) { left: 18px; }
+
+.icon-help-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.icon-help-text strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+.icon-help-text span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 @media (max-width: 960px) {
   .top-bar {
     align-items: center;
@@ -3487,6 +3586,44 @@ body.turn-cue-active .turn-scrim {
 .reward-pick:nth-child(2) { animation-delay: 130ms; }
 .reward-pick:nth-child(3) { animation-delay: 200ms; }
 .reward-pick:nth-child(4) { animation-delay: 270ms; }
+
+/* Card + its own "?" icon-help button */
+.reward-pick-card {
+  position: relative;
+  display: inline-block;
+}
+
+.card-help-btn {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: linear-gradient(#3aa0e2, #1f7fc4);
+  color: #fff;
+  font-family: var(--card-font);
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 11px rgba(13, 73, 122, 0.45);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.card-help-btn:hover {
+  transform: scale(1.14);
+  filter: brightness(1.08);
+}
+
+.card-help-btn:active {
+  transform: scale(1.02);
+}
 
 @keyframes reward-card-rise {
   from { opacity: 0; transform: translateY(26px) scale(0.92); }
