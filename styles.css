@@ -2715,7 +2715,7 @@ h2 {
 .cp-bg {
   position: absolute;
   inset: 0;
-  border-radius: 32px;
+  border-radius: 35px;
   background: var(--cp-frame) center / 100% 100% no-repeat;
 }
 
@@ -2724,17 +2724,18 @@ h2 {
 .cp-banner {
   position: absolute;
   inset: 0;
-  border-radius: 32px;
+  border-radius: 35px;
   background: var(--cp-banner) center / 100% 100% no-repeat;
+  transform: translate(-22px, -46px);
   pointer-events: none;
 }
 
 /* Priority number — centered on the banner's left circle (≈64,98). */
 .cp-priority {
   position: absolute;
-  left: 16px;
-  top: 48px;
-  width: 96px;
+  left: -4px;
+  top: 0px;
+  width: 100px;
   height: 100px;
   display: grid;
   place-items: center;
@@ -2748,15 +2749,16 @@ h2 {
 /* Card name — centered on the banner's plate (≈x120–485, y94). */
 .cp-name {
   position: absolute;
-  left: 120px;
-  top: 50px;
-  width: 366px;
+  left: 70px;
+  top: 5px;
+  width: 367px;
   height: 86px;
   display: grid;
   place-items: center;
+  justify-items: center;
   padding: 0 16px;
   color: #4a2f1b;
-  font-size: 42px;
+  font-size: 33px;
   font-weight: 900;
   line-height: 1.02;
   text-align: center;
@@ -2770,8 +2772,8 @@ h2 {
   position: absolute;
   left: 58px;
   right: 58px;
-  top: 190px;
-  bottom: 92px;
+  top: 139px;
+  bottom: 143px;
   display: grid;
   place-items: center;
   align-content: center;
