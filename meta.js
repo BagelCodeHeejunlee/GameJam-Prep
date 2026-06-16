@@ -1,5 +1,6 @@
 const MAX_LEVEL = 20;
 const STORAGE_KEY = "gamejam-prep-meta-levels-v2";
+const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
 
 const characters = {
   archer: {
@@ -49,6 +50,7 @@ const elements = {
   gainSmallButton: document.querySelector("#gainSmallButton"),
   gainBossButton: document.querySelector("#gainBossButton"),
   levelUpButton: document.querySelector("#levelUpButton"),
+  startButton: document.querySelector("#startButton"),
   resetButton: document.querySelector("#resetButton"),
   toast: document.querySelector("#levelToast"),
   heroButtons: [...document.querySelectorAll("[data-character]")],
@@ -56,7 +58,7 @@ const elements = {
   tabPanels: [...document.querySelectorAll("[data-panel]")],
 };
 
-let selectedCharacterId = "archer";
+let selectedCharacterId = loadSelectedCharacterId();
 let activeTab = "hero";
 let profile = loadProfile();
 
@@ -75,6 +77,23 @@ function loadProfile() {
 
 function saveProfile() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+}
+
+function loadSelectedCharacterId() {
+  try {
+    const saved = localStorage.getItem(SELECTED_CHARACTER_STORAGE_KEY);
+    return characters[saved] ? saved : "archer";
+  } catch {
+    return "archer";
+  }
+}
+
+function saveSelectedCharacterId(id) {
+  try {
+    localStorage.setItem(SELECTED_CHARACTER_STORAGE_KEY, id);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
 }
 
 function xpRequired(level) {
@@ -137,6 +156,7 @@ function resetGrowth() {
 
 function selectCharacter(id) {
   selectedCharacterId = id;
+  saveSelectedCharacterId(id);
   activeTab = "hero";
   render();
 }
@@ -171,6 +191,7 @@ function render() {
   elements.atkValue.textContent = state.atk;
   elements.hpValue.textContent = state.hp;
   elements.levelBadge.textContent = `Lv. ${state.level}`;
+  elements.startButton.href = `index.html?character=${encodeURIComponent(character.id)}`;
   elements.xpText.textContent = state.level >= MAX_LEVEL ? "MAX" : `${state.xp} / ${required}`;
   elements.xpFill.style.width = `${Math.round(xpRatio * 100)}%`;
   elements.levelUpButton.disabled = state.level >= MAX_LEVEL || state.xp < required;

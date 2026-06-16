@@ -12,6 +12,7 @@ const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.28;
 const CAMERA_UI_GAP = 16;
 const CAMERA_PLAYER_EDGE_MARGIN = 72;
 const CAMERA_FOLLOW_DURATION = 220;
+const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
 
 const directions = [
   { q: 1, r: 0 },
@@ -612,6 +613,33 @@ const characterDefinitions = {
     rewardPool: mageRewardPool,
   },
 };
+
+selectedCharacterId = initialSelectedCharacterId();
+
+function initialSelectedCharacterId() {
+  const queryCharacter = new URLSearchParams(window.location.search).get("character");
+  if (queryCharacter && characterDefinitions[queryCharacter]) {
+    persistSelectedCharacterId(queryCharacter);
+    return queryCharacter;
+  }
+
+  try {
+    const savedCharacter = localStorage.getItem(SELECTED_CHARACTER_STORAGE_KEY);
+    if (savedCharacter && characterDefinitions[savedCharacter]) return savedCharacter;
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+
+  return "archer";
+}
+
+function persistSelectedCharacterId(id) {
+  try {
+    localStorage.setItem(SELECTED_CHARACTER_STORAGE_KEY, id);
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
 
 const monsterDefinitions = {
   brute: { name: "브루트", label: "브", image: "assets/characters/brute.png", baseAtk: 3, baseRange: 1, baseMove: 2 },
@@ -4052,6 +4080,7 @@ elements.newRunButton.addEventListener("click", newRun);
 elements.characterButtons.forEach((button) => {
   button.addEventListener("click", () => {
     selectedCharacterId = button.dataset.character;
+    persistSelectedCharacterId(selectedCharacterId);
     newRun();
   });
 });
