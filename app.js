@@ -5,7 +5,7 @@ const TURN_DELAY = 540;
 const WAVE_INTRO_DELAY = 1300;
 const CAMERA_FOCUS_DELAY = 360;
 const MAP_ROOM_SCALE = 2;
-const CAMERA_FOCUS_TARGET_SCALE = 1;
+const CAMERA_FOCUS_TARGET_SCALE = 0.9;
 const CAMERA_FOCUS_MAX_SCALE = 1.02;
 const CAMERA_DEAD_ZONE_WIDTH_RATIO = 0.34;
 const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.28;
@@ -3168,9 +3168,11 @@ function commitCameraFrame(frame) {
 }
 
 function cameraPlayArea(panelHeight) {
-  const topHudRect = document.querySelector(".battle-top-hud")?.getBoundingClientRect();
+  const topRects = [document.querySelector(".top-bar"), document.querySelector(".character-select")]
+    .map((element) => element?.getBoundingClientRect())
+    .filter(Boolean);
   const playerHudRect = elements.playerHud?.getBoundingClientRect();
-  const top = topHudRect?.height ? topHudRect.bottom + CAMERA_UI_GAP : panelHeight * 0.24;
+  const top = topRects.length ? Math.max(...topRects.map((rect) => rect.bottom)) + CAMERA_UI_GAP : panelHeight * 0.14;
   const bottom = playerHudRect?.height ? playerHudRect.top - CAMERA_UI_GAP : panelHeight * 0.84;
   const safeBottom = Math.max(top + 140, bottom);
   return {
