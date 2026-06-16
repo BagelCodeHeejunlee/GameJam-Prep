@@ -724,16 +724,20 @@ async function runTurn() {
     if (state.finished || state.waitingReward) break;
     const entry = entries[index];
     state.activeTimelineIndex = index;
+    document.body.classList.toggle("player-acting", entry.actorType === "player");
     renderPriorityStrip();
+    renderBoard();
     renderDrawnCards();
     renderTimeline(index);
-    if (entry.actorType === "player") await playPlayerTurnCue(entry);
+    await playTurnCue(entry);
     await executeTimelineEntry(entry);
     expireTurnEndEffects(entry);
     state.completedTimelineIndexes.add(index);
     state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
     state.activeTimelineIndex = -1;
+    document.body.classList.remove("player-acting");
     renderPriorityStrip();
+    renderBoard();
     renderDrawnCards();
     renderTimeline();
     await sleep(turnDelay());
@@ -2140,8 +2144,16 @@ function renderBoard() {
 
   for (const entity of state.entities.filter(isAlive)) {
     const point = hexToPixel(entity, bounds);
+    const activeEntry =
+      state.activeTimelineIndex >= 0 ? state.currentTimeline[state.activeTimelineIndex] : null;
+    const acting =
+      activeEntry &&
+      ((activeEntry.actorType === "player" && entity.side === "player") ||
+        (activeEntry.actorType !== "player" &&
+          entity.side !== "player" &&
+          entity.kind === activeEntry.actorId));
     const div = document.createElement("div");
-    div.className = `entity ${entity.side} ${entity.boss ? "boss" : ""}`;
+    div.className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""}`;
     div.dataset.entityId = entity.id;
     div.innerHTML = `
       <span class="entity-label">${entity.label ?? (entity.side === "player" ? getSelectedCharacter().shortLabel : entity.monsterIndex)}</span>
@@ -2337,7 +2349,8 @@ function renderEnemySummary() {
 
 function renderPriorityStrip() {
   elements.priorityStrip.innerHTML = "";
-  elements.priorityStrip.className = `priority-strip ${state.priorityRevealMode ? `reveal-${state.priorityRevealMode}` : ""}`;
+  const executing = !state.priorityRevealMode && state.activeTimelineIndex >= 0;
+  elements.priorityStrip.className = `priority-strip ${state.priorityRevealMode ? `reveal-${state.priorityRevealMode}` : ""} ${executing ? "executing" : ""}`.trim();
   if (!state.currentTimeline.length) {
     elements.priorityStrip.innerHTML = `<span class="priority-empty">카드 대기</span>`;
     return;
@@ -2521,7 +2534,7 @@ async function playPriorityReveal(drawnEntries, sortedEntries) {
   await sleep(turnDelay(0.9));
 
   // 3) 내 카드 드로우 — 진짜 카드가 중앙에 완전히 등장
-  showDrawnCardReveal(playerEntry?.card, "내 카드", "player");
+  showDrawnCardReveal(playerEntry?.card, "이번 턴 내 카드", "player");
   await sleep(360);
 
   // 4) 1초 대기 (카드 읽기)
@@ -2639,21 +2652,29 @@ function flyRevealToHud() {
   host.style.opacity = "0";
 }
 
-async function playPlayerTurnCue(entry) {
+async function playTurnCue(entry) {
+  // 적 차례는 따로 알리지 않고 지나간다 — 내 차례만 명확히 인지시킨다.
+  if (entry.actorType !== "player") return;
   const host = document.querySelector("#turnCue");
   if (!host) return;
-  host.className = "turn-cue";
+  const emblem = getSelectedCharacter().shortLabel;
+  host.className = "turn-cue player";
   host.innerHTML = `
     <div class="turn-cue-panel">
-      <span class="turn-cue-kicker">PLAYER TURN</span>
-      <strong>${entryOwnerLabel(entry)} 차례</strong>
+      <span class="turn-cue-avatar"><span>${emblem}</span></span>
+      <div class="turn-cue-body">
+        <span class="turn-cue-kicker">MY TURN</span>
+        <strong class="turn-cue-name">내 차례</strong>
+      </div>
     </div>
   `;
   void host.offsetWidth;
+  document.body.classList.add("turn-cue-active");
   host.classList.add("show");
-  await sleep(720);
+  await sleep(turnDelay(1.7));
   host.classList.remove("show");
-  await sleep(140);
+  document.body.classList.remove("turn-cue-active");
+  await sleep(turnDelay(0.32));
 }
 
 function entryOwnerLabel(entry) {
