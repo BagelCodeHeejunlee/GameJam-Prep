@@ -3,94 +3,177 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>GameJam Prep - Character Meta</title>
-    <meta name="theme-color" content="#35b8f1" />
+    <title>GameJam Prep - Lobby Meta</title>
+    <meta name="theme-color" content="#2db7f0" />
     <link rel="icon" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon.svg" />
-    <link rel="stylesheet" href="meta.css?v=20260616-level-meta02" />
+    <link rel="stylesheet" href="meta.css?v=20260616-lobby-tabs02" />
   </head>
   <body>
-    <main class="meta-shell">
-      <header class="top-bar">
-        <div>
-          <span class="eyebrow">CHARACTER GROWTH</span>
-          <h1>영웅 성장</h1>
+    <main class="lobby-shell">
+      <header class="resource-bar" aria-label="플레이어 재화">
+        <div class="profile-chip">
+          <span class="avatar-mini">P</span>
+          <div>
+            <strong>PLAYER</strong>
+            <em id="accountLevel">Lv. 1</em>
+          </div>
         </div>
-        <a class="play-link" href="index.html" aria-label="게임 화면으로 이동">PLAY</a>
+        <div class="resource-pill energy"><span>⚡</span><strong>30/30</strong></div>
+        <div class="resource-pill gem"><span>◆</span><strong>250</strong></div>
+        <div class="resource-pill coin"><span>●</span><strong>12.4K</strong></div>
       </header>
 
-      <section class="hero-panel" aria-label="선택 캐릭터 성장 정보">
-        <div class="shine"></div>
-        <div class="hero-portrait" id="heroPortrait" aria-hidden="true">궁</div>
-        <div class="hero-info">
-          <p class="hero-class" id="heroClass">원거리 딜러</p>
-          <h2 id="heroName">궁수</h2>
-          <div class="level-row">
-            <strong id="levelValue">Lv. 1</strong>
-            <span id="levelCap">MAX 20</span>
+      <section class="hero-stage" aria-label="캐릭터 로비">
+        <div class="stage-bg"></div>
+        <div class="quick-stack" aria-label="빠른 메뉴">
+          <button type="button">출석</button>
+          <button type="button">상점</button>
+          <button type="button">미션</button>
+        </div>
+        <div class="hero-card">
+          <div class="hero-badge" id="heroPortrait">궁</div>
+          <div class="hero-copy">
+            <span id="heroRole">원거리 딜러</span>
+            <h1 id="heroName">궁수</h1>
+            <p id="powerText">전투력 170</p>
           </div>
         </div>
-      </section>
-
-      <section class="xp-panel" aria-label="경험치">
-        <div class="xp-head">
-          <span>경험치</span>
-          <strong id="xpText">0 / 80</strong>
-        </div>
-        <div class="xp-track">
-          <div id="xpFill" class="xp-fill"></div>
-        </div>
-      </section>
-
-      <section class="stat-panel" aria-label="능력치">
-        <article class="stat-card">
-          <span class="stat-icon hp">+</span>
+        <div class="stat-ribbon">
           <div>
-            <p>체력</p>
-            <strong id="hpValue">70</strong>
-          </div>
-          <em id="hpGain">+6 / Lv</em>
-        </article>
-        <article class="stat-card">
-          <span class="stat-icon atk">!</span>
-          <div>
-            <p>공격력</p>
+            <span>ATK</span>
             <strong id="atkValue">10</strong>
           </div>
-          <em id="atkGain">+1 / Lv</em>
-        </article>
+          <div>
+            <span>HP</span>
+            <strong id="hpValue">70</strong>
+          </div>
+        </div>
       </section>
 
-      <section class="growth-actions" aria-label="성장 테스트">
-        <button id="gainSmallButton" type="button">전투 보상</button>
-        <button id="gainBossButton" type="button">보스 보상</button>
-        <button id="levelUpButton" class="primary" type="button">레벨업</button>
+      <section class="content-window" aria-label="탭 내용">
+        <section class="tab-panel active" data-panel="hero">
+          <div class="panel-title">
+            <div>
+              <span>HERO</span>
+              <h2>캐릭터 성장</h2>
+            </div>
+            <strong id="levelBadge">Lv. 1</strong>
+          </div>
+
+          <div class="xp-box">
+            <div class="xp-label">
+              <span>EXP</span>
+              <strong id="xpText">0 / 80</strong>
+            </div>
+            <div class="xp-track"><div id="xpFill" class="xp-fill"></div></div>
+          </div>
+
+          <div class="level-actions">
+            <button id="gainSmallButton" type="button">전투 보상</button>
+            <button id="gainBossButton" type="button">보스 보상</button>
+            <button id="levelUpButton" class="level-up-button" type="button">LEVEL UP</button>
+          </div>
+
+          <div class="hero-select" aria-label="캐릭터 선택">
+            <button class="hero-option active" type="button" data-character="archer">
+              <span>궁</span>
+              <strong>궁수</strong>
+              <em id="archerLevel">Lv. 1</em>
+            </button>
+            <button class="hero-option" type="button" data-character="warrior">
+              <span>전</span>
+              <strong>전사</strong>
+              <em id="warriorLevel">Lv. 1</em>
+            </button>
+            <button class="hero-option" type="button" data-character="mage">
+              <span>마</span>
+              <strong>마법사</strong>
+              <em id="mageLevel">Lv. 1</em>
+            </button>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="gear">
+          <div class="panel-title">
+            <div>
+              <span>GEAR</span>
+              <h2>장비</h2>
+            </div>
+          </div>
+          <div class="locked-grid">
+            <article><span>무기</span><strong>준비중</strong></article>
+            <article><span>갑옷</span><strong>준비중</strong></article>
+            <article><span>장갑</span><strong>준비중</strong></article>
+            <article><span>신발</span><strong>준비중</strong></article>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="battle">
+          <div class="panel-title">
+            <div>
+              <span>BATTLE</span>
+              <h2>출전</h2>
+            </div>
+          </div>
+          <a class="start-button" href="index.html">전투 시작</a>
+          <p class="panel-note">현재 전투 프로토타입으로 이동합니다.</p>
+        </section>
+
+        <section class="tab-panel" data-panel="mission">
+          <div class="panel-title">
+            <div>
+              <span>MISSION</span>
+              <h2>미션</h2>
+            </div>
+          </div>
+          <div class="mission-list">
+            <article><span>일일 전투 1회</span><strong>EXP +45</strong></article>
+            <article><span>보스 웨이브 클리어</span><strong>EXP +120</strong></article>
+            <article><span>캐릭터 레벨업</span><strong>COIN +500</strong></article>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="shop">
+          <div class="panel-title">
+            <div>
+              <span>SHOP</span>
+              <h2>상점</h2>
+            </div>
+          </div>
+          <div class="shop-banner">
+            <strong>스타터 성장 팩</strong>
+            <span>추후 연결</span>
+          </div>
+          <button id="resetButton" class="reset-button" type="button">성장 초기화</button>
+        </section>
       </section>
 
-      <section class="character-list" aria-label="캐릭터 선택">
-        <button class="character-card active" type="button" data-character="archer">
-          <span class="character-face">궁</span>
-          <strong>궁수</strong>
-          <em id="archerLevel">Lv. 1</em>
+      <nav class="bottom-tabs" aria-label="하단 메뉴">
+        <button class="tab-button active" type="button" data-tab="hero">
+          <span>★</span>
+          <strong>영웅</strong>
         </button>
-        <button class="character-card" type="button" data-character="warrior">
-          <span class="character-face">전</span>
-          <strong>전사</strong>
-          <em id="warriorLevel">Lv. 1</em>
+        <button class="tab-button" type="button" data-tab="gear">
+          <span>▣</span>
+          <strong>장비</strong>
         </button>
-        <button class="character-card" type="button" data-character="mage">
-          <span class="character-face">마</span>
-          <strong>마법사</strong>
-          <em id="mageLevel">Lv. 1</em>
+        <button class="tab-button battle-tab" type="button" data-tab="battle">
+          <span>▶</span>
+          <strong>전투</strong>
         </button>
-      </section>
-
-      <footer class="meta-footer">
-        <button id="resetButton" type="button">성장 초기화</button>
-      </footer>
+        <button class="tab-button" type="button" data-tab="mission">
+          <span>✓</span>
+          <strong>미션</strong>
+        </button>
+        <button class="tab-button" type="button" data-tab="shop">
+          <span>◆</span>
+          <strong>상점</strong>
+        </button>
+      </nav>
     </main>
 
     <div id="levelToast" class="level-toast" aria-live="polite"></div>
-    <script src="meta.js?v=20260616-level-meta02"></script>
+    <script src="meta.js?v=20260616-lobby-tabs02"></script>
   </body>
 </html>

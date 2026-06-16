@@ -1,5 +1,5 @@
 const MAX_LEVEL = 20;
-const STORAGE_KEY = "gamejam-prep-meta-levels-v1";
+const STORAGE_KEY = "gamejam-prep-meta-levels-v2";
 
 const characters = {
   archer: {
@@ -35,27 +35,29 @@ const characters = {
 };
 
 const elements = {
-  heroPanel: document.querySelector(".hero-panel"),
+  accountLevel: document.querySelector("#accountLevel"),
+  heroStage: document.querySelector(".hero-stage"),
   heroPortrait: document.querySelector("#heroPortrait"),
-  heroClass: document.querySelector("#heroClass"),
+  heroRole: document.querySelector("#heroRole"),
   heroName: document.querySelector("#heroName"),
-  levelValue: document.querySelector("#levelValue"),
-  levelCap: document.querySelector("#levelCap"),
+  powerText: document.querySelector("#powerText"),
+  atkValue: document.querySelector("#atkValue"),
+  hpValue: document.querySelector("#hpValue"),
+  levelBadge: document.querySelector("#levelBadge"),
   xpText: document.querySelector("#xpText"),
   xpFill: document.querySelector("#xpFill"),
-  hpValue: document.querySelector("#hpValue"),
-  atkValue: document.querySelector("#atkValue"),
-  hpGain: document.querySelector("#hpGain"),
-  atkGain: document.querySelector("#atkGain"),
   gainSmallButton: document.querySelector("#gainSmallButton"),
   gainBossButton: document.querySelector("#gainBossButton"),
   levelUpButton: document.querySelector("#levelUpButton"),
   resetButton: document.querySelector("#resetButton"),
   toast: document.querySelector("#levelToast"),
-  characterButtons: [...document.querySelectorAll("[data-character]")],
+  heroButtons: [...document.querySelectorAll("[data-character]")],
+  tabButtons: [...document.querySelectorAll("[data-tab]")],
+  tabPanels: [...document.querySelectorAll("[data-panel]")],
 };
 
 let selectedCharacterId = "archer";
+let activeTab = "hero";
 let profile = loadProfile();
 
 function defaultProfile() {
@@ -80,23 +82,25 @@ function xpRequired(level) {
   return 80 + (level - 1) * 35;
 }
 
-function characterState(id) {
+function getCharacterState(id) {
   const character = characters[id];
   const saved = profile[id] ?? { level: 1, xp: 0 };
   const level = Math.min(Math.max(saved.level, 1), MAX_LEVEL);
   const xp = level >= MAX_LEVEL ? 0 : Math.max(saved.xp, 0);
+  const hp = character.baseHp + (level - 1) * character.hpPerLevel;
+  const atk = character.baseAtk + (level - 1) * character.atkPerLevel;
 
   return {
-    ...saved,
     level,
     xp,
-    hp: character.baseHp + (level - 1) * character.hpPerLevel,
-    atk: character.baseAtk + (level - 1) * character.atkPerLevel,
+    hp,
+    atk,
+    power: hp + atk * 10,
   };
 }
 
 function addXp(amount) {
-  const state = characterState(selectedCharacterId);
+  const state = getCharacterState(selectedCharacterId);
   if (state.level >= MAX_LEVEL) return;
 
   profile[selectedCharacterId] = {
@@ -109,7 +113,7 @@ function addXp(amount) {
 }
 
 function levelUp() {
-  const state = characterState(selectedCharacterId);
+  const state = getCharacterState(selectedCharacterId);
   const required = xpRequired(state.level);
   if (state.level >= MAX_LEVEL || state.xp < required) return;
 
@@ -121,16 +125,7 @@ function levelUp() {
 
   saveProfile();
   render();
-  showToast(`${characters[selectedCharacterId].name} Lv. ${nextLevel}!<br>체력과 공격력이 상승했습니다`);
-}
-
-function showToast(message) {
-  elements.toast.innerHTML = message;
-  elements.toast.classList.add("show");
-  window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => {
-    elements.toast.classList.remove("show");
-  }, 1250);
+  showToast(`${characters[selectedCharacterId].name} Lv. ${nextLevel}!<br>ATK +1 / HP 상승`);
 }
 
 function resetGrowth() {
@@ -142,40 +137,73 @@ function resetGrowth() {
 
 function selectCharacter(id) {
   selectedCharacterId = id;
+  activeTab = "hero";
   render();
+}
+
+function selectTab(id) {
+  activeTab = id;
+  renderTabs();
+}
+
+function showToast(message) {
+  elements.toast.innerHTML = message;
+  elements.toast.classList.add("show");
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => {
+    elements.toast.classList.remove("show");
+  }, 1250);
 }
 
 function render() {
   const character = characters[selectedCharacterId];
-  const state = characterState(selectedCharacterId);
+  const state = getCharacterState(selectedCharacterId);
   const required = xpRequired(state.level);
   const xpRatio = state.level >= MAX_LEVEL ? 1 : Math.min(state.xp / required, 1);
+  const highestLevel = Math.max(...Object.keys(characters).map((id) => getCharacterState(id).level));
 
-  elements.heroPanel.dataset.character = character.id;
+  elements.accountLevel.textContent = `Lv. ${highestLevel}`;
+  elements.heroStage.dataset.character = character.id;
   elements.heroPortrait.textContent = character.shortLabel;
-  elements.heroClass.textContent = character.role;
+  elements.heroRole.textContent = character.role;
   elements.heroName.textContent = character.name;
-  elements.levelValue.textContent = `Lv. ${state.level}`;
-  elements.levelCap.textContent = `MAX ${MAX_LEVEL}`;
-  elements.xpText.textContent = state.level >= MAX_LEVEL ? "최대 레벨" : `${state.xp} / ${required}`;
-  elements.xpFill.style.width = `${Math.round(xpRatio * 100)}%`;
-  elements.hpValue.textContent = state.hp;
+  elements.powerText.textContent = `전투력 ${state.power}`;
   elements.atkValue.textContent = state.atk;
-  elements.hpGain.textContent = `+${character.hpPerLevel} / Lv`;
-  elements.atkGain.textContent = `+${character.atkPerLevel} / Lv`;
+  elements.hpValue.textContent = state.hp;
+  elements.levelBadge.textContent = `Lv. ${state.level}`;
+  elements.xpText.textContent = state.level >= MAX_LEVEL ? "MAX" : `${state.xp} / ${required}`;
+  elements.xpFill.style.width = `${Math.round(xpRatio * 100)}%`;
   elements.levelUpButton.disabled = state.level >= MAX_LEVEL || state.xp < required;
 
-  elements.characterButtons.forEach((button) => {
+  elements.heroButtons.forEach((button) => {
     const id = button.dataset.character;
-    const buttonState = characterState(id);
+    if (!id) return;
+    const heroState = getCharacterState(id);
     button.classList.toggle("active", id === selectedCharacterId);
     const levelBadge = document.querySelector(`#${id}Level`);
-    if (levelBadge) levelBadge.textContent = `Lv. ${buttonState.level}`;
+    if (levelBadge) levelBadge.textContent = `Lv. ${heroState.level}`;
+  });
+
+  renderTabs();
+}
+
+function renderTabs() {
+  elements.tabButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === activeTab);
+  });
+  elements.tabPanels.forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.panel === activeTab);
   });
 }
 
-elements.characterButtons.forEach((button) => {
-  button.addEventListener("click", () => selectCharacter(button.dataset.character));
+elements.heroButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    if (button.dataset.character) selectCharacter(button.dataset.character);
+  });
+});
+
+elements.tabButtons.forEach((button) => {
+  button.addEventListener("click", () => selectTab(button.dataset.tab));
 });
 
 elements.gainSmallButton.addEventListener("click", () => addXp(45));
