@@ -8,7 +8,9 @@ const MAP_ROOM_SCALE = 2;
 const CAMERA_FOCUS_TARGET_SCALE = 0.68;
 const CAMERA_FOCUS_MAX_SCALE = 1.02;
 const CAMERA_DEAD_ZONE_WIDTH_RATIO = 0.34;
-const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.34;
+const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.28;
+const CAMERA_UI_GAP = 16;
+const CAMERA_PLAYER_EDGE_MARGIN = 72;
 
 const directions = [
   { q: 1, r: 0 },
@@ -2900,13 +2902,10 @@ function fitBoardToPanel(bounds = boardBounds()) {
   if (state.cameraMode === "focus" && player) {
     scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, CAMERA_FOCUS_TARGET_SCALE));
     const focusPoint = hexToPixel(player, bounds);
-    const topHudRect = document.querySelector(".battle-top-hud")?.getBoundingClientRect();
-    const playerHudRect = elements.playerHud?.getBoundingClientRect();
-    const playTop = topHudRect?.height ? Math.min(panelHeight * 0.46, topHudRect.bottom + 14) : panelHeight * 0.24;
-    const playBottom = playerHudRect?.height ? Math.max(playTop + 140, playerHudRect.top - 16) : panelHeight * 0.84;
+    const playArea = cameraPlayArea(panelHeight);
     const focusCenter = {
       x: panelWidth / 2,
-      y: playTop + (playBottom - playTop) * 0.55,
+      y: playArea.top + playArea.height * 0.55,
     };
     const currentScale = Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || scale;
     const panelChanged = state.cameraPanelWidth !== panelWidth || state.cameraPanelHeight !== panelHeight;
@@ -2927,21 +2926,25 @@ function fitBoardToPanel(bounds = boardBounds()) {
       };
       const deadZone = {
         halfWidth: panelWidth * CAMERA_DEAD_ZONE_WIDTH_RATIO * 0.5,
-        halfHeight: (playBottom - playTop) * CAMERA_DEAD_ZONE_HEIGHT_RATIO * 0.5,
+        halfHeight: playArea.height * CAMERA_DEAD_ZONE_HEIGHT_RATIO * 0.5,
       };
-      if (playerScreen.x < focusCenter.x - deadZone.halfWidth) {
-        offsetX += focusCenter.x - deadZone.halfWidth - playerScreen.x;
-      } else if (playerScreen.x > focusCenter.x + deadZone.halfWidth) {
-        offsetX -= playerScreen.x - (focusCenter.x + deadZone.halfWidth);
+      const deadZoneLeft = focusCenter.x - deadZone.halfWidth;
+      const deadZoneRight = focusCenter.x + deadZone.halfWidth;
+      const deadZoneTop = focusCenter.y - deadZone.halfHeight;
+      const deadZoneBottom = Math.min(focusCenter.y + deadZone.halfHeight, playArea.bottom - CAMERA_PLAYER_EDGE_MARGIN);
+      if (playerScreen.x < deadZoneLeft) {
+        offsetX += deadZoneLeft - playerScreen.x;
+      } else if (playerScreen.x > deadZoneRight) {
+        offsetX -= playerScreen.x - deadZoneRight;
       }
-      if (playerScreen.y < focusCenter.y - deadZone.halfHeight) {
-        offsetY += focusCenter.y - deadZone.halfHeight - playerScreen.y;
-      } else if (playerScreen.y > focusCenter.y + deadZone.halfHeight) {
-        offsetY -= playerScreen.y - (focusCenter.y + deadZone.halfHeight);
+      if (playerScreen.y < deadZoneTop) {
+        offsetY += deadZoneTop - playerScreen.y;
+      } else if (playerScreen.y > deadZoneBottom) {
+        offsetY -= playerScreen.y - deadZoneBottom;
       }
     }
-    offsetX = clampCameraOffset(offsetX, panelWidth, logicalWidth * scale);
-    offsetY = clampCameraOffset(offsetY, panelHeight, logicalHeight * scale);
+    offsetX = clampCameraOffset(offsetX, 0, panelWidth, logicalWidth * scale);
+    offsetY = clampCameraOffset(offsetY, playArea.top, playArea.bottom, logicalHeight * scale);
     state.cameraFocusReady = true;
     state.cameraPanelWidth = panelWidth;
     state.cameraPanelHeight = panelHeight;
@@ -2958,9 +2961,23 @@ function fitBoardToPanel(bounds = boardBounds()) {
   elements.board.style.setProperty("--board-y", `${offsetY}px`);
 }
 
-function clampCameraOffset(offset, panelSize, contentSize) {
-  if (contentSize <= panelSize) return (panelSize - contentSize) / 2;
-  return Math.min(0, Math.max(panelSize - contentSize, offset));
+function cameraPlayArea(panelHeight) {
+  const topHudRect = document.querySelector(".battle-top-hud")?.getBoundingClientRect();
+  const playerHudRect = elements.playerHud?.getBoundingClientRect();
+  const top = topHudRect?.height ? topHudRect.bottom + CAMERA_UI_GAP : panelHeight * 0.24;
+  const bottom = playerHudRect?.height ? playerHudRect.top - CAMERA_UI_GAP : panelHeight * 0.84;
+  const safeBottom = Math.max(top + 140, bottom);
+  return {
+    top,
+    bottom: safeBottom,
+    height: safeBottom - top,
+  };
+}
+
+function clampCameraOffset(offset, visibleStart, visibleEnd, contentSize) {
+  const visibleSize = visibleEnd - visibleStart;
+  if (contentSize <= visibleSize) return visibleStart + (visibleSize - contentSize) / 2;
+  return Math.min(visibleStart, Math.max(visibleEnd - contentSize, offset));
 }
 
 function hexToPixel(hex, bounds) {
