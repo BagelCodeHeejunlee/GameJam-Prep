@@ -5,8 +5,8 @@ const TURN_DELAY = 540;
 const WAVE_INTRO_DELAY = 1300;
 const CAMERA_FOCUS_DELAY = 360;
 const MAP_ROOM_SCALE = 2;
-const CAMERA_FOCUS_SCALE_MULTIPLIER = 1.35;
-const CAMERA_FOCUS_MAX_SCALE = 0.96;
+const CAMERA_FOCUS_SCALE_MULTIPLIER = 1.48;
+const CAMERA_FOCUS_MAX_SCALE = 1.02;
 
 const directions = [
   { q: 1, r: 0 },
