@@ -357,10 +357,9 @@ h2 {
   font-weight: 800;
   overflow: visible;
   transition:
-    left 260ms ease,
-    top 260ms ease,
     transform 160ms ease,
     opacity 160ms ease;
+  will-change: transform;
 }
 
 .entity.player {
@@ -715,9 +714,7 @@ h2 {
 
 .entity.moving {
   transition:
-    left 220ms ease-in-out,
-    top 220ms ease-in-out,
-    transform 160ms ease,
+    transform 220ms ease-in-out,
     opacity 160ms ease;
 }
 

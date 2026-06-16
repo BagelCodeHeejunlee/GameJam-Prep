@@ -403,6 +403,9 @@ function newRun() {
     cameraFollowToken: 0,
     cameraPanelWidth: 0,
     cameraPanelHeight: 0,
+    cameraX: 0,
+    cameraY: 0,
+    cameraScale: 0,
     boardTileSignature: "",
     boardTileElements: new Map(),
     rewardLocked: false,
@@ -434,6 +437,9 @@ function startWave(index) {
   state.cameraFollowToken = (state.cameraFollowToken ?? 0) + 1;
   state.cameraPanelWidth = 0;
   state.cameraPanelHeight = 0;
+  state.cameraX = 0;
+  state.cameraY = 0;
+  state.cameraScale = 0;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
   state.entities = [
     {
@@ -1201,20 +1207,21 @@ async function slideActorTo(actor, from, to) {
 
   const fromPoint = hexToPixel(from, bounds);
   const toPoint = hexToPixel(to, bounds);
+  const deltaX = fromPoint.x - toPoint.x;
+  const deltaY = fromPoint.y - toPoint.y;
   entityElement.classList.remove("moving");
   entityElement.style.transition = "none";
-  entityElement.style.left = `${fromPoint.x}px`;
-  entityElement.style.top = `${fromPoint.y}px`;
+  entityElement.style.left = `${toPoint.x}px`;
+  entityElement.style.top = `${toPoint.y}px`;
+  entityElement.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
   entityElement.getBoundingClientRect();
 
   await nextFrame();
   entityElement.style.transition = "";
   entityElement.classList.add("moving");
-  entityElement.getBoundingClientRect();
-  await nextFrame();
-  entityElement.style.left = `${toPoint.x}px`;
-  entityElement.style.top = `${toPoint.y}px`;
   const cameraFollow = animateCameraFollowForActor(actor, from, to);
+  await nextFrame();
+  entityElement.style.transform = "";
   await sleep(240);
   if (cameraFollow) await cameraFollow;
 }
@@ -1225,6 +1232,7 @@ function animateCameraFollowForActor(actor, from, to) {
   const bounds = boardBounds();
   const fromPoint = hexToPixel(from, bounds);
   const toPoint = hexToPixel(to, bounds);
+  const metrics = cameraMetrics(bounds);
   const token = (state.cameraFollowToken ?? 0) + 1;
   const previousTransition = elements.board.style.transition;
   state.cameraFollowToken = token;
@@ -1245,12 +1253,15 @@ function animateCameraFollowForActor(actor, from, to) {
 
       const progress = Math.min(1, (now - startedAt) / CAMERA_FOLLOW_DURATION);
       const eased = easeInOut(progress);
-      fitBoardToPanel(bounds, {
+      const frame = calculateCameraFrame(bounds, {
         focusPoint: {
           x: fromPoint.x + (toPoint.x - fromPoint.x) * eased,
           y: fromPoint.y + (toPoint.y - fromPoint.y) * eased,
         },
+        metrics,
       });
+      applyBoardCameraFrame(frame, false);
+      commitCameraFrame(frame);
 
       if (progress < 1) {
         window.requestAnimationFrame(tick);
@@ -2936,12 +2947,14 @@ function boardBounds() {
 }
 
 function fitBoardToPanel(bounds = boardBounds(), options = {}) {
-  const logicalWidth = Math.max(620, bounds.width + BOARD_PADDING * 2);
-  const logicalHeight = Math.max(620, bounds.height + BOARD_PADDING * 2);
-  const panel = elements.board.parentElement;
-  const panelWidth = Math.max(1, panel.clientWidth);
-  const panelHeight = Math.max(1, panel.clientHeight);
-  const fitScale = Math.min(panelWidth / logicalWidth, panelHeight / logicalHeight);
+  const frame = calculateCameraFrame(bounds, options);
+  applyBoardCameraFrame(frame);
+  commitCameraFrame(frame);
+}
+
+function calculateCameraFrame(bounds = boardBounds(), options = {}) {
+  const metrics = options.metrics ?? cameraMetrics(bounds);
+  const { logicalWidth, logicalHeight, panelWidth, panelHeight, fitScale } = metrics;
   let scale = fitScale;
   let offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
   let offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
@@ -2950,12 +2963,12 @@ function fitBoardToPanel(bounds = boardBounds(), options = {}) {
   if (state.cameraMode === "focus" && player) {
     scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, CAMERA_FOCUS_TARGET_SCALE));
     const focusPoint = options.focusPoint ?? hexToPixel(player, bounds);
-    const playArea = cameraPlayArea(panelHeight);
+    const playArea = metrics.playArea;
     const focusCenter = {
       x: panelWidth / 2,
       y: playArea.top + playArea.height * 0.55,
     };
-    const currentScale = Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || scale;
+    const currentScale = state.cameraScale || scale;
     const panelChanged = state.cameraPanelWidth !== panelWidth || state.cameraPanelHeight !== panelHeight;
     const shouldCenterCamera =
       !state.cameraFocusReady ||
@@ -2966,8 +2979,8 @@ function fitBoardToPanel(bounds = boardBounds(), options = {}) {
       offsetX = focusCenter.x - focusPoint.x * scale;
       offsetY = focusCenter.y - focusPoint.y * scale;
     } else {
-      offsetX = Number.parseFloat(elements.board.style.getPropertyValue("--board-x")) || offsetX;
-      offsetY = Number.parseFloat(elements.board.style.getPropertyValue("--board-y")) || offsetY;
+      offsetX = Number.isFinite(state.cameraX) ? state.cameraX : offsetX;
+      offsetY = Number.isFinite(state.cameraY) ? state.cameraY : offsetY;
       const playerScreen = {
         x: offsetX + focusPoint.x * scale,
         y: offsetY + focusPoint.y * scale,
@@ -2993,20 +3006,46 @@ function fitBoardToPanel(bounds = boardBounds(), options = {}) {
     }
     offsetX = clampCameraOffset(offsetX, 0, panelWidth, logicalWidth * scale);
     offsetY = clampCameraOffset(offsetY, playArea.top, playArea.bottom, logicalHeight * scale);
-    state.cameraFocusReady = true;
-    state.cameraPanelWidth = panelWidth;
-    state.cameraPanelHeight = panelHeight;
-  } else {
-    state.cameraFocusReady = false;
-    state.cameraPanelWidth = panelWidth;
-    state.cameraPanelHeight = panelHeight;
   }
 
-  elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
-  elements.board.style.setProperty("--board-height", `${logicalHeight}px`);
+  return { logicalWidth, logicalHeight, panelWidth, panelHeight, scale, offsetX, offsetY };
+}
+
+function cameraMetrics(bounds = boardBounds()) {
+  const logicalWidth = Math.max(620, bounds.width + BOARD_PADDING * 2);
+  const logicalHeight = Math.max(620, bounds.height + BOARD_PADDING * 2);
+  const panel = elements.board.parentElement;
+  const panelWidth = Math.max(1, panel.clientWidth);
+  const panelHeight = Math.max(1, panel.clientHeight);
+  const fitScale = Math.min(panelWidth / logicalWidth, panelHeight / logicalHeight);
+  return {
+    logicalWidth,
+    logicalHeight,
+    panelWidth,
+    panelHeight,
+    fitScale,
+    playArea: cameraPlayArea(panelHeight),
+  };
+}
+
+function applyBoardCameraFrame(frame, updateSize = true) {
+  const { logicalWidth, logicalHeight, scale, offsetX, offsetY } = frame;
+  if (updateSize) {
+    elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
+    elements.board.style.setProperty("--board-height", `${logicalHeight}px`);
+  }
   elements.board.style.setProperty("--board-scale", `${scale}`);
   elements.board.style.setProperty("--board-x", `${offsetX}px`);
   elements.board.style.setProperty("--board-y", `${offsetY}px`);
+}
+
+function commitCameraFrame(frame) {
+  state.cameraFocusReady = state.cameraMode === "focus" && Boolean(getPlayer());
+  state.cameraPanelWidth = frame.panelWidth;
+  state.cameraPanelHeight = frame.panelHeight;
+  state.cameraX = frame.offsetX;
+  state.cameraY = frame.offsetY;
+  state.cameraScale = frame.scale;
 }
 
 function cameraPlayArea(panelHeight) {
