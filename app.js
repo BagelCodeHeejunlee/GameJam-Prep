@@ -5,7 +5,7 @@ const TURN_DELAY = 540;
 const WAVE_INTRO_DELAY = 1300;
 const CAMERA_FOCUS_DELAY = 360;
 const MAP_ROOM_SCALE = 2;
-const CAMERA_FOCUS_SCALE_MULTIPLIER = 1.48;
+const CAMERA_FOCUS_TARGET_SCALE = 0.68;
 const CAMERA_FOCUS_MAX_SCALE = 1.02;
 const CAMERA_DEAD_ZONE_WIDTH_RATIO = 0.34;
 const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.34;
@@ -2898,7 +2898,7 @@ function fitBoardToPanel(bounds = boardBounds()) {
 
   const player = getPlayer();
   if (state.cameraMode === "focus" && player) {
-    scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, fitScale * CAMERA_FOCUS_SCALE_MULTIPLIER));
+    scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, CAMERA_FOCUS_TARGET_SCALE));
     const focusPoint = hexToPixel(player, bounds);
     const topHudRect = document.querySelector(".battle-top-hud")?.getBoundingClientRect();
     const playerHudRect = elements.playerHud?.getBoundingClientRect();
