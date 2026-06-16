@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>GameJam Prep - Character Meta</title>
+    <meta name="theme-color" content="#35b8f1" />
+    <link rel="icon" href="assets/app-icon.svg" />
+    <link rel="apple-touch-icon" href="assets/app-icon.svg" />
+    <link rel="stylesheet" href="meta.css?v=20260616-level-meta02" />
+  </head>
+  <body>
+    <main class="meta-shell">
+      <header class="top-bar">
+        <div>
+          <span class="eyebrow">CHARACTER GROWTH</span>
+          <h1>영웅 성장</h1>
+        </div>
+        <a class="play-link" href="index.html" aria-label="게임 화면으로 이동">PLAY</a>
+      </header>
+
+      <section class="hero-panel" aria-label="선택 캐릭터 성장 정보">
+        <div class="shine"></div>
+        <div class="hero-portrait" id="heroPortrait" aria-hidden="true">궁</div>
+        <div class="hero-info">
+          <p class="hero-class" id="heroClass">원거리 딜러</p>
+          <h2 id="heroName">궁수</h2>
+          <div class="level-row">
+            <strong id="levelValue">Lv. 1</strong>
+            <span id="levelCap">MAX 20</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="xp-panel" aria-label="경험치">
+        <div class="xp-head">
+          <span>경험치</span>
+          <strong id="xpText">0 / 80</strong>
+        </div>
+        <div class="xp-track">
+          <div id="xpFill" class="xp-fill"></div>
+        </div>
+      </section>
+
+      <section class="stat-panel" aria-label="능력치">
+        <article class="stat-card">
+          <span class="stat-icon hp">+</span>
+          <div>
+            <p>체력</p>
+            <strong id="hpValue">70</strong>
+          </div>
+          <em id="hpGain">+6 / Lv</em>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon atk">!</span>
+          <div>
+            <p>공격력</p>
+            <strong id="atkValue">10</strong>
+          </div>
+          <em id="atkGain">+1 / Lv</em>
+        </article>
+      </section>
+
+      <section class="growth-actions" aria-label="성장 테스트">
+        <button id="gainSmallButton" type="button">전투 보상</button>
+        <button id="gainBossButton" type="button">보스 보상</button>
+        <button id="levelUpButton" class="primary" type="button">레벨업</button>
+      </section>
+
+      <section class="character-list" aria-label="캐릭터 선택">
+        <button class="character-card active" type="button" data-character="archer">
+          <span class="character-face">궁</span>
+          <strong>궁수</strong>
+          <em id="archerLevel">Lv. 1</em>
+        </button>
+        <button class="character-card" type="button" data-character="warrior">
+          <span class="character-face">전</span>
+          <strong>전사</strong>
+          <em id="warriorLevel">Lv. 1</em>
+        </button>
+        <button class="character-card" type="button" data-character="mage">
+          <span class="character-face">마</span>
+          <strong>마법사</strong>
+          <em id="mageLevel">Lv. 1</em>
+        </button>
+      </section>
+
+      <footer class="meta-footer">
+        <button id="resetButton" type="button">성장 초기화</button>
+      </footer>
+    </main>
+
+    <div id="levelToast" class="level-toast" aria-live="polite"></div>
+    <script src="meta.js?v=20260616-level-meta02"></script>
+  </body>
+</html>
