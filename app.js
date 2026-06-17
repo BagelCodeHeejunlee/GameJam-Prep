@@ -3211,6 +3211,7 @@ function baseStat(kind, label, value) {
 
 function cardPrefab(card) {
   if (!card) return "";
+  const footerLabel = isPassiveCard(card) ? `<div class="cp-type-label">패시브</div>` : "";
   return `
     <div class="card-prefab ${rarityClass(card.rarity)}">
       <div class="cp-bg"></div>
@@ -3218,6 +3219,7 @@ function cardPrefab(card) {
       <div class="cp-priority">${card.priority}</div>
       <div class="cp-name">${card.name}</div>
       <div class="cp-actions">${renderActionList(card)}</div>
+      ${footerLabel}
     </div>
   `;
 }
@@ -3502,7 +3504,7 @@ function compactActionStat(action) {
   if (action.type === "placeMeteor") return actionStat("meteor", "운석 예고", action.delay ?? 1);
   if (action.type === "selfDamagePercent") return actionNote(`-${Math.round(action.percent * 100)}%`);
   if (action.type === "healPercent") return actionNote(`+${Math.round(action.percent * 100)}%`);
-  if (isPassiveAction(action)) return actionNote("패시브");
+  if (isPassiveAction(action)) return actionNote(passiveEffectLabel(action), passiveEffectLabel(action));
   if (action.type === "applyEffect") return actionNote(effectActionLabel(action), effectActionLabel(action));
   return actionNote(action.type);
 }
@@ -3551,7 +3553,6 @@ function renderActionLine(action) {
   }
   if (isPassiveAction(action)) {
     return `<span class="action-line">${actionGroup("special", [
-      actionStat("permanent", "패시브", 1),
       actionNote(passiveEffectLabel(action), passiveEffectLabel(action)),
     ])}</span>`;
   }

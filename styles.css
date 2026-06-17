@@ -3479,6 +3479,25 @@ body.turn-cue-active .turn-scrim {
   align-content: center;
 }
 
+.cp-type-label {
+  position: absolute;
+  left: 50%;
+  bottom: 92px;
+  z-index: 2;
+  min-width: 90px;
+  padding: 6px 16px 7px;
+  border: 2px solid rgba(126, 89, 34, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 247, 218, 0.78);
+  color: #6d4a1e;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 0 rgba(101, 70, 28, 0.12);
+}
+
 .card-prefab .action-list {
   display: grid;
   gap: 20px;
