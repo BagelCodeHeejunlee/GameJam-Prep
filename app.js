@@ -137,8 +137,9 @@ const archerRewardPool = [
   ]),
   card("emergency-evasion", "긴급 회피", "공용", "에픽", 24, [
     {
-      type: "passive",
+      type: "applyEffect",
       label: "긴급 회피",
+      duration: "turn",
       modifiers: [{ stat: "damageTaken", amount: -0.3 }],
       afterHitFlee: 1,
     },
@@ -1535,7 +1536,6 @@ function applyPassiveAction(actor, action) {
       label: passiveEffectLabel(action),
       duration: "stage",
       modifiers: action.modifiers,
-      afterHitFlee: action.afterHitFlee,
     });
   }
   if (action.effect === "lowHpDamage") {
@@ -1996,12 +1996,20 @@ function animateCameraFollowForActor(actor, from, to) {
 
   return new Promise((resolve) => {
     const startedAt = performance.now();
+    let latestFrame = null;
     const finish = () => {
-      if (state?.cameraFollowToken === token) elements.board.style.transition = previousTransition;
+      if (state?.cameraFollowToken === token) {
+        if (latestFrame) {
+          applyBoardCameraFrame(latestFrame, false);
+          commitCameraFrame(latestFrame);
+        }
+        elements.board.style.transition = previousTransition;
+      }
       resolve();
     };
     const tick = (now) => {
       if (!state || state.cameraFollowToken !== token || state.cameraMode !== "focus") {
+        elements.board.style.transform = "";
         elements.board.style.transition = previousTransition;
         resolve();
         return;
@@ -2016,8 +2024,8 @@ function animateCameraFollowForActor(actor, from, to) {
         },
         metrics,
       });
-      applyBoardCameraFrame(frame, false);
-      commitCameraFrame(frame);
+      latestFrame = frame;
+      applyBoardCameraTransform(frame);
 
       if (progress < 1) {
         window.requestAnimationFrame(tick);
@@ -4162,9 +4170,7 @@ function passiveEffectLabel(action) {
     berserkLostHpDamage: `잃은 체력 비율 / 2 피해 증가`,
     lowHpDamage: `체력 ${Math.round((action.threshold ?? 0.25) * 100)}% 미만 피해 +${Math.round(action.amount * 100)}%`,
   };
-  if (labels[action.effect]) return labels[action.effect];
-  if (action.label && (action.modifiers?.length || action.afterHitFlee)) return effectActionLabel(action);
-  return action.label ?? modifierLabel(action.modifiers?.[0]) ?? "패시브";
+  return labels[action.effect] ?? action.label ?? modifierLabel(action.modifiers?.[0]) ?? "패시브";
 }
 
 function effectActionLabel(action) {
@@ -4398,6 +4404,12 @@ function applyBoardCameraFrame(frame, updateSize = true) {
   elements.board.style.setProperty("--board-scale", `${scale}`);
   elements.board.style.setProperty("--board-x", `${offsetX}px`);
   elements.board.style.setProperty("--board-y", `${offsetY}px`);
+  elements.board.style.transform = "";
+}
+
+function applyBoardCameraTransform(frame) {
+  const { scale, offsetX, offsetY } = frame;
+  elements.board.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`;
 }
 
 function commitCameraFrame(frame) {
