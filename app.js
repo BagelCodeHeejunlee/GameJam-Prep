@@ -1337,7 +1337,7 @@ async function executeAction(actor, action, cardData) {
     return true;
   }
   if (action.type === "attack") {
-    attack(actor, action);
+    await attack(actor, action);
     return true;
   }
   if (action.type === "momentumAttack") {
@@ -1558,7 +1558,7 @@ function consumeEffects(actor, consumeOn) {
   actor.effects = actor.effects.filter((effect) => effect.consumeOn !== consumeOn);
 }
 
-function attack(actor, action) {
+async function attack(actor, action) {
   const targets = selectTargets(actor, action);
   if (!targets.length) {
     log(`${actor.name} 공격 실패`);
@@ -1573,8 +1573,8 @@ function attack(actor, action) {
     const beforeHp = target.hp;
     const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus, { targetCount: targets.length });
     applyOverkillSplash(actor, target, damage - beforeHp);
-    if (action.push && isAlive(target)) pushTarget(actor, target, action.push);
-    if (action.pull && isAlive(target)) pullTarget(actor, target, action.pull);
+    if (action.push && isAlive(target)) await pushTarget(actor, target, action.push);
+    if (action.pull && isAlive(target)) await pullTarget(actor, target, action.pull);
   }
   consumeEffects(actor, "attack");
 }
@@ -1677,7 +1677,7 @@ async function momentumAttack(actor, action) {
   if (!isAlive(actor)) return;
   const unusedMove = result?.unused ?? 0;
   const bonusPerMove = action.perUnusedMoveBonus ?? 1;
-  attack(actor, {
+  await attack(actor, {
     ...action,
     type: "attack",
     mult: action.mult + unusedMove * bonusPerMove,
@@ -2138,25 +2138,30 @@ function blocksPath(tile, actor, options = {}) {
   });
 }
 
-function pushTarget(actor, target, amount) {
-  forceMoveTarget(actor, target, amount, "push");
+async function pushTarget(actor, target, amount) {
+  return forceMoveTarget(actor, target, amount, "push");
 }
 
-function pullTarget(actor, target, amount) {
-  forceMoveTarget(actor, target, amount, "pull");
+async function pullTarget(actor, target, amount) {
+  return forceMoveTarget(actor, target, amount, "pull");
 }
 
-function forceMoveTarget(actor, target, amount, mode) {
+async function forceMoveTarget(actor, target, amount, mode) {
   let current = { q: target.q, r: target.r };
+  let triggeredTrap = null;
   for (let step = 0; step < amount; step += 1) {
     const next = nextForcedMoveTile(actor, target, current, mode);
     if (!next) break;
+    await slideActorTo(target, current, next);
     current = next;
     target.q = current.q;
     target.r = current.r;
-    const triggeredTrap = triggerTrap(target);
+    renderBoard();
+    triggeredTrap = triggerTrap(target) ?? triggeredTrap;
     if (triggeredTrap === "block" || !isAlive(target)) break;
+    await sleep(35);
   }
+  return triggeredTrap;
 }
 
 function nextForcedMoveTile(actor, target, current, mode) {
