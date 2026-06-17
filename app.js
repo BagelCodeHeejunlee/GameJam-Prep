@@ -470,6 +470,99 @@ const archerRewardPool = [
   ]),
 ];
 
+const archerFirstRewardIds = new Set([
+  "long-shot",
+  "retreat-step",
+  "split-shot",
+  "reward-advance-shot",
+  "quick-retreat",
+  "steady-shot",
+  "position-tune",
+  "cover-shot",
+  "range-secure",
+  "triple-cover",
+  "focused-shot",
+  "evasive-shot",
+  "double-shot",
+  "rapid-chain-shot",
+  "two-point-aim",
+  "scratch-weakness",
+  "low-shot",
+  "splitting-barrage",
+  "short-combo-bow",
+  "tracking-arrow",
+  "triple-shot",
+  "attack-trap",
+  "block-trap",
+  "push-shot",
+  "push-away-shot",
+  "short-push",
+  "behind-trap",
+  "interference-trap",
+  "guided-shot",
+  "spike-path",
+  "charge",
+  "short-focus",
+  "aim-breath",
+  "brace",
+  "load-shot",
+  "low-stance",
+  "prep-shot",
+  "quiet-aim",
+  "charge-2",
+  "charged-shot",
+]);
+
+const archerRewardUnlockRules = {
+  "piercing-prep": { minPicks: 1, anyOf: [{ tags: ["range"] }, { pickedIds: ["load-shot"] }] },
+  "double-power-shot": { minPicks: 2, anyOf: [{ tags: ["multi"] }, { tags: ["range"] }] },
+  "high-ground": { minPicks: 2, tags: ["range"] },
+  "reposition-shot": { minPicks: 2, tags: ["range"] },
+  "emergency-evasion": { minPicks: 2 },
+  "perfect-distance": { minPicks: 2, tags: ["range"] },
+  "storm-shot": { minPicks: 3, tags: ["range"] },
+  "hunt-rhythm": { minPicks: 3 },
+  "absolute-distance": {
+    minPicks: 3,
+    anyOf: [{ tags: ["range"] }, { pickedIds: ["perfect-distance"] }, { pickedIds: ["piercing-prep"] }],
+  },
+  "combo-sense": { routeCounts: { "다단중첩": 1 } },
+  "fixed-aim": { routeCounts: { "다단중첩": 1 } },
+  "weakness-stack": { routeCounts: { "다단중첩": 1 } },
+  "prey-mark": { routeCounts: { "다단중첩": 1 } },
+  "chasing-barrage": { routeCounts: { "다단중첩": 2 } },
+  "quad-strike": { routeCounts: { "다단중첩": 2 } },
+  "mark-burst": { routeCounts: { "다단중첩": 2 } },
+  "persistent-hunt": { routeCounts: { "다단중첩": 2 } },
+  "weakness-pierce": { routeCounts: { "다단중첩": 2 } },
+  "endless-barrage": { routeCounts: { "다단중첩": 3 } },
+  "hunt-finale": { routeCounts: { "다단중첩": 3 } },
+  "weakness-dismantle": { routeCounts: { "다단중첩": 3 } },
+  "close-smash": { routeCounts: { "함정": 1 } },
+  "trap-shot": { tags: ["trap"] },
+  "trap-link": { tags: ["trap"] },
+  "route-block": { tags: ["trap"] },
+  "spike-zone": { tags: ["trap"] },
+  "pressure-shot": { minPicks: 2, anyOf: [{ routeCounts: { "함정": 2 } }, { tags: ["push"] }] },
+  "chain-trigger": { routeCounts: { "함정": 2 } },
+  "trap-burst": { tags: ["trap"] },
+  "cross-block": { tags: ["trap"] },
+  "trap-hunt": { routeCounts: { "함정": 3 } },
+  "spike-storm": { routeCounts: { "함정": 2 } },
+  "force-trigger": { tags: ["trap", "push"] },
+  "steady-breath": { tags: ["charge"] },
+  "compressed-load": { tags: ["charge"] },
+  "charge-retreat": { tags: ["charge"] },
+  "piercing-charged-shot": { routeCounts: { "차지": 2 } },
+  "full-anchor": { tags: ["charge"] },
+  "charge-range": { routeCounts: { "차지": 2 } },
+  "waited-shot": { routeCounts: { "차지": 2 } },
+  "breath-hold": { routeCounts: { "차지": 2 } },
+  "heart-piercer": { routeCounts: { "차지": 3 } },
+  "charge-overkill": { routeCounts: { "차지": 3 } },
+  "charge-doubler": { routeCounts: { "차지": 3 } },
+};
+
 const baseWarriorCards = [
   card("warrior-advance-slash", "전진 베기", "기본", "기본", 48, [
     { type: "move", amount: 2, desiredRange: 1 },
@@ -805,6 +898,10 @@ function newRun() {
     rewardLocked: false,
     preStartReward: false,
     passiveCards: [],
+    rewardPickCount: 0,
+    rewardTags: new Set(),
+    rewardRouteCounts: {},
+    pickedRewardIds: new Set(),
     log: [],
     speedMultiplier,
     suppressPlayerCard: false,
@@ -2655,10 +2752,85 @@ function showRewards() {
 }
 
 function drawRewards() {
-  return shuffle(getSelectedCharacter().rewardPool).slice(0, 4).map((entry) => ({
+  const character = getSelectedCharacter();
+  const pool = character.id === "archer"
+    ? character.rewardPool.filter((entry) => isArcherRewardUnlocked(entry))
+    : character.rewardPool;
+  const safePool = pool.length >= 4 ? pool : character.rewardPool;
+  return shuffle(safePool).slice(0, 4).map((entry) => ({
     ...entry,
     instanceId: `${entry.id}-${Date.now()}-${Math.random()}`,
   }));
+}
+
+function isArcherRewardUnlocked(cardData) {
+  if (state?.rewardPickCount === 0) return archerFirstRewardIds.has(cardData.id);
+
+  const rule = archerRewardUnlockRules[cardData.id];
+  if (!rule) return true;
+  return archerRewardRuleSatisfied(rule);
+}
+
+function archerRewardRuleSatisfied(rule) {
+  if (!rule) return true;
+  if (rule.minPicks && (state?.rewardPickCount ?? 0) < rule.minPicks) return false;
+  if (rule.tags && !rule.tags.every((tag) => state?.rewardTags?.has(tag))) return false;
+  if (rule.pickedIds && !rule.pickedIds.every((id) => state?.pickedRewardIds?.has(id))) return false;
+  if (rule.routeCounts) {
+    const routeCounts = state?.rewardRouteCounts ?? {};
+    const hasRouteCounts = Object.entries(rule.routeCounts).every(
+      ([route, count]) => (routeCounts[route] ?? 0) >= count,
+    );
+    if (!hasRouteCounts) return false;
+  }
+  if (rule.anyOf && !rule.anyOf.some((option) => archerRewardRuleSatisfied(option))) return false;
+  return true;
+}
+
+function recordRewardPick(cardData) {
+  if (!state) return;
+  state.rewardPickCount = (state.rewardPickCount ?? 0) + 1;
+  state.rewardTags = state.rewardTags ?? new Set();
+  state.rewardRouteCounts = state.rewardRouteCounts ?? {};
+  state.pickedRewardIds = state.pickedRewardIds ?? new Set();
+  state.pickedRewardIds.add(cardData.id);
+  if (cardData.route && cardData.route !== "공용" && cardData.route !== "기본") {
+    state.rewardRouteCounts[cardData.route] = (state.rewardRouteCounts[cardData.route] ?? 0) + 1;
+  }
+  rewardTagsForCard(cardData).forEach((tag) => state.rewardTags.add(tag));
+}
+
+function rewardTagsForCard(cardData) {
+  const tags = new Set();
+  if (cardData.route === "다단중첩") tags.add("multi");
+  if (cardData.route === "함정") tags.add("trap");
+  if (cardData.route === "차지") tags.add("charge");
+
+  const actions = cardData.actions ?? [];
+  const attackActions = actions.filter((action) => action.type === "attack" || action.type === "patternAttack");
+  if (attackActions.length >= 2 || attackActions.some((action) => action.preferPreviousTarget)) tags.add("multi");
+
+  actions.forEach((action) => {
+    if (action.type === "charge") tags.add("charge");
+    if (action.type === "placeTrap" || action.type === "placeTrapBehindTarget" || action.type === "detonateTrap") {
+      tags.add("trap");
+    }
+    if (action.push) tags.add("push");
+    if ((action.type === "attack" || action.type === "patternAttack") && (action.range ?? 1) >= 3) tags.add("range");
+    if (action.targets && action.targets >= 2) tags.add("multi");
+    if (action.sameTargetBonus || action.thirdHitBonus) tags.add("multi");
+    if (action.modifiers?.some((modifier) => modifier.stat === "range" || modifier.stat === "ignoreAdjacentPenalty")) {
+      tags.add("range");
+    }
+    if (action.effect) {
+      if (action.effect.includes("combo") || action.effect.includes("thirdHit")) tags.add("multi");
+      if (action.effect.includes("trap")) tags.add("trap");
+      if (action.effect.includes("charge")) tags.add("charge");
+      if (action.effect.includes("Range") || action.effect.includes("range")) tags.add("range");
+    }
+  });
+
+  return tags;
 }
 
 async function pickReward(reward, button) {
@@ -2684,6 +2856,7 @@ async function pickReward(reward, button) {
 
   elements.rewardOverlay.classList.add("hidden");
   elements.rewardCards.innerHTML = "";
+  recordRewardPick(reward);
 
   if (passiveReward) {
     applyPassiveReward(reward);
