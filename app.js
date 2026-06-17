@@ -904,6 +904,8 @@ function newRun() {
     cameraScale: 0,
     boardTileSignature: "",
     boardTileElements: new Map(),
+    priorityStripSignature: "",
+    priorityStripItems: new Map(),
     rewardLocked: false,
     preStartReward: false,
     passiveCards: [],
@@ -935,6 +937,8 @@ function startWave(index) {
   state.meteors = [];
   state.boardTileSignature = "";
   state.boardTileElements = new Map();
+  state.priorityStripSignature = "";
+  state.priorityStripItems = new Map();
   state.cameraMode = "overview";
   state.cameraTransitionScheduled = false;
   state.cameraFocusReady = false;
@@ -1346,7 +1350,8 @@ async function executeAction(actor, action, cardData) {
     return true;
   }
   if (action.type === "attack") {
-    await attack(actor, action);
+    const didAttack = await attack(actor, action);
+    if (!didAttack) await moveAfterFailedAttack(actor, action);
     return true;
   }
   if (action.type === "momentumAttack") {
@@ -1354,7 +1359,8 @@ async function executeAction(actor, action, cardData) {
     return true;
   }
   if (action.type === "patternAttack") {
-    patternAttack(actor, action);
+    const didAttack = patternAttack(actor, action);
+    if (!didAttack) await moveAfterFailedAttack(actor, action);
     return true;
   }
   if (action.type === "charge") {
@@ -1576,13 +1582,13 @@ async function attack(actor, action) {
   const targets = selectTargets(actor, action);
   if (!targets.length) {
     log(`${actor.name} 공격 실패`);
-    return;
+    return false;
   }
 
   const chargeBonus = consumeChargeForAttack(actor);
   if (state.activeCardContext?.actorId === actor.id) state.activeCardContext.didAttack = true;
   for (const target of targets) {
-    if (!isAlive(actor)) return;
+    if (!isAlive(actor)) return true;
     if (!isAlive(target)) continue;
     const beforeHp = target.hp;
     const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus, { targetCount: targets.length });
@@ -1605,13 +1611,14 @@ async function attack(actor, action) {
     if (action.pull && isAlive(target)) await pullTarget(actor, target, action.pull);
   }
   consumeEffects(actor, "attack");
+  return true;
 }
 
 function patternAttack(actor, action) {
   const placement = bestPatternPlacement(action.pattern, actor, effectiveActionRange(actor, action), actor.side);
   if (!placement.tiles.length) {
     log(`${actor.name} 공격 실패`);
-    return;
+    return false;
   }
 
   const chargeBonus = consumeChargeForAttack(actor);
@@ -1627,6 +1634,7 @@ function patternAttack(actor, action) {
     refundChargeOnKill(actor, target, action);
   });
   consumeEffects(actor, "attack");
+  return true;
 }
 
 function selectTargets(actor, action) {
@@ -1696,6 +1704,12 @@ async function moveActor(actor, action, cardData) {
   log(`${actor.name} 이동 (${actor.q}, ${actor.r})`);
   triggerTrap(actor);
   return { moved, unused: Math.max(0, amount - moved) };
+}
+
+async function moveAfterFailedAttack(actor, attackAction) {
+  if (!isAlive(actor)) return;
+  const moveAction = { type: "move", amount: actor.baseMove };
+  await moveActor(actor, moveAction, { actions: [moveAction, attackAction] });
 }
 
 async function momentumAttack(actor, action) {
@@ -3437,37 +3451,100 @@ function renderEnemySummary() {
 }
 
 function renderPriorityStrip() {
-  elements.priorityStrip.innerHTML = "";
   const executing = !state.priorityRevealMode && state.activeTimelineIndex >= 0;
   elements.priorityStrip.className = `priority-strip ${state.priorityRevealMode ? `reveal-${state.priorityRevealMode}` : ""} ${executing ? "executing" : ""}`.trim();
   if (!state.currentTimeline.length) {
-    elements.priorityStrip.innerHTML = `<span class="priority-empty">카드 대기</span>`;
+    if (state.priorityStripSignature !== "empty") {
+      elements.priorityStrip.replaceChildren(priorityEmptyElement());
+      state.priorityStripSignature = "empty";
+      state.priorityStripItems.clear();
+    }
     return;
   }
 
-  state.currentTimeline.forEach((entry, index) => {
-    const isPlayer = entry.actorType === "player";
-    const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
-    const boss = groupEnemies.some((e) => e.boss);
-    const count = groupEnemies.length;
-    const emblem = isPlayer ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId);
-    const portraitImage = isPlayer ? getSelectedCharacter().image : monsterDefinitions[entry.actorId]?.image;
-    const statusClass = [
-      state.completedTimelineIndexes?.has(index) ? "done" : "",
-      index === state.activeTimelineIndex ? "active" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    const card = document.createElement("div");
-    card.className = `priority-item ${isPlayer ? "player" : "enemy"} ${boss ? "boss" : ""} ${statusClass}`;
-    card.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
-    card.innerHTML = `
-      <span class="pc-portrait">${portraitContent(portraitImage, emblem, "pc-art")}</span>
-      <span class="pc-badge">${entry.card.priority}</span>
-      ${count > 1 ? `<span class="pc-count">×${count}</span>` : ""}
-    `;
-    elements.priorityStrip.append(card);
+  const timelineKeys = state.currentTimeline.map(priorityEntryKey);
+  const signature = timelineKeys.join("|");
+  const activeKeys = new Set(timelineKeys);
+  state.priorityStripItems.forEach((item, key) => {
+    if (!activeKeys.has(key)) state.priorityStripItems.delete(key);
   });
+
+  state.currentTimeline.forEach((entry, index) => {
+    const key = timelineKeys[index];
+    let item = state.priorityStripItems.get(key);
+    if (!item) {
+      item = createPriorityItem();
+      state.priorityStripItems.set(key, item);
+    }
+    updatePriorityItem(item, entry, index);
+  });
+
+  if (state.priorityStripSignature !== signature) {
+    const fragment = document.createDocumentFragment();
+    timelineKeys.forEach((key) => fragment.append(state.priorityStripItems.get(key)));
+    elements.priorityStrip.replaceChildren(fragment);
+    state.priorityStripSignature = signature;
+  }
+}
+
+function priorityEntryKey(entry) {
+  return `${entry.actorType}:${entry.actorId}:${entry.card.instanceId ?? entry.card.id}`;
+}
+
+function priorityEmptyElement() {
+  const empty = document.createElement("span");
+  empty.className = "priority-empty";
+  empty.textContent = "카드 대기";
+  return empty;
+}
+
+function createPriorityItem() {
+  const item = document.createElement("div");
+  item.className = "priority-item";
+  item.innerHTML = `
+    <span class="pc-portrait"></span>
+    <span class="pc-badge"></span>
+  `;
+  return item;
+}
+
+function updatePriorityItem(item, entry, index) {
+  const isPlayer = entry.actorType === "player";
+  const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
+  const boss = groupEnemies.some((e) => e.boss);
+  const count = groupEnemies.length;
+  const emblem = isPlayer ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId);
+  const portraitImage = isPlayer ? getSelectedCharacter().image : monsterDefinitions[entry.actorId]?.image;
+  const className = [
+    "priority-item",
+    isPlayer ? "player" : "enemy",
+    boss ? "boss" : "",
+    state.completedTimelineIndexes?.has(index) ? "done" : "",
+    index === state.activeTimelineIndex ? "active" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const contentSignature = `${portraitImage ?? ""}:${emblem}:${entry.card.priority}:${count}`;
+
+  if (item.dataset.contentSignature !== contentSignature) {
+    item.querySelector(".pc-portrait").innerHTML = portraitContent(portraitImage, emblem, "pc-art");
+    item.querySelector(".pc-badge").textContent = entry.card.priority;
+    let countElement = item.querySelector(".pc-count");
+    if (count > 1) {
+      if (!countElement) {
+        countElement = document.createElement("span");
+        countElement.className = "pc-count";
+        item.append(countElement);
+      }
+      countElement.textContent = `×${count}`;
+    } else {
+      countElement?.remove();
+    }
+    item.dataset.contentSignature = contentSignature;
+  }
+
+  item.className = className;
+  item.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
 }
 
 function renderPlayerHud() {
