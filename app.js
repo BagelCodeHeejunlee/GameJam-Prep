@@ -368,7 +368,7 @@ const archerRewardPool = [
     { type: "charge", amount: 1 },
     {
       type: "applyEffect",
-      label: "다음 공격 사거리 +1",
+      label: "다음 공격 사거리 1 증가",
       duration: "nextAttack",
       modifiers: [{ stat: "range", amount: 1, when: { attackKind: "ranged" } }],
     },
@@ -395,7 +395,7 @@ const archerRewardPool = [
     { type: "charge", amount: 1 },
     {
       type: "applyEffect",
-      label: "다음 피격 피해 -10%",
+      label: "다음 피격 피해 10% 감소",
       duration: "nextHit",
       modifiers: [{ stat: "damageTaken", amount: -0.1 }],
     },
@@ -408,7 +408,7 @@ const archerRewardPool = [
     { type: "charge", amount: 1 },
     {
       type: "applyEffect",
-      label: "단일 공격 피해 +10%",
+      label: "단일 대상 공격 피해 10% 증가",
       duration: "nextAttack",
       modifiers: [{ stat: "damageDealt", amount: 0.1, when: { singleTarget: true } }],
     },
@@ -454,7 +454,7 @@ const archerRewardPool = [
     { type: "charge", amount: 1 },
     {
       type: "applyEffect",
-      label: "다음 공격 피해 +50%",
+      label: "다음 공격 피해 50% 증가",
       duration: "nextAttack",
       modifiers: [{ stat: "damageDealt", amount: 0.5 }],
     },
@@ -3767,7 +3767,7 @@ function friendlyAction(action) {
       return `${pat} ${action.melee ? "근접" : "원거리"} 공격 x${action.mult}`;
     }
     case "charge":
-      return `차지 +${action.amount}`;
+      return `차지 ${action.amount}`;
     case "placeTrap":
     case "placeObstacle":
       return `${trapLabel(action)} ${action.count ?? 1}개 설치 · 사거리 ${action.range}`;
@@ -3921,8 +3921,8 @@ function compactActionStat(action) {
   if (action.type === "runeAttack") return actionStat("rune", "룬 주변 공격", action.mult);
   if (action.type === "detonateRune") return actionStat("rune-burst", "룬 폭파", action.mult);
   if (action.type === "placeMeteor") return actionStat("meteor", "운석 예고", action.delay ?? 1);
-  if (action.type === "selfDamagePercent") return actionNote(`-${Math.round(action.percent * 100)}%`);
-  if (action.type === "healPercent") return actionNote(`+${Math.round(action.percent * 100)}%`);
+  if (action.type === "selfDamagePercent") return actionNote(`체력 ${Math.round(action.percent * 100)}% 감소`);
+  if (action.type === "healPercent") return actionNote(`체력 ${Math.round(action.percent * 100)}% 회복`);
   if (isPassiveAction(action)) return actionNote(passiveEffectLabel(action), passiveEffectLabel(action));
   if (action.type === "applyEffect") return actionNote(effectActionLabel(action), effectActionLabel(action));
   return actionNote(action.type);
@@ -4155,20 +4155,20 @@ function trapLabel(action) {
 
 function passiveEffectLabel(action) {
   const labels = {
-    comboDamage: `연타 피해 +${Math.round(action.amount * 100)}%`,
-    thirdHitDamage: `세 번째 명중 피해 +${Math.round(action.amount * 100)}%`,
+    comboDamage: `연타 피해 ${percentChangeLabel(action.amount)}`,
+    thirdHitDamage: `세 번째 명중 피해 ${percentChangeLabel(action.amount)}`,
     afterAttackMove: `공격 후 이동 ${action.amount}`,
     ignoreAdjacentPenalty: `근접 원거리 패널티 무시`,
-    trapNextAttackDamage: `함정 발동 후 다음 공격 피해 +${Math.round(action.amount * 100)}%`,
-    trapChainDamage: `함정 발동 시 주변 피해 x${action.amount}`,
-    trapRangedVulnerability: `함정 발동 대상 원거리 피해 +${Math.round(action.amount * 100)}%`,
+    trapNextAttackDamage: `함정 발동 후 다음 공격 피해 ${percentChangeLabel(action.amount)}`,
+    trapChainDamage: `함정 발동 시 주변 피해 ${action.amount}배`,
+    trapRangedVulnerability: `함정 발동 대상 원거리 피해 ${percentChangeLabel(action.amount)}`,
     chargeRetreat: `차지 시 후퇴 ${action.amount}`,
-    chargeRangePerStack: `차지당 사거리 +${action.amount}`,
-    chargeOnNoAttack: `공격하지 않으면 차지 +${action.amount}`,
+    chargeRangePerStack: `차지당 사거리 ${flatChangeLabel(action.amount)}`,
+    chargeOnNoAttack: `공격하지 않으면 차지 ${action.amount}`,
     overkillSplashRange: `처치 잔여 피해 ${action.amount}칸 전이`,
-    chargeStackMultiplier: `차지 스택 x${action.amount}`,
+    chargeStackMultiplier: `차지 스택 효과 ${action.amount}배`,
     berserkLostHpDamage: `잃은 체력 비율 / 2 피해 증가`,
-    lowHpDamage: `체력 ${Math.round((action.threshold ?? 0.25) * 100)}% 미만 피해 +${Math.round(action.amount * 100)}%`,
+    lowHpDamage: `체력 ${Math.round((action.threshold ?? 0.25) * 100)}% 미만 피해 ${percentChangeLabel(action.amount)}`,
   };
   return labels[action.effect] ?? action.label ?? modifierLabel(action.modifiers?.[0]) ?? "패시브";
 }
@@ -4184,16 +4184,25 @@ function effectActionLabel(action) {
 function modifierLabel(modifier) {
   if (!modifier) return "";
   const amount = modifier.amount ?? 0;
-  const percent = `${amount >= 0 ? "+" : ""}${Math.round(amount * 100)}%`;
-  const flat = `${amount >= 0 ? "+" : ""}${amount}`;
   const condition = modifier.when ? conditionLabel(modifier.when) : "";
-  const suffix = condition ? ` (${condition})` : "";
-  if (modifier.stat === "damageDealt") return `주는 피해 ${percent}${suffix}`;
-  if (modifier.stat === "damageTaken") return `받는 피해 ${percent}${suffix}`;
-  if (modifier.stat === "range") return `사거리 ${flat}${suffix}`;
-  if (modifier.stat === "push") return `밀기 ${flat}${suffix}`;
-  if (modifier.stat === "ignoreAdjacentPenalty") return `근접 원거리 패널티 무시${suffix}`;
-  return `${modifier.stat} ${flat}${suffix}`;
+  if (modifier.stat === "damageDealt") return conditionPrefix(condition, `주는 피해 ${percentChangeLabel(amount)}`);
+  if (modifier.stat === "damageTaken") return conditionPrefix(condition, `받는 피해 ${percentChangeLabel(amount)}`);
+  if (modifier.stat === "range") return conditionPrefix(condition, `사거리 ${flatChangeLabel(amount)}`);
+  if (modifier.stat === "push") return conditionPrefix(condition, `밀기 ${flatChangeLabel(amount)}`);
+  if (modifier.stat === "ignoreAdjacentPenalty") return conditionPrefix(condition, "근접 원거리 패널티 무시");
+  return conditionPrefix(condition, `${modifier.stat} ${flatChangeLabel(amount)}`);
+}
+
+function percentChangeLabel(amount) {
+  return `${Math.round(Math.abs(amount) * 100)}% ${amount < 0 ? "감소" : "증가"}`;
+}
+
+function flatChangeLabel(amount) {
+  return `${Math.abs(amount)} ${amount < 0 ? "감소" : "증가"}`;
+}
+
+function conditionPrefix(condition, label) {
+  return condition ? `${condition} 시 ${label}` : label;
 }
 
 function conditionLabel(when = {}) {
@@ -4244,7 +4253,7 @@ function describeAction(action) {
   if (action.type === "runeAttack") return `룬 주변 ATK ${action.mult}`;
   if (action.type === "detonateRune") return `룬 폭파 ATK ${action.mult}`;
   if (action.type === "placeMeteor") return `운석 예고 ${action.delay ?? 1}턴, 범위 ${action.radius ?? 1}, ATK ${action.mult}`;
-  if (action.type === "selfDamagePercent") return `체력 -${Math.round(action.percent * 100)}%`;
+  if (action.type === "selfDamagePercent") return `체력 ${Math.round(action.percent * 100)}% 감소`;
   if (action.type === "healPercent") return `회복 ${Math.round(action.percent * 100)}%`;
   return action.type;
 }
