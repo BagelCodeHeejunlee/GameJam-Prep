@@ -278,7 +278,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2 },
   ]),
   card("push-shot", "밀기 사격", "함정", "레어", 39, [
-    { type: "attack", mult: 1, range: 2, push: 1 },
+    { type: "attack", mult: 1, range: 2, push: 2 },
   ]),
   card("push-away-shot", "밀어내기 사격", "함정", "노말", 39, [
     { type: "attack", mult: 1, range: 2, push: 1 },
@@ -1690,7 +1690,10 @@ async function moveActor(actor, action, cardData) {
     const reachable = safeReachable.length ? safeReachable : fallbackReachable;
     destination = bestRuneRetreatTile(actor, reachable);
   } else {
-    destination = bestCombatMoveTile(actor, safeReachable, fallbackReachable, nextAttack ?? action);
+    destination = bestCombatMoveTile(actor, safeReachable, fallbackReachable, nextAttack ?? action, {
+      amount,
+      jump: action.jump,
+    });
   }
 
   if (!destination || sameHex(destination, actor)) {
@@ -2044,8 +2047,15 @@ function nextAttackAction(cardData, currentAction) {
   });
 }
 
-function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackAction) {
+function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackAction, moveOptions = {}) {
   if (isAttackMovementAction(attackAction)) {
+    const safePathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, true);
+    if (safePathTile && !sameHex(safePathTile, actor)) return safePathTile;
+    if (safePathTile && sameHex(safePathTile, actor)) return actor;
+
+    const fallbackPathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, false);
+    if (fallbackPathTile) return fallbackPathTile;
+
     const safeAttackTile = bestCombatMoveTileFromReachable(actor, safeReachable, attackAction, {
       requireAttackTile: true,
     });
@@ -2059,6 +2069,44 @@ function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackActio
 
   const reachable = safeReachable.length ? safeReachable : fallbackReachable;
   return bestCombatMoveTileFromReachable(actor, reachable, attackAction) ?? actor;
+}
+
+function bestPathStepTowardAttackTile(actor, attackAction, moveOptions, avoidTraps) {
+  const amount = moveOptions.amount ?? actor.baseMove ?? 0;
+  if (amount <= 0) return actor;
+  const goals = [actor, ...state.tiles]
+    .filter((tile) => sameHex(tile, actor) || canEndMoveAt(tile, actor, { avoidTraps }))
+    .map((tile) => {
+      const targetInfo = scoreTargetsFromTile(actor, tile, attackAction);
+      if (targetInfo.hitCount <= 0) return null;
+      const path = sameHex(tile, actor)
+        ? []
+        : findPathForActor(actor, actor, tile, moveOptions.jump, avoidTraps);
+      if (!sameHex(tile, actor) && !path.length) return null;
+      const trapRisk = avoidTraps ? 0 : path.filter((step) => movementTrapAt(step)).length;
+      return { tile, path, trapRisk, ...targetInfo };
+    })
+    .filter(Boolean);
+
+  if (!goals.length) return null;
+
+  goals.sort((a, b) => {
+    if (a.path.length !== b.path.length) return a.path.length - b.path.length;
+    if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
+    if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+    if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
+    return a.lowestIndex - b.lowestIndex;
+  });
+
+  const best = goals[0];
+  if (!best.path.length) return actor;
+  const stepIndex = Math.min(amount, best.path.length) - 1;
+  const destination = best.path[stepIndex];
+  return {
+    ...destination,
+    distance: stepIndex + 1,
+    trapRisk: avoidTraps ? 0 : best.path.slice(0, stepIndex + 1).filter((step) => movementTrapAt(step)).length,
+  };
 }
 
 function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options = {}) {
