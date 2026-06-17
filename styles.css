@@ -1889,10 +1889,12 @@ body.turn-cue-active .turn-scrim {
 
 .player-block {
   display: grid;
-  grid-template-columns: minmax(88px, 1fr) minmax(74px, 0.76fr);
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 142px;
+  height: 160px;
+  min-height: 160px;
   padding: 9px;
   pointer-events: none;
 }
@@ -3640,6 +3642,8 @@ body.turn-cue-active .turn-scrim {
   --cps: 0.18;
   justify-self: end;
   align-self: center;
+  width: calc(512px * var(--cps));
+  height: calc(768px * var(--cps));
 }
 
 .reveal-mount {
@@ -3656,6 +3660,8 @@ body.turn-cue-active .turn-scrim {
   place-items: center;
   justify-self: end;
   align-self: center;
+  width: calc(512px * var(--cps));
+  height: calc(768px * var(--cps));
   border: 2px dashed rgba(180, 140, 80, 0.55);
   border-radius: 12px;
   background: rgba(255, 248, 226, 0.42);
