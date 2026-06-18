@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="assets/card-normal-v2.png" />
-    <link rel="stylesheet" href="styles.css?v=20260617-stable-player-hud" />
+    <link rel="stylesheet" href="styles.css?v=20260618-enemy-action-card" />
   </head>
   <body>
     <main class="app-shell">
@@ -47,6 +47,7 @@
             <h2>우선권</h2>
             <div id="priorityStrip" class="priority-strip"></div>
           </section>
+          <section id="enemyActionHud" class="enemy-action-hud" aria-label="적 행동 카드" aria-live="polite"></section>
         </section>
 
         <section id="playerHud" class="player-hud" aria-label="플레이어 정보"></section>
@@ -115,6 +116,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260617-forced-slide"></script>
+    <script src="app.js?v=20260618-enemy-action-card"></script>
   </body>
 </html>

@@ -41,3 +41,20 @@
 로컬 브라우저 자동화나 임시 정적 서버는 문법/응답 확인 보조 용도로만 사용하고, 최종 화면 판단은 GitHub Pages에서 직접 테스트한다.
 
 모바일 전체화면 테스트는 일반 브라우저 탭이 아니라 홈 화면 앱 실행을 기준으로 한다. iPhone에서는 Safari로 GitHub Pages를 연 뒤 공유 버튼에서 `홈 화면에 추가`를 선택하고, 생성된 홈 화면 아이콘으로 실행한다. 이 방식으로 열어야 주소창과 하단 브라우저 툴바 없이 테스트할 수 있다.
+
+## Combat Simulation
+
+초반 웨이브 밸런스는 Node 시뮬레이터로 빠르게 확인할 수 있다.
+
+```sh
+node tools/simulate.js --strategy random --runs 50 --waves 5
+node tools/simulate.js --strategy random --runs 50 --stage 1
+node tools/simulate.js --strategy random --runs 50 --stage all
+node tools/simulate.js --strategy tree --tree 함정 --runs 50 --waves 5
+node tools/simulate.js --strategy auto --runs 50 --waves 5
+```
+
+전략은 `random`, `tree`, `auto`를 지원한다. `tree` 전략의 트리는 `다단중첩`, `함정`, `차지`를 사용할 수 있다.
+`--stage N`은 1웨이브부터 해당 스테이지 끝까지 전체 진행한다. 한 스테이지는 15웨이브 기준이며, `--stage all`은 현재 정의된 모든 웨이브를 끝까지 진행한다.
+
+기본 시뮬레이션은 대량 실행 속도를 위해 벽 시야 계산을 단순화한다. 실제 시야 계산까지 포함하려면 `--exact-los`를 붙인다.

@@ -38,6 +38,7 @@ const elements = {
   chargeCount: document.querySelector("#chargeCount"),
   chargeHud: document.querySelector("#chargeHud"),
   enemySummary: document.querySelector("#enemySummary"),
+  enemyActionHud: document.querySelector("#enemyActionHud"),
   priorityStrip: document.querySelector("#priorityStrip"),
   playerHud: document.querySelector("#playerHud"),
   drawnCards: document.querySelector("#drawnCards"),
@@ -60,12 +61,12 @@ const baseArcherCards = [
     { type: "move", amount: 2 },
     { type: "attack", mult: 1, range: 2 },
   ], 3),
-  card("retreat-shot", "후퇴 사격", "기본", "기본", 56, [
+  card("retreat-shot", "후퇴 사격", "기본", "기본", 32, [
     { type: "attack", mult: 1, range: 2 },
     { type: "flee", amount: 2 },
   ], 2),
   card("aimed-shot", "정조준", "기본", "기본", 58, [{ type: "attack", mult: 2, range: 2 }], 1),
-  card("keep-distance", "거리 벌리기", "기본", "기본", 28, [{ type: "flee", amount: 3 }], 1),
+  card("keep-distance", "거리 벌리기", "기본", "기본", 20, [{ type: "flee", amount: 3 }], 1),
   card(
     "paired-hex-shot",
     "붙은 두 칸 공격",
@@ -79,7 +80,7 @@ const baseArcherCards = [
 
 const archerRewardPool = [
   card("long-shot", "긴 사격", "공용", "노말", 34, [{ type: "attack", mult: 2, range: 3 }]),
-  card("retreat-step", "후퇴 발걸음", "공용", "노말", 62, [{ type: "flee", amount: 3 }]),
+  card("retreat-step", "후퇴 발걸음", "공용", "노말", 22, [{ type: "flee", amount: 3 }]),
   card("split-shot", "분산 사격", "공용", "노말", 35, [
     { type: "attack", mult: 1, range: 2, targets: 2 },
   ]),
@@ -87,14 +88,14 @@ const archerRewardPool = [
     { type: "move", amount: 2 },
     { type: "attack", mult: 1, range: 2 },
   ]),
-  card("quick-retreat", "빠른 후퇴", "공용", "노말", 24, [{ type: "flee", amount: 3 }]),
+  card("quick-retreat", "빠른 후퇴", "공용", "노말", 18, [{ type: "flee", amount: 3 }]),
   card("steady-shot", "안정 사격", "공용", "노말", 58, [{ type: "attack", mult: 3, range: 2 }]),
-  card("position-tune", "위치 조정", "공용", "노말", 45, [
+  card("position-tune", "위치 조정", "공용", "노말", 34, [
     { type: "move", amount: 1 },
     { type: "attack", mult: 2, range: 2 },
     { type: "flee", amount: 1 },
   ]),
-  card("cover-shot", "견제 사격", "공용", "노말", 50, [
+  card("cover-shot", "견제 사격", "공용", "노말", 33, [
     { type: "attack", mult: 1, range: 3 },
     { type: "flee", amount: 1 },
   ]),
@@ -107,7 +108,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2, targets: 3 },
   ]),
   card("focused-shot", "집중 사격", "공용", "레어", 42, [{ type: "attack", mult: 3, range: 2 }]),
-  card("evasive-shot", "회피 사격", "공용", "레어", 52, [
+  card("evasive-shot", "회피 사격", "공용", "레어", 31, [
     { type: "attack", mult: 2, range: 2 },
     { type: "flee", amount: 2 },
   ]),
@@ -130,7 +131,7 @@ const archerRewardPool = [
     { type: "move", amount: 3, jump: true },
     { type: "attack", mult: 3, range: 3 },
   ]),
-  card("reposition-shot", "재정렬 사격", "공용", "에픽", 48, [
+  card("reposition-shot", "재정렬 사격", "공용", "에픽", 30, [
     { type: "move", amount: 2 },
     { type: "attack", mult: 1, range: 3, targets: 2 },
     { type: "flee", amount: 2 },
@@ -166,7 +167,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2 },
     { type: "attack", mult: 1, range: 2, preferPreviousTarget: true },
   ]),
-  card("rapid-chain-shot", "재빠른 연사", "다단중첩", "노말", 38, [
+  card("rapid-chain-shot", "재빠른 연사", "다단중첩", "노말", 32, [
     { type: "attack", mult: 1, range: 2 },
     { type: "attack", mult: 1, range: 2, preferPreviousTarget: true },
     { type: "flee", amount: 1 },
@@ -286,7 +287,7 @@ const archerRewardPool = [
   card("short-push", "짧은 밀치기", "함정", "노말", 37, [
     { type: "attack", mult: 1, range: 1, melee: true, push: 1 },
   ]),
-  card("behind-trap", "함정 뒤로", "함정", "노말", 42, [
+  card("behind-trap", "함정 뒤로", "함정", "노말", 23, [
     { type: "flee", amount: 2 },
     { type: "placeTrap", range: 2, trap: "attack", count: 1 },
     { type: "attack", mult: 1, range: 2 },
@@ -312,7 +313,7 @@ const archerRewardPool = [
   card("trap-link", "함정 연계", "함정", "레어", 27, [
     { type: "passive", effect: "trapNextAttackDamage", amount: 0.2 },
   ]),
-  card("route-block", "진로 차단", "함정", "레어", 29, [
+  card("route-block", "진로 차단", "함정", "레어", 24, [
     { type: "flee", amount: 2 },
     { type: "placeTrap", range: 2, trap: "block", count: 2 },
     { type: "attack", mult: 1, range: 2 },
@@ -354,7 +355,7 @@ const archerRewardPool = [
       modifiers: [{ stat: "range", amount: 1, when: { attackKind: "ranged" } }],
     },
   ]),
-  card("short-focus", "짧은 집중", "차지", "노말", 28, [
+  card("short-focus", "짧은 집중", "차지", "노말", 21, [
     { type: "flee", amount: 1 },
     {
       type: "applyEffect",
@@ -1027,30 +1028,30 @@ function expandCards(cards) {
 function buildWaves() {
   return [
     wave(3, [], [
-      enemy(-2, -1, 20),
-      enemy(2, -2, 18, { kind: "skirmisher" }),
+      enemy(-2, -1, 2, { baseAtk: 1 }),
+      enemy(2, -2, 2, { kind: "skirmisher", baseAtk: 1 }),
     ]),
     wave(3, [{ q: 0, r: 0 }], [
-      enemy(-3, 0, 24),
-      enemy(3, -2, 20, { kind: "skirmisher" }),
-      enemy(1, -3, 18, { kind: "shooter" }),
+      enemy(-3, 0, 3, { baseAtk: 1 }),
+      enemy(3, -2, 3, { kind: "skirmisher", baseAtk: 1 }),
+      enemy(1, -3, 3, { kind: "shooter", baseAtk: 1 }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -1, r: 1 }], [
-      enemy(-3, 1, 24),
-      enemy(3, -2, 24, { kind: "skirmisher" }),
-      enemy(0, -4, 24, { kind: "shooter" }),
-      enemy(2, 1, 24),
+      enemy(-3, 1, 5, { baseAtk: 1 }),
+      enemy(3, -2, 5, { kind: "skirmisher", baseAtk: 1 }),
+      enemy(0, -4, 5, { kind: "shooter", baseAtk: 1 }),
+      enemy(2, 1, 5, { baseAtk: 1 }),
     ]),
     wave(4, [{ q: 0, r: -1 }, { q: 1, r: -1 }], [
-      enemy(-4, 1, 30),
-      enemy(-2, -2, 24, { kind: "shooter" }),
-      enemy(3, -3, 26, { kind: "skirmisher" }),
-      enemy(3, 0, 30),
+      enemy(-4, 1, 8, { baseAtk: 1 }),
+      enemy(-2, -2, 8, { kind: "shooter", baseAtk: 1 }),
+      enemy(3, -3, 8, { kind: "skirmisher", baseAtk: 1 }),
+      enemy(3, 0, 8, { baseAtk: 1 }),
     ]),
     wave(4, [{ q: -1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: 1 }], [
-      enemy(0, -4, 80, { boss: true, name: "보스 1", baseAtk: 5 }),
-      enemy(-3, 0, 24, { kind: "skirmisher" }),
-      enemy(3, -2, 24, { kind: "shooter" }),
+      enemy(0, -4, 24, { boss: true, name: "보스 1", baseAtk: 2 }),
+      enemy(-3, 0, 12, { kind: "skirmisher", baseAtk: 1 }),
+      enemy(3, -2, 12, { kind: "shooter", baseAtk: 1 }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -2, r: 2 }], [
       enemy(-4, 2, 34),
@@ -1059,73 +1060,88 @@ function buildWaves() {
       enemy(4, -2, 34),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 1, r: -2 }], [
-      enemy(-5, 2, 36),
-      enemy(-3, -1, 30, { kind: "skirmisher" }),
-      enemy(0, -5, 30, { kind: "shooter" }),
-      enemy(4, -4, 36),
-      enemy(4, 0, 36),
+      enemy(-5, 2, 32),
+      enemy(-3, -1, 26, { kind: "skirmisher" }),
+      enemy(0, -5, 26, { kind: "shooter" }),
+      enemy(1, -5, 26, { kind: "skirmisher" }),
+      enemy(4, -4, 32),
+      enemy(4, 0, 32),
     ]),
     wave(5, [{ q: -2, r: 1 }, { q: 0, r: 0 }, { q: 2, r: -2 }], [
-      enemy(-5, 3, 38),
-      enemy(-4, 0, 32, { kind: "skirmisher" }),
-      enemy(0, -5, 32, { kind: "shooter" }),
-      enemy(3, -5, 32, { kind: "shooter" }),
-      enemy(5, -2, 38),
+      enemy(-5, 3, 34),
+      enemy(-4, 0, 28, { kind: "skirmisher" }),
+      enemy(0, -5, 28, { kind: "shooter" }),
+      enemy(2, -5, 28, { kind: "skirmisher" }),
+      enemy(3, -5, 28, { kind: "shooter" }),
+      enemy(5, -2, 34),
     ]),
     wave(5, [{ q: -1, r: 1 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
-      enemy(-5, 1, 40),
-      enemy(-3, -2, 34, { kind: "skirmisher" }),
-      enemy(0, -5, 34, { kind: "shooter" }),
-      enemy(3, -4, 34, { kind: "shooter" }),
-      enemy(5, -3, 34, { kind: "skirmisher" }),
-      enemy(4, 0, 40),
+      enemy(-5, 1, 34),
+      enemy(-3, -2, 28, { kind: "skirmisher" }),
+      enemy(0, -5, 28, { kind: "shooter" }),
+      enemy(2, -5, 28, { kind: "skirmisher" }),
+      enemy(3, -4, 28, { kind: "shooter" }),
+      enemy(5, -3, 28, { kind: "skirmisher" }),
+      enemy(4, 0, 34),
     ]),
     wave(5, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 1, r: 1 }], [
-      enemy(0, -5, 130, { boss: true, name: "보스 2", baseAtk: 6 }),
-      enemy(-4, 1, 36, { kind: "skirmisher" }),
-      enemy(4, -3, 36, { kind: "shooter" }),
-      enemy(5, -1, 42),
+      enemy(0, -5, 110, { boss: true, name: "보스 2", baseAtk: 6 }),
+      enemy(-4, 1, 30, { kind: "skirmisher" }),
+      enemy(-2, -2, 28, { kind: "skirmisher" }),
+      enemy(2, -4, 28, { kind: "shooter" }),
+      enemy(4, -3, 30, { kind: "shooter" }),
+      enemy(5, -1, 34),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -2 }], [
-      enemy(-5, 3, 44),
-      enemy(-4, -1, 38, { kind: "skirmisher" }),
-      enemy(-1, -4, 38, { kind: "shooter" }),
-      enemy(2, -5, 38, { kind: "shooter" }),
-      enemy(5, -3, 38, { kind: "skirmisher" }),
-      enemy(5, 0, 44),
+      enemy(-5, 3, 42),
+      enemy(-4, -1, 36, { kind: "skirmisher" }),
+      enemy(-1, -4, 36, { kind: "shooter" }),
+      enemy(1, -5, 34, { kind: "skirmisher" }),
+      enemy(2, -5, 36, { kind: "shooter" }),
+      enemy(5, -3, 36, { kind: "skirmisher" }),
+      enemy(5, 0, 42),
     ]),
     wave(6, [{ q: -2, r: 1 }, { q: -1, r: 2 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
-      enemy(-6, 3, 48),
-      enemy(-5, 0, 40, { kind: "skirmisher" }),
-      enemy(-2, -4, 40, { kind: "shooter" }),
-      enemy(1, -6, 40, { kind: "shooter" }),
-      enemy(5, -5, 40, { kind: "skirmisher" }),
-      enemy(6, -2, 48),
+      enemy(-6, 3, 38),
+      enemy(-5, 0, 32, { kind: "skirmisher" }),
+      enemy(-2, -4, 32, { kind: "shooter" }),
+      enemy(0, -6, 30, { kind: "skirmisher" }),
+      enemy(1, -6, 32, { kind: "shooter" }),
+      enemy(4, -6, 34),
+      enemy(5, -5, 32, { kind: "skirmisher" }),
+      enemy(6, -2, 38),
     ]),
     wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 3, r: -4 }], [
-      enemy(-6, 2, 52),
-      enemy(-5, -1, 44, { kind: "skirmisher" }),
-      enemy(-2, -4, 44, { kind: "shooter" }),
-      enemy(2, -6, 44, { kind: "shooter" }),
-      enemy(5, -5, 44, { kind: "skirmisher" }),
-      enemy(6, -3, 52),
-      enemy(4, 1, 52),
+      enemy(-6, 2, 40),
+      enemy(-5, -1, 34, { kind: "skirmisher" }),
+      enemy(-3, -3, 32, { kind: "shooter" }),
+      enemy(-2, -4, 34, { kind: "shooter" }),
+      enemy(1, -6, 32, { kind: "skirmisher" }),
+      enemy(2, -6, 34, { kind: "shooter" }),
+      enemy(5, -5, 34, { kind: "skirmisher" }),
+      enemy(6, -3, 40),
+      enemy(4, 1, 40),
     ]),
     wave(6, [{ q: -3, r: 2 }, { q: -1, r: 1 }, { q: 1, r: -1 }, { q: 3, r: -3 }], [
-      enemy(-6, 4, 56),
-      enemy(-6, 1, 48, { kind: "skirmisher" }),
-      enemy(-3, -3, 48, { kind: "shooter" }),
-      enemy(0, -6, 48, { kind: "shooter" }),
-      enemy(4, -6, 48, { kind: "skirmisher" }),
-      enemy(6, -4, 56),
-      enemy(6, -1, 56),
+      enemy(-6, 4, 42),
+      enemy(-6, 1, 36, { kind: "skirmisher" }),
+      enemy(-4, -1, 34, { kind: "shooter" }),
+      enemy(-3, -3, 36, { kind: "shooter" }),
+      enemy(0, -6, 36, { kind: "shooter" }),
+      enemy(3, -6, 34, { kind: "skirmisher" }),
+      enemy(4, -6, 36, { kind: "skirmisher" }),
+      enemy(6, -4, 42),
+      enemy(6, -1, 42),
     ]),
     wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 1, r: 1 }, { q: -1, r: -1 }], [
-      enemy(0, -6, 200, { boss: true, name: "최종 보스", baseAtk: 7 }),
-      enemy(-6, 2, 52, { kind: "skirmisher" }),
-      enemy(-4, -1, 52, { kind: "shooter" }),
-      enemy(4, -5, 52, { kind: "skirmisher" }),
-      enemy(6, -3, 60),
+      enemy(0, -6, 160, { boss: true, name: "최종 보스", baseAtk: 7 }),
+      enemy(-6, 2, 38, { kind: "skirmisher" }),
+      enemy(-4, -1, 38, { kind: "shooter" }),
+      enemy(-2, -4, 34, { kind: "shooter" }),
+      enemy(2, -6, 34, { kind: "skirmisher" }),
+      enemy(4, -5, 38, { kind: "skirmisher" }),
+      enemy(5, -4, 36),
+      enemy(6, -3, 42),
     ]),
   ];
 }
@@ -1248,6 +1264,7 @@ async function runTurn() {
     state.activeTimelineIndex = index;
     document.body.classList.toggle("player-acting", entry.actorType === "player");
     renderPriorityStrip();
+    renderEnemyActionHud();
     renderBoard();
     renderDrawnCards();
     renderTimeline(index);
@@ -1259,6 +1276,7 @@ async function runTurn() {
     state.activeTimelineIndex = -1;
     document.body.classList.remove("player-acting");
     renderPriorityStrip();
+    renderEnemyActionHud();
     renderBoard();
     renderDrawnCards();
     renderTimeline();
@@ -1653,6 +1671,12 @@ function selectTargets(actor, action) {
         if (aPrevious !== bPrevious) return aPrevious ? -1 : 1;
       }
       if (a.hp !== b.hp) return a.hp - b.hp;
+      if (isRangedAttackAction(action)) {
+        const targetCount = action.targets ?? 1;
+        const aPenaltyFree = isPenaltyFreeTargetFromTile(actor, actor, a, action, targetCount);
+        const bPenaltyFree = isPenaltyFreeTargetFromTile(actor, actor, b, action, targetCount);
+        if (aPenaltyFree !== bPenaltyFree) return aPenaltyFree ? -1 : 1;
+      }
       const distanceA = targetPriorityDistance(actor, a, action);
       const distanceB = targetPriorityDistance(actor, b, action);
       if (distanceA !== distanceB) return distanceA - distanceB;
@@ -1674,10 +1698,9 @@ async function moveActor(actor, action, cardData) {
     return { moved: 0, unused: amount };
   }
 
-  const safeReachable = reachableTiles(actor, amount, action.jump, true)
-    .map((tile) => ({ ...tile, trapRisk: 0 }));
-  const fallbackReachable = reachableTiles(actor, amount, action.jump, false)
-    .map((tile) => ({ ...tile, trapRisk: movementTrapRisk(actor, tile, action.jump, amount) }));
+  const movementContext = createMovementContext(actor, amount, action.jump);
+  const safeReachable = movementContext.safeReachable;
+  const fallbackReachable = movementContext.fallbackReachable;
   if (!safeReachable.length && !fallbackReachable.length) {
     log(`${actor.name} 이동 실패`);
     return { moved: 0, unused: amount };
@@ -1695,6 +1718,7 @@ async function moveActor(actor, action, cardData) {
     destination = bestCombatMoveTile(actor, safeReachable, fallbackReachable, nextAttack ?? action, {
       amount,
       jump: action.jump,
+      movementContext,
     });
   }
 
@@ -1703,7 +1727,7 @@ async function moveActor(actor, action, cardData) {
     return { moved: 0, unused: amount };
   }
 
-  const path = findMovePath(actor, destination, action.jump, amount);
+  const path = movementContext.pathTo(destination);
   const moved = path.length || axialDistance(actor, destination);
   await animateActorPath(actor, path.length ? path : [destination]);
   log(`${actor.name} 이동 (${actor.q}, ${actor.r})`);
@@ -1775,8 +1799,8 @@ function resolveAfterHitEffects(attacker, target) {
   if (!isAlive(attacker) || !isAlive(target)) return;
   const fleeAmount = Math.max(0, ...(target.effects ?? []).map((effect) => effect.afterHitFlee ?? 0));
   if (!fleeAmount) return;
-  const reachable = reachableTiles(target, fleeAmount, false, false)
-    .map((tile) => ({ ...tile, trapRisk: movementTrapRisk(target, tile, false) }));
+  const movementContext = createMovementContext(target, fleeAmount, false);
+  const reachable = movementContext.fallbackReachable;
   const destination = bestFleeTile(target, reachable);
   if (!destination || sameHex(destination, target)) return;
   target.q = destination.q;
@@ -1892,6 +1916,111 @@ function findMovePath(actor, destination, jump = false, maxDistance = Infinity) 
   if ((safePath.length && safePath.length <= maxDistance) || sameHex(actor, destination)) return safePath;
   const fallbackPath = findPathForActor(actor, actor, destination, jump, false);
   return fallbackPath.length <= maxDistance ? fallbackPath : [];
+}
+
+function createMovementContext(actor, amount, jump = false) {
+  const safeField = buildMoveField(actor, amount, { jump, avoidTraps: true });
+  const fallbackField = buildMoveField(actor, amount, { jump, avoidTraps: false });
+  const fallbackReachable = fallbackField.reachableTiles.map((tile) => ({
+    ...tile,
+    trapRisk: safeField.distanceTo(tile) <= amount ? 0 : tile.trapRisk,
+  }));
+  const fullFields = new Map();
+
+  return {
+    amount,
+    jump,
+    safeField,
+    fallbackField,
+    safeReachable: safeField.reachableTiles,
+    fallbackReachable,
+    fullField(avoidTraps) {
+      const key = avoidTraps ? "safe" : "fallback";
+      if (!fullFields.has(key)) {
+        fullFields.set(key, buildMoveField(actor, Infinity, { jump, avoidTraps }));
+      }
+      return fullFields.get(key);
+    },
+    pathTo(destination) {
+      if (sameHex(actor, destination)) return [];
+      const safePath = safeField.pathTo(destination);
+      if (safePath) return safePath;
+      return fallbackField.pathTo(destination) ?? [];
+    },
+  };
+}
+
+function buildMoveField(actor, maxDistance = Infinity, options = {}) {
+  const jump = Boolean(options.jump);
+  const avoidTraps = Boolean(options.avoidTraps);
+  const start = { q: actor.q, r: actor.r };
+  const startKey = hexKey(start);
+  const queue = [{ ...start, distance: 0, trapRisk: 0 }];
+  const nodeByKey = new Map([[startKey, { ...start, distance: 0, trapRisk: 0, parentKey: null }]]);
+  const reachableTiles = [];
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (current.distance > 0 && canEndMoveAt(current, actor, { avoidTraps })) {
+      reachableTiles.push({
+        q: current.q,
+        r: current.r,
+        distance: current.distance,
+        trapRisk: avoidTraps ? 0 : current.trapRisk,
+      });
+    }
+    if (current.distance >= maxDistance) continue;
+
+    for (const dir of directions) {
+      const next = { q: current.q + dir.q, r: current.r + dir.r };
+      const key = hexKey(next);
+      if (!isTile(next) || nodeByKey.has(key)) continue;
+      if (!jump && blocksPath(next, actor, { avoidTraps })) continue;
+      const trapRisk = current.trapRisk + (!avoidTraps && movementTrapAt(next) ? 1 : 0);
+      const node = {
+        q: next.q,
+        r: next.r,
+        distance: current.distance + 1,
+        trapRisk,
+        parentKey: hexKey(current),
+      };
+      nodeByKey.set(key, node);
+      queue.push(node);
+    }
+  }
+
+  return {
+    reachableTiles,
+    has(tile) {
+      return nodeByKey.has(hexKey(tile));
+    },
+    node(tile) {
+      return nodeByKey.get(hexKey(tile)) ?? null;
+    },
+    distanceTo(tile) {
+      return nodeByKey.get(hexKey(tile))?.distance ?? Infinity;
+    },
+    trapRiskTo(tile) {
+      return avoidTraps ? 0 : (nodeByKey.get(hexKey(tile))?.trapRisk ?? Infinity);
+    },
+    pathTo(destination) {
+      const destinationKey = hexKey(destination);
+      if (!nodeByKey.has(destinationKey)) return null;
+      const path = [];
+      let key = destinationKey;
+      while (key && key !== startKey) {
+        const node = nodeByKey.get(key);
+        path.unshift({ q: node.q, r: node.r });
+        key = node.parentKey;
+      }
+      return path;
+    },
+    stepToward(destination, amount) {
+      const path = this.pathTo(destination);
+      if (!path?.length) return sameHex(actor, destination) ? actor : null;
+      return path[Math.min(amount, path.length) - 1] ?? null;
+    },
+  };
 }
 
 function findPathForActor(actor, start, destination, jump = false, avoidTraps = false) {
@@ -2061,6 +2190,11 @@ function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackActio
     if (safePathTile && !sameHex(safePathTile, actor)) return safePathTile;
     if (safePathTile && sameHex(safePathTile, actor)) return actor;
 
+    const safeApproachTile = bestCombatMoveTileFromReachable(actor, safeReachable, attackAction, {
+      excludeCurrentTile: true,
+    });
+    if (safeApproachTile && !sameHex(safeApproachTile, actor)) return safeApproachTile;
+
     const fallbackAttackTile = bestCombatMoveTileFromReachable(actor, fallbackReachable, attackAction, {
       requireAttackTile: true,
       includeCurrentTile: true,
@@ -2078,41 +2212,41 @@ function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackActio
 function bestPathStepTowardAttackTile(actor, attackAction, moveOptions, avoidTraps) {
   const amount = moveOptions.amount ?? actor.baseMove ?? 0;
   if (amount <= 0) return actor;
+  const movementField = moveOptions.movementContext?.fullField(avoidTraps)
+    ?? buildMoveField(actor, Infinity, { jump: moveOptions.jump, avoidTraps });
   const goals = [actor, ...state.tiles]
     .filter((tile) => sameHex(tile, actor) || canEndMoveAt(tile, actor, { avoidTraps }))
     .map((tile) => {
+      if (!movementField.has(tile)) return null;
       const targetInfo = scoreTargetsFromTile(actor, tile, attackAction);
       if (targetInfo.hitCount <= 0) return null;
-      const path = sameHex(tile, actor)
-        ? []
-        : findPathForActor(actor, actor, tile, moveOptions.jump, avoidTraps);
-      if (!sameHex(tile, actor) && !path.length) return null;
-      const trapRisk = avoidTraps ? 0 : path.filter((step) => movementTrapAt(step)).length;
-      return { tile, path, trapRisk, ...targetInfo };
+      const distance = movementField.distanceTo(tile);
+      const trapRisk = movementField.trapRiskTo(tile);
+      return { tile, distance, trapRisk, ...targetInfo };
     })
     .filter(Boolean);
 
   if (!goals.length) return null;
 
   goals.sort((a, b) => {
-    const aReachableNow = a.path.length <= amount;
-    const bReachableNow = b.path.length <= amount;
+    const aReachableNow = a.distance <= amount;
+    const bReachableNow = b.distance <= amount;
     if (aReachableNow !== bReachableNow) return aReachableNow ? -1 : 1;
     if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
     const targetScore = compareAttackMoveTargetScores(a, b, attackAction);
     if (targetScore) return targetScore;
-    if (a.path.length !== b.path.length) return a.path.length - b.path.length;
+    if (a.distance !== b.distance) return a.distance - b.distance;
     return a.lowestIndex - b.lowestIndex;
   });
 
   const best = goals[0];
-  if (!best.path.length) return actor;
-  const stepIndex = Math.min(amount, best.path.length) - 1;
-  const destination = best.path[stepIndex];
+  if (best.distance <= 0) return actor;
+  const destination = movementField.stepToward(best.tile, amount);
+  if (!destination) return null;
   return {
     ...destination,
-    distance: stepIndex + 1,
-    trapRisk: avoidTraps ? 0 : best.path.slice(0, stepIndex + 1).filter((step) => movementTrapAt(step)).length,
+    distance: movementField.distanceTo(destination),
+    trapRisk: movementField.trapRiskTo(destination),
   };
 }
 
@@ -2122,14 +2256,17 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
   const desiredRange = attackAction?.type === "attack" || attackAction?.type === "patternAttack"
     ? effectiveActionRange(actor, attackAction)
     : (attackAction?.desiredRange ?? actor.baseRange);
-  const candidateTiles = (options.includeCurrentTile || isMeleeAttackAction(attackAction))
+  const candidateTiles = (options.includeCurrentTile || (isMeleeAttackAction(attackAction) && !options.excludeCurrentTile))
     ? [actor, ...reachable]
     : reachable;
+  const approachFields = isMeleeAttackAction(attackAction)
+    ? buildMeleeApproachFields(actor, opponents)
+    : null;
 
   const scored = candidateTiles
     .map((tile) => {
       const targetInfo = scoreTargetsFromTile(actor, tile, attackAction);
-      const nearest = nearestOpponentMoveDistance(actor, tile, opponents, attackAction);
+      const nearest = nearestOpponentMoveDistance(actor, tile, opponents, attackAction, approachFields);
       const closestToDesired = -Math.abs(nearest - desiredRange);
       const farthestClosest = nearest;
       const moveCost = tile.distance ?? axialDistance(actor, tile);
@@ -2199,15 +2336,67 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
   return 0;
 }
 
-function nearestOpponentMoveDistance(actor, tile, opponents, attackAction) {
+function nearestOpponentMoveDistance(actor, tile, opponents, attackAction, approachFields = null) {
   if (!isMeleeAttackAction(attackAction)) {
     return Math.min(...opponents.map((enemy) => axialDistance(tile, enemy)));
   }
-  return Math.min(...opponents.map((enemy) => approachDistanceToTarget(actor, tile, enemy)));
+  return Math.min(...opponents.map((enemy) =>
+    approachDistanceToTarget(actor, tile, enemy, approachFields?.get(enemy.id)),
+  ));
 }
 
-function approachDistanceToTarget(actor, fromTile, target) {
+function buildMeleeApproachFields(actor, opponents) {
+  return new Map(opponents.map((target) => [
+    target.id,
+    {
+      safe: buildApproachField(actor, target, { avoidTraps: true }),
+      fallback: buildApproachField(actor, target, { avoidTraps: false }),
+    },
+  ]));
+}
+
+function buildApproachField(actor, target, options = {}) {
+  const avoidTraps = Boolean(options.avoidTraps);
+  const goals = directions
+    .map((dir) => ({ q: target.q + dir.q, r: target.r + dir.r }))
+    .filter((tile) => isTile(tile) && canEndMoveAt(tile, actor, { avoidTraps }));
+  const queue = [];
+  const distanceByKey = new Map();
+
+  goals.forEach((goal) => {
+    const key = hexKey(goal);
+    if (distanceByKey.has(key)) return;
+    distanceByKey.set(key, 0);
+    queue.push(goal);
+  });
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    const currentDistance = distanceByKey.get(hexKey(current));
+    for (const dir of directions) {
+      const next = { q: current.q + dir.q, r: current.r + dir.r };
+      const key = hexKey(next);
+      if (!isTile(next) || distanceByKey.has(key)) continue;
+      if (blocksPath(next, actor, { avoidTraps })) continue;
+      distanceByKey.set(key, currentDistance + 1);
+      queue.push(next);
+    }
+  }
+
+  return {
+    distanceTo(tile) {
+      return distanceByKey.get(hexKey(tile)) ?? Infinity;
+    },
+  };
+}
+
+function approachDistanceToTarget(actor, fromTile, target, approachFields = null) {
   if (axialDistance(fromTile, target) <= 1) return 0;
+  if (approachFields) {
+    const safeDistance = approachFields.safe.distanceTo(fromTile);
+    if (Number.isFinite(safeDistance)) return safeDistance;
+    return approachFields.fallback.distanceTo(fromTile);
+  }
   const adjacentTiles = directions
     .map((dir) => ({ q: target.q + dir.q, r: target.r + dir.r }))
     .filter((tile) => isTile(tile) && canEndMoveAt(tile, actor, { avoidTraps: true }));
@@ -3230,6 +3419,7 @@ function render() {
   renderHud();
   renderEnemySummary();
   renderPriorityStrip();
+  renderEnemyActionHud();
   renderPlayerHud();
   renderDrawnCards();
   renderTimeline();
@@ -3572,6 +3762,55 @@ function renderEnemySummary() {
     `;
     elements.enemySummary.append(div);
   });
+}
+
+function renderEnemyActionHud() {
+  if (!elements.enemyActionHud) return;
+  const entry = !state.priorityRevealMode && state.activeTimelineIndex >= 0
+    ? state.currentTimeline[state.activeTimelineIndex]
+    : null;
+
+  if (!entry || entry.actorType === "player") {
+    elements.enemyActionHud.className = "enemy-action-hud";
+    elements.enemyActionHud.innerHTML = "";
+    elements.enemyActionHud.dataset.signature = "";
+    return;
+  }
+
+  const groupEnemies = aliveEnemies()
+    .filter((enemy) => enemy.kind === entry.actorId)
+    .sort((a, b) => a.monsterIndex - b.monsterIndex);
+  if (!groupEnemies.length) {
+    elements.enemyActionHud.className = "enemy-action-hud";
+    elements.enemyActionHud.innerHTML = "";
+    elements.enemyActionHud.dataset.signature = "";
+    return;
+  }
+
+  const sample = groupEnemies[0];
+  const definition = monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
+  const boss = groupEnemies.some((enemy) => enemy.boss);
+  const name = boss && sample ? sample.name : definition.name;
+  const count = groupEnemies.length;
+  const signature = `${entry.actorId}:${entry.card.instanceId ?? entry.card.id}:${count}:${boss}`;
+
+  elements.enemyActionHud.className = `enemy-action-hud show ${boss ? "boss" : ""}`;
+  if (elements.enemyActionHud.dataset.signature === signature) return;
+  elements.enemyActionHud.dataset.signature = signature;
+  elements.enemyActionHud.innerHTML = `
+    <div class="enemy-action-info">
+      <span class="enemy-action-kicker">적 행동</span>
+      <div class="enemy-action-head">
+        <span class="combatant-portrait enemy-portrait">${portraitContent(definition.image, definition.label ?? "적", "portrait-art")}</span>
+        <div class="combatant-heading">
+          <strong>${name}</strong>
+          ${count > 1 ? `<span>x${count}</span>` : ""}
+        </div>
+      </div>
+      ${sample ? renderBaseStats(sample) : ""}
+    </div>
+    ${cardMount(entry.card, "enemy-action-mount")}
+  `;
 }
 
 function renderPriorityStrip() {
