@@ -482,10 +482,8 @@ const archerRewardPool = [
 
 const archerFirstRewardIds = new Set([
   "long-shot",
-  "retreat-step",
   "split-shot",
   "reward-advance-shot",
-  "quick-retreat",
   "steady-shot",
   "position-tune",
   "cover-shot",
@@ -722,7 +720,7 @@ const characterDefinitions = {
     shortLabel: "궁",
     image: "assets/characters/archer.png",
     title: "궁수 오토배틀 프로토타입",
-    maxHp: 70,
+    maxHp: 80,
     baseAtk: 10,
     baseRange: 2,
     baseMove: 2,
@@ -1038,10 +1036,10 @@ function buildWaves() {
       enemy(1, -3, 18, { kind: "shooter" }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -1, r: 1 }], [
-      enemy(-3, 1, 28),
+      enemy(-3, 1, 24),
       enemy(3, -2, 24, { kind: "skirmisher" }),
       enemy(0, -4, 24, { kind: "shooter" }),
-      enemy(2, 1, 28),
+      enemy(2, 1, 24),
     ]),
     wave(4, [{ q: 0, r: -1 }, { q: 1, r: -1 }], [
       enemy(-4, 1, 30),
@@ -2049,22 +2047,24 @@ function nextAttackAction(cardData, currentAction) {
 
 function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackAction, moveOptions = {}) {
   if (isAttackMovementAction(attackAction)) {
+    const safeAttackTile = bestCombatMoveTileFromReachable(actor, safeReachable, attackAction, {
+      requireAttackTile: true,
+      includeCurrentTile: true,
+    });
+    if (safeAttackTile) return safeAttackTile;
+
     const safePathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, true);
     if (safePathTile && !sameHex(safePathTile, actor)) return safePathTile;
     if (safePathTile && sameHex(safePathTile, actor)) return actor;
 
-    const fallbackPathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, false);
-    if (fallbackPathTile) return fallbackPathTile;
-
-    const safeAttackTile = bestCombatMoveTileFromReachable(actor, safeReachable, attackAction, {
-      requireAttackTile: true,
-    });
-    if (safeAttackTile) return safeAttackTile;
-
     const fallbackAttackTile = bestCombatMoveTileFromReachable(actor, fallbackReachable, attackAction, {
       requireAttackTile: true,
+      includeCurrentTile: true,
     });
     if (fallbackAttackTile) return fallbackAttackTile;
+
+    const fallbackPathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, false);
+    if (fallbackPathTile) return fallbackPathTile;
   }
 
   const reachable = safeReachable.length ? safeReachable : fallbackReachable;
@@ -2091,10 +2091,13 @@ function bestPathStepTowardAttackTile(actor, attackAction, moveOptions, avoidTra
   if (!goals.length) return null;
 
   goals.sort((a, b) => {
-    if (a.path.length !== b.path.length) return a.path.length - b.path.length;
+    const aReachableNow = a.path.length <= amount;
+    const bReachableNow = b.path.length <= amount;
+    if (aReachableNow !== bReachableNow) return aReachableNow ? -1 : 1;
     if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
-    if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
-    if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
+    const targetScore = compareAttackMoveTargetScores(a, b, attackAction);
+    if (targetScore) return targetScore;
+    if (a.path.length !== b.path.length) return a.path.length - b.path.length;
     return a.lowestIndex - b.lowestIndex;
   });
 
@@ -2115,7 +2118,9 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
   const desiredRange = attackAction?.type === "attack" || attackAction?.type === "patternAttack"
     ? effectiveActionRange(actor, attackAction)
     : (attackAction?.desiredRange ?? actor.baseRange);
-  const candidateTiles = isMeleeAttackAction(attackAction) ? [actor, ...reachable] : reachable;
+  const candidateTiles = (options.includeCurrentTile || isMeleeAttackAction(attackAction))
+    ? [actor, ...reachable]
+    : reachable;
 
   const scored = candidateTiles
     .map((tile) => {
@@ -2128,6 +2133,9 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
       return {
         tile,
         hitCount: targetInfo.hitCount,
+        nonPenaltyHitCount: targetInfo.nonPenaltyHitCount,
+        lowestHp: targetInfo.lowestHp,
+        lowestNonPenaltyHp: targetInfo.lowestNonPenaltyHp,
         lowestIndex: targetInfo.lowestIndex,
         closestToDesired,
         farthestClosest,
@@ -2139,7 +2147,8 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
 
   scored.sort((a, b) => {
     if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
-    if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+    const targetScore = compareAttackMoveTargetScores(a, b, attackAction);
+    if (targetScore) return targetScore;
     if (a.hitCount > 1 && a.farthestClosest !== b.farthestClosest) {
       return b.farthestClosest - a.farthestClosest;
     }
@@ -2158,6 +2167,32 @@ function isAttackMovementAction(action) {
 
 function isMeleeAttackAction(action) {
   return action?.type === "attack" && (action.melee || action.range <= 1);
+}
+
+function isRangedAttackAction(action) {
+  return isAttackMovementAction(action) && !action.melee && (action.range ?? 1) > 1;
+}
+
+function compareAttackMoveTargetScores(a, b, attackAction) {
+  if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+
+  const targetLimit = attackAction?.targets ?? 1;
+  const ranged = isRangedAttackAction(attackAction);
+  if (ranged && targetLimit > 1 && a.nonPenaltyHitCount !== b.nonPenaltyHitCount) {
+    return b.nonPenaltyHitCount - a.nonPenaltyHitCount;
+  }
+
+  if (ranged && targetLimit <= 1) {
+    const aHasPenaltyFreeTarget = Number.isFinite(a.lowestNonPenaltyHp);
+    const bHasPenaltyFreeTarget = Number.isFinite(b.lowestNonPenaltyHp);
+    if (aHasPenaltyFreeTarget !== bHasPenaltyFreeTarget) return aHasPenaltyFreeTarget ? -1 : 1;
+    if (aHasPenaltyFreeTarget && a.lowestNonPenaltyHp !== b.lowestNonPenaltyHp) {
+      return a.lowestNonPenaltyHp - b.lowestNonPenaltyHp;
+    }
+  }
+
+  if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
+  return 0;
 }
 
 function nearestOpponentMoveDistance(actor, tile, opponents, attackAction) {
@@ -2189,24 +2224,53 @@ function approachDistanceToTarget(actor, fromTile, target) {
 
 function scoreTargetsFromTile(actor, tile, attackAction) {
   if (!attackAction || (attackAction.type !== "attack" && attackAction.type !== "patternAttack")) {
-    return { hitCount: 0, lowestHp: Infinity, lowestIndex: 9999 };
+    return { hitCount: 0, nonPenaltyHitCount: 0, lowestHp: Infinity, lowestNonPenaltyHp: Infinity, lowestIndex: 9999 };
   }
   if (attackAction.type === "patternAttack") {
     const placement = bestPatternPlacement(attackAction.pattern, tile, effectiveActionRange(actor, attackAction), actor.side);
+    const nonPenaltyTargets = placement.targets.filter((target) =>
+      isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, placement.targets.length),
+    );
     return {
       hitCount: placement.targets.length,
+      nonPenaltyHitCount: nonPenaltyTargets.length,
       lowestHp: placement.lowestHp,
+      lowestNonPenaltyHp: Math.min(...nonPenaltyTargets.map((target) => target.hp), Infinity),
       lowestIndex: placement.lowestIndex,
     };
   }
   const targets = aliveOpponents(actor).filter((target) =>
     canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction)),
   );
+  const targetLimit = attackAction.targets ?? 1;
+  const nonPenaltyTargets = targets.filter((target) =>
+    isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, Math.min(targets.length, targetLimit)),
+  );
   return {
-    hitCount: Math.min(targets.length, attackAction.targets ?? 1),
+    hitCount: Math.min(targets.length, targetLimit),
+    nonPenaltyHitCount: Math.min(nonPenaltyTargets.length, targetLimit),
     lowestHp: Math.min(...targets.map((target) => target.hp), Infinity),
+    lowestNonPenaltyHp: Math.min(...nonPenaltyTargets.map((target) => target.hp), Infinity),
     lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0), 9999),
   };
+}
+
+function isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, targetCount = attackAction?.targets ?? 1) {
+  if (!isRangedAttackAction(attackAction)) return true;
+  const distance = axialDistance(tile, target);
+  if (distance > 1) return true;
+  if (actor.permanent?.ignoreAdjacentPenalty) return true;
+  const context = {
+    actor,
+    target,
+    action: attackAction,
+    distance,
+    repeatHits: 0,
+    targetCount,
+    isMelee: false,
+    isRanged: true,
+  };
+  return effectModifierTotal(actor, "ignoreAdjacentPenalty", context) > 0;
 }
 
 function bestFleeTile(actor, reachable) {
@@ -3115,7 +3179,7 @@ async function pickReward(reward, button) {
 
   await sleep(360);
   if (!passiveReward) {
-    if (preStartReward) state.deck.unshift(reward);
+    if (preStartReward) state.deck = shuffle([...state.deck, reward]);
     else state.deck.push(reward);
   }
   renderPlayerHud();
