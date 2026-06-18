@@ -3101,13 +3101,13 @@ body.turn-cue-active .turn-scrim {
   padding: 6px 2px;
 }
 
-.reward-cards.reward-passive {
+.reward-cards.reward-phase-passive {
   grid-template-columns: repeat(3, max-content);
   gap: 14px 8px;
 }
 
 @media (min-width: 600px) {
-  .reward-cards.reward-passive {
+  .reward-cards.reward-phase-passive {
     grid-template-columns: repeat(3, max-content);
     gap: 20px 16px;
   }
@@ -3875,18 +3875,18 @@ body.turn-cue-active .turn-scrim {
   transition: transform 180ms ease, filter 180ms ease;
 }
 
-.reward-overlay .reward-passive .reward-mount {
+.reward-overlay .reward-phase-passive .reward-mount {
   --cps: 0.2;
 }
 
 @media (min-width: 430px) {
-  .reward-overlay .reward-passive .reward-mount {
+  .reward-overlay .reward-phase-passive .reward-mount {
     --cps: 0.23;
   }
 }
 
 @media (min-width: 600px) {
-  .reward-overlay .reward-passive .reward-mount {
+  .reward-overlay .reward-phase-passive .reward-mount {
     --cps: 0.34;
   }
 }
@@ -3896,7 +3896,7 @@ body.turn-cue-active .turn-scrim {
     --cps: 0.4;
   }
 
-  .reward-overlay .reward-passive .reward-mount {
+  .reward-overlay .reward-phase-passive .reward-mount {
     --cps: 0.4;
   }
 }
@@ -3906,7 +3906,7 @@ body.turn-cue-active .turn-scrim {
     --cps: 0.29;
   }
 
-  .reward-overlay .reward-passive .reward-mount {
+  .reward-overlay .reward-phase-passive .reward-mount {
     --cps: 0.18;
   }
 }
@@ -3916,7 +3916,7 @@ body.turn-cue-active .turn-scrim {
     --cps: 0.25;
   }
 
-  .reward-overlay .reward-passive .reward-mount {
+  .reward-overlay .reward-phase-passive .reward-mount {
     --cps: 0.17;
   }
 }

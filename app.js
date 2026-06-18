@@ -3622,7 +3622,7 @@ function showRewards() {
       : `추가할 카드 <b>1장</b>을 선택하세요`;
   }
   elements.rewardCards.innerHTML = "";
-  elements.rewardCards.className = `reward-cards reward-${rewardPhase}`;
+  elements.rewardCards.className = `reward-cards reward-phase-${rewardPhase}`;
   rewards.forEach((reward) => {
     const pick = document.createElement("div");
     pick.className = `reward-pick ${rarityClass(reward.rarity)}`;
