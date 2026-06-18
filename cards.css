@@ -456,20 +456,21 @@ p {
 
 @media (max-width: 640px) {
   :root {
-    --manager-cps: 0.3;
+    --manager-cps: 0.2;
   }
 
   .card-grid {
-    grid-template-columns: repeat(2, calc(512px * var(--manager-cps)));
+    grid-template-columns: repeat(3, calc(512px * var(--manager-cps)));
+    gap: 12px 10px;
   }
 
   .card-sections {
-    max-width: calc((512px * var(--manager-cps) * 2) + 18px);
+    max-width: calc((512px * var(--manager-cps) * 3) + 52px);
   }
 }
 
 @media (max-width: 380px) {
   :root {
-    --manager-cps: 0.27;
+    --manager-cps: 0.185;
   }
 }
