@@ -1467,6 +1467,10 @@ function isSustainCard(cardData) {
   return cardData?.type === "지속";
 }
 
+function isTurnSustainCard(cardData) {
+  return cardData?.actions?.some((action) => action.type === "applyEffect" && action.duration === "turn");
+}
+
 function expireTurnEndEffects(entry) {
   if (entry.actorType === "player") {
     const actor = state.entities.find((entity) => entity.id === entry.actorId);
@@ -3739,7 +3743,8 @@ function baseStat(kind, label, value) {
 
 function cardPrefab(card) {
   if (!card) return "";
-  const footerLabel = isPassiveCard(card) ? `<div class="cp-type-label">패시브</div>` : "";
+  const typeLabel = isPassiveCard(card) ? "패시브" : isTurnSustainCard(card) ? "턴 지속" : "";
+  const footerLabel = typeLabel ? `<div class="cp-type-label">${typeLabel}</div>` : "";
   return `
     <div class="card-prefab ${rarityClass(card.rarity)}">
       <div class="cp-bg"></div>
