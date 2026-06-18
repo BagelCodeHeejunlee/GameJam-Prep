@@ -12,8 +12,9 @@ const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.28;
 const CAMERA_UI_GAP = 16;
 const CAMERA_PLAYER_EDGE_MARGIN = 72;
 const CAMERA_FOLLOW_DURATION = 220;
+const CAMERA_DRAG_THRESHOLD = 5;
+const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
-const WAVE_CLEAR_HEAL_RATIO = 0.2;
 const POST_WAVE_TWO_HP_SCALE = 0.75;
 
 const directions = [
@@ -904,6 +905,8 @@ function newRun() {
     cameraX: 0,
     cameraY: 0,
     cameraScale: 0,
+    cameraDrag: null,
+    cameraDeadZoneSuppressed: false,
     boardTileSignature: "",
     boardTileElements: new Map(),
     priorityStripSignature: "",
@@ -950,6 +953,8 @@ function startWave(index) {
   state.cameraX = 0;
   state.cameraY = 0;
   state.cameraScale = 0;
+  state.cameraDrag = null;
+  state.cameraDeadZoneSuppressed = false;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
   state.entities = [
     {
@@ -1265,6 +1270,7 @@ async function runTurn() {
     const entry = entries[index];
     state.activeTimelineIndex = index;
     document.body.classList.toggle("player-acting", entry.actorType === "player");
+    releaseManualCameraPanForPlayerTurn(entry);
     renderPriorityStrip();
     renderEnemyActionHud();
     renderBoard();
@@ -1342,6 +1348,10 @@ async function executeCard(actor, cardData) {
       state.activeCardContext = previousCardContext;
       return;
     }
+    if (shouldSkipFleeAfterFailedAttackMove(actor, action)) {
+      log(`${actor.name} 후퇴 생략`);
+      continue;
+    }
     const rendered = await executeAction(actor, action, cardData);
     if (!rendered) render();
     await sleep(turnDelay(0.7));
@@ -1353,6 +1363,14 @@ async function executeCard(actor, cardData) {
 
   await resolveCardEndEffects(actor, cardData, state.activeCardContext);
   state.activeCardContext = previousCardContext;
+}
+
+function shouldSkipFleeAfterFailedAttackMove(actor, action) {
+  const context = state.activeCardContext;
+  if (action.type !== "flee") return false;
+  if (!context || context.actorId !== actor.id || !context.skipFleeAfterFailedAttackMove) return false;
+  context.skipFleeAfterFailedAttackMove = false;
+  return true;
 }
 
 async function executeAction(actor, action, cardData) {
@@ -1740,7 +1758,10 @@ async function moveActor(actor, action, cardData) {
 async function moveAfterFailedAttack(actor, attackAction) {
   if (!isAlive(actor)) return;
   const moveAction = { type: "move", amount: actor.baseMove };
-  await moveActor(actor, moveAction, { actions: [moveAction, attackAction] });
+  const result = await moveActor(actor, moveAction, { actions: [moveAction, attackAction] });
+  if ((result?.moved ?? 0) > 0 && state.activeCardContext?.actorId === actor.id) {
+    state.activeCardContext.skipFleeAfterFailedAttackMove = true;
+  }
 }
 
 async function momentumAttack(actor, action) {
@@ -3173,21 +3194,10 @@ function clearWave() {
     finishRun(true);
     return;
   }
-  healWaveClear();
   state.waitingReward = true;
   state.discard = [];
   state.deck = shuffle([...state.playerCards]);
   showRewards();
-}
-
-function healWaveClear() {
-  const player = getPlayer();
-  if (!player || !isAlive(player)) return;
-  const amount = Math.max(1, Math.round(player.maxHp * WAVE_CLEAR_HEAL_RATIO));
-  const beforeHp = player.hp;
-  player.hp = Math.min(player.maxHp, player.hp + amount);
-  const healed = player.hp - beforeHp;
-  if (healed > 0) log(`${player.name} 웨이브 정비: 체력 ${healed} 회복`);
 }
 
 function finishRun(win) {
@@ -4688,6 +4698,10 @@ function fitBoardToPanel(bounds = boardBounds(), options = {}) {
   commitCameraFrame(frame);
 }
 
+function shouldSuppressCameraDeadZone(options = {}) {
+  return Boolean(options.suppressDeadZone || state.cameraDrag || state.cameraDeadZoneSuppressed);
+}
+
 function calculateCameraFrame(bounds = boardBounds(), options = {}) {
   const metrics = options.metrics ?? cameraMetrics(bounds);
   const { logicalWidth, logicalHeight, panelWidth, panelHeight, fitScale } = metrics;
@@ -4717,34 +4731,120 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
     } else {
       offsetX = Number.isFinite(state.cameraX) ? state.cameraX : offsetX;
       offsetY = Number.isFinite(state.cameraY) ? state.cameraY : offsetY;
-      const playerScreen = {
-        x: offsetX + focusPoint.x * scale,
-        y: offsetY + focusPoint.y * scale,
-      };
-      const deadZone = {
-        halfWidth: panelWidth * CAMERA_DEAD_ZONE_WIDTH_RATIO * 0.5,
-        halfHeight: playArea.height * CAMERA_DEAD_ZONE_HEIGHT_RATIO * 0.5,
-      };
-      const deadZoneLeft = focusCenter.x - deadZone.halfWidth;
-      const deadZoneRight = focusCenter.x + deadZone.halfWidth;
-      const deadZoneTop = focusCenter.y - deadZone.halfHeight;
-      const deadZoneBottom = Math.min(focusCenter.y + deadZone.halfHeight, playArea.bottom - CAMERA_PLAYER_EDGE_MARGIN);
-      if (playerScreen.x < deadZoneLeft) {
-        offsetX += deadZoneLeft - playerScreen.x;
-      } else if (playerScreen.x > deadZoneRight) {
-        offsetX -= playerScreen.x - deadZoneRight;
-      }
-      if (playerScreen.y < deadZoneTop) {
-        offsetY += deadZoneTop - playerScreen.y;
-      } else if (playerScreen.y > deadZoneBottom) {
-        offsetY -= playerScreen.y - deadZoneBottom;
+      if (!shouldSuppressCameraDeadZone(options)) {
+        const playerScreen = {
+          x: offsetX + focusPoint.x * scale,
+          y: offsetY + focusPoint.y * scale,
+        };
+        const deadZone = {
+          halfWidth: panelWidth * CAMERA_DEAD_ZONE_WIDTH_RATIO * 0.5,
+          halfHeight: playArea.height * CAMERA_DEAD_ZONE_HEIGHT_RATIO * 0.5,
+        };
+        const deadZoneLeft = focusCenter.x - deadZone.halfWidth;
+        const deadZoneRight = focusCenter.x + deadZone.halfWidth;
+        const deadZoneTop = focusCenter.y - deadZone.halfHeight;
+        const deadZoneBottom = Math.min(focusCenter.y + deadZone.halfHeight, playArea.bottom - CAMERA_PLAYER_EDGE_MARGIN);
+        if (playerScreen.x < deadZoneLeft) {
+          offsetX += deadZoneLeft - playerScreen.x;
+        } else if (playerScreen.x > deadZoneRight) {
+          offsetX -= playerScreen.x - deadZoneRight;
+        }
+        if (playerScreen.y < deadZoneTop) {
+          offsetY += deadZoneTop - playerScreen.y;
+        } else if (playerScreen.y > deadZoneBottom) {
+          offsetY -= playerScreen.y - deadZoneBottom;
+        }
       }
     }
-    offsetX = clampCameraOffset(offsetX, 0, panelWidth, logicalWidth * scale);
-    offsetY = clampCameraOffset(offsetY, playArea.top, playArea.bottom, logicalHeight * scale);
+    const manualPanSlack = shouldSuppressCameraDeadZone(options) ? CAMERA_MANUAL_PAN_SLACK : 0;
+    offsetX = clampCameraOffset(offsetX, 0, panelWidth, logicalWidth * scale, manualPanSlack);
+    offsetY = clampCameraOffset(offsetY, playArea.top, playArea.bottom, logicalHeight * scale, manualPanSlack);
   }
 
   return { logicalWidth, logicalHeight, panelWidth, panelHeight, scale, offsetX, offsetY };
+}
+
+function releaseManualCameraPanForPlayerTurn(entry) {
+  if (entry?.actorType !== "player" || !state.cameraDeadZoneSuppressed) return;
+  state.cameraDeadZoneSuppressed = false;
+  state.cameraFollowToken = (state.cameraFollowToken ?? 0) + 1;
+}
+
+function beginBoardCameraDrag(event) {
+  if (!canStartBoardCameraDrag(event)) return;
+  const bounds = boardBounds();
+  const metrics = cameraMetrics(bounds);
+  const frame = calculateCameraFrame(bounds, { metrics, suppressDeadZone: true });
+  state.cameraFollowToken = (state.cameraFollowToken ?? 0) + 1;
+  state.cameraDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    bounds,
+    metrics,
+    frame,
+    moved: false,
+  };
+  if (elements.boardPanel.setPointerCapture) elements.boardPanel.setPointerCapture(event.pointerId);
+}
+
+function canStartBoardCameraDrag(event) {
+  if (!state || state.finished || state.waitingReward || state.cameraMode !== "focus") return false;
+  if (event.pointerType === "mouse" && event.button !== 0) return false;
+  if (event.target.closest("button, a, input, select, textarea, [role='button'], .overlay")) return false;
+  return elements.boardPanel.contains(event.target);
+}
+
+function moveBoardCameraDrag(event) {
+  const drag = state?.cameraDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+
+  const deltaX = event.clientX - drag.startX;
+  const deltaY = event.clientY - drag.startY;
+  if (!drag.moved && Math.hypot(deltaX, deltaY) < CAMERA_DRAG_THRESHOLD) return;
+
+  drag.moved = true;
+  state.cameraDeadZoneSuppressed = true;
+  elements.boardPanel.classList.add("dragging");
+  elements.board.style.transition = "none";
+  event.preventDefault();
+
+  const frame = clampCameraDragFrame({
+    ...drag.frame,
+    offsetX: drag.frame.offsetX + deltaX,
+    offsetY: drag.frame.offsetY + deltaY,
+  }, drag.metrics);
+  applyBoardCameraFrame(frame, false);
+  commitCameraFrame(frame);
+  refreshOffscreenEnemyIndicators(drag.bounds);
+}
+
+function endBoardCameraDrag(event) {
+  const drag = state?.cameraDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  state.cameraDrag = null;
+  if (!drag.moved) state.cameraDeadZoneSuppressed = false;
+  elements.boardPanel.classList.remove("dragging");
+  elements.board.style.transition = "";
+  if (elements.boardPanel.hasPointerCapture?.(event.pointerId)) {
+    elements.boardPanel.releasePointerCapture(event.pointerId);
+  }
+}
+
+function clampCameraDragFrame(frame, metrics) {
+  const focusClamp = state.cameraMode === "focus";
+  const visibleTop = focusClamp ? metrics.playArea.top : 0;
+  const visibleBottom = focusClamp ? metrics.playArea.bottom : metrics.panelHeight;
+  return {
+    ...frame,
+    offsetX: clampCameraOffset(frame.offsetX, 0, metrics.panelWidth, frame.logicalWidth * frame.scale, CAMERA_MANUAL_PAN_SLACK),
+    offsetY: clampCameraOffset(frame.offsetY, visibleTop, visibleBottom, frame.logicalHeight * frame.scale, CAMERA_MANUAL_PAN_SLACK),
+  };
+}
+
+function refreshOffscreenEnemyIndicators(bounds = boardBounds()) {
+  elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
+  renderOffscreenEnemyIndicators(bounds);
 }
 
 function cameraMetrics(bounds = boardBounds()) {
@@ -4805,10 +4905,13 @@ function cameraPlayArea(panelHeight) {
   };
 }
 
-function clampCameraOffset(offset, visibleStart, visibleEnd, contentSize) {
+function clampCameraOffset(offset, visibleStart, visibleEnd, contentSize, slack = 0) {
   const visibleSize = visibleEnd - visibleStart;
-  if (contentSize <= visibleSize) return visibleStart + (visibleSize - contentSize) / 2;
-  return Math.min(visibleStart, Math.max(visibleEnd - contentSize, offset));
+  if (contentSize <= visibleSize) {
+    const centeredOffset = visibleStart + (visibleSize - contentSize) / 2;
+    return Math.min(centeredOffset + slack, Math.max(centeredOffset - slack, offset));
+  }
+  return Math.min(visibleStart + slack, Math.max(visibleEnd - contentSize - slack, offset));
 }
 
 function easeInOut(progress) {
@@ -5005,6 +5108,10 @@ elements.speedButton.addEventListener("click", () => {
   if (state) state.speedMultiplier = speedMultiplier;
   renderHud();
 });
+elements.boardPanel.addEventListener("pointerdown", beginBoardCameraDrag);
+elements.boardPanel.addEventListener("pointermove", moveBoardCameraDrag);
+elements.boardPanel.addEventListener("pointerup", endBoardCameraDrag);
+elements.boardPanel.addEventListener("pointercancel", endBoardCameraDrag);
 elements.closeHelpButton.addEventListener("click", () => {
   elements.iconHelpOverlay.classList.add("hidden");
 });

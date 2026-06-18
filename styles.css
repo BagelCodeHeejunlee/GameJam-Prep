@@ -222,6 +222,12 @@ h2 {
     linear-gradient(#1c87a6 0%, #126582 44%, #0a4862 74%, #062f43 100%);
   background-color: #062f43;
   overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.board-panel.dragging {
+  cursor: grabbing;
 }
 
 .board {
