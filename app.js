@@ -1942,8 +1942,8 @@ function findMovePath(actor, destination, jump = false, maxDistance = Infinity) 
 }
 
 function createMovementContext(actor, amount, jump = false) {
-  const safeField = buildMoveField(actor, amount, { jump, avoidTraps: true });
-  const fallbackField = buildMoveField(actor, amount, { jump, avoidTraps: false });
+  const safeField = buildMoveField(actor, amount, { jump, avoidTraps: true, stopDistance: amount });
+  const fallbackField = buildMoveField(actor, amount, { jump, avoidTraps: false, stopDistance: amount });
   const fallbackReachable = fallbackField.reachableTiles.map((tile) => ({
     ...tile,
     trapRisk: safeField.distanceTo(tile) <= amount ? 0 : tile.trapRisk,
@@ -1960,7 +1960,7 @@ function createMovementContext(actor, amount, jump = false) {
     fullField(avoidTraps) {
       const key = avoidTraps ? "safe" : "fallback";
       if (!fullFields.has(key)) {
-        fullFields.set(key, buildMoveField(actor, Infinity, { jump, avoidTraps }));
+        fullFields.set(key, buildMoveField(actor, Infinity, { jump, avoidTraps, stopDistance: amount }));
       }
       return fullFields.get(key);
     },
@@ -1976,8 +1976,14 @@ function createMovementContext(actor, amount, jump = false) {
 function buildMoveField(actor, maxDistance = Infinity, options = {}) {
   const jump = Boolean(options.jump);
   const avoidTraps = Boolean(options.avoidTraps);
+  const stopDistance = options.stopDistance ?? maxDistance;
   const start = { q: actor.q, r: actor.r };
   const startKey = hexKey(start);
+  const stopBlockedKeys = Number.isFinite(stopDistance)
+    ? new Set(state.entities
+      .filter((entity) => isAlive(entity) && entity.id !== actor.id && axialDistance(actor, entity) === stopDistance)
+      .map(hexKey))
+    : new Set();
   const queue = [{ ...start, distance: 0, trapRisk: 0 }];
   const nodeByKey = new Map([[startKey, { ...start, distance: 0, trapRisk: 0, parentKey: null }]]);
   const reachableTiles = [];
@@ -1998,12 +2004,15 @@ function buildMoveField(actor, maxDistance = Infinity, options = {}) {
       const next = { q: current.q + dir.q, r: current.r + dir.r };
       const key = hexKey(next);
       if (!isTile(next) || nodeByKey.has(key)) continue;
+      if (stopBlockedKeys.has(key)) continue;
+      const nextDistance = current.distance + 1;
+      if (nextDistance === stopDistance && occupiedByOtherEntity(next, actor)) continue;
       if (!jump && blocksPath(next, actor, { avoidTraps })) continue;
       const trapRisk = current.trapRisk + (!avoidTraps && movementTrapAt(next) ? 1 : 0);
       const node = {
         q: next.q,
         r: next.r,
-        distance: current.distance + 1,
+        distance: nextDistance,
         trapRisk,
         parentKey: hexKey(current),
       };
@@ -2547,7 +2556,7 @@ function reachableTiles(actor, maxDistance, jump = false, avoidTraps = false) {
 function canEndMoveAt(tile, actor, options = {}) {
   if (isWall(tile)) return false;
   if (options.avoidTraps && movementTrapAt(tile)) return false;
-  return !state.entities.some((entity) => isAlive(entity) && entity.id !== actor.id && sameHex(entity, tile));
+  return !occupiedByOtherEntity(tile, actor);
 }
 
 function blocksPath(tile, actor, options = {}) {
@@ -2557,6 +2566,10 @@ function blocksPath(tile, actor, options = {}) {
     if (!isAlive(entity) || entity.id === actor.id) return false;
     return sameHex(entity, tile) && entity.side !== actor.side;
   });
+}
+
+function occupiedByOtherEntity(tile, actor) {
+  return state.entities.some((entity) => isAlive(entity) && entity.id !== actor.id && sameHex(entity, tile));
 }
 
 async function pushTarget(actor, target, amount) {
