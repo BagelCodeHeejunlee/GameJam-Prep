@@ -388,7 +388,8 @@ globalThis.__simExports = {
   expandCards,
   shuffle,
   startWave,
-  drawRewards,
+  drawPassiveRewards,
+  drawCardRewards,
   recordRewardPick,
   isPassiveCard,
   applyPassiveReward,
@@ -396,6 +397,8 @@ globalThis.__simExports = {
   aliveEnemies,
   aliveEnemyKinds,
   drawPlayerCard,
+  drawPlayerCards,
+  cardsPerPlayerTurn,
   drawEnemyCard,
   compareTimeline,
   executeCard,
@@ -459,6 +462,7 @@ function createInitialState(game) {
     boardTileElements: new Map(),
     rewardLocked: false,
     preStartReward: false,
+    rewardPhase: "passive",
     passiveCards: [],
     rewardPickCount: 0,
     rewardTags: new Set(),
@@ -503,7 +507,7 @@ function sample(items, rng) {
 
 function addReward(game, reward, preStart = false) {
   const state = game.getState();
-  game.recordRewardPick(reward);
+  game.recordRewardPick(reward, { countPick: !game.isPassiveCard(reward) });
   if (game.isPassiveCard(reward)) {
     game.applyPassiveReward(reward);
     return;
@@ -524,14 +528,14 @@ async function simulateTurn(game) {
   game.processMeteors();
   if (game.checkEndConditions()) return;
 
-  const playerCard = game.drawPlayerCard();
+  const playerCards = game.drawPlayerCards(game.cardsPerPlayerTurn(player));
   const enemyEntries = game.aliveEnemyKinds().map((kind) => ({
     actorType: "enemyGroup",
     actorId: kind,
     card: game.drawEnemyCard(kind),
   }));
   const entries = [
-    { actorType: "player", actorId: player.id, card: playerCard },
+    ...playerCards.map((card, index) => ({ actorType: "player", actorId: player.id, card, playIndex: index })),
     ...enemyEntries,
   ].sort(game.compareTimeline);
 
@@ -554,7 +558,7 @@ async function simulateTurn(game) {
   }
 
   if (!state.waitingReward && !state.finished) {
-    game.discardResolvedCard(playerCard, game.getPlayer());
+    playerCards.forEach((card) => game.discardResolvedCard(card, game.getPlayer()));
     enemyEntries.forEach((entry) => game.discardEnemyCard(entry.card, entry.actorId));
   }
 }
@@ -566,10 +570,12 @@ async function simulateRun(options, runIndex, sharedContext = null) {
   const rng = context.__random;
   createInitialState(game);
 
-  const preReward = chooseReward(game, game.drawRewards(), options.strategy, options.tree, rng);
+  const prePassive = chooseReward(game, game.drawPassiveRewards(), options.strategy, options.tree, rng);
+  addReward(game, prePassive, true);
+  const preReward = chooseReward(game, game.drawCardRewards(), options.strategy, options.tree, rng);
   addReward(game, preReward, true);
 
-  const picked = [preReward.name];
+  const picked = [prePassive.name, preReward.name];
   const waveResults = [];
 
   for (let waveIndex = 0; waveIndex < options.waves; waveIndex += 1) {
@@ -596,7 +602,10 @@ async function simulateRun(options, runIndex, sharedContext = null) {
     if (!cleared) break;
     if (waveIndex >= options.waves - 1) break;
 
-    const reward = chooseReward(game, game.drawRewards(), options.strategy, options.tree, rng);
+    const passive = chooseReward(game, game.drawPassiveRewards(), options.strategy, options.tree, rng);
+    picked.push(passive.name);
+    addReward(game, passive, false);
+    const reward = chooseReward(game, game.drawCardRewards(), options.strategy, options.tree, rng);
     picked.push(reward.name);
     addReward(game, reward, false);
 

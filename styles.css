@@ -3101,9 +3101,17 @@ body.turn-cue-active .turn-scrim {
   padding: 6px 2px;
 }
 
+.reward-cards.reward-passive {
+  grid-template-columns: repeat(1, max-content);
+}
+
 @media (min-width: 600px) {
   .reward-cards {
     grid-template-columns: repeat(4, max-content);
+  }
+
+  .reward-cards.reward-passive {
+    grid-template-columns: repeat(3, max-content);
   }
 }
 

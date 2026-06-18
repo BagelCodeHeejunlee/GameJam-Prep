@@ -15,8 +15,6 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
-const POST_WAVE_TWO_HP_SCALE = 0.75;
-
 const directions = [
   { q: 1, r: 0 },
   { q: 1, r: -1 },
@@ -46,6 +44,7 @@ const elements = {
   timeline: document.querySelector("#timeline"),
   battleLog: document.querySelector("#battleLog"),
   rewardOverlay: document.querySelector("#rewardOverlay"),
+  rewardInstr: document.querySelector("#rewardInstr"),
   rewardCards: document.querySelector("#rewardCards"),
   iconHelpOverlay: document.querySelector("#iconHelpOverlay"),
   closeHelpButton: document.querySelector("#closeHelpButton"),
@@ -622,6 +621,10 @@ function cardPassive(effect, label, amount = 1, extra = {}) {
   return { type: "passive", effect, label, amount, ...extra };
 }
 
+function passiveCard(id, name, route, rarity, actions) {
+  return { id, name, route, rarity, type: "패시브", priority: 0, actions, copies: 1 };
+}
+
 function cardMeteor(range, mult, radius = 1, delay = 1, extra = {}) {
   return { type: "placeMeteor", range, mult, radius, delay, ...extra };
 }
@@ -821,6 +824,179 @@ const mageRewardPool = [
   card("mage-sky-collapse", "하늘 붕괴", "운석", "전설", 22, [cardPassive("meteorKillSplash", "운석이 적을 처치하면 같은 위치 주변 1칸에 공격 3 추가 발생", 3)]),
 ];
 
+const archerPassivePool = [
+  passiveCard("archer-passive-sharp-bow", "예리한 활", "공용", "노말", [
+    cardPassive("baseAtkPercent", "공격력 10% 증가", 0.1),
+  ]),
+  passiveCard("archer-passive-light-armor", "가벼운 방호", "공용", "노말", [
+    cardPassive("maxHpPercent", "최대 체력 10% 증가", 0.1),
+  ]),
+  passiveCard("archer-passive-repeat-rhythm", "반복 리듬", "다단중첩", "노말", [
+    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 10% 증가", 0.1),
+  ]),
+  passiveCard("archer-passive-trap-polish", "함정 손질", "함정", "노말", [
+    cardPassive("trapNextAttackDamage", "함정 발동 후 다음 공격 피해 10% 증가", 0.1),
+  ]),
+  passiveCard("archer-passive-steady-charge", "안정 차지", "차지", "노말", [
+    cardPassive("chargeRangePerStack", "차지 1당 사거리 1 증가", 1),
+  ]),
+  passiveCard("archer-passive-quick-hands", "빠른 손놀림", "공용", "레어", [
+    cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("archer-passive-weakness-read", "약점 판독", "다단중첩", "레어", [
+    cardPassive("thirdHitDamage", "세 번째 명중 피해 30% 증가", 0.3),
+  ]),
+  passiveCard("archer-passive-trap-mark", "덫 표식", "함정", "레어", [
+    cardPassive("trapRangedVulnerability", "함정 발동 대상이 받는 원거리 피해 20% 증가", 0.2),
+  ]),
+  passiveCard("archer-passive-ambush-shot", "매복 사격", "함정", "레어", [
+    cardPassive("trapTriggerShot", "함정 발동 시 사거리 5 원거리 공격", 1, { range: 5 }),
+  ]),
+  passiveCard("archer-passive-overdraw", "과집중", "차지", "레어", [
+    cardPassive("chargeStackMultiplier", "차지 스택 효과 2배", 2),
+  ]),
+  passiveCard("archer-passive-hunt-flow", "사냥 흐름", "공용", "에픽", [
+    cardPassive("afterAttackMove", "공격 카드 사용 후 이동 1", 1),
+  ]),
+  passiveCard("archer-passive-endless-string", "끝없는 현", "다단중첩", "에픽", [
+    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 20% 증가", 0.2),
+  ]),
+  passiveCard("archer-passive-chain-trap", "연쇄 덫", "함정", "에픽", [
+    cardPassive("trapChainDamage", "함정 발동 시 주변 피해 2배", 2),
+  ]),
+  passiveCard("archer-passive-piercing-charge", "관통 차지", "차지", "에픽", [
+    cardPassive("overkillSplashRange", "처치 잔여 피해 3칸 전이", 3),
+  ]),
+  passiveCard("archer-passive-double-draw", "쌍궁 운용", "공용", "전설", [
+    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("archer-passive-finale-sense", "결말 감각", "다단중첩", "전설", [
+    cardPassive("thirdHitDamage", "세 번째 명중 피해 60% 증가", 0.6),
+  ]),
+  passiveCard("archer-passive-perfect-overkill", "완전 관통", "차지", "전설", [
+    cardPassive("overkillSplashRange", "처치 잔여 피해 5칸 전이", 5),
+  ]),
+];
+
+const warriorPassivePool = [
+  passiveCard("warrior-passive-honed-blade", "단련된 칼날", "공용", "노말", [
+    cardPassive("baseAtkPercent", "공격력 10% 증가", 0.1),
+  ]),
+  passiveCard("warrior-passive-hard-body", "단단한 몸", "공용", "노말", [
+    cardPassive("maxHpPercent", "최대 체력 10% 증가", 0.1),
+  ]),
+  passiveCard("warrior-passive-blood-heat", "피의 열기", "광전", "노말", [
+    cardPassive("berserkLostHpDamage", "잃은 체력 비율 / 2만큼 공격 피해 증가", 0.5),
+  ]),
+  passiveCard("warrior-passive-charge-step", "돌입 보폭", "돌진", "노말", [
+    cardPassive("moveCardBonus", "이동 카드 이동력 1 증가", 1),
+  ]),
+  passiveCard("warrior-passive-wide-pressure", "넓은 압박", "범위 공격", "노말", [
+    cardPassive("pushBonus", "밀기 효과 1 증가", 1, { modifiers: [{ stat: "push", amount: 1 }] }),
+  ]),
+  passiveCard("warrior-passive-second-breath", "두 번째 호흡", "공용", "레어", [
+    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("warrior-passive-blood-resolve", "피의 결의", "광전", "레어", [
+    cardPassive("lowHpDamage", "체력이 25% 미만이면 공격 피해 50% 증가", 0.5, { threshold: 0.25 }),
+  ]),
+  passiveCard("warrior-passive-inertia", "관성 유지", "돌진", "레어", [
+    cardPassive("moveAttackDamage", "근접 공격 피해 10% 증가", 0.1, {
+      modifiers: [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "melee" } }],
+    }),
+  ]),
+  passiveCard("warrior-passive-area-read", "휩쓸기 감각", "범위 공격", "레어", [
+    cardPassive("areaPerTargetBonus", "범위 공격으로 맞힌 적 1명당 해당 공격 피해 배수 1 증가", 1),
+  ]),
+  passiveCard("warrior-passive-iron-heart", "철심장", "공용", "에픽", [
+    cardPassive("maxHpPercent", "최대 체력 20% 증가", 0.2),
+  ]),
+  passiveCard("warrior-passive-battle-thirst", "전투 갈증", "광전", "에픽", [
+    cardPassive("killDamageBonus", "적 처치 시 다음 공격 피해 20% 증가", 0.2, {
+      modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "melee" } }],
+    }),
+  ]),
+  passiveCard("warrior-passive-reentry", "재돌입", "돌진", "에픽", [
+    cardPassive("killMoveBonus", "적 처치 후 다음 이동 카드 이동력 1 증가", 1),
+  ]),
+  passiveCard("warrior-passive-domination", "전장 지배", "범위 공격", "에픽", [
+    cardPassive("pushAreaDamage", "적을 밀 때마다 다음 범위 공격 피해 10% 증가", 0.1),
+  ]),
+  passiveCard("warrior-passive-war-god", "전신", "공용", "전설", [
+    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("warrior-passive-death-edge", "죽음의 칼끝", "광전", "전설", [
+    cardPassive("lowHpDamage", "체력이 35% 미만이면 공격 피해 60% 증가", 0.6, { threshold: 0.35 }),
+  ]),
+  passiveCard("warrior-passive-infinite-inertia", "무한 관성", "돌진", "전설", [
+    cardPassive("stackingMoveBonus", "적 처치 시 이번 웨이브 동안 이동 카드 이동력 1 증가", 1),
+  ]),
+];
+
+const magePassivePool = [
+  passiveCard("mage-passive-arcane-focus", "비전 집중", "공용", "노말", [
+    cardPassive("baseAtkPercent", "공격력 10% 증가", 0.1),
+  ]),
+  passiveCard("mage-passive-mana-shell", "마나 껍질", "공용", "노말", [
+    cardPassive("maxHpPercent", "최대 체력 10% 증가", 0.1),
+  ]),
+  passiveCard("mage-passive-magic-overflow", "마력 과잉", "연쇄", "노말", [
+    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 10% 증가", 0.1),
+  ]),
+  passiveCard("mage-passive-rune-tune", "룬 조율", "룬", "노말", [
+    cardPassive("runeDamage", "룬이 남아 있으면 원거리 공격 피해 10% 증가", 0.1, {
+      modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "ranged" } }],
+    }),
+  ]),
+  passiveCard("mage-passive-star-sight", "별빛 시야", "운석", "노말", [
+    cardPassive("meteorTargeting", "운석 낙하지점 선택 시 적이 많은 위치를 더 강하게 우선", 1),
+  ]),
+  passiveCard("mage-passive-quick-cast", "빠른 영창", "공용", "레어", [
+    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("mage-passive-chain-amplify", "연쇄 증폭", "연쇄", "레어", [
+    cardPassive("multiTargetDamage", "원거리 공격 타겟 수가 2 이상이면 피해 10% 증가", 0.1, {
+      modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "ranged" } }],
+    }),
+  ]),
+  passiveCard("mage-passive-rune-chain", "룬 연동", "룬", "레어", [
+    cardPassive("runeChainDamage", "룬이 발동하면 인접 룬도 공격 1로 발동", 1),
+  ]),
+  passiveCard("mage-passive-shard-recovery", "파편 회수", "운석", "레어", [
+    cardPassive("chargeOnNoAttack", "공격하지 않으면 차지 1", 1),
+  ]),
+  passiveCard("mage-passive-arcane-cycle", "마력 순환", "공용", "에픽", [
+    cardPassive("chargeRangePerStack", "차지 1당 사거리 1 증가", 1),
+  ]),
+  passiveCard("mage-passive-infinite-chain", "무한 연쇄", "연쇄", "에픽", [
+    cardPassive("killChainDamage", "적을 처치하면 같은 카드의 다음 공격 피해 30% 증가", 0.3, {
+      modifiers: [{ stat: "damageDealt", amount: 0.05, when: { repeatHit: true } }],
+    }),
+  ]),
+  passiveCard("mage-passive-stable-circuit", "안정된 회로", "룬", "에픽", [
+    cardPassive("runeDamage", "룬이 남아 있으면 원거리 공격 피해 20% 증가", 0.2, {
+      modifiers: [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }],
+    }),
+  ]),
+  passiveCard("mage-passive-collision-predict", "충돌 예측", "운석", "에픽", [
+    cardPassive("meteorMultiDamage", "운석이 2명 이상 맞히면 다음 운석 피해 20% 증가", 0.2),
+  ]),
+  passiveCard("mage-passive-double-cast", "이중 영창", "공용", "전설", [
+    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("mage-passive-infinite-circuit", "무한 회로", "연쇄", "전설", [
+    cardPassive("multiTargetDamage", "원거리 공격 타겟 수가 2 이상이면 피해 20% 증가", 0.2, {
+      modifiers: [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }],
+    }),
+  ]),
+  passiveCard("mage-passive-permanent-circuit", "영구 회로", "룬", "전설", [
+    cardPassive("persistentRune", "웨이브 중 처음 설치한 룬 1개는 발동 후에도 사라지지 않음", 1),
+  ]),
+  passiveCard("mage-passive-sky-collapse", "하늘 붕괴", "운석", "전설", [
+    cardPassive("meteorKillSplash", "운석이 적을 처치하면 같은 위치 주변 1칸에 공격 3 추가 발생", 3),
+  ]),
+];
+
 const characterDefinitions = {
   archer: {
     id: "archer",
@@ -834,6 +1010,7 @@ const characterDefinitions = {
     baseMove: 2,
     baseCards: baseArcherCards,
     rewardPool: archerRewardPool,
+    passivePool: archerPassivePool,
   },
   warrior: {
     id: "warrior",
@@ -847,6 +1024,7 @@ const characterDefinitions = {
     baseMove: 2,
     baseCards: baseWarriorCards,
     rewardPool: warriorRewardPool,
+    passivePool: warriorPassivePool,
   },
   mage: {
     id: "mage",
@@ -860,6 +1038,7 @@ const characterDefinitions = {
     baseMove: 2,
     baseCards: baseMageCards,
     rewardPool: mageRewardPool,
+    passivePool: magePassivePool,
   },
 };
 
@@ -958,7 +1137,7 @@ const monsterDecks = {
   ],
 };
 
-const waves = buildWaves().map(applyWaveBalance);
+const waves = buildWaves();
 
 let state;
 
@@ -1020,6 +1199,7 @@ function newRun() {
     priorityStripItems: new Map(),
     rewardLocked: false,
     preStartReward: false,
+    rewardPhase: "passive",
     passiveCards: [],
     rewardPickCount: 0,
     rewardTags: new Set(),
@@ -1034,6 +1214,7 @@ function newRun() {
   log(`${character.name} 새 런을 시작했다.`);
   state.waitingReward = true;
   state.preStartReward = true;
+  state.rewardPhase = "passive";
   render();
   showRewards();
 }
@@ -1080,8 +1261,8 @@ function startWave(index) {
       q: start.q,
       r: start.r,
       hp: previousPlayer?.hp ?? character.maxHp,
-      maxHp: character.maxHp,
-      baseAtk: character.baseAtk,
+      maxHp: previousPlayer?.maxHp ?? character.maxHp,
+      baseAtk: previousPlayer?.baseAtk ?? character.baseAtk,
       baseRange: character.baseRange,
       baseMove: character.baseMove,
       charge: 0,
@@ -1101,7 +1282,7 @@ function startWave(index) {
       name: enemy.name ?? (enemy.boss ? `보스 ${indexNumber}` : `${monster.name} ${indexNumber}`),
       side: "enemy",
       kind,
-      label: enemy.boss ? "보" : monster.label,
+      label: enemy.boss ? "보" : enemy.elite ? "정" : monster.label,
       q: enemy.q,
       r: enemy.r,
       hp: enemy.hp,
@@ -1111,6 +1292,7 @@ function startWave(index) {
       baseMove: enemy.baseMove ?? monster.baseMove,
       monsterIndex: indexNumber,
       boss: Boolean(enemy.boss),
+      elite: Boolean(enemy.elite),
       charge: 0,
       permanent: {},
       temporary: {},
@@ -1178,15 +1360,18 @@ function buildWaves() {
       enemy(4, -2, 16, { baseAtk: 3 }),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 1, r: -2 }], [
+      enemy(-4, 3, 78, { name: "정예 브루트", baseAtk: 1, elite: true }),
       enemy(-5, 2, 27, { baseAtk: 3 }),
       enemy(-3, -1, 26, { kind: "skirmisher", baseAtk: 2 }),
       enemy(0, -5, 27, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(5, [{ q: -2, r: 1 }, { q: 0, r: 0 }, { q: 2, r: -2 }], [
+      enemy(-4, 2, 90, { kind: "skirmisher", name: "정예 척후병", baseAtk: 1, elite: true }),
       enemy(-5, 3, 40, { kind: "skirmisher", baseAtk: 2 }),
       enemy(0, -5, 42, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(5, [{ q: -1, r: 1 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
+      enemy(-4, 2, 82, { kind: "shooter", name: "정예 사수", baseAtk: 2, elite: true }),
       enemy(-5, 1, 34),
       enemy(-3, -2, 28, { kind: "skirmisher" }),
       enemy(0, -5, 28, { kind: "shooter" }),
@@ -1204,6 +1389,7 @@ function buildWaves() {
       enemy(5, -1, 34),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -2 }], [
+      enemy(-4, 2, 88, { name: "정예 브루트", baseAtk: 2, elite: true }),
       enemy(-5, 3, 42),
       enemy(-4, -1, 36, { kind: "skirmisher" }),
       enemy(-1, -4, 36, { kind: "shooter" }),
@@ -1213,6 +1399,7 @@ function buildWaves() {
       enemy(5, 0, 42),
     ]),
     wave(6, [{ q: -2, r: 1 }, { q: -1, r: 2 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
+      enemy(-5, 3, 96, { kind: "skirmisher", name: "정예 척후병", baseAtk: 2, elite: true }),
       enemy(-6, 3, 38),
       enemy(-5, 0, 32, { kind: "skirmisher" }),
       enemy(-2, -4, 32, { kind: "shooter" }),
@@ -1223,6 +1410,7 @@ function buildWaves() {
       enemy(6, -2, 38),
     ]),
     wave(6, [{ q: -2, r: 2 }, { q: 0, r: 0 }, { q: 2, r: -2 }, { q: 3, r: -4 }], [
+      enemy(-5, 2, 104, { kind: "shooter", name: "정예 사수", baseAtk: 2, elite: true }),
       enemy(-6, 2, 40),
       enemy(-5, -1, 34, { kind: "skirmisher" }),
       enemy(-3, -3, 32, { kind: "shooter" }),
@@ -1234,6 +1422,7 @@ function buildWaves() {
       enemy(4, 1, 40),
     ]),
     wave(6, [{ q: -3, r: 2 }, { q: -1, r: 1 }, { q: 1, r: -1 }, { q: 3, r: -3 }], [
+      enemy(-5, 4, 110, { name: "정예 브루트", baseAtk: 2, elite: true }),
       enemy(-6, 4, 42),
       enemy(-6, 1, 36, { kind: "skirmisher" }),
       enemy(-4, -1, 34, { kind: "shooter" }),
@@ -1255,17 +1444,6 @@ function buildWaves() {
       enemy(6, -3, 42),
     ]),
   ];
-}
-
-function applyWaveBalance(waveData, index) {
-  if (index < 2) return waveData;
-  return {
-    ...waveData,
-    enemies: waveData.enemies.map((entry) => ({
-      ...entry,
-      hp: Math.max(1, Math.round(entry.hp * POST_WAVE_TWO_HP_SCALE)),
-    })),
-  };
 }
 
 function wave(radius, walls, enemies) {
@@ -1346,8 +1524,13 @@ async function runTurn() {
 
   await playTurnStart();
 
-  const playerCard = drawPlayerCard();
-  const drawnEntries = [{ actorType: "player", actorId: player.id, card: playerCard }];
+  const playerCards = drawPlayerCards(cardsPerPlayerTurn(player));
+  const drawnEntries = playerCards.map((cardData, index) => ({
+    actorType: "player",
+    actorId: player.id,
+    card: cardData,
+    playIndex: index,
+  }));
   const enemyEntries = aliveEnemyKinds().map((kind) => ({
     actorType: "enemyGroup",
     actorId: kind,
@@ -1397,7 +1580,7 @@ async function runTurn() {
   }
 
   if (!state.waitingReward && !state.finished) {
-    discardResolvedCard(playerCard, player);
+    playerCards.forEach((cardData) => discardResolvedCard(cardData, player));
     enemyEntries.forEach((entry) => discardEnemyCard(entry.card, entry.actorId));
   }
   state.busy = false;
@@ -1572,6 +1755,21 @@ function drawPlayerCard() {
   return state.deck.shift();
 }
 
+function drawPlayerCards(count = 1) {
+  const cards = [];
+  for (let index = 0; index < count; index += 1) {
+    const cardData = drawPlayerCard();
+    if (cardData) cards.push(cardData);
+  }
+  return cards;
+}
+
+function cardsPerPlayerTurn(player) {
+  const everyTurnBonus = Math.floor(player?.permanent?.extraCardPlays ?? 0);
+  const firstTurnBonus = state.turn === 1 ? Math.floor(player?.permanent?.firstTurnExtraCardPlays ?? 0) : 0;
+  return Math.max(1, 1 + everyTurnBonus + firstTurnBonus);
+}
+
 function drawEnemyCard(kind) {
   state.enemyDecks[kind] = state.enemyDecks[kind] ?? shuffle(expandCards(monsterDecks[kind] ?? monsterDecks.brute));
   state.enemyDiscards[kind] = state.enemyDiscards[kind] ?? [];
@@ -1674,6 +1872,17 @@ async function resolveCardEndEffects(actor, cardData, cardContext) {
 function applyPassiveAction(actor, action) {
   actor.permanent = actor.permanent ?? {};
   if (action.effect) actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + (action.amount ?? 1);
+  if (action.effect === "baseAtkPercent") {
+    const definition = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
+    const increase = Math.max(1, Math.round((definition.baseAtk ?? actor.baseAtk ?? 1) * (action.amount ?? 0)));
+    actor.baseAtk = (actor.baseAtk ?? 0) + increase;
+  }
+  if (action.effect === "maxHpPercent") {
+    const definition = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
+    const increase = Math.max(1, Math.round((definition.maxHp ?? actor.maxHp ?? 1) * (action.amount ?? 0)));
+    actor.maxHp = (actor.maxHp ?? 0) + increase;
+    actor.hp = Math.min(actor.maxHp, (actor.hp ?? 0) + increase);
+  }
   if (action.modifiers?.length) {
     applyEffect(actor, {
       type: "applyEffect",
@@ -1684,6 +1893,10 @@ function applyPassiveAction(actor, action) {
   }
   if (action.effect === "lowHpDamage") {
     actor.permanent.lowHpDamageThreshold = Math.min(actor.permanent.lowHpDamageThreshold ?? 1, action.threshold ?? 0.25);
+  }
+  if (action.effect && action.range) {
+    const rangeKey = `${action.effect}Range`;
+    actor.permanent[rangeKey] = Math.max(actor.permanent[rangeKey] ?? 0, action.range);
   }
   log(`${actor.name} 패시브: ${passiveEffectLabel(action)}`);
 }
@@ -1736,11 +1949,20 @@ async function attack(actor, action) {
     if (!isAlive(target)) continue;
     const beforeHp = target.hp;
     const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus, { targetCount: targets.length });
+    resolveKillPassives(actor, target);
     applyOverkillSplash(actor, target, damage - beforeHp, action);
     refundChargeOnKill(actor, target, action);
     const pushAmount = attackPushAmount(actor, target, action, targets.length);
     if (pushAmount && isAlive(target)) {
       const pushedIntoTrap = await pushTarget(actor, target, pushAmount);
+      if (actor.permanent?.pushAreaDamage) {
+        applyEffect(actor, {
+          type: "applyEffect",
+          label: "전장 지배",
+          duration: "nextAttack",
+          modifiers: [{ stat: "damageDealt", amount: actor.permanent.pushAreaDamage }],
+        });
+      }
       if (pushedIntoTrap && action.trapHitBonus && isAlive(target)) {
         const bonusBeforeHp = target.hp;
         const bonusDamage = dealAttackDamage(actor, target, {
@@ -1766,7 +1988,7 @@ function patternAttack(actor, action) {
   }
 
   const chargeBonus = consumeChargeForAttack(actor);
-  const targetBonus = (placement.targets.length - 1) * (action.perTargetBonus ?? 0);
+  const targetBonus = (placement.targets.length - 1) * ((action.perTargetBonus ?? 0) + (actor.permanent?.areaPerTargetBonus ?? 0));
   if (state.activeCardContext?.actorId === actor.id) state.activeCardContext.didAttack = true;
   placement.targets.forEach((target) => {
     if (!isAlive(actor) || !isAlive(target)) return;
@@ -1774,6 +1996,7 @@ function patternAttack(actor, action) {
     const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus + targetBonus, {
       targetCount: placement.targets.length,
     });
+    resolveKillPassives(actor, target);
     applyOverkillSplash(actor, target, damage - beforeHp, action);
     refundChargeOnKill(actor, target, action);
   });
@@ -1816,7 +2039,7 @@ function targetPriorityDistance(actor, target, action) {
 }
 
 async function moveActor(actor, action, cardData) {
-  const amount = action.amount ?? actor.baseMove;
+  const amount = effectiveMoveAmount(actor, action);
   if (actor.temporary?.cannotMove && !action.ignoreCannotMove) {
     log(`${actor.name} 이동 불가`);
     return { moved: 0, unused: amount };
@@ -1857,6 +2080,20 @@ async function moveActor(actor, action, cardData) {
   log(`${actor.name} 이동 (${actor.q}, ${actor.r})`);
   triggerTrap(actor);
   return { moved, unused: Math.max(0, amount - moved) };
+}
+
+function effectiveMoveAmount(actor, action) {
+  let amount = action.amount ?? actor.baseMove ?? 0;
+  if (action.type === "move" || action.type === "flee" || action.type === "fleeToRune") {
+    actor.temporary = actor.temporary ?? {};
+    amount += actor.permanent?.moveCardBonus ?? 0;
+    amount += actor.temporary.waveMoveCardBonus ?? 0;
+    if (actor.temporary.nextMoveCardBonus) {
+      amount += actor.temporary.nextMoveCardBonus;
+      delete actor.temporary.nextMoveCardBonus;
+    }
+  }
+  return Math.max(0, amount);
 }
 
 async function moveAfterFailedAttack(actor, attackAction) {
@@ -1962,6 +2199,8 @@ function outgoingDamageMultiplier(context) {
   let bonus = actorDamageMultiplier(actor) - 1;
   if (actor.permanent?.comboDamage && repeatHits > 0) bonus += repeatHits * actor.permanent.comboDamage;
   if (actor.permanent?.thirdHitDamage && repeatHits >= 2) bonus += actor.permanent.thirdHitDamage;
+  if (actor.permanent?.multiTargetDamage && context.targetCount >= 2) bonus += actor.permanent.multiTargetDamage;
+  if (actor.permanent?.runeDamage && ownedRunes(actor).length) bonus += actor.permanent.runeDamage;
   if (action.perRepeatTargetDamage && repeatHits > 0) bonus += repeatHits * action.perRepeatTargetDamage;
   if (action.sameTargetBonus && repeatHits > 0) bonus += action.sameTargetBonus;
   if (action.thirdHitBonus && repeatHits >= 2) bonus += action.thirdHitBonus;
@@ -1993,6 +2232,35 @@ function refundChargeOnKill(actor, target, action) {
   actor.temporary.cannotMove = true;
   log(`${actor.name} 처치 집중: 차지 ${actor.charge}`);
   renderHud();
+}
+
+function resolveKillPassives(actor, target) {
+  if (!actor || !target || isAlive(target)) return;
+  actor.temporary = actor.temporary ?? {};
+  if (actor.permanent?.killDamageBonus) {
+    applyEffect(actor, {
+      type: "applyEffect",
+      label: "전투 갈증",
+      duration: "nextAttack",
+      modifiers: [{ stat: "damageDealt", amount: actor.permanent.killDamageBonus }],
+    });
+  }
+  if (actor.permanent?.killChainDamage) {
+    applyEffect(actor, {
+      type: "applyEffect",
+      label: "무한 연쇄",
+      duration: "nextAttack",
+      modifiers: [{ stat: "damageDealt", amount: actor.permanent.killChainDamage }],
+    });
+  }
+  if (actor.permanent?.killMoveBonus) {
+    actor.temporary.nextMoveCardBonus = (actor.temporary.nextMoveCardBonus ?? 0) + actor.permanent.killMoveBonus;
+    log(`${actor.name} 재돌입 준비`);
+  }
+  if (actor.permanent?.stackingMoveBonus) {
+    actor.temporary.waveMoveCardBonus = (actor.temporary.waveMoveCardBonus ?? 0) + actor.permanent.stackingMoveBonus;
+    log(`${actor.name} 관성 증가`);
+  }
 }
 
 function effectModifierTotal(owner, stat, context) {
@@ -3033,6 +3301,7 @@ function processMeteors() {
   if (!due.length) return;
   state.meteors = state.meteors.filter((meteor) => meteor.triggerTurn > state.turn);
   due.forEach((meteor) => {
+    const owner = state.entities.find((entity) => entity.id === meteor.ownerId);
     const targets = state.entities.filter((entity) => {
       return isAlive(entity) && entity.side !== meteor.ownerSide && axialDistance(meteor, entity) <= meteor.radius;
     });
@@ -3040,16 +3309,33 @@ function processMeteors() {
       log(`운석 빗나감 (${meteor.q}, ${meteor.r})`);
       return;
     }
+    const multiHitBonus = targets.length >= 2 ? owner?.permanent?.meteorMultiDamage ?? 0 : 0;
     targets.forEach((target) => {
-      const damage = Math.max(1, Math.round((meteor.baseAtk ?? 10) * meteor.mult));
+      const damage = Math.max(1, Math.round((meteor.baseAtk ?? 10) * meteor.mult * (1 + multiHitBonus)));
       const hitPosition = { q: target.q, r: target.r };
       applyDamage(target, damage);
+      if (owner) resolveKillPassives(owner, target);
+      if (owner?.permanent?.meteorKillSplash && !isAlive(target)) {
+        meteorKillSplash(owner, target, owner.permanent.meteorKillSplash);
+      }
       renderBoard();
       renderHud();
       showHitEffect(target, hitPosition, damage);
       log(`운석 -> ${target.name} ${damage} 피해`);
     });
   });
+}
+
+function meteorKillSplash(owner, defeatedTarget, mult) {
+  aliveOpponents(owner)
+    .filter((enemy) => enemy.id !== defeatedTarget.id && axialDistance(enemy, defeatedTarget) <= 1)
+    .forEach((enemy) => {
+      const damage = Math.max(1, Math.round((owner.baseAtk ?? 10) * mult));
+      const hitPosition = { q: enemy.q, r: enemy.r };
+      applyDamage(enemy, damage);
+      showHitEffect(enemy, hitPosition, damage);
+      log(`${owner.name} 하늘 붕괴 -> ${enemy.name} ${damage} 피해`);
+    });
 }
 
 function targetsNearRunes(actor, runes, radius) {
@@ -3310,6 +3596,7 @@ function clearWave() {
     return;
   }
   state.waitingReward = true;
+  state.rewardPhase = "passive";
   state.discard = [];
   state.deck = shuffle([...state.playerCards]);
   showRewards();
@@ -3326,9 +3613,16 @@ function finishRun(win) {
 }
 
 function showRewards() {
-  const rewards = drawRewards();
+  const rewardPhase = state.rewardPhase ?? "passive";
+  const rewards = rewardPhase === "passive" ? drawPassiveRewards() : drawCardRewards();
   state.rewardLocked = false;
+  if (elements.rewardInstr) {
+    elements.rewardInstr.innerHTML = rewardPhase === "passive"
+      ? `획득할 패시브 <b>1개</b>를 선택하세요`
+      : `추가할 카드 <b>1장</b>을 선택하세요`;
+  }
   elements.rewardCards.innerHTML = "";
+  elements.rewardCards.className = `reward-cards reward-${rewardPhase}`;
   rewards.forEach((reward) => {
     const pick = document.createElement("div");
     pick.className = `reward-pick ${rarityClass(reward.rarity)}`;
@@ -3356,13 +3650,23 @@ function showRewards() {
   elements.rewardOverlay.classList.remove("hidden");
 }
 
-function drawRewards() {
+function drawPassiveRewards() {
   const character = getSelectedCharacter();
+  return drawRewardOptions(character.passivePool ?? [], 3);
+}
+
+function drawCardRewards() {
+  const character = getSelectedCharacter();
+  const basePool = character.rewardPool.filter((entry) => !isPassiveCard(entry));
   const pool = character.id === "archer"
-    ? character.rewardPool.filter((entry) => isArcherRewardUnlocked(entry))
-    : character.rewardPool;
-  const safePool = pool.length >= 4 ? pool : character.rewardPool;
-  return shuffle(safePool).slice(0, 4).map((entry) => ({
+    ? basePool.filter((entry) => isArcherRewardUnlocked(entry))
+    : basePool;
+  const safePool = pool.length >= 4 ? pool : basePool;
+  return drawRewardOptions(safePool, 4);
+}
+
+function drawRewardOptions(pool, count) {
+  return shuffle(pool).slice(0, count).map((entry) => ({
     ...entry,
     instanceId: `${entry.id}-${Date.now()}-${Math.random()}`,
   }));
@@ -3392,9 +3696,11 @@ function archerRewardRuleSatisfied(rule) {
   return true;
 }
 
-function recordRewardPick(cardData) {
+function recordRewardPick(cardData, options = {}) {
   if (!state) return;
-  state.rewardPickCount = (state.rewardPickCount ?? 0) + 1;
+  if (options.countPick !== false) {
+    state.rewardPickCount = (state.rewardPickCount ?? 0) + 1;
+  }
   state.rewardTags = state.rewardTags ?? new Set();
   state.rewardRouteCounts = state.rewardRouteCounts ?? {};
   state.pickedRewardIds = state.pickedRewardIds ?? new Set();
@@ -3442,7 +3748,7 @@ async function pickReward(reward, button) {
   if (state.rewardLocked) return;
   state.rewardLocked = true;
   const preStartReward = state.preStartReward;
-  const passiveReward = isPassiveCard(reward);
+  const passiveReward = (state.rewardPhase ?? "passive") === "passive";
 
   const mount = button.querySelector(".reward-mount") || button;
   const startRect = mount.getBoundingClientRect();
@@ -3461,7 +3767,7 @@ async function pickReward(reward, button) {
 
   elements.rewardOverlay.classList.add("hidden");
   elements.rewardCards.innerHTML = "";
-  recordRewardPick(reward);
+  recordRewardPick(reward, { countPick: !passiveReward });
 
   if (passiveReward) {
     applyPassiveReward(reward);
@@ -3516,6 +3822,14 @@ async function pickReward(reward, button) {
 
   state.rewardLocked = false;
   log(`보상 선택: ${reward.name}`);
+  if (passiveReward) {
+    state.rewardPhase = "card";
+    render();
+    showRewards();
+    return;
+  }
+
+  state.rewardPhase = "passive";
   if (preStartReward) {
     state.preStartReward = false;
     state.waitingReward = false;
@@ -3927,7 +4241,7 @@ function renderEnemySummary() {
       <div class="enemy-card-head">
         <div class="combatant-portrait enemy-portrait">${portraitContent(definition.image, definition.label ?? sample?.label ?? "적", "portrait-art")}</div>
         <div class="combatant-heading">
-          <strong>${sample?.boss ? sample.name : definition.name}</strong>
+          <strong>${sample?.boss || sample?.elite ? sample.name : definition.name}</strong>
           <span>x${group.enemies.length}</span>
         </div>
       </div>
@@ -4093,7 +4407,15 @@ function renderPlayerHud() {
 
   visiblePlayers.slice(0, 2).forEach((player) => {
     const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
-    const entry = state.currentTimeline.find((item) => item.actorType === "player" && item.actorId === player.id);
+    const playerEntries = state.currentTimeline.filter((item, index) => {
+      return item.actorType === "player" && item.actorId === player.id && !state.completedTimelineIndexes?.has(index);
+    });
+    const activeEntry = state.activeTimelineIndex >= 0
+      ? state.currentTimeline[state.activeTimelineIndex]
+      : null;
+    const entry = activeEntry?.actorType === "player" && activeEntry.actorId === player.id
+      ? activeEntry
+      : playerEntries[0] ?? state.currentTimeline.find((item) => item.actorType === "player" && item.actorId === player.id);
     const cardData = state.suppressPlayerCard ? null : entry?.card;
     const article = document.createElement("article");
     article.className = `player-block ${cardData ? "" : "waiting-card"}`;
@@ -4115,8 +4437,10 @@ function renderPlayerHud() {
     elements.playerHud.append(article);
   });
 
-  const playerEntry = state.currentTimeline.find((item) => item.actorType === "player");
-  const drawnCardId = playerEntry?.card?.id;
+  const playerEntry = state.currentTimeline.find((item, index) => {
+    return item.actorType === "player" && !state.completedTimelineIndexes?.has(index);
+  }) ?? state.currentTimeline.find((item) => item.actorType === "player");
+  const drawnCardId = playerEntry?.card?.instanceId ?? playerEntry?.card?.id;
   if (drawnCardId && elements.playerHud.dataset.cardId !== drawnCardId) {
     const freshCard = elements.playerHud.querySelector(".player-block:not(.waiting-card) .hud-card");
     if (freshCard) freshCard.classList.add("card-just-drawn");
@@ -4127,7 +4451,7 @@ function renderPlayerHud() {
 function enemyGroups() {
   const groups = new Map();
   aliveEnemies().forEach((enemy) => {
-    const key = enemy.boss ? enemy.id : enemy.kind;
+    const key = enemy.boss || enemy.elite ? enemy.id : enemy.kind;
     if (!groups.has(key)) groups.set(key, { kind: enemy.kind, enemies: [] });
     groups.get(key).enemies.push(enemy);
   });
@@ -4684,6 +5008,10 @@ function trapLabel(action) {
 
 function passiveEffectLabel(action) {
   const labels = {
+    baseAtkPercent: `공격력 ${percentChangeLabel(action.amount)}`,
+    maxHpPercent: `최대 체력 ${percentChangeLabel(action.amount)}`,
+    extraCardPlays: `매턴 카드 ${action.amount}장 추가 사용`,
+    firstTurnExtraCardPlays: `첫 턴 카드 ${action.amount}장 추가 사용`,
     comboDamage: `연타 피해 ${percentChangeLabel(action.amount)}`,
     thirdHitDamage: `세 번째 명중 피해 ${percentChangeLabel(action.amount)}`,
     afterAttackMove: `공격 후 이동 ${action.amount}`,
@@ -4691,6 +5019,7 @@ function passiveEffectLabel(action) {
     trapNextAttackDamage: `함정 발동 후 다음 공격 피해 ${percentChangeLabel(action.amount)}`,
     trapChainDamage: `함정 발동 시 주변 피해 ${action.amount}배`,
     trapRangedVulnerability: `함정 발동 대상 원거리 피해 ${percentChangeLabel(action.amount)}`,
+    trapTriggerShot: `함정 발동 시 사거리 ${action.range ?? 5} 원거리 공격`,
     chargeRetreat: `차지 시 후퇴 ${action.amount}`,
     chargeRangePerStack: `차지당 사거리 ${flatChangeLabel(action.amount)}`,
     chargeOnNoAttack: `공격하지 않으면 차지 ${action.amount}`,
@@ -4698,6 +5027,22 @@ function passiveEffectLabel(action) {
     chargeStackMultiplier: `차지 스택 효과 ${action.amount}배`,
     berserkLostHpDamage: `잃은 체력 비율 / 2 피해 증가`,
     lowHpDamage: `체력 ${Math.round((action.threshold ?? 0.25) * 100)}% 미만 피해 ${percentChangeLabel(action.amount)}`,
+    moveCardBonus: `이동 카드 이동력 ${flatChangeLabel(action.amount)}`,
+    killMoveBonus: `처치 후 다음 이동 카드 이동력 ${flatChangeLabel(action.amount)}`,
+    stackingMoveBonus: `처치 시 이번 웨이브 이동력 ${flatChangeLabel(action.amount)}`,
+    moveAttackDamage: `이동 후 근접 피해 ${percentChangeLabel(action.amount)}`,
+    areaPerTargetBonus: `범위 적중당 공격 배수 ${flatChangeLabel(action.amount)}`,
+    pushBonus: `밀기 ${flatChangeLabel(action.amount)}`,
+    pushAreaDamage: `밀기 후 다음 공격 피해 ${percentChangeLabel(action.amount)}`,
+    killDamageBonus: `처치 후 다음 공격 피해 ${percentChangeLabel(action.amount)}`,
+    multiTargetDamage: `다중 타겟 피해 ${percentChangeLabel(action.amount)}`,
+    killChainDamage: `처치 후 다음 공격 피해 ${percentChangeLabel(action.amount)}`,
+    runeDamage: `룬 보유 시 원거리 피해 ${percentChangeLabel(action.amount)}`,
+    runeChainDamage: `룬 발동 시 주변 피해 ${action.amount}배`,
+    persistentRune: `첫 룬 발동 후 룬 유지`,
+    meteorTargeting: `운석 낙하지점 개선`,
+    meteorMultiDamage: `운석 다중 명중 피해 ${percentChangeLabel(action.amount)}`,
+    meteorKillSplash: `운석 처치 시 주변 피해 ${action.amount}배`,
   };
   return labels[action.effect] ?? action.label ?? modifierLabel(action.modifiers?.[0]) ?? "패시브";
 }
@@ -5182,7 +5527,14 @@ function triggerTrap(actor) {
   if (!trap) return null;
   if (trap.kind === "rune" && trap.ownerSide === actor.side) return null;
 
-  state.obstacles = state.obstacles.filter((item) => item !== trap);
+  const owner = state.entities.find((entity) => entity.id === trap.ownerId && isAlive(entity));
+  const keepRune = trap.kind === "rune" && owner?.permanent?.persistentRune && !owner.temporary?.persistentRuneUsed;
+  if (keepRune) {
+    owner.temporary = owner.temporary ?? {};
+    owner.temporary.persistentRuneUsed = true;
+  } else {
+    state.obstacles = state.obstacles.filter((item) => item !== trap);
+  }
   if (trap.kind === "attack" || trap.kind === "spike" || trap.kind === "rune") {
     const damage = Math.max(1, Math.round((trap.baseAtk ?? 10) * (trap.power ?? 2)));
     const hitPosition = { q: actor.q, r: actor.r };
@@ -5236,6 +5588,28 @@ function resolveTrapTriggeredEffects(trap, target) {
       expiresAfterOwnTurnEnds: state.turn + 99,
     };
     log(`${target.name} 함정 사냥 표식`);
+  }
+  if (trap.kind !== "rune" && owner.permanent?.trapTriggerShot && isAlive(target)) {
+    const shotRange = owner.permanent.trapTriggerShotRange ?? 5;
+    const shotCount = Math.max(1, Math.floor(owner.permanent.trapTriggerShot));
+    for (let index = 0; index < shotCount; index += 1) {
+      if (!isAlive(owner) || !isAlive(target) || !canTarget(owner, target, shotRange)) break;
+      const action = { type: "attack", mult: 1, range: shotRange };
+      const beforeHp = target.hp;
+      const damage = dealAttackDamage(owner, target, action, 1);
+      resolveKillPassives(owner, target);
+      applyOverkillSplash(owner, target, damage - beforeHp, action);
+      log(`${owner.name} 매복 사격`);
+    }
+  }
+  if (trap.kind === "rune" && owner.permanent?.runeChainDamage) {
+    aliveOpponents(owner)
+      .filter((enemy) => enemy.id !== target.id && axialDistance(enemy, target) <= 1)
+      .forEach((enemy) => dealAttackDamage(owner, enemy, {
+        type: "attack",
+        mult: owner.permanent.runeChainDamage,
+        range: owner.baseRange,
+      }, owner.permanent.runeChainDamage));
   }
 }
 
