@@ -510,29 +510,23 @@ const archerFirstRewardIds = new Set([
   "interference-trap",
   "guided-shot",
   "spike-path",
-  "charge",
-  "short-focus",
-  "aim-breath",
-  "brace",
-  "load-shot",
-  "low-stance",
   "prep-shot",
-  "quiet-aim",
-  "charge-2",
   "charged-shot",
 ]);
 
 const archerRewardUnlockRules = {
-  "piercing-prep": { minPicks: 1, anyOf: [{ tags: ["range"] }, { pickedIds: ["load-shot"] }] },
+  "retreat-step": { minPicks: 5 },
+  "quick-retreat": { minPicks: 5 },
+  "piercing-prep": { minPicks: 5, anyOf: [{ tags: ["range"] }, { pickedIds: ["load-shot"] }] },
   "double-power-shot": { minPicks: 2, anyOf: [{ tags: ["multi"] }, { tags: ["range"] }] },
   "high-ground": { minPicks: 2, tags: ["range"] },
   "reposition-shot": { minPicks: 2, tags: ["range"] },
-  "emergency-evasion": { minPicks: 2 },
-  "perfect-distance": { minPicks: 2, tags: ["range"] },
+  "emergency-evasion": { minPicks: 5 },
+  "perfect-distance": { minPicks: 5, tags: ["range"] },
   "storm-shot": { minPicks: 3, tags: ["range"] },
-  "hunt-rhythm": { minPicks: 3 },
+  "hunt-rhythm": { minPicks: 5 },
   "absolute-distance": {
-    minPicks: 3,
+    minPicks: 5,
     anyOf: [{ tags: ["range"] }, { pickedIds: ["perfect-distance"] }, { pickedIds: ["piercing-prep"] }],
   },
   "combo-sense": { routeCounts: { "다단중첩": 1 } },
@@ -556,20 +550,28 @@ const archerRewardUnlockRules = {
   "chain-trigger": { routeCounts: { "함정": 2 } },
   "trap-burst": { tags: ["trap"] },
   "cross-block": { tags: ["trap"] },
-  "trap-hunt": { routeCounts: { "함정": 3 } },
+  "trap-hunt": { minPicks: 5, routeCounts: { "함정": 3 } },
   "spike-storm": { routeCounts: { "함정": 2 } },
   "force-trigger": { tags: ["trap", "push"] },
-  "steady-breath": { tags: ["charge"] },
-  "compressed-load": { tags: ["charge"] },
-  "charge-retreat": { tags: ["charge"] },
+  "charge": { minPicks: 5 },
+  "short-focus": { minPicks: 5 },
+  "aim-breath": { minPicks: 5 },
+  "brace": { minPicks: 5 },
+  "load-shot": { minPicks: 5 },
+  "low-stance": { minPicks: 5 },
+  "quiet-aim": { minPicks: 5 },
+  "charge-2": { minPicks: 5 },
+  "steady-breath": { minPicks: 5, tags: ["charge"] },
+  "compressed-load": { minPicks: 5, tags: ["charge"] },
+  "charge-retreat": { minPicks: 5, tags: ["charge"] },
   "piercing-charged-shot": { routeCounts: { "차지": 2 } },
-  "full-anchor": { tags: ["charge"] },
-  "charge-range": { routeCounts: { "차지": 2 } },
+  "full-anchor": { minPicks: 5, tags: ["charge"] },
+  "charge-range": { minPicks: 5, routeCounts: { "차지": 2 } },
   "waited-shot": { routeCounts: { "차지": 2 } },
-  "breath-hold": { routeCounts: { "차지": 2 } },
+  "breath-hold": { minPicks: 5, routeCounts: { "차지": 2 } },
   "heart-piercer": { routeCounts: { "차지": 3 } },
-  "charge-overkill": { routeCounts: { "차지": 3 } },
-  "charge-doubler": { routeCounts: { "차지": 3 } },
+  "charge-overkill": { minPicks: 5, routeCounts: { "차지": 3 } },
+  "charge-doubler": { minPicks: 5, routeCounts: { "차지": 3 } },
 };
 
 const baseWarriorCards = [
@@ -1028,30 +1030,30 @@ function expandCards(cards) {
 function buildWaves() {
   return [
     wave(3, [], [
-      enemy(-2, -1, 2, { baseAtk: 1 }),
-      enemy(2, -2, 2, { kind: "skirmisher", baseAtk: 1 }),
+      enemy(-2, -1, 2, { baseAtk: 0 }),
+      enemy(2, -2, 2, { kind: "skirmisher", baseAtk: 0 }),
     ]),
     wave(3, [{ q: 0, r: 0 }], [
-      enemy(-3, 0, 3, { baseAtk: 1 }),
-      enemy(3, -2, 3, { kind: "skirmisher", baseAtk: 1 }),
-      enemy(1, -3, 3, { kind: "shooter", baseAtk: 1 }),
+      enemy(-3, 0, 3, { baseAtk: 0 }),
+      enemy(3, -2, 3, { kind: "skirmisher", baseAtk: 0 }),
+      enemy(1, -3, 3, { kind: "shooter", baseAtk: 0 }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -1, r: 1 }], [
-      enemy(-3, 1, 5, { baseAtk: 1 }),
-      enemy(3, -2, 5, { kind: "skirmisher", baseAtk: 1 }),
-      enemy(0, -4, 5, { kind: "shooter", baseAtk: 1 }),
-      enemy(2, 1, 5, { baseAtk: 1 }),
+      enemy(-3, 1, 5, { baseAtk: 0 }),
+      enemy(3, -2, 5, { kind: "skirmisher", baseAtk: 0 }),
+      enemy(0, -4, 5, { kind: "shooter", baseAtk: 0 }),
+      enemy(2, 1, 5, { baseAtk: 0 }),
     ]),
     wave(4, [{ q: 0, r: -1 }, { q: 1, r: -1 }], [
-      enemy(-4, 1, 8, { baseAtk: 1 }),
-      enemy(-2, -2, 8, { kind: "shooter", baseAtk: 1 }),
-      enemy(3, -3, 8, { kind: "skirmisher", baseAtk: 1 }),
-      enemy(3, 0, 8, { baseAtk: 1 }),
+      enemy(-4, 1, 8, { baseAtk: 0 }),
+      enemy(-2, -2, 8, { kind: "shooter", baseAtk: 0 }),
+      enemy(3, -3, 8, { kind: "skirmisher", baseAtk: 0 }),
+      enemy(3, 0, 8, { baseAtk: 0 }),
     ]),
     wave(4, [{ q: -1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: 1 }], [
-      enemy(0, -4, 24, { boss: true, name: "보스 1", baseAtk: 2 }),
-      enemy(-3, 0, 12, { kind: "skirmisher", baseAtk: 1 }),
-      enemy(3, -2, 12, { kind: "shooter", baseAtk: 1 }),
+      enemy(0, -4, 24, { boss: true, name: "보스 1", baseAtk: 0 }),
+      enemy(-3, 0, 12, { kind: "skirmisher", baseAtk: 0 }),
+      enemy(3, -2, 12, { kind: "shooter", baseAtk: 0 }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -2, r: 2 }], [
       enemy(-4, 2, 34),
@@ -1782,7 +1784,9 @@ function dealAttackDamage(actor, target, action, multiplier, options = {}) {
   const context = damageContext(actor, target, action, options);
   const finalMultiplier = multiplier * outgoingDamageMultiplier(context) * incomingDamageMultiplier(context);
   const adjacentPenalty = adjacentDamagePenalty(context);
-  const damage = Math.max(1, Math.round(actor.baseAtk * finalMultiplier * adjacentPenalty));
+  const damage = actor.baseAtk <= 0
+    ? 0
+    : Math.max(1, Math.round(actor.baseAtk * finalMultiplier * adjacentPenalty));
   const hitPosition = { q: target.q, r: target.r };
   applyDamage(target, damage);
   noteTargetHit(actor, target);
