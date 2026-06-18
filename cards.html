@@ -7,7 +7,8 @@
     <meta name="theme-color" content="#123946" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="assets/card-normal-v2.png" />
-    <link rel="stylesheet" href="cards.css?v=20260618-card-manager" />
+    <link rel="stylesheet" href="styles.css?v=20260618-enemy-action-card" />
+    <link rel="stylesheet" href="cards.css?v=20260618-gallery" />
   </head>
   <body>
     <main class="card-manager-shell">
@@ -18,25 +19,18 @@
           <h1>카드 관리</h1>
         </div>
         <div id="characterList" class="character-list"></div>
+        <section id="routeSummary" class="route-summary" aria-label="카드 요약"></section>
       </aside>
 
-      <section class="manager-main">
-        <header class="manager-header">
+      <section class="manager-gallery">
+        <header class="gallery-header">
           <div id="characterHero" class="character-hero"></div>
-          <div class="toolbar" aria-label="카드 필터">
-            <label class="search-box">
-              <span>검색</span>
-              <input id="cardSearch" type="search" autocomplete="off" placeholder="카드, 트리, 효과" />
-            </label>
-            <div id="rarityFilters" class="segmented-control" aria-label="등급"></div>
-          </div>
         </header>
 
-        <section id="routeSummary" class="route-summary" aria-label="카드 요약"></section>
         <section id="cardSections" class="card-sections" aria-live="polite"></section>
       </section>
     </main>
 
-    <script src="cards.js?v=20260618-card-manager"></script>
+    <script src="cards.js?v=20260618-gallery"></script>
   </body>
 </html>
