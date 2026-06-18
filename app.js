@@ -907,6 +907,9 @@ function newRun() {
     cameraScale: 0,
     cameraDrag: null,
     cameraDeadZoneSuppressed: false,
+    offscreenIndicatorElements: new Map(),
+    offscreenIndicatorFrame: 0,
+    pendingOffscreenBounds: null,
     boardTileSignature: "",
     boardTileElements: new Map(),
     priorityStripSignature: "",
@@ -948,6 +951,10 @@ function startWave(index) {
   state.cameraTransitionScheduled = false;
   state.cameraFocusReady = false;
   state.cameraFollowToken = (state.cameraFollowToken ?? 0) + 1;
+  clearOffscreenEnemyIndicators();
+  if (state.offscreenIndicatorFrame && window.cancelAnimationFrame) {
+    window.cancelAnimationFrame(state.offscreenIndicatorFrame);
+  }
   state.cameraPanelWidth = 0;
   state.cameraPanelHeight = 0;
   state.cameraX = 0;
@@ -955,6 +962,9 @@ function startWave(index) {
   state.cameraScale = 0;
   state.cameraDrag = null;
   state.cameraDeadZoneSuppressed = false;
+  state.offscreenIndicatorElements = new Map();
+  state.offscreenIndicatorFrame = 0;
+  state.pendingOffscreenBounds = null;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
   state.entities = [
     {
@@ -3542,7 +3552,6 @@ function renderBoard() {
     if (child.classList.contains("entity") && aliveEntityIds.has(child.dataset.entityId)) return;
     child.remove();
   });
-  elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
   const bounds = boardBounds();
   fitBoardToPanel(bounds);
   renderBoardTiles(bounds);
@@ -3633,15 +3642,26 @@ function renderBoardTiles(bounds) {
 }
 
 function renderOffscreenEnemyIndicators(bounds) {
-  if (state.cameraMode !== "focus") return;
+  state.offscreenIndicatorElements = state.offscreenIndicatorElements ?? new Map();
+  if (state.cameraMode !== "focus") {
+    clearOffscreenEnemyIndicators();
+    return;
+  }
   const player = getPlayer();
-  if (!player) return;
+  if (!player) {
+    clearOffscreenEnemyIndicators();
+    return;
+  }
 
   const panelWidth = elements.boardPanel.clientWidth;
   const panelHeight = elements.boardPanel.clientHeight;
-  const scale = Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || 1;
-  const offsetX = Number.parseFloat(elements.board.style.getPropertyValue("--board-x")) || 0;
-  const offsetY = Number.parseFloat(elements.board.style.getPropertyValue("--board-y")) || 0;
+  const scale = state.cameraScale || Number.parseFloat(elements.board.style.getPropertyValue("--board-scale")) || 1;
+  const offsetX = Number.isFinite(state.cameraX)
+    ? state.cameraX
+    : Number.parseFloat(elements.board.style.getPropertyValue("--board-x")) || 0;
+  const offsetY = Number.isFinite(state.cameraY)
+    ? state.cameraY
+    : Number.parseFloat(elements.board.style.getPropertyValue("--board-y")) || 0;
   const playerPoint = screenPointForHex(player, bounds, scale, offsetX, offsetY);
   const visible = {
     left: 60,
@@ -3650,37 +3670,73 @@ function renderOffscreenEnemyIndicators(bounds) {
     bottom: panelHeight - 50,
   };
   const occupied = [];
+  const visibleBoard = {
+    left: -48,
+    right: panelWidth + 48,
+    top: -48,
+    bottom: panelHeight + 48,
+  };
+  const visibleIndicatorIds = new Set();
 
   aliveEnemies().forEach((enemy) => {
     const enemyPoint = screenPointForHex(enemy, bounds, scale, offsetX, offsetY);
-    if (isEnemyElementVisible(enemy)) return;
+    const indicatorId = String(enemy.id);
+    if (isPointInsideRect(enemyPoint, visibleBoard)) {
+      removeOffscreenEnemyIndicator(indicatorId);
+      return;
+    }
 
     const dx = enemyPoint.x - playerPoint.x;
     const dy = enemyPoint.y - playerPoint.y;
     const position = placeOffscreenIndicator(enemyPoint, visible, occupied);
-    const indicator = document.createElement("div");
-    indicator.className = `offscreen-indicator ${enemy.boss ? "boss" : ""}`;
+    let indicator = state.offscreenIndicatorElements.get(indicatorId);
+    if (!indicator) {
+      indicator = document.createElement("div");
+      indicator.className = "offscreen-indicator";
+      indicator.innerHTML = `
+        <span class="offscreen-arrow"></span>
+        <span class="offscreen-enemy"></span>
+        <span class="offscreen-distance"></span>
+        <span class="offscreen-unit">칸</span>
+      `;
+      indicator._offscreenParts = {
+        arrow: indicator.querySelector(".offscreen-arrow"),
+        enemy: indicator.querySelector(".offscreen-enemy"),
+        distance: indicator.querySelector(".offscreen-distance"),
+      };
+      state.offscreenIndicatorElements.set(indicatorId, indicator);
+      elements.boardPanel.append(indicator);
+    }
+    const parts = indicator._offscreenParts;
+    indicator.classList.toggle("boss", Boolean(enemy.boss));
     indicator.style.left = `${position.x}px`;
     indicator.style.top = `${position.y}px`;
-    indicator.innerHTML = `
-      <span class="offscreen-arrow">${directionArrow(dx, dy)}</span>
-      <span class="offscreen-enemy">${enemy.label ?? enemy.monsterIndex}</span>
-      <span class="offscreen-distance">${axialDistance(player, enemy)}</span>
-      <span class="offscreen-unit">칸</span>
-    `;
-    elements.boardPanel.append(indicator);
+    if (parts?.arrow) parts.arrow.textContent = directionArrow(dx, dy);
+    if (parts?.enemy) parts.enemy.textContent = enemy.label ?? enemy.monsterIndex;
+    if (parts?.distance) parts.distance.textContent = axialDistance(player, enemy);
+    visibleIndicatorIds.add(indicatorId);
   });
+
+  for (const id of Array.from(state.offscreenIndicatorElements.keys())) {
+    if (!visibleIndicatorIds.has(id)) removeOffscreenEnemyIndicator(id);
+  }
 }
 
-function isEnemyElementVisible(enemy) {
-  const entityElement = elements.board.querySelector(`[data-entity-id="${enemy.id}"]`);
-  if (!entityElement) return false;
+function clearOffscreenEnemyIndicators() {
+  if (!state?.offscreenIndicatorElements) return;
+  state.offscreenIndicatorElements.forEach((indicator) => indicator.remove());
+  state.offscreenIndicatorElements.clear();
+}
 
-  const entityRect = entityElement.getBoundingClientRect();
-  const panelRect = elements.boardPanel.getBoundingClientRect();
-  const visibleWidth = Math.min(entityRect.right, panelRect.right) - Math.max(entityRect.left, panelRect.left);
-  const visibleHeight = Math.min(entityRect.bottom, panelRect.bottom) - Math.max(entityRect.top, panelRect.top);
-  return visibleWidth > 0 && visibleHeight > 0;
+function removeOffscreenEnemyIndicator(id) {
+  const indicator = state.offscreenIndicatorElements?.get(id);
+  if (!indicator) return;
+  indicator.remove();
+  state.offscreenIndicatorElements.delete(id);
+}
+
+function isPointInsideRect(point, rect) {
+  return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
 }
 
 function screenPointForHex(hex, bounds, scale, offsetX, offsetY) {
@@ -3693,13 +3749,11 @@ function screenPointForHex(hex, bounds, scale, offsetX, offsetY) {
 
 function updateBoardCamera(bounds = boardBounds(), refreshAfterTransition = false) {
   fitBoardToPanel(bounds);
-  elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
   renderOffscreenEnemyIndicators(bounds);
   if (refreshAfterTransition) {
     window.setTimeout(() => {
       if (!state || state.cameraMode !== "focus") return;
       const currentBounds = boardBounds();
-      elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
       renderOffscreenEnemyIndicators(currentBounds);
     }, 380);
   }
@@ -4783,6 +4837,7 @@ function beginBoardCameraDrag(event) {
     bounds,
     metrics,
     frame,
+    latestFrame: frame,
     moved: false,
   };
   if (elements.boardPanel.setPointerCapture) elements.boardPanel.setPointerCapture(event.pointerId);
@@ -4814,9 +4869,10 @@ function moveBoardCameraDrag(event) {
     offsetX: drag.frame.offsetX + deltaX,
     offsetY: drag.frame.offsetY + deltaY,
   }, drag.metrics);
-  applyBoardCameraFrame(frame, false);
+  drag.latestFrame = frame;
+  applyBoardCameraTransform(frame);
   commitCameraFrame(frame);
-  refreshOffscreenEnemyIndicators(drag.bounds);
+  scheduleOffscreenEnemyIndicators(drag.bounds);
 }
 
 function endBoardCameraDrag(event) {
@@ -4826,6 +4882,7 @@ function endBoardCameraDrag(event) {
   if (!drag.moved) state.cameraDeadZoneSuppressed = false;
   elements.boardPanel.classList.remove("dragging");
   elements.board.style.transition = "";
+  if (drag.latestFrame) applyBoardCameraFrame(drag.latestFrame, false);
   if (elements.boardPanel.hasPointerCapture?.(event.pointerId)) {
     elements.boardPanel.releasePointerCapture(event.pointerId);
   }
@@ -4842,9 +4899,16 @@ function clampCameraDragFrame(frame, metrics) {
   };
 }
 
-function refreshOffscreenEnemyIndicators(bounds = boardBounds()) {
-  elements.boardPanel.querySelectorAll(".offscreen-indicator").forEach((indicator) => indicator.remove());
-  renderOffscreenEnemyIndicators(bounds);
+function scheduleOffscreenEnemyIndicators(bounds = boardBounds()) {
+  state.pendingOffscreenBounds = bounds;
+  if (state.offscreenIndicatorFrame) return;
+  state.offscreenIndicatorFrame = window.requestAnimationFrame(() => {
+    if (!state) return;
+    const pendingBounds = state.pendingOffscreenBounds ?? boardBounds();
+    state.offscreenIndicatorFrame = 0;
+    state.pendingOffscreenBounds = null;
+    renderOffscreenEnemyIndicators(pendingBounds);
+  });
 }
 
 function cameraMetrics(bounds = boardBounds()) {
@@ -4867,18 +4931,35 @@ function cameraMetrics(bounds = boardBounds()) {
 function applyBoardCameraFrame(frame, updateSize = true) {
   const { logicalWidth, logicalHeight, scale, offsetX, offsetY } = frame;
   if (updateSize) {
-    elements.board.style.setProperty("--board-width", `${logicalWidth}px`);
-    elements.board.style.setProperty("--board-height", `${logicalHeight}px`);
+    setBoardStyleProperty("--board-width", `${logicalWidth}px`);
+    setBoardStyleProperty("--board-height", `${logicalHeight}px`);
   }
-  elements.board.style.setProperty("--board-scale", `${scale}`);
-  elements.board.style.setProperty("--board-x", `${offsetX}px`);
-  elements.board.style.setProperty("--board-y", `${offsetY}px`);
-  elements.board.style.transform = "";
+  setBoardStyleProperty("--board-scale", `${scale}`);
+  setBoardStyleProperty("--board-x", `${offsetX}px`);
+  setBoardStyleProperty("--board-y", `${offsetY}px`);
+  setBoardTransform("");
 }
 
 function applyBoardCameraTransform(frame) {
   const { scale, offsetX, offsetY } = frame;
-  elements.board.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`;
+  setBoardTransform(`translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`);
+}
+
+function setBoardStyleProperty(name, value) {
+  const currentValue = elements.board.style.getPropertyValue
+    ? elements.board.style.getPropertyValue(name)
+    : elements.board.style[name];
+  if (currentValue === value) return;
+  if (elements.board.style.setProperty) {
+    elements.board.style.setProperty(name, value);
+  } else {
+    elements.board.style[name] = value;
+  }
+}
+
+function setBoardTransform(value) {
+  if (elements.board.style.transform === value) return;
+  elements.board.style.transform = value;
 }
 
 function commitCameraFrame(frame) {
