@@ -3015,7 +3015,7 @@ body.turn-cue-active .turn-scrim {
   align-items: center;
   gap: 14px;
   width: 100%;
-  max-width: 880px;
+  max-width: 960px;
   padding: 16px 18px calc(16px + env(safe-area-inset-bottom));
   animation: reward-fade 360ms ease both;
 }
@@ -3102,16 +3102,21 @@ body.turn-cue-active .turn-scrim {
 }
 
 .reward-cards.reward-passive {
-  grid-template-columns: repeat(1, max-content);
+  grid-template-columns: repeat(3, max-content);
+  gap: 14px 8px;
 }
 
 @media (min-width: 600px) {
-  .reward-cards {
-    grid-template-columns: repeat(4, max-content);
-  }
-
   .reward-cards.reward-passive {
     grid-template-columns: repeat(3, max-content);
+    gap: 20px 16px;
+  }
+}
+
+@media (min-width: 920px) {
+  .reward-cards {
+    grid-template-columns: repeat(4, max-content);
+    gap: 20px 16px;
   }
 }
 
@@ -3870,9 +3875,49 @@ body.turn-cue-active .turn-scrim {
   transition: transform 180ms ease, filter 180ms ease;
 }
 
+.reward-overlay .reward-passive .reward-mount {
+  --cps: 0.2;
+}
+
+@media (min-width: 430px) {
+  .reward-overlay .reward-passive .reward-mount {
+    --cps: 0.23;
+  }
+}
+
 @media (min-width: 600px) {
+  .reward-overlay .reward-passive .reward-mount {
+    --cps: 0.34;
+  }
+}
+
+@media (min-width: 920px) {
   .reward-overlay .reward-mount {
     --cps: 0.4;
+  }
+
+  .reward-overlay .reward-passive .reward-mount {
+    --cps: 0.4;
+  }
+}
+
+@media (max-width: 370px) {
+  .reward-overlay .reward-mount {
+    --cps: 0.29;
+  }
+
+  .reward-overlay .reward-passive .reward-mount {
+    --cps: 0.18;
+  }
+}
+
+@media (max-width: 340px) {
+  .reward-overlay .reward-mount {
+    --cps: 0.25;
+  }
+
+  .reward-overlay .reward-passive .reward-mount {
+    --cps: 0.17;
   }
 }
 
