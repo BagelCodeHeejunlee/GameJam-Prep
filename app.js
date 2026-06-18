@@ -594,65 +594,130 @@ const baseWarriorCards = [
   ], 1),
 ];
 
+function meleeAttack(mult, extra = {}) {
+  return { type: "attack", mult, range: 1, melee: true, ...extra };
+}
+
+function rangedAttack(mult, range = 3, extra = {}) {
+  return { type: "attack", mult, range, ...extra };
+}
+
+function cardMove(amount, extra = {}) {
+  return { type: "move", amount, ...extra };
+}
+
+function cardFlee(amount, extra = {}) {
+  return { type: "flee", amount, ...extra };
+}
+
+function cardPattern(mult, pattern = "adjacent-pair", extra = {}) {
+  return { type: "patternAttack", mult, range: 1, pattern, melee: true, ...extra };
+}
+
+function cardEffect(label, duration = "turn", modifiers = [], extra = {}) {
+  return { type: "applyEffect", label, duration, modifiers, ...extra };
+}
+
+function cardPassive(effect, label, amount = 1, extra = {}) {
+  return { type: "passive", effect, label, amount, ...extra };
+}
+
+function cardMeteor(range, mult, radius = 1, delay = 1, extra = {}) {
+  return { type: "placeMeteor", range, mult, radius, delay, ...extra };
+}
+
+function cardRune(range, count = 1, power = 1, extra = {}) {
+  return { type: "placeRune", range, count, power, ...extra };
+}
+
 const warriorRewardPool = [
-  card("warrior-quick-slash", "빠른 베기", "공용", "노말", 42, [{ type: "attack", mult: 1, range: 1, melee: true }]),
-  card("warrior-long-step", "긴 돌입", "돌진", "노말", 55, [{ type: "move", amount: 4, desiredRange: 1 }]),
-  card("warrior-berserk-cut", "피의 대가", "광전", "노말", 46, [
-    { type: "selfDamagePercent", percent: 0.1 },
-    { type: "attack", mult: 3, range: 1, melee: true },
-  ]),
-  card("warrior-push", "밀어붙이기", "범위 공격", "노말", 46, [{ type: "attack", mult: 1, range: 1, melee: true, push: 1 }]),
-  card("warrior-rush-5", "달려들기", "돌진", "노말", 60, [{ type: "move", amount: 5, desiredRange: 1 }]),
-  card("warrior-advance-cleave", "파고들기", "범위 공격", "노말", 50, [
-    { type: "move", amount: 2, desiredRange: 1 },
-    { type: "patternAttack", mult: 1, range: 1, pattern: "adjacent-pair", melee: true },
-  ]),
-  card("warrior-berserk-heal-small", "숨 고르기", "광전", "노말", 64, [{ type: "healPercent", percent: 0.1 }]),
-  card("warrior-cleave-reward", "넓은 휩쓸기", "범위 공격", "레어", 48, [
-    { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-pair", melee: true },
-  ]),
-  card("warrior-jump-entry", "점프 진입", "돌진", "레어", 58, [{ type: "move", amount: 4, desiredRange: 1, jump: true }]),
-  card("warrior-breakthrough", "돌파 베기", "돌진", "레어", 56, [
-    { type: "move", amount: 4, desiredRange: 1 },
-    { type: "attack", mult: 2, range: 1, melee: true, push: 1 },
-  ]),
-  card("warrior-blood-chain", "피의 연격", "광전", "레어", 44, [
-    { type: "attack", mult: 1, range: 1, melee: true },
-    { type: "attack", mult: 1, range: 1, melee: true },
-    { type: "attack", mult: 1, range: 1, melee: true },
-  ]),
-  card("warrior-triangle-cleave", "삼각 휩쓸기", "범위 공격", "에픽", 47, [
-    { type: "patternAttack", mult: 2, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
-  ]),
-  card("warrior-overrun", "남은 힘 베기", "돌진", "에픽", 60, [
-    { type: "momentumAttack", amount: 5, mult: 1, range: 1 },
-  ]),
-  card("warrior-berserk-stance", "광전 태세", "광전", "레어", 44, [
-    { type: "passive", effect: "berserkLostHpDamage", amount: 0.5 },
-  ]),
-  card("warrior-blood-recovery", "피의 회복", "광전", "레어", 40, [
-    { type: "attack", mult: 1, range: 1, melee: true },
-    { type: "healPercent", percent: 0.12 },
-  ]),
-  card("warrior-blood-combo", "무자비한 연속", "광전", "에픽", 43, [
-    { type: "selfDamagePercent", percent: 0.1 },
-    { type: "attack", mult: 3, range: 1, melee: true },
-    { type: "attack", mult: 2, range: 1, melee: true },
-  ]),
-  card("warrior-surround-hit", "주변 견제", "범위 공격", "에픽", 49, [
-    { type: "attack", mult: 1, range: 1, melee: true, targets: 3 },
-  ]),
-  card("warrior-whirlwind", "피의 폭풍", "범위 공격", "전설", 45, [
-    { type: "patternAttack", mult: 3, range: 1, pattern: "adjacent-triple", melee: true, perTargetBonus: 1 },
-  ]),
-  card("warrior-endless-charge", "멈추지 않는 돌입", "돌진", "전설", 62, [{ type: "move", amount: 6, desiredRange: 1, jump: true }]),
-  card("warrior-death-edge", "죽음의 칼끝", "광전", "전설", 38, [
-    { type: "passive", effect: "lowHpDamage", amount: 0.5, threshold: 0.25 },
-  ]),
-  card("warrior-final-blow", "최후의 일격", "광전", "전설", 36, [
-    { type: "selfDamagePercent", percent: 0.2 },
-    { type: "attack", mult: 6, range: 1, melee: true },
-  ]),
+  card("warrior-quick-slash", "빠른 베기", "공용", "노말", 42, [meleeAttack(1)]),
+  card("warrior-reward-advance-slash", "전진 베기", "공용", "노말", 48, [cardMove(2, { desiredRange: 1 }), meleeAttack(1)]),
+  card("warrior-short-entry", "짧은 돌입", "공용", "노말", 58, [cardMove(3, { desiredRange: 1 })]),
+  card("warrior-strong-slash", "강한 베기", "공용", "노말", 44, [meleeAttack(2)]),
+  card("warrior-side-slash", "옆 베기", "공용", "노말", 50, [cardPattern(1)]),
+  card("warrior-common-push", "밀어붙이기", "공용", "노말", 46, [meleeAttack(1, { push: 1 })]),
+  card("warrior-frontline-hold", "전열 유지", "공용", "노말", 52, [cardMove(1, { desiredRange: 1 }), meleeAttack(1), cardMove(1, { desiredRange: 1, ignoreCannotMove: true })]),
+  card("warrior-bracing-stance", "버티는 자세", "공용", "노말", 30, [cardEffect("버티는 자세", "turn", [{ stat: "damageTaken", amount: -0.2 }])]),
+  card("warrior-breakthrough-common", "돌파", "공용", "레어", 54, [cardMove(3, { desiredRange: 1 }), meleeAttack(2)]),
+  card("warrior-counter-stance", "반격 태세", "공용", "레어", 34, [cardEffect("반격 태세", "turn", [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "melee" } }])]),
+  card("warrior-wide-cleave-common", "넓은 휩쓸기", "공용", "레어", 48, [cardPattern(2)]),
+  card("warrior-iron-wall", "철벽", "공용", "레어", 28, [cardEffect("철벽", "turn", [{ stat: "damageTaken", amount: -0.4 }])]),
+  card("warrior-shatter", "파쇄", "공용", "레어", 40, [meleeAttack(3)]),
+  card("warrior-battle-center", "전장의 중심", "공용", "에픽", 32, [cardPassive("adjacentEnemyDamageReduction", "인접한 적 1명당 받는 피해 5% 감소", 0.05, { modifiers: [{ stat: "damageTaken", amount: -0.05 }] })]),
+  card("warrior-chain-slash", "연속 베기", "공용", "에픽", 43, [meleeAttack(1), meleeAttack(1), meleeAttack(1)]),
+  card("warrior-push-realign", "밀어붙인 뒤 재정렬", "공용", "에픽", 44, [meleeAttack(1, { push: 2 }), cardMove(1, { desiredRange: 1, ignoreCannotMove: true })]),
+  card("warrior-brace-counter", "버티고 반격", "공용", "에픽", 30, [cardEffect("버티고 반격", "turn", [{ stat: "damageTaken", amount: -0.3 }, { stat: "damageDealt", amount: 0.2, when: { attackKind: "melee" } }])]),
+  card("warrior-heavy-breakthrough", "묵직한 돌파", "공용", "에픽", 50, [cardMove(2, { desiredRange: 1 }), meleeAttack(3, { push: 1 })]),
+  card("warrior-indomitable", "불굴", "공용", "전설", 24, [cardPassive("firstHitDamageReduction", "턴마다 처음 받는 피해 30% 감소", 0.3, { modifiers: [{ stat: "damageTaken", amount: -0.1 }] })]),
+  card("warrior-battle-roar", "전장의 포효", "공용", "전설", 22, [cardEffect("전장의 포효", "turn", [{ stat: "damageTaken", amount: -0.2 }])]),
+  card("warrior-earth-split", "대지 가르기", "공용", "전설", 38, [cardPattern(3, "adjacent-triple", { push: 1 })]),
+
+  card("warrior-rough-slash", "거친 베기", "광전", "노말", 44, [meleeAttack(2), cardEffect("다음 피격 피해 증가", "nextHit", [{ stat: "damageTaken", amount: 0.1 }])]),
+  card("warrior-blood-rhythm", "피의 박자", "광전", "노말", 36, [cardPassive("berserkLostHpDamage", "광전 태세", 0.5)]),
+  card("warrior-rushdown", "몰아치기", "광전", "노말", 42, [meleeAttack(1), meleeAttack(1)]),
+  card("warrior-rage-move", "분노 이동", "광전", "노말", 50, [cardMove(2, { desiredRange: 1 }), meleeAttack(1)]),
+  card("warrior-wound-use", "상처 활용", "광전", "노말", 40, [{ type: "selfDamagePercent", percent: 0.1 }, meleeAttack(3)]),
+  card("warrior-reckless-charge", "무모한 돌진", "광전", "노말", 54, [cardMove(3, { desiredRange: 1 }), meleeAttack(2), cardEffect("다음 피격 피해 증가", "nextHit", [{ stat: "damageTaken", amount: 0.1 }])]),
+  card("warrior-bloody-blade", "피 묻은 칼날", "광전", "노말", 34, [cardEffect("피 묻은 칼날", "turn", [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "melee" } }, { stat: "damageTaken", amount: 0.1 }])]),
+  card("warrior-assault", "맹공", "광전", "노말", 45, [meleeAttack(1, { targets: 2 })]),
+  card("warrior-berserk-stance", "광전 태세", "광전", "레어", 34, [cardPassive("berserkLostHpDamage", "잃은 체력 비율 / 2만큼 공격 피해 증가", 0.5)]),
+  card("warrior-blood-chain", "피의 연격", "광전", "레어", 41, [meleeAttack(1), meleeAttack(1), meleeAttack(1)]),
+  card("warrior-rage-burst", "분노 폭발", "광전", "레어", 43, [cardPattern(2)]),
+  card("warrior-fierce-chase", "사나운 추격", "광전", "레어", 46, [meleeAttack(1), cardMove(2, { desiredRange: 1, ignoreCannotMove: true }), meleeAttack(1)]),
+  card("warrior-blood-recovery", "피의 회복", "광전", "레어", 38, [meleeAttack(1), { type: "healPercent", percent: 0.12 }]),
+  card("warrior-blood-resolve", "피의 결의", "광전", "에픽", 32, [cardPassive("lowHpDamage", "체력이 25% 미만이면 공격 피해 50% 증가", 0.5, { threshold: 0.25 })]),
+  card("warrior-finisher-slash", "끝장 베기", "광전", "에픽", 30, [meleeAttack(4)]),
+  card("warrior-frenzy", "광란", "광전", "에픽", 28, [cardEffect("광란", "turn", [], { afterHitFlee: 1 })]),
+  card("warrior-merciless-chain", "무자비한 연속", "광전", "에픽", 36, [{ type: "selfDamagePercent", percent: 0.1 }, meleeAttack(3), meleeAttack(2)]),
+  card("warrior-battle-thirst", "전투 갈증", "광전", "에픽", 33, [cardPassive("killDamageBonus", "적 처치 시 다음 공격 피해 20% 증가", 0.2, { modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "melee" } }] })]),
+  card("warrior-blood-storm-berserk", "피의 폭풍", "광전", "전설", 29, [meleeAttack(1), meleeAttack(1), meleeAttack(1), meleeAttack(1), meleeAttack(1)]),
+  card("warrior-death-edge", "죽음의 칼끝", "광전", "전설", 27, [cardPassive("lowHpDamage", "체력이 25% 미만이면 공격 피해 50% 증가", 0.5, { threshold: 0.25 })]),
+  card("warrior-final-blow", "최후의 일격", "광전", "전설", 26, [{ type: "selfDamagePercent", percent: 0.2 }, meleeAttack(6)]),
+
+  card("warrior-long-entry", "긴 돌입", "돌진", "노말", 58, [cardMove(4, { desiredRange: 1 })]),
+  card("warrior-shoulder-push", "어깨 밀기", "돌진", "노말", 52, [cardMove(2, { desiredRange: 1 }), meleeAttack(1, { push: 1 })]),
+  card("warrior-leap-in", "달려들기", "돌진", "노말", 60, [cardMove(5, { desiredRange: 1 })]),
+  card("warrior-low-entry", "낮은 자세 돌입", "돌진", "노말", 54, [cardMove(3, { desiredRange: 1 })]),
+  card("warrior-gap-entry", "빈틈 파고들기", "돌진", "노말", 50, [cardMove(2, { desiredRange: 1 }), meleeAttack(1)]),
+  card("warrior-chase-slash", "추격 베기", "돌진", "노말", 48, [meleeAttack(1), cardMove(2, { desiredRange: 1, ignoreCannotMove: true })]),
+  card("warrior-close-move", "밀착 이동", "돌진", "노말", 52, [cardMove(2, { desiredRange: 1 }), meleeAttack(2)]),
+  card("warrior-shake", "뒤흔들기", "돌진", "노말", 54, [cardMove(3, { desiredRange: 1 }), meleeAttack(1, { push: 1 })]),
+  card("warrior-jump-entry", "점프 진입", "돌진", "레어", 56, [cardMove(4, { desiredRange: 1, jump: true })]),
+  card("warrior-inertia-slash", "관성 베기", "돌진", "레어", 34, [cardPassive("moveAttackDamage", "2칸 이상 이동 후 공격 피해 10% 증가", 0.1, { modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "melee" } }] })]),
+  card("warrior-breakthrough-slash", "돌파 베기", "돌진", "레어", 52, [cardMove(4, { desiredRange: 1 }), meleeAttack(2, { push: 1 })]),
+  card("warrior-trample", "짓밟기", "돌진", "레어", 50, [cardMove(3, { desiredRange: 1 }), meleeAttack(2), cardFlee(1)]),
+  card("warrior-flank-entry", "측면 진입", "돌진", "레어", 51, [cardMove(3, { desiredRange: 1, jump: true }), meleeAttack(1)]),
+  card("warrior-leftover-force", "남은 힘 베기", "돌진", "에픽", 48, [{ type: "momentumAttack", amount: 5, mult: 1, range: 1 }]),
+  card("warrior-sprint-mastery", "질주 숙련", "돌진", "에픽", 31, [cardPassive("moveCardBonus", "이동 카드 이동력 1 증가", 1)]),
+  card("warrior-piercing-entry", "관통 진입", "돌진", "에픽", 49, [cardMove(4, { desiredRange: 1, jump: true }), cardPattern(2)]),
+  card("warrior-shockwave", "충격파", "돌진", "에픽", 47, [cardMove(4, { desiredRange: 1 }), meleeAttack(2), meleeAttack(1, { targets: 3 })]),
+  card("warrior-reentry", "재돌입", "돌진", "에픽", 33, [cardPassive("killMoveBonus", "적 처치 후 다음 이동 카드 이동력 1 증가", 1)]),
+  card("warrior-unstoppable-entry", "멈추지 않는 돌입", "돌진", "전설", 55, [cardMove(6, { desiredRange: 1, jump: true })]),
+  card("warrior-battle-comet", "전장의 혜성", "돌진", "전설", 45, [cardMove(5, { desiredRange: 1, jump: true }), meleeAttack(3, { push: 2 })]),
+  card("warrior-infinite-inertia", "무한 관성", "돌진", "전설", 30, [cardPassive("stackingMoveBonus", "적 처치 시 이번 웨이브 동안 이동 카드 이동력 1 증가", 1)]),
+
+  card("warrior-arc-slash", "호형 베기", "범위 공격", "노말", 48, [cardPattern(1)]),
+  card("warrior-area-push", "밀어붙이기", "범위 공격", "노말", 46, [meleeAttack(1, { push: 1 })]),
+  card("warrior-dive-cleave", "파고들기", "범위 공격", "노말", 50, [cardMove(2, { desiredRange: 1 }), cardPattern(1)]),
+  card("warrior-entry-block", "진입 방해", "범위 공격", "노말", 47, [cardPattern(1, "adjacent-pair", { push: 1 })]),
+  card("warrior-nearby-check", "주변 견제", "범위 공격", "노말", 45, [meleeAttack(1, { targets: 2 })]),
+  card("warrior-low-sweep", "낮은 휩쓸기", "범위 공격", "노말", 44, [cardPattern(1), cardEffect("맞은 적 다음 이동 1 감소", "turn")]),
+  card("warrior-front-pressure", "전방 압박", "범위 공격", "노말", 46, [cardPattern(1)]),
+  card("warrior-flank-open", "옆구리 열기", "범위 공격", "노말", 49, [cardMove(1, { desiredRange: 1 }), cardPattern(1)]),
+  card("warrior-wide-cleave-area", "넓은 휩쓸기", "범위 공격", "레어", 42, [cardPattern(2)]),
+  card("warrior-surround-lure", "포위 유도", "범위 공격", "레어", 46, [cardMove(2, { desiredRange: 1 }), cardPattern(2)]),
+  card("warrior-line-collapse", "전열 붕괴", "범위 공격", "레어", 40, [cardPattern(1, "adjacent-pair", { push: 2 })]),
+  card("warrior-cornering", "몰아넣기", "범위 공격", "레어", 45, [cardMove(2, { desiredRange: 1 }), meleeAttack(1, { push: 1 }), cardPattern(1)]),
+  card("warrior-multi-hit", "다중 타격", "범위 공격", "레어", 32, [cardPassive("areaPerTargetBonus", "범위 공격으로 맞힌 적 1명당 해당 공격 피해 배수 1 증가", 1)]),
+  card("warrior-triangle-cleave", "삼각 휩쓸기", "범위 공격", "에픽", 39, [cardPattern(2, "adjacent-triple", { perTargetBonus: 1 })]),
+  card("warrior-battle-control", "전장 장악", "범위 공격", "에픽", 31, [cardPassive("pushBonus", "밀기 효과 1 증가", 1, { modifiers: [{ stat: "push", amount: 1 }] })]),
+  card("warrior-make-crack", "균열 만들기", "범위 공격", "에픽", 40, [cardPattern(2, "adjacent-pair", { push: 1 }), meleeAttack(1, { targets: 3 })]),
+  card("warrior-spin-slash", "회전 베기", "범위 공격", "에픽", 38, [cardPattern(2, "adjacent-triple")]),
+  card("warrior-overpower", "압도", "범위 공격", "에픽", 41, [cardMove(2, { desiredRange: 1 }), cardPattern(2, "adjacent-triple", { push: 1 })]),
+  card("warrior-blood-storm-area", "피의 폭풍", "범위 공격", "전설", 34, [cardPattern(3, "adjacent-triple", { perTargetBonus: 1 })]),
+  card("warrior-battle-domination", "전장 지배", "범위 공격", "전설", 29, [cardPassive("pushAreaDamage", "적을 밀 때마다 다음 범위 공격 피해 10% 증가", 0.1)]),
+  card("warrior-earth-crush", "대지 분쇄", "범위 공격", "전설", 35, [meleeAttack(3, { targets: 6, push: 2 })]),
 ];
 
 const baseMageCards = [
@@ -667,54 +732,93 @@ const baseMageCards = [
 ];
 
 const mageRewardPool = [
-  card("mage-long-bolt", "장거리 마력탄", "공용", "노말", 34, [{ type: "attack", mult: 1, range: 4 }]),
-  card("mage-fork", "갈래 마력", "연쇄", "노말", 38, [{ type: "attack", mult: 1, range: 3, targets: 3 }]),
-  card("mage-chain-bolt", "연쇄 마력탄", "연쇄", "노말", 36, [
-    { type: "attack", mult: 1, range: 3 },
-    { type: "attack", mult: 1, range: 3 },
-  ]),
-  card("mage-triple-bolt", "세 갈래 번개", "연쇄", "레어", 37, [{ type: "attack", mult: 1, range: 3, targets: 3 }]),
-  card("mage-rune-seed", "룬 흩뿌리기", "룬", "노말", 58, [
-    { type: "placeRune", range: 2, count: 2, power: 1 },
-    { type: "fleeToRune", amount: 2 },
-  ]),
-  card("mage-rune-back", "룬 뒤로", "룬", "노말", 60, [
-    { type: "flee", amount: 2 },
-    { type: "placeRune", range: 2, count: 1, power: 1 },
-  ]),
-  card("mage-rune-spark", "룬 점화", "룬", "레어", 40, [
-    { type: "runeAttack", mult: 2, radius: 1 },
-  ]),
-  card("mage-double-rune", "이중 룬", "룬", "레어", 56, [
-    { type: "placeRune", range: 3, count: 2, power: 2 },
-  ]),
-  card("mage-rune-burst", "룬 폭파", "룬", "에픽", 42, [
-    { type: "detonateRune", mult: 3, radius: 1 },
-  ]),
-  card("mage-rune-field", "마력 지뢰밭", "룬", "전설", 50, [
-    { type: "placeRune", range: 4, count: 4, power: 2 },
-    { type: "fleeToRune", amount: 3 },
-  ]),
-  card("mage-small-meteor", "작은 운석", "운석", "노말", 33, [
-    { type: "placeMeteor", range: 3, mult: 2, radius: 1, delay: 1 },
-  ]),
-  card("mage-meteor-mark", "운석 예고", "운석", "레어", 30, [
-    { type: "placeMeteor", range: 4, mult: 4, radius: 1, delay: 1 },
-  ]),
-  card("mage-two-stars", "두 번째 별", "운석", "레어", 32, [
-    { type: "placeMeteor", range: 4, mult: 2, radius: 1, delay: 1 },
-    { type: "placeMeteor", range: 4, mult: 2, radius: 1, delay: 1 },
-  ]),
-  card("mage-starfall", "별 추락", "운석", "전설", 26, [
-    { type: "placeMeteor", range: 5, mult: 7, radius: 1, delay: 1 },
-  ]),
-  card("mage-doom-meteor", "종말 예고", "운석", "전설", 24, [
-    { type: "placeMeteor", range: 5, mult: 10, radius: 2, delay: 2 },
-  ]),
-  card("mage-overflow", "마력 과잉", "연쇄", "레어", 34, [
-    { type: "passive", effect: "comboDamage", amount: 0.1 },
-  ]),
-  card("mage-thunder-ring", "천둥의 고리", "연쇄", "전설", 28, [{ type: "attack", mult: 1, range: 4, targets: 5 }]),
+  card("mage-long-bolt", "장거리 마력탄", "공용", "노말", 34, [rangedAttack(1, 4)]),
+  card("mage-reward-retreat", "마력 후퇴", "공용", "노말", 60, [cardFlee(3)]),
+  card("mage-small-burst", "작은 폭발", "공용", "노말", 38, [{ type: "patternAttack", mult: 1, range: 3, pattern: "adjacent-pair" }]),
+  card("mage-reward-shift-shot", "전이 사격", "공용", "노말", 46, [cardMove(2), rangedAttack(1, 3)]),
+  card("mage-stable-magic", "안정된 마력", "공용", "노말", 36, [rangedAttack(2, 3)]),
+  card("mage-split-magic", "갈래 마력", "공용", "노말", 39, [rangedAttack(1, 3, { targets: 2 })]),
+  card("mage-magic-tune", "마력 조정", "공용", "노말", 44, [cardMove(1), rangedAttack(1, 4), cardFlee(1)]),
+  card("mage-long-breath", "긴 호흡", "공용", "노말", 50, [{ type: "charge", amount: 1 }]),
+  card("mage-lance-rare", "마력창", "공용", "레어", 32, [rangedAttack(3, 3)]),
+  card("mage-three-way-magic", "세 갈래 마력", "공용", "레어", 35, [rangedAttack(1, 3, { targets: 3 })]),
+  card("mage-magic-leap", "마력 도약", "공용", "레어", 52, [cardMove(3, { jump: true })]),
+  card("mage-shield", "보호막", "공용", "레어", 28, [cardEffect("보호막", "turn", [{ stat: "damageTaken", amount: -0.3 }])]),
+  card("mage-overflow", "마력 과잉", "공용", "레어", 30, [cardPassive("comboDamage", "한 카드 안에서 같은 적을 여러 번 맞히면 피해 10% 증가", 0.1)]),
+  card("mage-explosion-rune-common", "폭발 룬", "공용", "에픽", 34, [{ type: "patternAttack", mult: 2, range: 3, pattern: "adjacent-pair" }]),
+  card("mage-long-bombard", "장거리 폭격", "공용", "에픽", 33, [rangedAttack(2, 4, { targets: 2 })]),
+  card("mage-leap-shot", "마력 도약", "공용", "에픽", 40, [cardMove(3, { jump: true }), rangedAttack(2, 3)]),
+  card("mage-arcane-veil", "비전 장막", "공용", "에픽", 26, [cardEffect("비전 장막", "turn", [{ stat: "damageDealt", amount: 0.2, when: { attackKind: "ranged" } }, { stat: "damageTaken", amount: -0.2 }])]),
+  card("mage-magic-cycle", "마력 순환", "공용", "에픽", 29, [cardPassive("chargeRangePerStack", "차지 후 다음 공격 사거리 1 증가", 1)]),
+  card("mage-starlight-bombard", "별빛 폭격", "공용", "전설", 27, [rangedAttack(2, 4, { targets: 4 })]),
+  card("mage-infinite-circuit", "무한 회로", "공용", "전설", 25, [cardPassive("multiTargetDamage", "원거리 공격 타겟 수가 2 이상이면 피해 20% 증가", 0.2, { modifiers: [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }] })]),
+  card("mage-meteor-preview-common", "운석 예고", "공용", "전설", 24, [cardMeteor(4, 4, 1, 1)]),
+
+  card("mage-chain-bolt", "연쇄 마력탄", "연쇄", "노말", 36, [rangedAttack(1, 3), rangedAttack(1, 3)]),
+  card("mage-spreading-lightning", "퍼지는 번개", "연쇄", "노말", 38, [rangedAttack(1, 3, { targets: 2 })]),
+  card("mage-shaking-current", "흔들리는 전류", "연쇄", "노말", 37, [rangedAttack(1, 3), cardEffect("주변 적 다음 피해 증가", "turn", [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }])]),
+  card("mage-current-align", "전류 정렬", "연쇄", "노말", 41, [cardMove(1), rangedAttack(1, 3, { targets: 2 })]),
+  card("mage-weak-chain", "약한 연쇄", "연쇄", "노말", 35, [rangedAttack(1, 4), rangedAttack(1, 2)]),
+  card("mage-repeat-ignite", "반복 점화", "연쇄", "노말", 36, [rangedAttack(1, 3), rangedAttack(1, 3, { preferPreviousTarget: true, sameTargetBonus: 0.1 })]),
+  card("mage-bouncing-spark", "튀는 불꽃", "연쇄", "노말", 39, [rangedAttack(1, 3, { targets: 2 }), cardFlee(1)]),
+  card("mage-magic-echo", "마력 잔향", "연쇄", "노말", 28, [cardEffect("두 번째 공격 피해 10% 증가", "turn", [{ stat: "damageDealt", amount: 0.1, when: { repeatHit: true } }])]),
+  card("mage-triple-lightning", "세 갈래 번개", "연쇄", "레어", 34, [rangedAttack(1, 3, { targets: 3 })]),
+  card("mage-chain-amplify", "연쇄 증폭", "연쇄", "레어", 29, [cardPassive("multiTargetDamage", "원거리 공격 타겟 수가 2 이상이면 피해 10% 증가", 0.1, { modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "ranged" } }] })]),
+  card("mage-lightning-repeat", "번개 반복", "연쇄", "레어", 35, [rangedAttack(1, 3), rangedAttack(1, 3), rangedAttack(1, 3)]),
+  card("mage-resonance-mark", "공명 표식", "연쇄", "레어", 33, [rangedAttack(1, 4), rangedAttack(1, 4, { preferPreviousTarget: true, sameTargetBonus: 0.2 })]),
+  card("mage-residual-current", "잔류 전류", "연쇄", "레어", 27, [cardEffect("잔류 전류", "turn", [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }])]),
+  card("mage-storm-circuit", "폭풍 회로", "연쇄", "에픽", 32, [rangedAttack(1, 3, { targets: 3 }), rangedAttack(1, 3)]),
+  card("mage-current-burst", "전류 폭발", "연쇄", "에픽", 31, [rangedAttack(2, 3), rangedAttack(1, 3, { preferPreviousTarget: true, sameTargetBonus: 0.2 })]),
+  card("mage-pack-hunt", "무리 사냥", "연쇄", "에픽", 25, [cardPassive("multiPriority", "원거리 공격 타겟 수가 2 이상이면 우선권 숫자 5 감소", 5)]),
+  card("mage-amplify-circuit", "증폭 회로", "연쇄", "에픽", 26, [cardEffect("원거리 공격 타겟 수 1 증가", "turn", [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }])]),
+  card("mage-bright-afterimage", "빛나는 잔상", "연쇄", "에픽", 33, [rangedAttack(1, 4), cardMove(2, { jump: true }), rangedAttack(1, 4)]),
+  card("mage-thunder-ring", "천둥의 고리", "연쇄", "전설", 24, [rangedAttack(1, 4, { targets: 5 })]),
+  card("mage-infinite-chain", "무한 연쇄", "연쇄", "전설", 23, [cardPassive("killChainDamage", "적을 처치하면 같은 카드의 다음 공격 피해 30% 증가", 0.3, { modifiers: [{ stat: "damageDealt", amount: 0.05, when: { repeatHit: true } }] })]),
+  card("mage-eye-of-storm", "폭풍의 눈", "연쇄", "전설", 22, [cardEffect("폭풍의 눈", "turn", [{ stat: "damageDealt", amount: 0.2, when: { attackKind: "ranged" } }])]),
+
+  card("mage-small-rune", "작은 룬", "룬", "노말", 48, [cardRune(3, 1, 1)]),
+  card("mage-rune-back", "룬 뒤로", "룬", "노말", 54, [cardFlee(2), cardRune(2, 1, 1)]),
+  card("mage-rune-scatter", "룬 흩뿌리기", "룬", "노말", 52, [cardRune(2, 2, 1), { type: "fleeToRune", amount: 2 }]),
+  card("mage-rune-ignite", "룬 점화", "룬", "노말", 36, [{ type: "runeAttack", mult: 1, radius: 1 }]),
+  card("mage-burst-shard", "폭발 조각", "룬", "노말", 38, [{ type: "patternAttack", mult: 1, range: 3, pattern: "adjacent-pair" }]),
+  card("mage-slippery-circuit", "미끄러운 회로", "룬", "노말", 56, [cardFlee(3), cardRune(2, 1, 1)]),
+  card("mage-rune-carve", "룬 새기기", "룬", "노말", 50, [cardMove(1), cardRune(2, 1, 1)]),
+  card("mage-magic-mark", "마력 표식", "룬", "노말", 39, [rangedAttack(1, 3), cardRune(2, 1, 1)]),
+  card("mage-explosion-rune", "폭발 룬", "룬", "레어", 42, [cardRune(3, 1, 2)]),
+  card("mage-rune-blast", "룬 폭파", "룬", "레어", 37, [{ type: "detonateRune", mult: 2, radius: 1 }]),
+  card("mage-rune-shield", "룬 보호막", "룬", "레어", 28, [cardEffect("룬 보호막", "turn", [{ stat: "damageTaken", amount: -0.2 }])]),
+  card("mage-double-rune", "이중 룬", "룬", "레어", 44, [cardRune(3, 2, 1)]),
+  card("mage-rune-missile", "룬 유도탄", "룬", "레어", 35, [{ type: "runeAttack", mult: 2, radius: 1 }]),
+  card("mage-rune-zone", "룬 지대", "룬", "에픽", 40, [cardRune(2, 2, 1), cardFlee(2)]),
+  card("mage-chain-explosion", "연쇄 폭발", "룬", "에픽", 27, [cardPassive("runeChainDamage", "룬이 발동하면 인접 룬도 공격 1로 발동", 1)]),
+  card("mage-large-rune", "대형 룬", "룬", "에픽", 36, [cardRune(3, 1, 3)]),
+  card("mage-rune-shift", "룬 전이", "룬", "에픽", 39, [{ type: "fleeToRune", amount: 3 }, { type: "runeAttack", mult: 2, radius: 1 }]),
+  card("mage-stable-circuit", "안정된 회로", "룬", "에픽", 30, [cardPassive("runeDamage", "룬이 남아 있으면 원거리 공격 피해 10% 증가", 0.1, { modifiers: [{ stat: "damageDealt", amount: 0.05, when: { attackKind: "ranged" } }] })]),
+  card("mage-minefield", "마력 지뢰밭", "룬", "전설", 34, [cardRune(4, 4, 1), { type: "fleeToRune", amount: 3 }]),
+  card("mage-great-rune-blast", "룬 대폭발", "룬", "전설", 30, [{ type: "detonateRune", mult: 3, radius: 1 }]),
+  card("mage-permanent-circuit", "영구 회로", "룬", "전설", 25, [cardPassive("persistentRune", "웨이브 중 처음 설치한 룬 1개는 발동 후에도 사라지지 않음", 1)]),
+
+  card("mage-small-meteor", "작은 운석", "운석", "노말", 33, [cardMeteor(3, 2, 1, 1)]),
+  card("mage-sky-mark", "하늘 표식", "운석", "노말", 31, [cardMeteor(4, 3, 0, 1)]),
+  card("mage-guided-retreat", "유도 후퇴", "운석", "노말", 44, [cardFlee(2), cardMeteor(3, 2, 1, 1)]),
+  card("mage-shaking-star", "흔들리는 별", "운석", "노말", 32, [cardMeteor(4, 2, 1, 1)]),
+  card("mage-shard-preview", "파편 예고", "운석", "노말", 34, [cardMeteor(3, 1, 1, 1)]),
+  card("mage-starlight-check", "별빛 견제", "운석", "노말", 36, [rangedAttack(1, 3), cardMeteor(3, 2, 1, 1)]),
+  card("mage-missed-shard", "빗나간 파편", "운석", "노말", 26, [cardEffect("운석 빗나감 대비", "turn", [{ stat: "damageTaken", amount: -0.2 }])]),
+  card("mage-unstable-orbit", "불안정한 궤도", "운석", "노말", 35, [cardMeteor(4, 3, 1, 1)]),
+  card("mage-meteor-preview", "운석 예고", "운석", "레어", 30, [cardMeteor(4, 4, 1, 1)]),
+  card("mage-star-tracking", "별 추적", "운석", "레어", 25, [cardPassive("meteorTargeting", "운석 낙하지점 선택 시 적이 많은 위치를 더 강하게 우선", 1)]),
+  card("mage-second-star", "두 번째 별", "운석", "레어", 32, [cardMeteor(4, 2, 1, 1), cardMeteor(4, 2, 1, 1)]),
+  card("mage-starlight-lock", "별빛 고정", "운석", "레어", 27, [cardEffect("운석 명중 대상 이동 1 감소", "turn")]),
+  card("mage-shard-recovery", "파편 회수", "운석", "레어", 45, [{ type: "charge", amount: 1 }, cardFlee(2)]),
+  card("mage-star-cluster", "별무리", "운석", "에픽", 28, [cardMeteor(5, 3, 1, 1), cardMeteor(5, 3, 1, 1)]),
+  card("mage-collision-predict", "충돌 예측", "운석", "에픽", 24, [cardPassive("meteorMultiDamage", "운석이 2명 이상 맞히면 다음 운석 피해 20% 증가", 0.2)]),
+  card("mage-red-orbit", "붉은 궤도", "운석", "에픽", 26, [cardMeteor(5, 5, 1, 1)]),
+  card("mage-fall-guide", "낙하 유도", "운석", "에픽", 34, [rangedAttack(1, 4, { push: 1 }), cardMeteor(4, 3, 1, 1)]),
+  card("mage-star-afterheat", "별의 잔열", "운석", "에픽", 23, [cardEffect("별의 잔열", "turn", [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged" } }])]),
+  card("mage-starfall", "별 추락", "운석", "전설", 21, [cardMeteor(5, 7, 1, 1)]),
+  card("mage-doom-preview", "종말 예고", "운석", "전설", 20, [cardMeteor(5, 10, 2, 2)]),
+  card("mage-sky-collapse", "하늘 붕괴", "운석", "전설", 22, [cardPassive("meteorKillSplash", "운석이 적을 처치하면 같은 위치 주변 1칸에 공격 3 추가 발생", 3)]),
 ];
 
 const characterDefinitions = {

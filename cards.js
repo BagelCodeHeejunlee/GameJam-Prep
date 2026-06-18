@@ -435,7 +435,7 @@ function passiveLabel(action) {
     lowHpDamage: `낮은 체력 피해 +${percent(action.amount)}`,
     chargeStackMultiplier: `차지 스택 ${action.amount}배`,
   };
-  return labels[action.effect] || modifierLabel(action.modifiers) || "영구 효과";
+  return labels[action.effect] || action.label || modifierLabel(action.modifiers) || "영구 효과";
 }
 
 function effectLabel(action) {
