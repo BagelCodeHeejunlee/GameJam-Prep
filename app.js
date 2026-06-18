@@ -1045,52 +1045,42 @@ function expandCards(cards) {
 function buildWaves() {
   return [
     wave(3, [], [
-      enemy(-2, -1, 5, { baseAtk: 0 }),
-      enemy(2, -2, 5, { kind: "skirmisher", baseAtk: 0 }),
+      enemy(-2, -1, 5, { baseAtk: 2 }),
+      enemy(2, -2, 5, { kind: "skirmisher", baseAtk: 2 }),
     ]),
     wave(3, [{ q: 0, r: 0 }], [
-      enemy(-3, 0, 6, { baseAtk: 0 }),
-      enemy(3, -2, 6, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(1, -3, 6, { kind: "shooter", baseAtk: 0 }),
+      enemy(-3, 0, 6, { baseAtk: 2 }),
+      enemy(3, -2, 6, { kind: "skirmisher", baseAtk: 2 }),
+      enemy(1, -3, 6, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -1, r: 1 }], [
-      enemy(-3, 1, 7, { baseAtk: 0 }),
-      enemy(3, -2, 7, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(0, -4, 7, { kind: "shooter", baseAtk: 0 }),
-      enemy(2, 1, 7, { baseAtk: 0 }),
+      enemy(-3, 1, 9, { baseAtk: 2 }),
+      enemy(3, -2, 9, { kind: "skirmisher", baseAtk: 2 }),
+      enemy(0, -4, 8, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(4, [{ q: 0, r: -1 }, { q: 1, r: -1 }], [
-      enemy(-4, 1, 11, { baseAtk: 0 }),
-      enemy(-2, -2, 11, { kind: "shooter", baseAtk: 0 }),
-      enemy(3, -3, 11, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(3, 0, 11, { baseAtk: 0 }),
+      enemy(-4, 1, 9, { baseAtk: 2 }),
+      enemy(-2, -2, 9, { kind: "shooter", baseAtk: 2 }),
+      enemy(3, -3, 10, { kind: "skirmisher", baseAtk: 2 }),
     ]),
     wave(4, [{ q: -1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: 1 }], [
-      enemy(0, -4, 24, { boss: true, name: "보스 1", baseAtk: 0 }),
-      enemy(-3, 0, 12, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(3, -2, 12, { kind: "shooter", baseAtk: 0 }),
+      enemy(0, -4, 18, { boss: true, name: "보스 1", baseAtk: 2 }),
+      enemy(3, -2, 12, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(4, [{ q: 0, r: 0 }, { q: -2, r: 2 }], [
-      enemy(-4, 2, 34),
-      enemy(-2, -2, 28, { kind: "shooter" }),
-      enemy(2, -4, 30, { kind: "skirmisher" }),
-      enemy(4, -2, 34),
+      enemy(-4, 2, 16, { baseAtk: 3 }),
+      enemy(-2, -2, 16, { kind: "shooter", baseAtk: 2 }),
+      enemy(2, -4, 16, { kind: "skirmisher", baseAtk: 2 }),
+      enemy(4, -2, 16, { baseAtk: 3 }),
     ]),
     wave(5, [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 1, r: -2 }], [
-      enemy(-5, 2, 32, { baseAtk: 1 }),
-      enemy(-3, -1, 26, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(0, -5, 26, { kind: "shooter", baseAtk: 0 }),
-      enemy(1, -5, 26, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(4, -4, 32, { baseAtk: 1 }),
-      enemy(4, 0, 32, { baseAtk: 1 }),
+      enemy(-5, 2, 27, { baseAtk: 3 }),
+      enemy(-3, -1, 26, { kind: "skirmisher", baseAtk: 2 }),
+      enemy(0, -5, 27, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(5, [{ q: -2, r: 1 }, { q: 0, r: 0 }, { q: 2, r: -2 }], [
-      enemy(-5, 3, 34, { baseAtk: 1 }),
-      enemy(-4, 0, 28, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(0, -5, 28, { kind: "shooter", baseAtk: 0 }),
-      enemy(2, -5, 28, { kind: "skirmisher", baseAtk: 0 }),
-      enemy(3, -5, 28, { kind: "shooter", baseAtk: 0 }),
-      enemy(5, -2, 34, { baseAtk: 1 }),
+      enemy(-5, 3, 40, { kind: "skirmisher", baseAtk: 2 }),
+      enemy(0, -5, 42, { kind: "shooter", baseAtk: 2 }),
     ]),
     wave(5, [{ q: -1, r: 1 }, { q: 1, r: -1 }, { q: 2, r: -3 }], [
       enemy(-5, 1, 34),
@@ -1815,9 +1805,7 @@ function dealAttackDamage(actor, target, action, multiplier, options = {}) {
   const context = damageContext(actor, target, action, options);
   const finalMultiplier = multiplier * outgoingDamageMultiplier(context) * incomingDamageMultiplier(context);
   const adjacentPenalty = adjacentDamagePenalty(context);
-  const damage = actor.baseAtk <= 0
-    ? 0
-    : Math.max(1, Math.round(actor.baseAtk * finalMultiplier * adjacentPenalty));
+  const damage = Math.max(1, Math.round(actor.baseAtk * finalMultiplier * adjacentPenalty));
   const hitPosition = { q: target.q, r: target.r };
   applyDamage(target, damage);
   noteTargetHit(actor, target);
