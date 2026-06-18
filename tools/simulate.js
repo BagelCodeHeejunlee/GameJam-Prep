@@ -388,7 +388,6 @@ globalThis.__simExports = {
   expandCards,
   shuffle,
   startWave,
-  healWaveClear,
   drawRewards,
   recordRewardPick,
   isPassiveCard,
@@ -597,7 +596,6 @@ async function simulateRun(options, runIndex, sharedContext = null) {
     if (!cleared) break;
     if (waveIndex >= options.waves - 1) break;
 
-    game.healWaveClear();
     const reward = chooseReward(game, game.drawRewards(), options.strategy, options.tree, rng);
     picked.push(reward.name);
     addReward(game, reward, false);

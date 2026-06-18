@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>캐릭터 카드 관리 - GameJam Prep</title>
+    <meta name="theme-color" content="#123946" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="assets/card-normal-v2.png" />
+    <link rel="stylesheet" href="cards.css?v=20260618-card-manager" />
+  </head>
+  <body>
+    <main class="card-manager-shell">
+      <aside class="manager-sidebar" aria-label="캐릭터 선택">
+        <a class="battle-link" href="index.html">전투</a>
+        <div class="brand-block">
+          <span>GameJam Prep</span>
+          <h1>카드 관리</h1>
+        </div>
+        <div id="characterList" class="character-list"></div>
+      </aside>
+
+      <section class="manager-main">
+        <header class="manager-header">
+          <div id="characterHero" class="character-hero"></div>
+          <div class="toolbar" aria-label="카드 필터">
+            <label class="search-box">
+              <span>검색</span>
+              <input id="cardSearch" type="search" autocomplete="off" placeholder="카드, 트리, 효과" />
+            </label>
+            <div id="rarityFilters" class="segmented-control" aria-label="등급"></div>
+          </div>
+        </header>
+
+        <section id="routeSummary" class="route-summary" aria-label="카드 요약"></section>
+        <section id="cardSections" class="card-sections" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <script src="cards.js?v=20260618-card-manager"></script>
+  </body>
+</html>

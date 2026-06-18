@@ -50,6 +50,10 @@ button {
   font: inherit;
 }
 
+a {
+  color: inherit;
+}
+
 button:hover {
   border-color: var(--accent);
 }
@@ -134,12 +138,14 @@ h2 {
 }
 
 .controls button,
+.tool-link,
 .reward-card,
 .icon-button {
   border-radius: 8px;
 }
 
-.controls button {
+.controls button,
+.tool-link {
   flex: 0 0 auto;
   min-width: 52px;
   min-height: 32px;
@@ -156,6 +162,12 @@ h2 {
     inset 0 2px 0 rgba(255, 255, 255, 0.26),
     0 5px 12px rgba(22, 93, 112, 0.24);
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.tool-link {
+  display: inline-grid;
+  place-items: center;
+  text-decoration: none;
 }
 
 .controls button.active {
