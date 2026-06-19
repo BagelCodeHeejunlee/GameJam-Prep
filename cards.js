@@ -106,7 +106,7 @@ function renderCharacters() {
         <span class="portrait"><img src="${character.image}" alt="" /></span>
         <span>
           <strong>${escapeHtml(character.name)}</strong>
-          <span>기본 ${sumCopies(character.baseCards)}장 · 트리 ${character.rewardPool.length}종</span>
+          <span>기본 ${sumCopies(character.baseCards)}장 · 카드 ${character.rewardPool.length}종 · 패시브 ${passivePool(character).length}종</span>
         </span>
       </button>
     `;
@@ -194,7 +194,7 @@ function currentCharacter() {
 
 function groupedCards(character) {
   const grouped = new Map();
-  [...expandedBaseCards(character.baseCards), ...character.rewardPool]
+  displayCards(character)
     .filter(matchesCardType)
     .forEach((cardData) => {
     if (!grouped.has(cardData.route)) grouped.set(cardData.route, []);
@@ -220,7 +220,7 @@ function matchesCardType(cardData) {
 
 function routeNames(character) {
   const preferred = ROUTE_ORDER[character.id] || [];
-  const actual = new Set([...expandedBaseCards(character.baseCards), ...character.rewardPool].map((cardData) => cardData.route));
+  const actual = new Set(displayCards(character).map((cardData) => cardData.route));
   const ordered = preferred.filter((route) => actual.has(route));
   [...actual].sort((a, b) => a.localeCompare(b, "ko")).forEach((route) => {
     if (!ordered.includes(route)) ordered.push(route);
@@ -245,6 +245,18 @@ function expandedBaseCards(cards) {
       copies: 1,
     }));
   });
+}
+
+function displayCards(character) {
+  return [
+    ...expandedBaseCards(character.baseCards),
+    ...character.rewardPool,
+    ...passivePool(character),
+  ];
+}
+
+function passivePool(character) {
+  return character.passivePool ?? [];
 }
 
 function statTile(label, value) {
