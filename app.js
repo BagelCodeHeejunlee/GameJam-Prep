@@ -15,11 +15,33 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
-const NORMAL_REWARD_RARITY_WEIGHTS = [
-  { rarity: "노말", weight: 50 },
-  { rarity: "레어", weight: 40 },
-  { rarity: "에픽", weight: 9.9 },
-  { rarity: "전설", weight: 0.1 },
+const NORMAL_REWARD_RARITY_WEIGHT_TIERS = [
+  {
+    maxWave: 5,
+    weights: [
+      { rarity: "노말", weight: 80 },
+      { rarity: "레어", weight: 19.9 },
+      { rarity: "에픽", weight: 0.1 },
+    ],
+  },
+  {
+    maxWave: 10,
+    weights: [
+      { rarity: "노말", weight: 60 },
+      { rarity: "레어", weight: 30 },
+      { rarity: "에픽", weight: 9.9 },
+      { rarity: "전설", weight: 0.1 },
+    ],
+  },
+  {
+    maxWave: 15,
+    weights: [
+      { rarity: "노말", weight: 40 },
+      { rarity: "레어", weight: 40 },
+      { rarity: "에픽", weight: 19.5 },
+      { rarity: "전설", weight: 0.5 },
+    ],
+  },
 ];
 const directions = [
   { q: 1, r: 0 },
@@ -3675,8 +3697,9 @@ function drawRewardOptions(pool, count) {
   if (isBossReward()) return drawBossRewardOptions(pool, count);
   const selected = [];
   const remaining = [...pool];
+  const weights = currentNormalRewardRarityWeights();
   while (selected.length < count && remaining.length) {
-    const rarity = rollRewardRarity(NORMAL_REWARD_RARITY_WEIGHTS);
+    const rarity = rollRewardRarity(weights);
     let candidates = remaining.filter((entry) => entry.rarity === rarity);
     if (!candidates.length) candidates = remaining;
     const picked = candidates[Math.floor(Math.random() * candidates.length)];
@@ -3710,6 +3733,12 @@ function drawBossRewardOptions(pool, count) {
 
 function isBossReward() {
   return Boolean(waves[state?.waveIndex]?.boss);
+}
+
+function currentNormalRewardRarityWeights() {
+  const waveNumber = (state?.waveIndex ?? 0) + 1;
+  return NORMAL_REWARD_RARITY_WEIGHT_TIERS.find((tier) => waveNumber <= tier.maxWave)?.weights
+    ?? NORMAL_REWARD_RARITY_WEIGHT_TIERS.at(-1).weights;
 }
 
 function rollRewardRarity(weights) {
