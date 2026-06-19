@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="assets/card-normal-v2.png" />
     <link rel="stylesheet" href="styles.css?v=20260618-enemy-action-card" />
-    <link rel="stylesheet" href="cards.css?v=20260618-gallery-3col" />
+    <link rel="stylesheet" href="cards.css?v=20260619-type-tabs" />
   </head>
   <body>
     <main class="card-manager-shell">
@@ -25,12 +25,17 @@
       <section class="manager-gallery">
         <header class="gallery-header">
           <div id="characterHero" class="character-hero"></div>
+          <nav id="cardTypeTabs" class="card-type-tabs" aria-label="카드 유형">
+            <button type="button" data-card-type="all">전체</button>
+            <button type="button" data-card-type="action">액션</button>
+            <button type="button" data-card-type="passive">패시브</button>
+          </nav>
         </header>
 
         <section id="cardSections" class="card-sections" aria-live="polite"></section>
       </section>
     </main>
 
-    <script src="cards.js?v=20260618-gallery"></script>
+    <script src="cards.js?v=20260619-type-tabs"></script>
   </body>
 </html>

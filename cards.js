@@ -2,6 +2,11 @@ const DATA_START_MARKER = "const baseArcherCards = [";
 const DATA_END_MARKER = "selectedCharacterId = initialSelectedCharacterId();";
 const CHARACTER_ORDER = ["archer", "warrior", "mage"];
 const RARITY_ORDER = ["기본", "노말", "레어", "에픽", "전설"];
+const CARD_TYPE_TABS = {
+  all: "전체",
+  action: "액션",
+  passive: "패시브",
+};
 const ROUTE_ORDER = {
   archer: ["기본", "공용", "다단중첩", "함정", "차지"],
   warrior: ["기본", "공용", "광전", "돌진", "범위 공격"],
@@ -11,6 +16,7 @@ const ROUTE_ORDER = {
 const els = {
   characterList: document.querySelector("#characterList"),
   characterHero: document.querySelector("#characterHero"),
+  cardTypeTabs: document.querySelector("#cardTypeTabs"),
   routeSummary: document.querySelector("#routeSummary"),
   cardSections: document.querySelector("#cardSections"),
 };
@@ -18,11 +24,13 @@ const els = {
 const state = {
   data: null,
   characterId: new URLSearchParams(window.location.search).get("character") || "archer",
+  cardType: validCardType(new URLSearchParams(window.location.search).get("type")),
 };
 
 init();
 
 async function init() {
+  bindCardTypeTabs();
   try {
     state.data = await loadCardData();
     if (!state.data.characterDefinitions[state.characterId]) state.characterId = "archer";
@@ -58,9 +66,34 @@ function card(id, name, route, rarity, priority, actions, copies = 1) {
 
 function render() {
   renderCharacters();
+  renderCardTypeTabs();
   renderHero();
   renderRouteSummary();
   renderCardSections();
+}
+
+function bindCardTypeTabs() {
+  els.cardTypeTabs.querySelectorAll("[data-card-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.cardType = validCardType(button.dataset.cardType);
+      const url = new URL(window.location.href);
+      if (state.cardType === "all") {
+        url.searchParams.delete("type");
+      } else {
+        url.searchParams.set("type", state.cardType);
+      }
+      window.history.replaceState({}, "", url);
+      render();
+    });
+  });
+}
+
+function renderCardTypeTabs() {
+  els.cardTypeTabs.querySelectorAll("[data-card-type]").forEach((button) => {
+    const active = button.dataset.cardType === state.cardType;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
 }
 
 function renderCharacters() {
@@ -110,7 +143,7 @@ function renderHero() {
 function renderRouteSummary() {
   const character = currentCharacter();
   const grouped = groupedCards(character);
-  els.routeSummary.innerHTML = routeNames(character).map((route) => {
+  els.routeSummary.innerHTML = visibleRouteNames(character, grouped).map((route) => {
     const cards = grouped.get(route) || [];
     return `
       <article class="route-chip">
@@ -124,7 +157,7 @@ function renderRouteSummary() {
 function renderCardSections() {
   const character = currentCharacter();
   const grouped = groupedCards(character);
-  const sections = routeNames(character)
+  const sections = visibleRouteNames(character, grouped)
     .map((route) => {
       const cards = grouped.get(route) || [];
       if (!cards.length) return "";
@@ -161,7 +194,9 @@ function currentCharacter() {
 
 function groupedCards(character) {
   const grouped = new Map();
-  [...expandedBaseCards(character.baseCards), ...character.rewardPool].forEach((cardData) => {
+  [...expandedBaseCards(character.baseCards), ...character.rewardPool]
+    .filter(matchesCardType)
+    .forEach((cardData) => {
     if (!grouped.has(cardData.route)) grouped.set(cardData.route, []);
     grouped.get(cardData.route).push(cardData);
   });
@@ -177,6 +212,12 @@ function groupedCards(character) {
   return grouped;
 }
 
+function matchesCardType(cardData) {
+  if (state.cardType === "all") return true;
+  const passive = isPassiveCard(cardData);
+  return state.cardType === "passive" ? passive : !passive;
+}
+
 function routeNames(character) {
   const preferred = ROUTE_ORDER[character.id] || [];
   const actual = new Set([...expandedBaseCards(character.baseCards), ...character.rewardPool].map((cardData) => cardData.route));
@@ -185,6 +226,14 @@ function routeNames(character) {
     if (!ordered.includes(route)) ordered.push(route);
   });
   return ordered;
+}
+
+function visibleRouteNames(character, grouped) {
+  return routeNames(character).filter((route) => (grouped.get(route) || []).length);
+}
+
+function validCardType(value) {
+  return Object.hasOwn(CARD_TYPE_TABS, value) ? value : "all";
 }
 
 function expandedBaseCards(cards) {
