@@ -15,6 +15,12 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
+const NORMAL_REWARD_RARITY_WEIGHTS = [
+  { rarity: "노말", weight: 50 },
+  { rarity: "레어", weight: 40 },
+  { rarity: "에픽", weight: 9.9 },
+  { rarity: "전설", weight: 0.1 },
+];
 const directions = [
   { q: 1, r: 0 },
   { q: 1, r: -1 },
@@ -3666,10 +3672,54 @@ function drawCardRewards() {
 }
 
 function drawRewardOptions(pool, count) {
-  return shuffle(pool).slice(0, count).map((entry) => ({
+  if (isBossReward()) return drawBossRewardOptions(pool, count);
+  const selected = [];
+  const remaining = [...pool];
+  while (selected.length < count && remaining.length) {
+    const rarity = rollRewardRarity(NORMAL_REWARD_RARITY_WEIGHTS);
+    let candidates = remaining.filter((entry) => entry.rarity === rarity);
+    if (!candidates.length) candidates = remaining;
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    selected.push(picked);
+    remaining.splice(remaining.indexOf(picked), 1);
+  }
+  return selected.map((entry) => ({
     ...entry,
     instanceId: `${entry.id}-${Date.now()}-${Math.random()}`,
   }));
+}
+
+function drawBossRewardOptions(pool, count) {
+  const legendaryPool = pool.filter((entry) => entry.rarity === "전설");
+  const sourcePool = legendaryPool.length ? legendaryPool : pool;
+  if (!sourcePool.length) return [];
+  const selected = [];
+  const allowDuplicates = sourcePool.length < count;
+  const remaining = [...sourcePool];
+  while (selected.length < count && (allowDuplicates || remaining.length)) {
+    const candidates = allowDuplicates ? sourcePool : remaining;
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    selected.push(picked);
+    if (!allowDuplicates) remaining.splice(remaining.indexOf(picked), 1);
+  }
+  return selected.map((entry, index) => ({
+    ...entry,
+    instanceId: `${entry.id}-${Date.now()}-${Math.random()}-${index}`,
+  }));
+}
+
+function isBossReward() {
+  return Boolean(waves[state?.waveIndex]?.boss);
+}
+
+function rollRewardRarity(weights) {
+  const total = weights.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of weights) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.rarity;
+  }
+  return weights.at(-1)?.rarity ?? "노말";
 }
 
 function isArcherRewardUnlocked(cardData) {
