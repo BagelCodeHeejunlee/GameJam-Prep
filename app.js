@@ -176,19 +176,19 @@ const archerRewardPool = [
   card("perfect-distance", "완벽한 거리", "공용", "에픽", 33, [
     {
       type: "passive",
-      modifiers: [{ stat: "damageDealt", amount: 0.1, when: { attackKind: "ranged", nonAdjacent: true } }],
+      modifiers: [{ stat: "damageDealt", amount: 0.35, when: { attackKind: "ranged", nonAdjacent: true } }],
     },
   ]),
   card("storm-shot", "폭풍 사격", "공용", "전설", 28, [{ type: "attack", mult: 2, range: 3, targets: 4 }]),
   card("hunt-rhythm", "사냥의 리듬", "공용", "전설", 32, [
-    { type: "passive", effect: "afterAttackMove", amount: 1 },
+    { type: "passive", effect: "afterAttackMove", amount: 3 },
   ]),
   card("absolute-distance", "절대 거리", "공용", "전설", 26, [
     {
       type: "passive",
       effect: "ignoreAdjacentPenalty",
       amount: 1,
-      modifiers: [{ stat: "range", amount: 1, when: { attackKind: "ranged" } }],
+      modifiers: [{ stat: "range", amount: 3, when: { attackKind: "ranged" } }],
     },
   ]),
   card("double-shot", "연속 사격", "다단중첩", "노말", 35, [
@@ -231,7 +231,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2, preferPreviousTarget: true },
   ]),
   card("combo-sense", "연타 감각", "다단중첩", "레어", 32, [
-    { type: "passive", effect: "comboDamage", amount: 0.1 },
+    { type: "passive", effect: "comboDamage", amount: 0.3 },
   ]),
   card("fixed-aim", "고정 조준", "다단중첩", "레어", 31, [
     {
@@ -242,7 +242,7 @@ const archerRewardPool = [
     },
   ]),
   card("weakness-stack", "약점 누적", "다단중첩", "레어", 34, [
-    { type: "passive", effect: "thirdHitDamage", amount: 0.3 },
+    { type: "passive", effect: "thirdHitDamage", amount: 0.8 },
   ]),
   card("prey-mark", "사냥감 표시", "다단중첩", "레어", 33, [
     { type: "attack", mult: 1, range: 3 },
@@ -275,7 +275,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 3, preferPreviousTarget: true, thirdHitBonus: 0.2 },
   ]),
   card("endless-barrage", "끝없는 연사", "다단중첩", "전설", 29, [
-    { type: "passive", effect: "comboDamage", amount: 0.2 },
+    { type: "passive", effect: "comboDamage", amount: 0.6 },
   ]),
   card("hunt-finale", "사냥의 결말", "다단중첩", "전설", 31, [
     { type: "attack", mult: 1, range: 3 },
@@ -339,7 +339,7 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 2, push: 1 },
   ]),
   card("trap-link", "함정 연계", "함정", "레어", 27, [
-    { type: "passive", effect: "trapNextAttackDamage", amount: 0.2 },
+    { type: "passive", effect: "trapNextAttackDamage", amount: 0.5 },
   ]),
   card("route-block", "진로 차단", "함정", "레어", 24, [
     { type: "flee", amount: 2 },
@@ -354,7 +354,7 @@ const archerRewardPool = [
     { type: "attack", mult: 2, range: 3, push: 2 },
   ]),
   card("chain-trigger", "연쇄 발동", "함정", "에픽", 25, [
-    { type: "passive", effect: "trapChainDamage", amount: 2 },
+    { type: "passive", effect: "trapChainDamage", amount: 5 },
   ]),
   card("trap-burst", "함정 폭파", "함정", "에픽", 33, [
     { type: "detonateTrap", mult: 2, radius: 1 },
@@ -364,7 +364,8 @@ const archerRewardPool = [
     { type: "attack", mult: 1, range: 3 },
   ]),
   card("trap-hunt", "함정 사냥", "함정", "전설", 23, [
-    { type: "passive", effect: "trapRangedVulnerability", amount: 0.2 },
+    { type: "passive", effect: "trapRangedVulnerability", amount: 1 },
+    { type: "passive", effect: "trapTriggerShot", amount: 4, range: 6 },
   ]),
   card("spike-storm", "쐐기 폭풍", "함정", "전설", 20, [
     { type: "placeTrap", range: 3, trap: "attack", count: 5 },
@@ -489,23 +490,23 @@ const archerRewardPool = [
     },
   ]),
   card("charge-range", "긴 조준", "차지", "에픽", 31, [
-    { type: "passive", effect: "chargeRangePerStack", amount: 1 },
+    { type: "passive", effect: "chargeRangePerStack", amount: 3 },
   ]),
   card("waited-shot", "기다린 한 발", "차지", "에픽", 34, [
     { type: "charge", amount: 2 },
     { type: "attack", mult: 2, range: 3, killChargeRefund: 1 },
   ]),
   card("breath-hold", "호흡 유지", "차지", "에픽", 29, [
-    { type: "passive", effect: "chargeOnNoAttack", amount: 1 },
+    { type: "passive", effect: "chargeOnNoAttack", amount: 3 },
   ]),
   card("heart-piercer", "심장 꿰뚫기", "차지", "전설", 33, [
-    { type: "attack", mult: 5, range: 4, overkillSplashRange: 3 },
+    { type: "attack", mult: 8, range: 4, overkillSplashRange: 10 },
   ]),
   card("charge-overkill", "잔여 관통", "차지", "전설", 33, [
-    { type: "passive", effect: "overkillSplashRange", amount: 3 },
+    { type: "passive", effect: "overkillSplashRange", amount: 10 },
   ]),
   card("charge-doubler", "과충전", "차지", "전설", 30, [
-    { type: "passive", effect: "chargeStackMultiplier", amount: 2 },
+    { type: "passive", effect: "chargeStackMultiplier", amount: 4 },
   ]),
 ];
 
@@ -854,55 +855,69 @@ const mageRewardPool = [
 
 const archerPassivePool = [
   passiveCard("archer-passive-sharp-bow", "예리한 활", "공용", "노말", [
-    cardPassive("baseAtkPercent", "공격력 10% 증가", 0.1),
-  ]),
-  passiveCard("archer-passive-light-armor", "가벼운 방호", "공용", "노말", [
-    cardPassive("maxHpPercent", "최대 체력 10% 증가", 0.1),
-  ]),
-  passiveCard("archer-passive-repeat-rhythm", "반복 리듬", "다단중첩", "노말", [
-    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 10% 증가", 0.1),
-  ]),
-  passiveCard("archer-passive-trap-polish", "함정 손질", "함정", "노말", [
-    cardPassive("trapNextAttackDamage", "함정 발동 후 다음 공격 피해 10% 증가", 0.1),
-  ]),
-  passiveCard("archer-passive-steady-charge", "안정 차지", "차지", "노말", [
-    cardPassive("chargeRangePerStack", "차지 1당 사거리 1 증가", 1),
-  ]),
-  passiveCard("archer-passive-quick-hands", "빠른 손놀림", "공용", "레어", [
+    cardPassive("baseAtkPercent", "공격력 50% 증가", 0.5),
     cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 1장 추가 사용", 1),
   ]),
+  passiveCard("archer-passive-light-armor", "가벼운 방호", "공용", "노말", [
+    cardPassive("maxHpPercent", "최대 체력 50% 증가", 0.5),
+    { type: "passive", label: "받는 피해 15% 감소", modifiers: [{ stat: "damageTaken", amount: -0.15 }] },
+  ]),
+  passiveCard("archer-passive-repeat-rhythm", "반복 리듬", "다단중첩", "노말", [
+    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 35% 증가", 0.35),
+  ]),
+  passiveCard("archer-passive-trap-polish", "함정 손질", "함정", "노말", [
+    cardPassive("trapNextAttackDamage", "함정 발동 후 다음 공격 피해 50% 증가", 0.5),
+    cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 1장 추가 사용", 1),
+  ]),
+  passiveCard("archer-passive-steady-charge", "안정 차지", "차지", "노말", [
+    cardPassive("chargeRangePerStack", "차지 1당 사거리 3 증가", 3),
+    cardPassive("chargeStackMultiplier", "차지 스택 효과 1.5배", 1.5),
+    cardPassive("chargeOnNoAttack", "공격하지 않으면 차지 1", 1),
+  ]),
+  passiveCard("archer-passive-quick-hands", "빠른 손놀림", "공용", "레어", [
+    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
+    cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 2장 추가 사용", 2),
+  ]),
   passiveCard("archer-passive-weakness-read", "약점 판독", "다단중첩", "레어", [
-    cardPassive("thirdHitDamage", "세 번째 명중 피해 30% 증가", 0.3),
+    cardPassive("thirdHitDamage", "세 번째 명중 피해 100% 증가", 1),
   ]),
   passiveCard("archer-passive-trap-mark", "덫 표식", "함정", "레어", [
-    cardPassive("trapRangedVulnerability", "함정 발동 대상이 받는 원거리 피해 20% 증가", 0.2),
+    cardPassive("trapRangedVulnerability", "함정 발동 대상이 받는 원거리 피해 60% 증가", 0.6),
+    cardPassive("trapNextAttackDamage", "함정 발동 후 다음 공격 피해 50% 증가", 0.5),
   ]),
   passiveCard("archer-passive-ambush-shot", "매복 사격", "함정", "레어", [
-    cardPassive("trapTriggerShot", "함정 발동 시 사거리 5 원거리 공격", 1, { range: 5 }),
+    cardPassive("trapTriggerShot", "함정 발동 시 사거리 5 원거리 공격 4회", 4, { range: 5 }),
   ]),
   passiveCard("archer-passive-overdraw", "과집중", "차지", "레어", [
-    cardPassive("chargeStackMultiplier", "차지 스택 효과 2배", 2),
+    cardPassive("chargeStackMultiplier", "차지 스택 효과 2.5배", 2.5),
   ]),
   passiveCard("archer-passive-hunt-flow", "사냥 흐름", "공용", "에픽", [
-    cardPassive("afterAttackMove", "공격 카드 사용 후 이동 1", 1),
+    cardPassive("afterAttackMove", "공격 카드 사용 후 이동 2", 2),
   ]),
   passiveCard("archer-passive-endless-string", "끝없는 현", "다단중첩", "에픽", [
-    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 20% 증가", 0.2),
+    cardPassive("comboDamage", "한 카드 안에서 같은 적을 다시 공격할 때마다 피해 60% 증가", 0.6),
   ]),
   passiveCard("archer-passive-chain-trap", "연쇄 덫", "함정", "에픽", [
-    cardPassive("trapChainDamage", "함정 발동 시 주변 피해 2배", 2),
-  ]),
-  passiveCard("archer-passive-piercing-charge", "관통 차지", "차지", "에픽", [
-    cardPassive("overkillSplashRange", "처치 잔여 피해 3칸 전이", 3),
-  ]),
-  passiveCard("archer-passive-double-draw", "쌍궁 운용", "공용", "전설", [
+    cardPassive("trapChainDamage", "함정 발동 시 주변 피해 5배", 5),
     cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
   ]),
+  passiveCard("archer-passive-piercing-charge", "관통 차지", "차지", "에픽", [
+    cardPassive("overkillSplashRange", "처치 잔여 피해 6칸 전이", 6),
+    cardPassive("chargeStackMultiplier", "차지 스택 효과 2배", 2),
+  ]),
+  passiveCard("archer-passive-double-draw", "쌍궁 운용", "공용", "전설", [
+    cardPassive("extraCardPlays", "매턴 카드 3장 추가 사용", 3),
+  ]),
   passiveCard("archer-passive-finale-sense", "결말 감각", "다단중첩", "전설", [
-    cardPassive("thirdHitDamage", "세 번째 명중 피해 60% 증가", 0.6),
+    cardPassive("thirdHitDamage", "세 번째 명중 피해 200% 증가", 2),
+  ]),
+  passiveCard("archer-passive-predator-snare", "포식 덫", "함정", "전설", [
+    cardPassive("trapRangedVulnerability", "함정 발동 대상이 받는 원거리 피해 100% 증가", 1),
+    cardPassive("trapTriggerShot", "함정 발동 시 사거리 6 원거리 공격 4회", 4, { range: 6 }),
   ]),
   passiveCard("archer-passive-perfect-overkill", "완전 관통", "차지", "전설", [
-    cardPassive("overkillSplashRange", "처치 잔여 피해 5칸 전이", 5),
+    cardPassive("overkillSplashRange", "처치 잔여 피해 10칸 전이", 10),
+    cardPassive("chargeStackMultiplier", "차지 스택 효과 4배", 4),
   ]),
 ];
 
@@ -3934,6 +3949,12 @@ function applyPassiveReward(cardData) {
   state.passiveCards = state.passiveCards ?? [];
   state.passiveCards.push(cardData);
   cardData.actions.filter(isPassiveAction).forEach((action) => applyPassiveAction(player, action));
+  if (player.characterId === "archer") {
+    const heal = Math.max(1, Math.round((player.maxHp ?? 1) * 0.4));
+    const beforeHp = player.hp ?? 0;
+    player.hp = Math.min(player.maxHp ?? beforeHp, beforeHp + heal);
+    if (player.hp > beforeHp) log(`${player.name} 패시브 회복: ${player.hp - beforeHp}`);
+  }
 }
 
 function render() {
