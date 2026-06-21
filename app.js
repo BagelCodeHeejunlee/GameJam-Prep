@@ -3965,12 +3965,6 @@ function applyPassiveReward(cardData) {
   state.passiveCards = state.passiveCards ?? [];
   state.passiveCards.push(cardData);
   cardData.actions.filter(isPassiveAction).forEach((action) => applyPassiveAction(player, action));
-  if (player.characterId === "archer") {
-    const heal = Math.max(1, Math.round((player.maxHp ?? 1) * 0.4));
-    const beforeHp = player.hp ?? 0;
-    player.hp = Math.min(player.maxHp ?? beforeHp, beforeHp + heal);
-    if (player.hp > beforeHp) log(`${player.name} 패시브 회복: ${player.hp - beforeHp}`);
-  }
 }
 
 function render() {
