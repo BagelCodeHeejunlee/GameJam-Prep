@@ -794,6 +794,21 @@ body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::after 
   opacity: 1;
 }
 
+.drawn-reveal-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.8vw, 16px);
+  width: min(94vw, 760px);
+}
+
+.drawn-reveal-card-wrap {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
 /* Card flips face-up on draw instead of flying/zooming in */
 .drawn-reveal .reveal-mount {
   transform: rotateY(88deg);
@@ -805,6 +820,45 @@ body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::after 
 
 .drawn-reveal.show .reveal-mount {
   transform: rotateY(0deg);
+}
+
+.drawn-reveal.multi.count-2 .reveal-mount {
+  --cps: 0.42;
+}
+
+.drawn-reveal.multi.count-3 .reveal-mount {
+  --cps: 0.34;
+}
+
+.drawn-reveal.multi.count-4 .reveal-mount {
+  --cps: 0.29;
+}
+
+.drawn-reveal .reveal-mount.fastest {
+  filter: drop-shadow(0 0 12px rgba(255, 221, 103, 0.9));
+}
+
+.drawn-reveal .reveal-mount.fastest .cp-priority {
+  box-shadow:
+    0 0 0 2px rgba(255, 248, 199, 0.9),
+    0 5px 12px rgba(103, 63, 10, 0.35);
+}
+
+.base-priority {
+  position: absolute;
+  right: 5%;
+  bottom: 5%;
+  z-index: 5;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 248, 223, 0.94);
+  border-radius: 999px;
+  background: rgba(40, 33, 27, 0.74);
+  color: #fff8df;
+  font-family: var(--card-font);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(25, 15, 5, 0.28);
 }
 
 .drawn-reveal-tag {
@@ -826,6 +880,29 @@ body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::after 
 .drawn-reveal.enemy .drawn-reveal-tag {
   background: linear-gradient(#f08152, #d9452c);
   box-shadow: 0 4px 12px rgba(150, 45, 24, 0.4);
+}
+
+@media (max-width: 620px) {
+  .drawn-reveal.multi.count-2 .reveal-mount {
+    --cps: 0.36;
+  }
+
+  .drawn-reveal.multi.count-3 .reveal-mount {
+    --cps: 0.29;
+  }
+
+  .drawn-reveal.multi.count-4 .reveal-mount {
+    --cps: 0.24;
+  }
+
+  .drawn-reveal-cards {
+    gap: 6px;
+  }
+
+  .base-priority {
+    font-size: 10px;
+    padding: 3px 5px;
+  }
 }
 
 .drawn-reveal-card {

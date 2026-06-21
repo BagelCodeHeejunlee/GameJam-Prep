@@ -1574,6 +1574,7 @@ async function runTurn() {
     card: cardData,
     playIndex: index,
   }));
+  applySharedPlayerPriority(drawnEntries);
   const enemyEntries = aliveEnemyKinds().map((kind) => ({
     actorType: "enemyGroup",
     actorId: kind,
@@ -1631,8 +1632,23 @@ async function runTurn() {
   scheduleTurn();
 }
 
+function applySharedPlayerPriority(entries) {
+  const playerEntries = entries.filter((entry) => entry.actorType === "player" && entry.card);
+  if (playerEntries.length <= 1) return;
+  const fastestPriority = Math.min(...playerEntries.map((entry) => entry.card.priority));
+  playerEntries.forEach((entry) => {
+    entry.effectivePriority = fastestPriority;
+  });
+}
+
+function timelinePriority(entry) {
+  return entry?.effectivePriority ?? entry?.card?.priority ?? 99;
+}
+
 function compareTimeline(a, b) {
-  if (a.card.priority !== b.card.priority) return a.card.priority - b.card.priority;
+  const leftPriority = timelinePriority(a);
+  const rightPriority = timelinePriority(b);
+  if (leftPriority !== rightPriority) return leftPriority - rightPriority;
   if (a.actorType === "player" && b.actorType !== "player") return -1;
   if (b.actorType === "player" && a.actorType !== "player") return 1;
   return 0;
@@ -4061,7 +4077,7 @@ function entityIntentMarkup(entity) {
         `<span class="intent-chip"><span class="action-icon ${p.kind}">${actionIcon(p.kind)}</span>${p.val !== "" ? `<b>${p.val}</b>` : ""}</span>`
     )
     .join("");
-  return `<span class="intent-badge tone-${tone} ${side} ${done ? "done" : ""} ${active ? "active" : ""}" aria-hidden="true"><span class="intent-pri">${card.priority}</span>${chips}</span>`;
+  return `<span class="intent-badge tone-${tone} ${side} ${done ? "done" : ""} ${active ? "active" : ""}" aria-hidden="true"><span class="intent-pri">${timelinePriority(entry)}</span>${chips}</span>`;
 }
 
 function renderBoard() {
@@ -4474,11 +4490,12 @@ function updatePriorityItem(item, entry, index) {
   ]
     .filter(Boolean)
     .join(" ");
-  const contentSignature = `${portraitImage ?? ""}:${emblem}:${entry.card.priority}:${count}`;
+  const priority = timelinePriority(entry);
+  const contentSignature = `${portraitImage ?? ""}:${emblem}:${priority}:${count}`;
 
   if (item.dataset.contentSignature !== contentSignature) {
     item.querySelector(".pc-portrait").innerHTML = portraitContent(portraitImage, emblem, "pc-art");
-    item.querySelector(".pc-badge").textContent = entry.card.priority;
+    item.querySelector(".pc-badge").textContent = priority;
     let countElement = item.querySelector(".pc-count");
     if (count > 1) {
       if (!countElement) {
@@ -4494,7 +4511,7 @@ function updatePriorityItem(item, entry, index) {
   }
 
   item.className = className;
-  item.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
+  item.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${priority}`;
 }
 
 function renderPlayerHud() {
@@ -4532,7 +4549,7 @@ function renderPlayerHud() {
           <span title="차지">${actionIcon("charge")}<b>${player.charge ?? 0}</b><em>차지</em></span>
         </div>
       </div>
-      ${renderHudCard(cardData)}
+      ${renderHudCard(cardData, entry ? timelinePriority(entry) : null)}
     `;
     elements.playerHud.append(article);
   });
@@ -4577,15 +4594,16 @@ function baseStat(kind, label, value) {
   return `<span class="base-stat" title="${label}"><span class="action-icon ${kind}">${actionIcon(kind)}</span><b>${value}</b></span>`;
 }
 
-function cardPrefab(card) {
+function cardPrefab(card, priorityOverride = null) {
   if (!card) return "";
+  const priority = priorityOverride ?? card.priority;
   const typeLabel = isPassiveCard(card) ? "패시브" : isTurnSustainCard(card) ? "턴 지속" : "";
   const footerLabel = typeLabel ? `<div class="cp-type-label">${typeLabel}</div>` : "";
   return `
     <div class="card-prefab ${rarityClass(card.rarity)}">
       <div class="cp-bg"></div>
       <div class="cp-banner"></div>
-      <div class="cp-priority">${card.priority}</div>
+      <div class="cp-priority">${priority}</div>
       <div class="cp-name">${card.name}</div>
       <div class="cp-actions">${renderActionList(card)}</div>
       ${footerLabel}
@@ -4593,15 +4611,15 @@ function cardPrefab(card) {
   `;
 }
 
-function cardMount(card, cls = "") {
-  return `<div class="card-mount ${cls}">${cardPrefab(card)}</div>`;
+function cardMount(card, cls = "", priorityOverride = null) {
+  return `<div class="card-mount ${cls}">${cardPrefab(card, priorityOverride)}</div>`;
 }
 
-function renderHudCard(cardData) {
+function renderHudCard(cardData, priorityOverride = null) {
   if (!cardData) {
     return `<div class="card-mount hud-mount is-empty"><span>카드 대기</span></div>`;
   }
-  return cardMount(cardData, "hud-mount");
+  return cardMount(cardData, "hud-mount", priorityOverride);
 }
 
 function pileIcon() {
@@ -4619,7 +4637,7 @@ function renderDrawnCards() {
       .filter(Boolean)
       .join(" ");
     div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
-    div.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${entry.card.priority}`;
+    div.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${timelinePriority(entry)}`;
     div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</strong>`;
     elements.drawnCards.append(div);
   });
@@ -4630,7 +4648,7 @@ function renderTimeline(activeIndex = -1) {
   state.currentTimeline.forEach((entry, index) => {
     const li = document.createElement("li");
     if (index === activeIndex) li.classList.add("active");
-    li.innerHTML = `<span>${entry.card.priority}</span><strong>${entryLabel(entry)}</strong><span>${entry.card.name}</span>`;
+    li.innerHTML = `<span>${timelinePriority(entry)}</span><strong>${entryLabel(entry)}</strong><span>${entry.card.name}</span>`;
     elements.timeline.append(li);
   });
 }
@@ -4647,7 +4665,7 @@ function renderLog() {
 
 async function playPriorityReveal(drawnEntries, sortedEntries) {
   document.body.classList.add("revealing-priority");
-  const playerEntry = drawnEntries.find((e) => e.actorType === "player");
+  const playerEntries = drawnEntries.filter((e) => e.actorType === "player");
   const enemyEntries = drawnEntries.filter((e) => e.actorType !== "player");
   state.activeTimelineIndex = -1;
   state.completedTimelineCount = 0;
@@ -4664,7 +4682,7 @@ async function playPriorityReveal(drawnEntries, sortedEntries) {
   await sleep(turnDelay(0.9));
 
   // 3) 내 카드 드로우 — 진짜 카드가 중앙에 완전히 등장
-  showDrawnCardReveal(playerEntry?.card, "이번 턴 내 카드", "player");
+  showDrawnCardReveal(playerEntries, "이번 턴 카드", "player");
   await sleep(360);
 
   // 4) 1초 대기 (카드 읽기)
@@ -4752,14 +4770,33 @@ function friendlyAction(action) {
   }
 }
 
-function showDrawnCardReveal(card, ownerLabel = "내 카드", side = "player") {
+function showDrawnCardReveal(entriesOrCard, ownerLabel = "내 카드", side = "player", priorityOverride = null) {
   const host = document.querySelector("#drawnCardReveal");
-  if (!host || !card) return;
+  if (!host || !entriesOrCard) return;
+  const entries = Array.isArray(entriesOrCard)
+    ? entriesOrCard.filter((entry) => entry?.card)
+    : [{ card: entriesOrCard, effectivePriority: priorityOverride }];
+  if (!entries.length) return;
+  const fastestBasePriority = Math.min(...entries.map((entry) => entry.card.priority));
+  const sharedPriority = Math.min(...entries.map(timelinePriority));
+  const countClass = `count-${Math.min(entries.length, 4)}`;
+  const cardsMarkup = entries
+    .map((entry) => {
+      const isFastest = entry.card.priority === fastestBasePriority;
+      const className = `reveal-mount ${isFastest ? "fastest" : ""}`.trim();
+      return `
+        <div class="drawn-reveal-card-wrap">
+          ${cardMount(entry.card, className, timelinePriority(entry))}
+          ${entry.card.priority !== timelinePriority(entry) ? `<span class="base-priority">원래 ${entry.card.priority}</span>` : ""}
+        </div>
+      `;
+    })
+    .join("");
   host.removeAttribute("style");
-  host.className = `drawn-reveal ${side}`;
+  host.className = `drawn-reveal ${side} ${entries.length > 1 ? "multi" : ""} ${countClass}`;
   host.innerHTML = `
-    <div class="drawn-reveal-tag">${ownerLabel}</div>
-    ${cardMount(card, "reveal-mount")}
+    <div class="drawn-reveal-tag">${ownerLabel} · PRI ${sharedPriority}</div>
+    <div class="drawn-reveal-cards">${cardsMarkup}</div>
   `;
   void host.offsetWidth;
   host.classList.add("show");

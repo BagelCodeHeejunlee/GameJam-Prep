@@ -400,6 +400,7 @@ globalThis.__simExports = {
   drawPlayerCards,
   cardsPerPlayerTurn,
   drawEnemyCard,
+  applySharedPlayerPriority,
   compareTimeline,
   executeCard,
   expireTurnEndEffects,
@@ -529,13 +530,20 @@ async function simulateTurn(game) {
   if (game.checkEndConditions()) return;
 
   const playerCards = game.drawPlayerCards(game.cardsPerPlayerTurn(player));
+  const playerEntries = playerCards.map((card, index) => ({
+    actorType: "player",
+    actorId: player.id,
+    card,
+    playIndex: index,
+  }));
+  game.applySharedPlayerPriority(playerEntries);
   const enemyEntries = game.aliveEnemyKinds().map((kind) => ({
     actorType: "enemyGroup",
     actorId: kind,
     card: game.drawEnemyCard(kind),
   }));
   const entries = [
-    ...playerCards.map((card, index) => ({ actorType: "player", actorId: player.id, card, playIndex: index })),
+    ...playerEntries,
     ...enemyEntries,
   ].sort(game.compareTimeline);
 
