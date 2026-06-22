@@ -687,12 +687,12 @@ h2 {
   }
 }
 
-.hud-card.card-just-drawn {
+.card-mount.card-just-drawn {
   animation: card-draw-in 480ms cubic-bezier(0.2, 0.9, 0.25, 1.25) both;
   z-index: 4;
 }
 
-.hud-card.card-just-drawn::after {
+.card-mount.card-just-drawn::after {
   content: "";
   position: absolute;
   inset: -2px;
@@ -705,17 +705,17 @@ h2 {
   animation: card-draw-glow 720ms ease both;
 }
 
-/* While the player is acting, spotlight their card + block in the HUD */
-body.player-acting #playerHud .player-block:not(.waiting-card) {
+/* While the player is acting, spotlight their current action card in the HUD */
+body.player-acting #playerHud .hero-action-slot.active {
   position: relative;
   z-index: 6;
 }
 
-body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card {
+body.player-acting #playerHud .hero-action-slot.active .card-mount {
   z-index: 5;
 }
 
-body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::before {
+body.player-acting #playerHud .hero-action-slot.active .card-mount::before {
   content: "지금 발동";
   position: absolute;
   top: -11px;
@@ -737,7 +737,7 @@ body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::before
   pointer-events: none;
 }
 
-body.player-acting #playerHud .player-block:not(.waiting-card) .hud-card::after {
+body.player-acting #playerHud .hero-action-slot.active .card-mount::after {
   content: "";
   position: absolute;
   inset: -3px;
@@ -4316,11 +4316,13 @@ body.turn-cue-active .turn-scrim {
 .player-hud {
   position: fixed;
   z-index: 35;
-  right: max(7px, env(safe-area-inset-right));
   bottom: max(7px, env(safe-area-inset-bottom));
   left: max(7px, env(safe-area-inset-left));
+  right: auto;
+  width: min(calc(100vw - 14px), 560px);
   display: grid;
   grid-template-columns: repeat(var(--party-cols, 1), minmax(0, 1fr));
+  align-items: end;
   gap: 7px;
   padding: 0;
   border: 0;
@@ -4332,6 +4334,9 @@ body.turn-cue-active .turn-scrim {
 
 .player-hud.solo {
   --party-cols: 1;
+  width: auto;
+  max-width: calc(100vw - 14px);
+  grid-template-columns: auto;
 }
 
 .player-hud.duo {
@@ -4342,53 +4347,30 @@ body.turn-cue-active .turn-scrim {
   --party-cols: 3;
 }
 
-.player-focus-strip {
-  grid-column: 1 / -1;
+.hero-action-slot {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid rgba(255, 250, 228, 0.35);
-  border-radius: 10px;
-  background: rgba(41, 56, 64, 0.88);
-  color: #fff3cf;
-  box-shadow: 0 8px 18px rgba(30, 20, 12, 0.18);
-}
-
-.player-focus-strip strong {
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.player-focus-strip span {
+  grid-template-columns: minmax(94px, 122px) auto;
+  align-items: end;
+  gap: 6px;
   min-width: 0;
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 182px;
 }
 
-.player-focus-strip b {
-  min-width: 28px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: #f4b83c;
-  color: #4c3114;
-  font-size: 11px;
+.player-hud.solo .hero-action-slot {
+  max-width: 192px;
+}
+
+.player-hud.trio .hero-action-slot {
+  grid-template-columns: minmax(82px, 1fr) auto;
+  gap: 4px;
+  max-width: 178px;
 }
 
 .player-block {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 7px;
   width: 100%;
   height: auto;
-  min-height: 112px;
+  min-height: 82px;
   padding: 7px;
   border: 1px solid rgba(255, 250, 228, 0.42);
   border-radius: 10px;
@@ -4399,10 +4381,7 @@ body.turn-cue-active .turn-scrim {
 
 .player-hud.solo .player-block {
   width: 100%;
-  min-height: 126px;
-  grid-template-columns: 1fr minmax(0, 1.45fr);
-  grid-template-rows: auto;
-  align-items: stretch;
+  min-height: 82px;
 }
 
 .player-block.active {
@@ -4502,6 +4481,39 @@ body.turn-cue-active .turn-scrim {
   height: 12px;
 }
 
+.current-action-card {
+  display: grid;
+  grid-template-columns: auto;
+  justify-items: center;
+  width: calc(512px * 0.14);
+  min-width: 0;
+}
+
+.player-hud.solo .current-action-card {
+  width: calc(512px * 0.15);
+}
+
+.current-action-card .card-mount {
+  --cps: 0.14;
+}
+
+.player-hud.solo .current-action-card .card-mount {
+  --cps: 0.15;
+}
+
+.current-action-card .card-mount.is-empty {
+  width: 100%;
+  min-height: 104px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(95, 68, 38, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 239, 209, 0.72);
+  color: #7b6655;
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .hud-compact-card {
   display: grid;
   grid-template-rows: auto minmax(18px, auto) auto;
@@ -4564,8 +4576,14 @@ body.turn-cue-active .turn-scrim {
 }
 
 .player-hud.trio .player-block {
-  min-height: 108px;
+  min-height: 78px;
   padding: 6px;
+}
+
+.player-hud.trio .current-action-card,
+.player-hud.trio .current-action-card .card-mount {
+  --cps: 0.12;
+  width: calc(512px * 0.12);
 }
 
 .player-hud.trio .player-heading,
@@ -4611,6 +4629,18 @@ body.turn-cue-active .turn-scrim {
 
   .player-hud {
     gap: 5px;
+  }
+
+  .hero-action-slot {
+    grid-template-columns: minmax(80px, 110px) auto;
+    gap: 4px;
+    max-width: 168px;
+  }
+
+  .current-action-card,
+  .current-action-card .card-mount {
+    --cps: 0.12;
+    width: calc(512px * 0.12);
   }
 
   .player-hud.trio .pile-row span:nth-child(n + 2) {

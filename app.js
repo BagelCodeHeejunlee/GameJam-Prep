@@ -4582,34 +4582,26 @@ function renderPlayerHud() {
   const activeEntry = state.activeTimelineIndex >= 0
     ? state.currentTimeline[state.activeTimelineIndex]
     : null;
-  const nextPlayerEntry = state.currentTimeline.find((item, index) => {
-    return item.actorType === "player" && !state.completedTimelineIndexes?.has(index);
+  const currentEntryByPlayer = new Map();
+  state.currentTimeline.forEach((entry, index) => {
+    if (entry.actorType !== "player" || state.completedTimelineIndexes?.has(index)) return;
+    if (activeEntry === entry) {
+      currentEntryByPlayer.set(entry.actorId, entry);
+      return;
+    }
+    if (!currentEntryByPlayer.has(entry.actorId)) {
+      currentEntryByPlayer.set(entry.actorId, entry);
+    }
   });
-  const focusEntry = activeEntry?.actorType === "player" ? activeEntry : nextPlayerEntry;
-  if (shownPlayers.length > 1 && focusEntry && !state.suppressPlayerCard) {
-    const focusPlayer = shownPlayers.find((player) => player.id === focusEntry.actorId);
-    const character = characterDefinitions[focusPlayer?.characterId] ?? getSelectedCharacter();
-    const strip = document.createElement("div");
-    strip.className = "player-focus-strip";
-    strip.innerHTML = `
-      <strong>${character.name} 행동 중</strong>
-      <span>${focusEntry.card.name} · ${compactCardText(focusEntry.card)}</span>
-      <b>${timelinePriority(focusEntry)}</b>
-    `;
-    elements.playerHud.append(strip);
-  }
 
   shownPlayers.forEach((player) => {
     const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
-    const playerEntries = state.currentTimeline.filter((item, index) => {
-      return item.actorType === "player" && item.actorId === player.id && !state.completedTimelineIndexes?.has(index);
-    });
-    const entry = activeEntry?.actorType === "player" && activeEntry.actorId === player.id
-      ? activeEntry
-      : playerEntries[0] ?? null;
-    const cardData = state.suppressPlayerCard ? null : entry?.card;
+    const currentEntry = currentEntryByPlayer.get(player.id);
+    const isActive = activeEntry?.actorType === "player" && activeEntry.actorId === player.id;
+    const slot = document.createElement("div");
+    slot.className = `hero-action-slot ${isActive ? "active" : ""}`;
     const article = document.createElement("article");
-    article.className = `player-block ${entry === activeEntry ? "active" : ""} ${cardData ? "" : "waiting-card"}`;
+    article.className = `player-block ${isActive ? "active" : ""}`;
     article.innerHTML = `
       <div class="player-info">
         <div class="player-head">
@@ -4627,17 +4619,25 @@ function renderPlayerHud() {
           <span title="차지">${actionIcon("charge")}<b>${player.charge ?? 0}</b><em>차지</em></span>
         </div>
       </div>
-      ${renderCompactHudCard(cardData, entry ? timelinePriority(entry) : null)}
     `;
-    elements.playerHud.append(article);
+    slot.append(article);
+    if (currentEntry && !state.suppressPlayerCard) {
+      const focusCard = document.createElement("div");
+      focusCard.className = "current-action-card";
+      focusCard.innerHTML = renderHudCard(currentEntry.card, timelinePriority(currentEntry));
+      slot.append(focusCard);
+    }
+    elements.playerHud.append(slot);
   });
 
-  const playerEntry = state.currentTimeline.find((item, index) => {
-    return item.actorType === "player" && !state.completedTimelineIndexes?.has(index);
-  });
-  const drawnCardId = playerEntry?.card?.instanceId ?? playerEntry?.card?.id;
+  const drawnCardId = shownPlayers
+    .map((player) => currentEntryByPlayer.get(player.id)?.card)
+    .filter(Boolean)
+    .map((card) => card.instanceId ?? card.id)
+    .join("|");
   if (drawnCardId && elements.playerHud.dataset.cardId !== drawnCardId) {
-    const freshCard = elements.playerHud.querySelector(".player-block:not(.waiting-card) .hud-card");
+    const freshCard = elements.playerHud.querySelector(".hero-action-slot.active .current-action-card .card-mount")
+      ?? elements.playerHud.querySelector(".current-action-card .card-mount");
     if (freshCard) freshCard.classList.add("card-just-drawn");
   }
   elements.playerHud.dataset.cardId = drawnCardId ?? "";
@@ -4649,23 +4649,6 @@ function renderHudHp(player) {
     <div class="hud-hp">
       <span><i style="width: ${pct}%"></i></span>
       <b>HP ${Math.max(0, player.hp ?? 0)} / ${player.maxHp ?? 0}</b>
-    </div>
-  `;
-}
-
-function renderCompactHudCard(cardData, priorityOverride = null) {
-  if (!cardData) {
-    return `<div class="hud-compact-card empty"><span>카드 대기</span></div>`;
-  }
-  const priority = priorityOverride ?? cardData.priority;
-  return `
-    <div class="hud-compact-card ${rarityClass(cardData.rarity)}" title="${cardData.name}">
-      <div class="compact-card-title">
-        <strong>${cardData.name}</strong>
-        <span>${priority}</span>
-      </div>
-      <div class="compact-card-actions">${renderCompactActionList(cardData)}</div>
-      <div class="compact-card-note">${compactCardText(cardData)}</div>
     </div>
   `;
 }
@@ -4942,7 +4925,7 @@ function flyRevealToHud() {
   const host = document.querySelector("#drawnCardReveal");
   if (!host) return;
   const target =
-    document.querySelector("#playerHud .player-block:not(.waiting-card) .card-mount") ||
+    document.querySelector("#playerHud .current-action-card:not(.waiting-card) .card-mount") ||
     document.querySelector("#playerHud .card-mount") ||
     document.querySelector("#priorityStrip .priority-item.player") ||
     document.querySelector("#priorityStrip");
