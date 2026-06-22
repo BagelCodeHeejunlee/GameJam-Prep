@@ -1608,7 +1608,7 @@ async function runTurn() {
     renderBoard();
     renderDrawnCards();
     renderTimeline(index);
-    await playTurnCue(entry);
+    await playTurnCue(entry, index);
     await executeTimelineEntry(entry);
     expireTurnEndEffects(entry);
     state.completedTimelineIndexes.add(index);
@@ -1682,6 +1682,16 @@ function displayEntryActive(entry) {
 function displayEntryDone(entry) {
   const indexes = entry.timelineIndexes ?? [];
   return indexes.length > 0 && indexes.every((index) => state.completedTimelineIndexes?.has(index));
+}
+
+function isFirstPlayerEntryInPriorityGroup(entry, index) {
+  if (entry.actorType !== "player") return false;
+  const priority = timelinePriority(entry);
+  return !state.currentTimeline.slice(0, index).some((candidate) => (
+    candidate.actorType === "player" &&
+    candidate.actorId === entry.actorId &&
+    timelinePriority(candidate) === priority
+  ));
 }
 
 function compareTimeline(a, b) {
@@ -4886,9 +4896,10 @@ async function playTurnStart() {
   await sleep(300); // 사라지는 트랜지션 동안 대기
 }
 
-async function playTurnCue(entry) {
+async function playTurnCue(entry, index = 0) {
   // 적 차례는 따로 알리지 않고 지나간다 — 내 차례만 명확히 인지시킨다.
   if (entry.actorType !== "player") return;
+  if (!isFirstPlayerEntryInPriorityGroup(entry, index)) return;
   const host = document.querySelector("#turnCue");
   if (!host) return;
   const character = getSelectedCharacter();
