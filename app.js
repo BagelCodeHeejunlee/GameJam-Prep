@@ -4621,12 +4621,12 @@ function renderPlayerHud() {
       </div>
     `;
     slot.append(article);
-    if (currentEntry && !state.suppressPlayerCard) {
-      const focusCard = document.createElement("div");
-      focusCard.className = "current-action-card";
-      focusCard.innerHTML = renderHudCard(currentEntry.card, timelinePriority(currentEntry));
-      slot.append(focusCard);
-    }
+    const focusCard = document.createElement("div");
+    focusCard.className = `current-action-card ${currentEntry && !state.suppressPlayerCard ? "" : "waiting-card"}`;
+    focusCard.innerHTML = currentEntry && !state.suppressPlayerCard
+      ? renderHudCard(currentEntry.card, timelinePriority(currentEntry))
+      : renderHudCard(null);
+    slot.append(focusCard);
     elements.playerHud.append(slot);
   });
 
