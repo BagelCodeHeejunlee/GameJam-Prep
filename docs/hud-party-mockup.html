@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HUD Party Mockup</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #30251e;
+        --muted: #7b6655;
+        --cream: #fff0cf;
+        --cream-2: #f4d39b;
+        --line: rgba(88, 61, 38, 0.26);
+        --gold: #f4b83c;
+        --green: #4f9d70;
+        --blue: #4a9edc;
+        --red: #c95d4a;
+        --violet: #7b6bd6;
+        --shadow: rgba(30, 20, 12, 0.22);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #10242c;
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        display: block;
+      }
+
+      .phone {
+        position: relative;
+        width: 430px;
+        height: 932px;
+        max-width: 100vw;
+        max-height: 100vh;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 26% 18%, rgba(255, 236, 158, 0.3), transparent 22%),
+          linear-gradient(180deg, #8ed7e7 0%, #72c88a 39%, #3ca26e 64%, #237787 100%);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 24px 80px rgba(0, 0, 0, 0.45);
+      }
+
+      .battlefield {
+        position: absolute;
+        inset: 98px 0 146px;
+        overflow: hidden;
+      }
+
+      .hex-board {
+        position: absolute;
+        left: 50%;
+        top: 49%;
+        width: 560px;
+        height: 560px;
+        transform: translate(-50%, -50%);
+      }
+
+      .hex {
+        position: absolute;
+        width: 58px;
+        height: 50px;
+        display: grid;
+        place-items: center;
+        clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+        background: rgba(86, 163, 93, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: inset 0 0 0 2px rgba(55, 91, 55, 0.16);
+      }
+
+      .hex:nth-child(3n) {
+        background: rgba(101, 177, 99, 0.74);
+      }
+
+      .hex:nth-child(4n) {
+        background: rgba(75, 145, 101, 0.72);
+      }
+
+      .hex.threat {
+        background: rgba(207, 76, 50, 0.44);
+        box-shadow: inset 0 0 0 3px rgba(255, 224, 120, 0.42);
+      }
+
+      .hex.target {
+        background: rgba(245, 181, 52, 0.62);
+        box-shadow: inset 0 0 0 3px rgba(255, 252, 219, 0.78), 0 0 18px rgba(244, 184, 60, 0.48);
+      }
+
+      .trap {
+        position: absolute;
+        width: 28px;
+        height: 24px;
+        clip-path: polygon(50% 0, 100% 100%, 0 100%);
+        background: linear-gradient(#5b3826, #d16b45);
+        box-shadow: 0 3px 0 rgba(50, 26, 14, 0.35);
+      }
+
+      .path {
+        position: absolute;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(86, 188, 241, 0.84);
+        box-shadow: 0 0 12px rgba(86, 188, 241, 0.7);
+        transform-origin: left center;
+      }
+
+      .unit {
+        position: absolute;
+        width: 50px;
+        height: 58px;
+        transform: translate(-50%, -78%);
+        display: grid;
+        place-items: center;
+        z-index: 5;
+      }
+
+      .unit .portrait {
+        width: 48px;
+        height: 48px;
+        border: 2px solid rgba(255, 247, 220, 0.9);
+        border-radius: 50%;
+        overflow: hidden;
+        background: #ffe8b9;
+        box-shadow: 0 6px 14px var(--shadow);
+      }
+
+      .unit.enemy .portrait {
+        border-color: #ffddbc;
+        background: #f6b090;
+      }
+
+      .unit.hero .portrait {
+        border-color: #dff5ff;
+        background: #a9d7ff;
+      }
+
+      .face {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        color: #fff8dd;
+        font-size: 15px;
+        font-weight: 1000;
+        text-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+      }
+
+      .face.archer {
+        background: linear-gradient(135deg, #3f9a79, #7ec260);
+      }
+
+      .face.warrior {
+        background: linear-gradient(135deg, #b85c45, #e0a84c);
+      }
+
+      .face.mage {
+        background: linear-gradient(135deg, #5577c8, #8e67d9);
+      }
+
+      .face.brute {
+        background: linear-gradient(135deg, #6f5540, #b46a47);
+      }
+
+      .face.skirmisher {
+        background: linear-gradient(135deg, #61615a, #95a157);
+      }
+
+      .face.shooter {
+        background: linear-gradient(135deg, #824d46, #cf7656);
+      }
+
+      .hp-mini {
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        bottom: 0;
+        height: 6px;
+        border: 1px solid rgba(46, 29, 17, 0.28);
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(30, 20, 12, 0.24);
+      }
+
+      .hp-mini span {
+        display: block;
+        height: 100%;
+        width: var(--hp, 70%);
+        background: linear-gradient(90deg, #61d17c, #f7ca48);
+      }
+
+      .top-hud {
+        position: absolute;
+        z-index: 10;
+        inset: max(10px, env(safe-area-inset-top)) 10px auto;
+        display: grid;
+        gap: 7px;
+      }
+
+      .run-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .pill,
+      .top-button,
+      .enemy-card,
+      .timeline,
+      .hero-card,
+      .log-chip,
+      .offscreen {
+        border: 1px solid rgba(255, 250, 228, 0.38);
+        background: rgba(255, 240, 207, 0.9);
+        box-shadow: 0 8px 18px rgba(50, 28, 15, 0.13);
+      }
+
+      .pill {
+        min-height: 28px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        color: #fdf2cf;
+        background: linear-gradient(#246b82, #164c62);
+        font-size: 12px;
+        font-weight: 900;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+      }
+
+      .top-actions {
+        display: none;
+        gap: 5px;
+      }
+
+      .top-button {
+        min-width: 34px;
+        min-height: 28px;
+        border-radius: 9px;
+        color: #4f351d;
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .enemy-row {
+        display: grid;
+        grid-template-columns: repeat(var(--enemy-count), minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .enemy-card {
+        min-width: 0;
+        min-height: 46px;
+        border-radius: 8px;
+        padding: 5px 6px;
+        display: grid;
+        grid-template-columns: 29px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 5px;
+        background: rgba(255, 231, 205, 0.9);
+      }
+
+      .enemy-icon {
+        width: 29px;
+        height: 29px;
+        border: 2px solid rgba(255, 255, 255, 0.72);
+        border-radius: 50%;
+        overflow: hidden;
+        background: #f4b18e;
+      }
+
+      .enemy-main {
+        min-width: 0;
+      }
+
+      .enemy-main strong {
+        display: block;
+        overflow: hidden;
+        font-size: 10px;
+        line-height: 1.05;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .enemy-main span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 800;
+      }
+
+      .enemy-action {
+        display: grid;
+        gap: 2px;
+        justify-items: end;
+      }
+
+      .enemies-3 .enemy-card {
+        grid-template-columns: 27px minmax(0, 1fr) 24px;
+        gap: 4px;
+        padding: 5px;
+      }
+
+      .enemies-3 .enemy-main span {
+        display: none;
+      }
+
+      .enemies-3 .enemy-action {
+        gap: 3px;
+      }
+
+      .enemies-3 .act {
+        width: 22px;
+        overflow: hidden;
+        color: transparent;
+      }
+
+      .enemies-3 .act i {
+        color: #2c638d;
+      }
+
+      .prio {
+        min-width: 24px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: #f4b83c;
+        color: #4c3114;
+        font-size: 11px;
+        font-weight: 1000;
+        box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35);
+      }
+
+      .act {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        color: #5a3a23;
+        font-size: 9px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .act i {
+        width: 14px;
+        height: 14px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 4px;
+        background: rgba(63, 128, 182, 0.14);
+        color: #2c638d;
+        font-style: normal;
+        font-size: 9px;
+      }
+
+      .timeline {
+        min-height: 34px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px;
+        overflow: hidden;
+      }
+
+      .turn-token {
+        min-width: 47px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        border-radius: 999px;
+        background: rgba(53, 90, 106, 0.12);
+        color: #463527;
+        font-size: 10px;
+        font-weight: 1000;
+      }
+
+      .turn-token.active {
+        min-width: 62px;
+        color: #fff4d6;
+        background: linear-gradient(#e99c3f, #bc553a);
+        box-shadow: 0 4px 10px rgba(188, 85, 58, 0.3);
+      }
+
+      .turn-token.done {
+        opacity: 0.45;
+      }
+
+      .bottom-party {
+        position: absolute;
+        z-index: 12;
+        left: 7px;
+        right: 7px;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        display: grid;
+        gap: 7px;
+      }
+
+      .party-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--hero-count), minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .hero-card {
+        position: relative;
+        min-width: 0;
+        min-height: 116px;
+        border-radius: 10px;
+        padding: 8px;
+        overflow: hidden;
+        background: rgba(255, 239, 209, 0.94);
+      }
+
+      .heroes-1 .hero-card {
+        min-height: 132px;
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr) 92px;
+        gap: 9px;
+        align-items: center;
+      }
+
+      .heroes-2 .hero-card {
+        min-height: 122px;
+      }
+
+      .heroes-3 .hero-card {
+        min-height: 112px;
+        padding: 5px;
+      }
+
+      .hero-card.active {
+        border-color: rgba(255, 238, 171, 0.9);
+        box-shadow: 0 0 0 2px rgba(244, 184, 60, 0.45), 0 8px 18px rgba(50, 28, 15, 0.18);
+      }
+
+      .hero-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .hero-portrait {
+        flex: 0 0 auto;
+        width: 45px;
+        height: 45px;
+        border: 2px solid rgba(255, 255, 255, 0.82);
+        border-radius: 50%;
+        overflow: hidden;
+        background: #b8dcff;
+      }
+
+      .heroes-1 .hero-portrait {
+        width: 64px;
+        height: 64px;
+      }
+
+      .heroes-3 .hero-portrait {
+        width: 34px;
+        height: 34px;
+      }
+
+      .hero-name {
+        min-width: 0;
+      }
+
+      .hero-name strong {
+        display: block;
+        overflow: hidden;
+        font-size: 12px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .heroes-3 .hero-name strong {
+        font-size: 10px;
+      }
+
+      .hp-bar {
+        position: relative;
+        height: 11px;
+        margin-top: 4px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(56, 39, 24, 0.18);
+      }
+
+      .hp-bar span {
+        display: block;
+        height: 100%;
+        width: var(--hp, 70%);
+        background: linear-gradient(90deg, #46b869, #f1c647);
+      }
+
+      .hp-label {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 900;
+      }
+
+      .mini-card {
+        min-width: 0;
+        min-height: 58px;
+        margin-top: 7px;
+        padding: 6px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(70, 137, 184, 0.16), rgba(244, 184, 60, 0.18));
+        border: 1px solid rgba(95, 68, 38, 0.16);
+      }
+
+      .heroes-1 .mini-card {
+        margin-top: 0;
+        min-height: 88px;
+      }
+
+      .heroes-3 .mini-card {
+        min-height: 46px;
+        padding: 5px;
+      }
+
+      .card-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .card-title strong {
+        overflow: hidden;
+        font-size: 11px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .heroes-3 .card-title strong {
+        max-width: 38px;
+        font-size: 9px;
+      }
+
+      .action-icons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+      }
+
+      .action-icons span,
+      .status-icons span,
+      .resource span {
+        min-width: 22px;
+        min-height: 20px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 6px;
+        background: rgba(55, 111, 150, 0.14);
+        color: #335b7c;
+        font-size: 10px;
+        font-weight: 1000;
+      }
+
+      .resource-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+        margin-top: 7px;
+      }
+
+      .resource {
+        display: flex;
+        gap: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 1000;
+      }
+
+      .status-icons {
+        display: flex;
+        gap: 3px;
+      }
+
+      .heroes-3 .resource-row {
+        margin-top: 5px;
+      }
+
+      .heroes-3 .resource span,
+      .heroes-3 .status-icons span,
+      .heroes-3 .action-icons span {
+        min-width: 18px;
+        min-height: 18px;
+        border-radius: 5px;
+        font-size: 8px;
+      }
+
+      .focus-preview {
+        display: none;
+      }
+
+      .heroes-2 .focus-preview,
+      .heroes-3 .focus-preview {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 6px 8px;
+        border: 1px solid rgba(255, 250, 228, 0.35);
+        border-radius: 10px;
+        background: rgba(41, 56, 64, 0.78);
+        color: #fff3cf;
+        box-shadow: 0 8px 18px rgba(30, 20, 12, 0.18);
+      }
+
+      .focus-preview strong {
+        font-size: 12px;
+      }
+
+      .focus-preview span {
+        font-size: 11px;
+        font-weight: 800;
+        opacity: 0.88;
+      }
+
+      .log-chip {
+        position: absolute;
+        z-index: 13;
+        right: 10px;
+        bottom: calc(max(10px, env(safe-area-inset-bottom)) + 150px);
+        max-width: 56%;
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 8px;
+        border-radius: 999px;
+        color: #4d3524;
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .log-chip b {
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #3e6f86;
+        color: #fff3cf;
+        font-size: 10px;
+      }
+
+      .offscreen {
+        position: absolute;
+        z-index: 9;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 26px;
+        padding: 4px 7px;
+        border-radius: 999px;
+        background: rgba(93, 47, 34, 0.78);
+        color: #fff3cf;
+        font-size: 10px;
+        font-weight: 1000;
+      }
+
+      .offscreen.left {
+        left: 8px;
+        top: 43%;
+      }
+
+      .offscreen.right {
+        right: 8px;
+        top: 51%;
+      }
+
+      .offscreen.top {
+        left: 47%;
+        top: 112px;
+      }
+
+      @media (max-width: 380px) {
+        .phone {
+          min-width: 320px;
+        }
+
+        .enemy-card {
+          grid-template-columns: 26px minmax(0, 1fr);
+          min-height: 42px;
+        }
+
+        .enemy-icon {
+          width: 26px;
+          height: 26px;
+        }
+
+        .enemy-action {
+          grid-column: 1 / -1;
+          grid-template-columns: auto auto;
+          justify-content: space-between;
+          width: 100%;
+        }
+
+        .turn-token {
+          min-width: 40px;
+          font-size: 9px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="phone" class="phone" aria-label="HUD party mockup">
+      <section class="top-hud">
+        <div class="run-row">
+          <div class="pill">웨이브 8 · 턴 4</div>
+          <div class="top-actions">
+            <button class="top-button" type="button">x1</button>
+            <button class="top-button" type="button">II</button>
+          </div>
+        </div>
+        <div id="enemyRow" class="enemy-row"></div>
+        <div id="timeline" class="timeline"></div>
+      </section>
+
+      <section class="battlefield" aria-label="battle board">
+        <div id="hexBoard" class="hex-board"></div>
+        <div class="offscreen left">위협 4</div>
+        <div class="offscreen right">사수 6</div>
+        <div class="offscreen top">적 5</div>
+      </section>
+
+      <div class="log-chip"><b>로그</b><span>궁수 후퇴 사격 · 브루트 12 피해</span></div>
+
+      <section id="bottomParty" class="bottom-party">
+        <div class="focus-preview">
+          <strong id="focusName">궁수 행동 중</strong>
+          <span id="focusAction">후퇴 사격 · 공격 후 후퇴</span>
+          <span class="prio">18</span>
+        </div>
+        <div id="partyGrid" class="party-grid"></div>
+      </section>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const heroCount = Math.max(1, Math.min(3, Number(params.get("heroes") || 1)));
+      const enemyCount = Math.max(1, Math.min(3, Number(params.get("enemies") || 1)));
+
+      const heroes = [
+        {
+          name: "궁수",
+          face: "궁",
+          faceClass: "archer",
+          hp: "62 / 80",
+          hpPct: "78%",
+          card: "후퇴 사격",
+          prio: 18,
+          actions: ["ATK", "RNG", "RET"],
+          resources: ["덱 9", "버림 3", "차지 2"],
+          status: ["집중", "거리"],
+        },
+        {
+          name: "전사",
+          face: "전",
+          faceClass: "warrior",
+          hp: "83 / 100",
+          hpPct: "83%",
+          card: "전진 베기",
+          prio: 24,
+          actions: ["MOV", "ATK"],
+          resources: ["덱 8", "버림 4", "방어 1"],
+          status: ["방어"],
+        },
+        {
+          name: "마법사",
+          face: "마",
+          faceClass: "mage",
+          hp: "39 / 55",
+          hpPct: "71%",
+          card: "운석 예고",
+          prio: 44,
+          actions: ["RNG", "AOE"],
+          resources: ["덱 10", "버림 2", "룬 3"],
+          status: ["룬", "예고"],
+        },
+      ];
+
+      const enemies = [
+        {
+          name: "브루트",
+          count: 3,
+          face: "브",
+          faceClass: "brute",
+          prio: 31,
+          action: "이동+공격",
+          icon: "M",
+        },
+        {
+          name: "척후병",
+          count: 2,
+          face: "척",
+          faceClass: "skirmisher",
+          prio: 16,
+          action: "돌입",
+          icon: "J",
+        },
+        {
+          name: "사수",
+          count: 2,
+          face: "사",
+          faceClass: "shooter",
+          prio: 51,
+          action: "사격",
+          icon: "R",
+        },
+      ];
+
+      const phone = document.getElementById("phone");
+      const enemyRow = document.getElementById("enemyRow");
+      const partyGrid = document.getElementById("partyGrid");
+      const bottomParty = document.getElementById("bottomParty");
+      const timeline = document.getElementById("timeline");
+      const hexBoard = document.getElementById("hexBoard");
+
+      phone.style.setProperty("--hero-count", heroCount);
+      phone.style.setProperty("--enemy-count", enemyCount);
+      bottomParty.classList.add(`heroes-${heroCount}`);
+      phone.classList.add(`enemies-${enemyCount}`);
+
+      document.getElementById("focusName").textContent = `${heroes[0].name} 행동 중`;
+      document.getElementById("focusAction").textContent = `${heroes[0].card} · 공격 후 후퇴`;
+
+      enemyRow.innerHTML = enemies.slice(0, enemyCount).map((enemy) => `
+        <article class="enemy-card">
+          <div class="enemy-icon"><span class="face ${enemy.faceClass}">${enemy.face}</span></div>
+          <div class="enemy-main">
+            <strong>${enemy.name} x${enemy.count}</strong>
+            <span>적 · ${enemy.action}</span>
+          </div>
+          <div class="enemy-action">
+            <span class="prio">${enemy.prio}</span>
+            <span class="act"><i>${enemy.icon}</i>${enemy.action}</span>
+          </div>
+        </article>
+      `).join("");
+
+      partyGrid.innerHTML = heroes.slice(0, heroCount).map((hero, index) => `
+        <article class="hero-card ${index === 0 ? "active" : ""}">
+          <div class="hero-head">
+            <div class="hero-portrait"><span class="face ${hero.faceClass}">${hero.face}</span></div>
+            <div class="hero-name">
+              <strong>${hero.name}</strong>
+              <div class="hp-bar" style="--hp: ${hero.hpPct}"><span></span></div>
+              <div class="hp-label">HP ${hero.hp}</div>
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="card-title">
+              <strong>${hero.card}</strong>
+              <span class="prio">${hero.prio}</span>
+            </div>
+            <div class="action-icons">
+              ${hero.actions.map((action) => `<span>${action}</span>`).join("")}
+            </div>
+            <div class="resource-row">
+              <div class="resource">${hero.resources.slice(0, heroCount === 3 ? 1 : 3).map((item) => `<span>${item}</span>`).join("")}</div>
+              <div class="status-icons">${hero.status.map((item) => `<span>${item}</span>`).join("")}</div>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      const timelineEntries = [
+        { label: "척후", prio: 16, done: true },
+        ...heroes.slice(0, heroCount).map((hero, index) => ({
+          label: hero.name.slice(0, 2),
+          prio: hero.prio,
+          active: index === 0,
+        })),
+        ...enemies.slice(0, enemyCount).map((enemy) => ({
+          label: enemy.name.slice(0, 2),
+          prio: enemy.prio,
+        })),
+      ].sort((a, b) => a.prio - b.prio);
+
+      timeline.innerHTML = timelineEntries.map((entry) => `
+        <span class="turn-token ${entry.active ? "active" : ""} ${entry.done ? "done" : ""}">
+          ${entry.prio} ${entry.label}
+        </span>
+      `).join("");
+
+      const hexes = [];
+      for (let row = 0; row < 8; row += 1) {
+        for (let col = 0; col < 7; col += 1) {
+          const x = 78 + col * 61 + (row % 2 ? 30 : 0);
+          const y = 56 + row * 44;
+          const classes = ["hex"];
+          if ((row === 3 && col >= 2 && col <= 4) || (row === 4 && col === 3)) classes.push("threat");
+          if (row === 2 && col === 4) classes.push("target");
+          hexes.push(`<div class="${classes.join(" ")}" style="left:${x}px;top:${y}px"></div>`);
+        }
+      }
+
+      hexBoard.innerHTML = hexes.join("") + `
+        <div class="path" style="left:244px;top:348px;width:122px;transform:rotate(-28deg)"></div>
+        <div class="path" style="left:176px;top:328px;width:84px;transform:rotate(18deg)"></div>
+        <div class="trap" style="left:258px;top:222px"></div>
+        <div class="trap" style="left:335px;top:254px"></div>
+        ${unit("hero", heroes[0], 286, 383, "78%")}
+        ${heroCount >= 2 ? unit("hero", heroes[1], 214, 366, "83%") : ""}
+        ${heroCount >= 3 ? unit("hero", heroes[2], 348, 354, "71%") : ""}
+        ${unit("enemy", enemies[0], 374, 238, "56%")}
+        ${unit("enemy", enemies[0], 306, 205, "42%")}
+        ${enemyCount >= 2 ? unit("enemy", enemies[1], 182, 252, "64%") : ""}
+        ${enemyCount >= 2 ? unit("enemy", enemies[1], 452, 298, "88%") : ""}
+        ${enemyCount >= 3 ? unit("enemy", enemies[2], 242, 146, "73%") : ""}
+        ${enemyCount >= 3 ? unit("enemy", enemies[2], 426, 162, "61%") : ""}
+      `;
+
+      function unit(type, actor, x, y, hp) {
+        return `
+          <div class="unit ${type}" style="left:${x}px;top:${y}px">
+            <div class="portrait"><span class="face ${actor.faceClass}">${actor.face}</span></div>
+            <div class="hp-mini" style="--hp:${hp}"><span></span></div>
+          </div>
+        `;
+      }
+    </script>
+  </body>
+</html>

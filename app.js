@@ -4394,6 +4394,10 @@ function renderEnemySummary() {
   groups.forEach((group) => {
     const definition = monsterDefinitions[group.kind] ?? monsterDefinitions.brute;
     const sample = group.enemies[0];
+    const timelineEntry = displayTimelineEntries().find((entry) => {
+      return entry.actorType !== "player" && entry.actorId === group.kind && !displayEntryDone(entry);
+    });
+    const priority = timelineEntry ? timelinePriority(timelineEntry) : null;
     const div = document.createElement("article");
     div.className = `enemy-group ${sample?.boss ? "boss" : ""}`;
     div.innerHTML = `
@@ -4404,7 +4408,10 @@ function renderEnemySummary() {
           <span>x${group.enemies.length}</span>
         </div>
       </div>
-      ${renderBaseStats(sample ?? definition)}
+      <div class="enemy-summary-action">
+        ${priority ? `<span class="enemy-summary-priority">${priority}</span>` : ""}
+        <span class="enemy-summary-icons">${timelineEntry ? renderCompactActionList(timelineEntry.card) : baseStat("move", "이동", sample?.baseMove ?? definition.baseMove)}</span>
+      </div>
     `;
     elements.enemySummary.append(div);
   });
@@ -4567,37 +4574,60 @@ function renderPlayerHud() {
   const alivePlayers = players.filter(isAlive);
   const visiblePlayers = alivePlayers.length ? alivePlayers : players;
   elements.playerHud.innerHTML = "";
-  elements.playerHud.classList.toggle("solo", visiblePlayers.length <= 1);
-  elements.playerHud.classList.toggle("duo", visiblePlayers.length >= 2);
+  const shownPlayers = visiblePlayers.slice(0, 3);
+  elements.playerHud.classList.toggle("solo", shownPlayers.length <= 1);
+  elements.playerHud.classList.toggle("duo", shownPlayers.length === 2);
+  elements.playerHud.classList.toggle("trio", shownPlayers.length >= 3);
 
-  visiblePlayers.slice(0, 2).forEach((player) => {
+  const activeEntry = state.activeTimelineIndex >= 0
+    ? state.currentTimeline[state.activeTimelineIndex]
+    : null;
+  const nextPlayerEntry = state.currentTimeline.find((item, index) => {
+    return item.actorType === "player" && !state.completedTimelineIndexes?.has(index);
+  });
+  const focusEntry = activeEntry?.actorType === "player" ? activeEntry : nextPlayerEntry;
+  if (shownPlayers.length > 1 && focusEntry && !state.suppressPlayerCard) {
+    const focusPlayer = shownPlayers.find((player) => player.id === focusEntry.actorId);
+    const character = characterDefinitions[focusPlayer?.characterId] ?? getSelectedCharacter();
+    const strip = document.createElement("div");
+    strip.className = "player-focus-strip";
+    strip.innerHTML = `
+      <strong>${character.name} 행동 중</strong>
+      <span>${focusEntry.card.name} · ${compactCardText(focusEntry.card)}</span>
+      <b>${timelinePriority(focusEntry)}</b>
+    `;
+    elements.playerHud.append(strip);
+  }
+
+  shownPlayers.forEach((player) => {
     const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
     const playerEntries = state.currentTimeline.filter((item, index) => {
       return item.actorType === "player" && item.actorId === player.id && !state.completedTimelineIndexes?.has(index);
     });
-    const activeEntry = state.activeTimelineIndex >= 0
-      ? state.currentTimeline[state.activeTimelineIndex]
-      : null;
     const entry = activeEntry?.actorType === "player" && activeEntry.actorId === player.id
       ? activeEntry
       : playerEntries[0] ?? null;
     const cardData = state.suppressPlayerCard ? null : entry?.card;
     const article = document.createElement("article");
-    article.className = `player-block ${cardData ? "" : "waiting-card"}`;
+    article.className = `player-block ${entry === activeEntry ? "active" : ""} ${cardData ? "" : "waiting-card"}`;
     article.innerHTML = `
       <div class="player-info">
-        <div class="combatant-heading player-heading">
-          <strong>${character.name}</strong>
+        <div class="player-head">
+          <div class="combatant-portrait player-portrait">${portraitContent(character.image, character.shortLabel, "portrait-art")}</div>
+          <div class="player-vitals">
+            <div class="combatant-heading player-heading">
+              <strong>${character.name}</strong>
+            </div>
+            ${renderHudHp(player)}
+          </div>
         </div>
-        <div class="combatant-portrait player-portrait">${portraitContent(character.image, character.shortLabel, "portrait-art")}</div>
-        ${renderBaseStats(player)}
         <div class="pile-row">
           <span title="덱">${pileIcon()}<b>${state.deck.length}</b><em>덱</em></span>
           <span title="버림">${pileIcon()}<b>${state.discard.length}</b><em>버림</em></span>
           <span title="차지">${actionIcon("charge")}<b>${player.charge ?? 0}</b><em>차지</em></span>
         </div>
       </div>
-      ${renderHudCard(cardData, entry ? timelinePriority(entry) : null)}
+      ${renderCompactHudCard(cardData, entry ? timelinePriority(entry) : null)}
     `;
     elements.playerHud.append(article);
   });
@@ -4611,6 +4641,56 @@ function renderPlayerHud() {
     if (freshCard) freshCard.classList.add("card-just-drawn");
   }
   elements.playerHud.dataset.cardId = drawnCardId ?? "";
+}
+
+function renderHudHp(player) {
+  const pct = Math.max(0, Math.min(100, ((player.hp ?? 0) / Math.max(1, player.maxHp ?? 1)) * 100));
+  return `
+    <div class="hud-hp">
+      <span><i style="width: ${pct}%"></i></span>
+      <b>HP ${Math.max(0, player.hp ?? 0)} / ${player.maxHp ?? 0}</b>
+    </div>
+  `;
+}
+
+function renderCompactHudCard(cardData, priorityOverride = null) {
+  if (!cardData) {
+    return `<div class="hud-compact-card empty"><span>카드 대기</span></div>`;
+  }
+  const priority = priorityOverride ?? cardData.priority;
+  return `
+    <div class="hud-compact-card ${rarityClass(cardData.rarity)}" title="${cardData.name}">
+      <div class="compact-card-title">
+        <strong>${cardData.name}</strong>
+        <span>${priority}</span>
+      </div>
+      <div class="compact-card-actions">${renderCompactActionList(cardData)}</div>
+      <div class="compact-card-note">${compactCardText(cardData)}</div>
+    </div>
+  `;
+}
+
+function compactCardText(cardData) {
+  return cardData.actions
+    .slice(0, 3)
+    .map(compactActionText)
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function compactActionText(action) {
+  if (action.type === "move") return `이동 ${action.amount}`;
+  if (action.type === "flee" || action.type === "fleeToRune") return `후퇴 ${action.amount}`;
+  if (action.type === "attack") return `${action.melee || action.range <= 1 ? "근접" : "원거리"} 공격 ${action.mult}`;
+  if (action.type === "patternAttack") return `범위 공격 ${action.mult}`;
+  if (action.type === "charge") return `차지 ${action.amount}`;
+  if (action.type === "placeTrap" || action.type === "placeObstacle" || action.type === "placeTrapBehindTarget") return "함정";
+  if (action.type === "placeRune") return "룬";
+  if (action.type === "placeMeteor") return "운석 예고";
+  if (action.type === "selfDamagePercent") return "체력 소모";
+  if (action.type === "healPercent") return "회복";
+  if (isPassiveAction(action)) return "지속 효과";
+  return "";
 }
 
 function enemyGroups() {
