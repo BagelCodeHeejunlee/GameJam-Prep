@@ -1604,6 +1604,7 @@ async function runTurn() {
     releaseManualCameraPanForPlayerTurn(entry);
     renderPriorityStrip();
     renderEnemyActionHud();
+    renderPlayerHud();
     renderBoard();
     renderDrawnCards();
     renderTimeline(index);
@@ -1616,6 +1617,7 @@ async function runTurn() {
     document.body.classList.remove("player-acting");
     renderPriorityStrip();
     renderEnemyActionHud();
+    renderPlayerHud();
     renderBoard();
     renderDrawnCards();
     renderTimeline();
@@ -1643,6 +1645,43 @@ function applySharedPlayerPriority(entries) {
 
 function timelinePriority(entry) {
   return entry?.effectivePriority ?? entry?.card?.priority ?? 99;
+}
+
+function displayTimelineEntries() {
+  const result = [];
+  const playerGroups = new Map();
+  state.currentTimeline.forEach((entry, index) => {
+    if (entry.actorType !== "player") {
+      result.push({ ...entry, displayEntries: [entry], timelineIndexes: [index] });
+      return;
+    }
+
+    const key = `player:${entry.actorId}:${timelinePriority(entry)}`;
+    let group = playerGroups.get(key);
+    if (!group) {
+      group = {
+        ...entry,
+        displayType: "playerGroup",
+        displayEntries: [],
+        timelineIndexes: [],
+      };
+      playerGroups.set(key, group);
+      result.push(group);
+    }
+    group.displayEntries.push(entry);
+    group.timelineIndexes.push(index);
+    if (index === state.activeTimelineIndex) group.card = entry.card;
+  });
+  return result;
+}
+
+function displayEntryActive(entry) {
+  return entry.timelineIndexes?.includes(state.activeTimelineIndex) ?? false;
+}
+
+function displayEntryDone(entry) {
+  const indexes = entry.timelineIndexes ?? [];
+  return indexes.length > 0 && indexes.every((index) => state.completedTimelineIndexes?.has(index));
 }
 
 function compareTimeline(a, b) {
@@ -4422,21 +4461,22 @@ function renderPriorityStrip() {
     return;
   }
 
-  const timelineKeys = state.currentTimeline.map(priorityEntryKey);
+  const displayEntries = displayTimelineEntries();
+  const timelineKeys = displayEntries.map(priorityEntryKey);
   const signature = timelineKeys.join("|");
   const activeKeys = new Set(timelineKeys);
   state.priorityStripItems.forEach((item, key) => {
     if (!activeKeys.has(key)) state.priorityStripItems.delete(key);
   });
 
-  state.currentTimeline.forEach((entry, index) => {
+  displayEntries.forEach((entry, index) => {
     const key = timelineKeys[index];
     let item = state.priorityStripItems.get(key);
     if (!item) {
       item = createPriorityItem();
       state.priorityStripItems.set(key, item);
     }
-    updatePriorityItem(item, entry, index);
+    updatePriorityItem(item, entry);
   });
 
   if (state.priorityStripSignature !== signature) {
@@ -4448,6 +4488,9 @@ function renderPriorityStrip() {
 }
 
 function priorityEntryKey(entry) {
+  if (entry.displayType === "playerGroup") {
+    return `${entry.displayType}:${entry.actorId}:${timelinePriority(entry)}`;
+  }
   return `${entry.actorType}:${entry.actorId}:${entry.card.instanceId ?? entry.card.id}`;
 }
 
@@ -4468,19 +4511,19 @@ function createPriorityItem() {
   return item;
 }
 
-function updatePriorityItem(item, entry, index) {
+function updatePriorityItem(item, entry) {
   const isPlayer = entry.actorType === "player";
   const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
   const boss = groupEnemies.some((e) => e.boss);
-  const count = groupEnemies.length;
+  const count = isPlayer ? entry.displayEntries?.length ?? 1 : groupEnemies.length;
   const emblem = isPlayer ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId);
   const portraitImage = isPlayer ? getSelectedCharacter().image : monsterDefinitions[entry.actorId]?.image;
   const className = [
     "priority-item",
     isPlayer ? "player" : "enemy",
     boss ? "boss" : "",
-    state.completedTimelineIndexes?.has(index) ? "done" : "",
-    index === state.activeTimelineIndex ? "active" : "",
+    displayEntryDone(entry) ? "done" : "",
+    displayEntryActive(entry) ? "active" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -4505,7 +4548,8 @@ function updatePriorityItem(item, entry, index) {
   }
 
   item.className = className;
-  item.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${priority}`;
+  const titleCard = count > 1 ? `${count}장` : entry.card.name;
+  item.title = `${entryLabel(entry)} · ${titleCard} · PRI ${priority}`;
 }
 
 function renderPlayerHud() {
@@ -4526,7 +4570,7 @@ function renderPlayerHud() {
       : null;
     const entry = activeEntry?.actorType === "player" && activeEntry.actorId === player.id
       ? activeEntry
-      : playerEntries[0] ?? state.currentTimeline.find((item) => item.actorType === "player" && item.actorId === player.id);
+      : playerEntries[0] ?? null;
     const cardData = state.suppressPlayerCard ? null : entry?.card;
     const article = document.createElement("article");
     article.className = `player-block ${cardData ? "" : "waiting-card"}`;
@@ -4550,7 +4594,7 @@ function renderPlayerHud() {
 
   const playerEntry = state.currentTimeline.find((item, index) => {
     return item.actorType === "player" && !state.completedTimelineIndexes?.has(index);
-  }) ?? state.currentTimeline.find((item) => item.actorType === "player");
+  });
   const drawnCardId = playerEntry?.card?.instanceId ?? playerEntry?.card?.id;
   if (drawnCardId && elements.playerHud.dataset.cardId !== drawnCardId) {
     const freshCard = elements.playerHud.querySelector(".player-block:not(.waiting-card) .hud-card");
@@ -4622,27 +4666,30 @@ function pileIcon() {
 
 function renderDrawnCards() {
   elements.drawnCards.innerHTML = "";
-  state.currentTimeline.forEach((entry, index) => {
+  displayTimelineEntries().forEach((entry, index) => {
     const div = document.createElement("div");
     const statusClass = [
-      state.completedTimelineIndexes?.has(index) ? "done" : "",
-      index === state.activeTimelineIndex ? "active" : "",
+      displayEntryDone(entry) ? "done" : "",
+      displayEntryActive(entry) ? "active" : "",
     ]
       .filter(Boolean)
       .join(" ");
+    const count = entry.displayEntries?.length ?? 1;
     div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
-    div.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${timelinePriority(entry)}`;
-    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}</strong>`;
+    div.title = `${entryLabel(entry)} · ${count > 1 ? `${count}장` : entry.card.name} · PRI ${timelinePriority(entry)}`;
+    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}${count > 1 ? `×${count}` : ""}</strong>`;
     elements.drawnCards.append(div);
   });
 }
 
-function renderTimeline(activeIndex = -1) {
+function renderTimeline() {
   elements.timeline.innerHTML = "";
-  state.currentTimeline.forEach((entry, index) => {
+  displayTimelineEntries().forEach((entry) => {
     const li = document.createElement("li");
-    if (index === activeIndex) li.classList.add("active");
-    li.innerHTML = `<span>${timelinePriority(entry)}</span><strong>${entryLabel(entry)}</strong><span>${entry.card.name}</span>`;
+    if (displayEntryActive(entry)) li.classList.add("active");
+    if (displayEntryDone(entry)) li.classList.add("done");
+    const count = entry.displayEntries?.length ?? 1;
+    li.innerHTML = `<span>${timelinePriority(entry)}</span><strong>${entryLabel(entry)}</strong><span>${count > 1 ? `${count}장 플레이` : entry.card.name}</span>`;
     elements.timeline.append(li);
   });
 }

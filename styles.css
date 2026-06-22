@@ -1447,6 +1447,11 @@ body.turn-cue-active .turn-scrim {
   color: var(--text);
 }
 
+.timeline li.done {
+  opacity: 0.42;
+  filter: grayscale(0.6);
+}
+
 .battle-log {
   display: flex;
   flex-direction: column;
