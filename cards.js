@@ -2,11 +2,34 @@ const DATA_START_MARKER = "const baseArcherCards = [";
 const DATA_END_MARKER = "selectedCharacterId = initialSelectedCharacterId();";
 const CHARACTER_ORDER = ["archer", "warrior", "mage"];
 const RARITY_ORDER = ["기본", "노말", "레어", "에픽", "전설"];
+const CARD_EDIT_STORAGE_KEY = "gamejam-prep-card-edits-v1";
 const CARD_TYPE_TABS = {
   all: "전체",
   action: "액션",
   passive: "패시브",
 };
+const ACTION_TYPES = [
+  "move",
+  "flee",
+  "attack",
+  "patternAttack",
+  "momentumAttack",
+  "charge",
+  "placeTrap",
+  "placeObstacle",
+  "placeTrapBehindTarget",
+  "pushTowardTrap",
+  "detonateTrap",
+  "placeRune",
+  "fleeToRune",
+  "runeAttack",
+  "detonateRune",
+  "placeMeteor",
+  "selfDamagePercent",
+  "healPercent",
+  "applyEffect",
+  "passive",
+];
 const ROUTE_ORDER = {
   archer: ["기본", "공용", "다단중첩", "함정", "차지"],
   warrior: ["기본", "공용", "광전", "돌진", "범위 공격"],
@@ -23,8 +46,11 @@ const els = {
 
 const state = {
   data: null,
+  edits: loadCardEdits(),
   characterId: new URLSearchParams(window.location.search).get("character") || "archer",
+  cardId: new URLSearchParams(window.location.search).get("card") || "",
   cardType: validCardType(new URLSearchParams(window.location.search).get("type")),
+  editorMessage: null,
 };
 
 init();
@@ -33,7 +59,9 @@ async function init() {
   bindCardTypeTabs();
   try {
     state.data = await loadCardData();
+    applyStoredCardEdits();
     if (!state.data.characterDefinitions[state.characterId]) state.characterId = "archer";
+    syncCharacterToSelectedCard();
     render();
   } catch (error) {
     console.error(error);
@@ -65,6 +93,7 @@ function card(id, name, route, rarity, priority, actions, copies = 1) {
 }
 
 function render() {
+  document.body.classList.toggle("card-detail-open", Boolean(state.cardId));
   renderCharacters();
   renderCardTypeTabs();
   renderHero();
@@ -94,6 +123,7 @@ function renderCardTypeTabs() {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", active ? "true" : "false");
   });
+  els.cardTypeTabs.hidden = Boolean(state.cardId);
 }
 
 function renderCharacters() {
@@ -115,8 +145,10 @@ function renderCharacters() {
   els.characterList.querySelectorAll("[data-character-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.characterId = button.dataset.characterId;
+      state.cardId = "";
       const url = new URL(window.location.href);
       url.searchParams.set("character", state.characterId);
+      url.searchParams.delete("card");
       window.history.replaceState({}, "", url);
       render();
     });
@@ -155,6 +187,11 @@ function renderRouteSummary() {
 }
 
 function renderCardSections() {
+  if (state.cardId) {
+    renderCardEditor();
+    return;
+  }
+
   const character = currentCharacter();
   const grouped = groupedCards(character);
   const sections = visibleRouteNames(character, grouped)
@@ -182,10 +219,431 @@ function renderCardSections() {
 
 function renderCard(cardData) {
   return `
-    <article class="manager-card">
+    <a class="manager-card" href="${cardEditorUrl(cardData)}" aria-label="${escapeHtml(cardData.name)} 카드 편집">
       ${cardMount(cardData)}
+    </a>
+  `;
+}
+
+function renderCardEditor() {
+  const located = findCardLocation(state.cardId, state.characterId) || findCardLocation(state.cardId);
+  if (!located) {
+    state.cardId = "";
+    const url = new URL(window.location.href);
+    url.searchParams.delete("card");
+    window.history.replaceState({}, "", url);
+    renderCardSections();
+    return;
+  }
+
+  const { card: cardData, character } = located;
+  const actionText = JSON.stringify(cardData.actions, null, 2);
+  els.cardSections.innerHTML = `
+    <section class="card-editor-shell">
+      <header class="editor-toolbar">
+        <a class="back-link" href="${listUrl(character.id)}">목록</a>
+        <div>
+          <span>${escapeHtml(character.name)} · ${escapeHtml(cardData.route)}</span>
+          <h2>${escapeHtml(cardData.name)}</h2>
+        </div>
+      </header>
+
+      <div class="card-editor-layout">
+        <aside class="card-editor-preview" aria-label="카드 미리보기">
+          ${cardMount(cardData)}
+        </aside>
+
+        <form id="cardEditorForm" class="card-editor-form">
+          <section class="editor-panel">
+            <div class="field-grid">
+              ${textField("cardName", "카드 이름", cardData.name)}
+              ${numberField("cardPriority", "우선도", cardData.priority, 1)}
+              ${textField("cardRoute", "루트", cardData.route)}
+              ${selectField("cardRarity", "등급", RARITY_ORDER, cardData.rarity)}
+              ${numberField("cardCopies", "기본 덱 장수", cardData.copies || 1, 1)}
+            </div>
+          </section>
+
+          <section class="editor-panel">
+            <div class="panel-head">
+              <h3>액션 빠른 편집</h3>
+              <button class="small-command" type="button" data-add-action>액션 추가</button>
+            </div>
+            <div id="actionEditorRows" class="action-editor-list">
+              ${cardData.actions.map((action, index) => actionEditorRow(action, index)).join("")}
+            </div>
+          </section>
+
+          <section class="editor-panel">
+            <label class="json-field">
+              <span>액션 JSON</span>
+              <textarea id="actionsJson" spellcheck="false">${escapeHtml(actionText)}</textarea>
+            </label>
+            <p id="editorStatus" class="editor-status" role="status"></p>
+          </section>
+
+          <div class="editor-actions">
+            <button type="button" class="secondary-command" data-reset-card>초기화</button>
+            <button type="submit" class="primary-command">저장</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  `;
+
+  bindCardEditor(cardData);
+  if (state.editorMessage) {
+    const status = document.querySelector("#editorStatus");
+    status.textContent = state.editorMessage.message;
+    status.dataset.tone = state.editorMessage.tone;
+    state.editorMessage = null;
+  }
+}
+
+function bindCardEditor(cardData) {
+  const form = document.querySelector("#cardEditorForm");
+  const rows = document.querySelector("#actionEditorRows");
+  const jsonInput = document.querySelector("#actionsJson");
+  const status = document.querySelector("#editorStatus");
+
+  const setStatus = (message, tone = "") => {
+    status.textContent = message;
+    status.dataset.tone = tone;
+  };
+
+  const syncRowsToJson = () => {
+    const actions = actionsFromQuickRows(rows);
+    jsonInput.value = JSON.stringify(actions, null, 2);
+    updateEditorPreview(form, actions);
+    setStatus("");
+  };
+
+  rows.addEventListener("input", syncRowsToJson);
+  rows.addEventListener("change", syncRowsToJson);
+
+  rows.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-remove-action]");
+    if (!removeButton) return;
+    const row = removeButton.closest("[data-action-row]");
+    row?.remove();
+    renumberActionRows(rows);
+    const actions = actionsFromQuickRows(rows);
+    jsonInput.value = JSON.stringify(actions, null, 2);
+    updateEditorPreview(form, actions);
+  });
+
+  form.querySelector("[data-add-action]").addEventListener("click", () => {
+    const index = rows.querySelectorAll("[data-action-row]").length;
+    rows.insertAdjacentHTML("beforeend", actionEditorRow({ type: "move", amount: 1 }, index));
+    const actions = actionsFromQuickRows(rows);
+    jsonInput.value = JSON.stringify(actions, null, 2);
+    updateEditorPreview(form, actions);
+  });
+
+  jsonInput.addEventListener("input", () => {
+    try {
+      const actions = parseActionsJson(jsonInput.value);
+      rows.innerHTML = actions.map((action, index) => actionEditorRow(action, index)).join("");
+      updateEditorPreview(form, actions);
+      setStatus("");
+    } catch {
+      setStatus("액션 JSON 형식을 확인해주세요.", "error");
+    }
+  });
+
+  const syncFormToPreview = (event) => {
+    if (event.target === jsonInput || event.target.closest("#actionEditorRows")) return;
+    try {
+      updateEditorPreview(form, parseActionsJson(jsonInput.value));
+    } catch {
+      updateEditorPreview(form, actionsFromQuickRows(rows));
+    }
+    setStatus("");
+  };
+
+  form.addEventListener("input", syncFormToPreview);
+  form.addEventListener("change", syncFormToPreview);
+
+  form.querySelector("[data-reset-card]").addEventListener("click", () => {
+    delete state.edits[cardData.sourceId || cardData.id];
+    saveCardEdits();
+    reloadCardsKeepingSelection();
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const actions = parseActionsJson(jsonInput.value);
+      const nextCard = cardFromEditorForm(form, actions, cardData);
+      state.edits[cardData.sourceId || cardData.id] = {
+        name: nextCard.name,
+        route: nextCard.route,
+        rarity: nextCard.rarity,
+        priority: nextCard.priority,
+        actions: nextCard.actions,
+        copies: nextCard.copies,
+      };
+      saveCardEdits();
+      state.editorMessage = { message: "저장했습니다.", tone: "ok" };
+      await reloadCardsKeepingSelection();
+    } catch (error) {
+      setStatus(error.message || "저장할 수 없습니다.", "error");
+    }
+  });
+}
+
+async function reloadCardsKeepingSelection() {
+  state.data = await loadCardData();
+  applyStoredCardEdits();
+  syncCharacterToSelectedCard();
+  render();
+}
+
+function updateEditorPreview(form, actions) {
+  const preview = document.querySelector(".card-editor-preview");
+  if (!preview) return;
+  const located = findCardLocation(state.cardId, state.characterId) || findCardLocation(state.cardId);
+  if (!located) return;
+  try {
+    preview.innerHTML = cardMount(cardFromEditorForm(form, actions, located.card));
+  } catch {
+    // Keep the last valid preview while the user is mid-edit.
+  }
+}
+
+function cardFromEditorForm(form, actions, fallbackCard) {
+  const data = new FormData(form);
+  const priority = Number(data.get("cardPriority"));
+  const copies = Number(data.get("cardCopies"));
+  if (!Number.isFinite(priority)) throw new Error("우선도는 숫자로 입력해주세요.");
+  if (!Number.isFinite(copies) || copies < 1) throw new Error("기본 덱 장수는 1 이상이어야 합니다.");
+
+  return {
+    ...fallbackCard,
+    name: cleanString(data.get("cardName")) || fallbackCard.name,
+    route: cleanString(data.get("cardRoute")) || fallbackCard.route,
+    rarity: cleanString(data.get("cardRarity")) || fallbackCard.rarity,
+    priority,
+    copies: Math.max(1, Math.round(copies)),
+    actions,
+  };
+}
+
+function actionsFromQuickRows(container) {
+  return [...container.querySelectorAll("[data-action-row]")].map((row) => {
+    const action = parseStoredAction(row.querySelector("[name='actionRaw']").value);
+    action.type = row.querySelector("[name='actionType']").value;
+    const label = cleanString(row.querySelector("[name='actionLabel']").value);
+    const effect = cleanString(row.querySelector("[name='actionEffect']").value);
+    const numericFields = ["amount", "mult", "range", "targets", "count", "radius", "delay", "push", "pull", "percent"];
+
+    if (label) {
+      action.label = label;
+    } else {
+      delete action.label;
+    }
+    if (effect) {
+      action.effect = effect;
+    } else {
+      delete action.effect;
+    }
+    numericFields.forEach((field) => {
+      const value = cleanString(row.querySelector(`[name='${field}']`).value);
+      if (value === "") {
+        delete action[field];
+        return;
+      }
+      const number = Number(value);
+      action[field] = Number.isFinite(number) ? number : value;
+    });
+
+    if ((action.type === "attack" || action.type === "patternAttack") && !Object.hasOwn(action, "range")) {
+      action.range = 1;
+    }
+
+    return action;
+  });
+}
+
+function parseStoredAction(value) {
+  try {
+    const action = JSON.parse(value);
+    return action && typeof action === "object" && !Array.isArray(action) ? action : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseActionsJson(value) {
+  const actions = JSON.parse(value);
+  if (!Array.isArray(actions)) throw new Error("액션 JSON은 배열이어야 합니다.");
+  actions.forEach((action, index) => {
+    if (!action || typeof action !== "object" || Array.isArray(action)) {
+      throw new Error(`${index + 1}번째 액션 형식이 올바르지 않습니다.`);
+    }
+    if (!action.type) throw new Error(`${index + 1}번째 액션에 type이 필요합니다.`);
+  });
+  return actions;
+}
+
+function renumberActionRows(container) {
+  container.querySelectorAll("[data-action-row]").forEach((row, index) => {
+    row.querySelector(".action-row-index").textContent = index + 1;
+  });
+}
+
+function actionEditorRow(action, index) {
+  return `
+    <article class="action-editor-row" data-action-row>
+      <input name="actionRaw" type="hidden" value="${escapeHtml(JSON.stringify(action))}" />
+      <div class="action-row-top">
+        <span class="action-row-index">${index + 1}</span>
+        ${selectField("actionType", "타입", ACTION_TYPES, action.type || "move")}
+        <button class="icon-command" type="button" data-remove-action aria-label="액션 삭제">×</button>
+      </div>
+      <div class="action-row-fields">
+        ${compactTextField("actionLabel", "이름/라벨", action.label || "")}
+        ${compactTextField("actionEffect", "효과 키", action.effect || "")}
+        ${compactNumberField("amount", "값", action.amount)}
+        ${compactNumberField("mult", "공격", action.mult)}
+        ${compactNumberField("range", "사거리", action.range)}
+        ${compactNumberField("targets", "타겟", action.targets)}
+        ${compactNumberField("count", "개수", action.count)}
+        ${compactNumberField("radius", "범위", action.radius)}
+        ${compactNumberField("delay", "지연", action.delay)}
+        ${compactNumberField("push", "밀기", action.push)}
+        ${compactNumberField("pull", "당기기", action.pull)}
+        ${compactNumberField("percent", "비율", action.percent, "0.05")}
+      </div>
     </article>
   `;
+}
+
+function textField(name, label, value) {
+  return `
+    <label class="editor-field">
+      <span>${label}</span>
+      <input name="${name}" type="text" value="${escapeHtml(value)}" />
+    </label>
+  `;
+}
+
+function compactTextField(name, label, value) {
+  return `
+    <label class="editor-field compact">
+      <span>${label}</span>
+      <input name="${name}" type="text" value="${escapeHtml(value)}" />
+    </label>
+  `;
+}
+
+function numberField(name, label, value, step = "any") {
+  return `
+    <label class="editor-field">
+      <span>${label}</span>
+      <input name="${name}" type="number" step="${step}" value="${escapeHtml(value)}" />
+    </label>
+  `;
+}
+
+function compactNumberField(name, label, value, step = "any") {
+  return `
+    <label class="editor-field compact">
+      <span>${label}</span>
+      <input name="${name}" type="number" step="${step}" value="${escapeHtml(value ?? "")}" />
+    </label>
+  `;
+}
+
+function selectField(name, label, options, value) {
+  return `
+    <label class="editor-field">
+      <span>${label}</span>
+      <select name="${name}">
+        ${options.map((option) => `
+          <option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>
+        `).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function cardEditorUrl(cardData) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("character", state.characterId);
+  url.searchParams.set("card", cardData.sourceId || cardData.id);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function listUrl(characterId = state.characterId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("character", characterId);
+  url.searchParams.delete("card");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function findCardLocation(cardId, characterId = "") {
+  const ids = characterId ? [characterId] : CHARACTER_ORDER;
+  for (const id of ids) {
+    const character = state.data.characterDefinitions[id];
+    if (!character) continue;
+    const groups = [
+      ["baseCards", character.baseCards],
+      ["rewardPool", character.rewardPool],
+      ["passivePool", passivePool(character)],
+    ];
+    for (const [group, cards] of groups) {
+      const index = cards.findIndex((cardData) => cardData.id === cardId || cardData.sourceId === cardId);
+      if (index >= 0) return { characterId: id, character, group, index, card: cards[index] };
+    }
+  }
+  return null;
+}
+
+function syncCharacterToSelectedCard() {
+  if (!state.cardId) return;
+  const located = findCardLocation(state.cardId, state.characterId) || findCardLocation(state.cardId);
+  if (!located) {
+    state.cardId = "";
+    const url = new URL(window.location.href);
+    url.searchParams.delete("card");
+    window.history.replaceState({}, "", url);
+    return;
+  }
+  state.characterId = located.characterId;
+}
+
+function loadCardEdits() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CARD_EDIT_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCardEdits() {
+  localStorage.setItem(CARD_EDIT_STORAGE_KEY, JSON.stringify(state.edits));
+}
+
+function applyStoredCardEdits() {
+  Object.values(state.data.characterDefinitions).forEach((character) => {
+    [character.baseCards, character.rewardPool, passivePool(character)].forEach((cards) => {
+      cards.forEach((cardData) => {
+        const edit = state.edits[cardData.id];
+        if (!edit) return;
+        Object.assign(cardData, {
+          ...edit,
+          id: cardData.id,
+          sourceId: cardData.id,
+        });
+      });
+    });
+  });
+}
+
+function cleanString(value) {
+  return String(value ?? "").trim();
 }
 
 function currentCharacter() {
@@ -241,6 +699,7 @@ function expandedBaseCards(cards) {
     const copies = Math.max(1, cardData.copies || 1);
     return Array.from({ length: copies }, (_, index) => ({
       ...cardData,
+      sourceId: cardData.id,
       id: index ? `${cardData.id}-${index + 1}` : cardData.id,
       copies: 1,
     }));
