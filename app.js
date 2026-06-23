@@ -1041,12 +1041,12 @@ const magePassivePool = [
 ];
 
 const archerTokenImages = {
-  front: "assets/characters/archer-token/archer-token-front.png",
-  frontRight: "assets/characters/archer-token/archer-token-front-right.png",
-  right: "assets/characters/archer-token/archer-token-right.png",
-  back: "assets/characters/archer-token/archer-token-back.png",
-  backLeft: "assets/characters/archer-token/archer-token-back-left.png",
-  left: "assets/characters/archer-token/archer-token-left.png",
+  front: "assets/characters/archer-token/archer-token-v2-front.png",
+  frontRight: "assets/characters/archer-token/archer-token-v2-front-right.png",
+  right: "assets/characters/archer-token/archer-token-v2-right.png",
+  back: "assets/characters/archer-token/archer-token-v2-back.png",
+  backLeft: "assets/characters/archer-token/archer-token-v2-back-left.png",
+  left: "assets/characters/archer-token/archer-token-v2-left.png",
 };
 
 const characterDefinitions = {
@@ -1054,7 +1054,7 @@ const characterDefinitions = {
     id: "archer",
     name: "궁수",
     shortLabel: "궁",
-    image: "assets/casting/archer/archer-01-2d-illustration.png",
+    image: "assets/casting/archer/archer-01-2d-illustration-cutout.png",
     tokenImages: archerTokenImages,
     title: "궁수 오토배틀 프로토타입",
     maxHp: 80,
