@@ -4387,6 +4387,10 @@ body.turn-cue-active .turn-scrim {
   --cps: var(--priority-card-scale);
 }
 
+.priority-card-mount .cp-character-watermark {
+  opacity: 0.26;
+}
+
 .priority-item.active {
   transform: translateY(2px);
   filter:

@@ -4465,7 +4465,7 @@ function renderEnemyActionHud() {
       </div>
       ${sample ? renderBaseStats(sample) : ""}
     </div>
-    ${cardMount(entry.card, "enemy-action-mount monster-card-mount")}
+    ${cardMount(entry.card, "enemy-action-mount monster-card-mount", null, definition)}
   `;
 }
 
@@ -4530,6 +4530,7 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
   const boss = groupEnemies.some((e) => e.boss);
   const count = isPlayer ? 1 : groupEnemies.length;
   const ownerLabel = isPlayer ? "나" : monsterLabel(entry.actorId);
+  const cardOwner = isPlayer ? getSelectedCharacter() : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
   const className = [
     "priority-item",
     isPlayer ? "player" : "enemy",
@@ -4541,12 +4542,12 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
     .join(" ");
   const priority = timelinePriority(entry);
   const cardKey = cardRuntimeKey(entry.card);
-  const contentSignature = `${cardKey}:${priority}:${ownerLabel}:${count}`;
+  const contentSignature = `${cardKey}:${priority}:${ownerLabel}:${count}:${cardOwner.image ?? ""}`;
 
   if (item.dataset.contentSignature !== contentSignature) {
     const cardMountClass = `priority-card-mount ${isPlayer ? "" : "monster-card-mount"}`.trim();
     item.innerHTML = `
-      ${cardMount(entry.card, cardMountClass, priority)}
+      ${cardMount(entry.card, cardMountClass, priority, cardOwner)}
       <span class="pc-owner">${ownerLabel}${count > 1 ? ` ×${count}` : ""}</span>
     `;
     item.dataset.contentSignature = contentSignature;
