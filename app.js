@@ -15,6 +15,7 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
+const STAT_PERCENT_PASSIVE_CAP = 0.3;
 const NORMAL_REWARD_RARITY_WEIGHT_TIERS = [
   {
     maxWave: 5,
@@ -858,11 +859,10 @@ const mageRewardPool = [
 
 const archerPassivePool = [
   passiveCard("archer-passive-sharp-bow", "예리한 활", "공용", "노말", [
-    cardPassive("baseAtkPercent", "공격력 50% 증가", 0.5),
-    cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 1장 추가 사용", 1),
+    cardPassive("baseAtkPercent", "공격력 30% 증가", 0.3),
   ]),
   passiveCard("archer-passive-light-armor", "가벼운 방호", "공용", "노말", [
-    cardPassive("maxHpPercent", "최대 체력 50% 증가", 0.5),
+    cardPassive("maxHpPercent", "최대 체력 30% 증가", 0.3),
     { type: "passive", label: "받는 피해 15% 감소", modifiers: [{ stat: "damageTaken", amount: -0.15 }] },
   ]),
   passiveCard("archer-passive-repeat-rhythm", "반복 리듬", "다단중첩", "노말", [
@@ -870,16 +870,11 @@ const archerPassivePool = [
   ]),
   passiveCard("archer-passive-trap-polish", "함정 손질", "함정", "노말", [
     cardPassive("trapNextAttackDamage", "함정 발동 후 다음 공격 피해 50% 증가", 0.5),
-    cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 1장 추가 사용", 1),
   ]),
   passiveCard("archer-passive-steady-charge", "안정 차지", "차지", "노말", [
     cardPassive("chargeRangePerStack", "차지 1당 사거리 3 증가", 3),
     cardPassive("chargeStackMultiplier", "차지 스택 효과 1.5배", 1.5),
     cardPassive("chargeOnNoAttack", "공격하지 않으면 차지 1", 1),
-  ]),
-  passiveCard("archer-passive-quick-hands", "빠른 손놀림", "공용", "레어", [
-    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
-    cardPassive("firstTurnExtraCardPlays", "첫 턴에 카드 2장 추가 사용", 2),
   ]),
   passiveCard("archer-passive-weakness-read", "약점 판독", "다단중첩", "레어", [
     cardPassive("thirdHitDamage", "세 번째 명중 피해 100% 증가", 1),
@@ -902,14 +897,10 @@ const archerPassivePool = [
   ]),
   passiveCard("archer-passive-chain-trap", "연쇄 덫", "함정", "에픽", [
     cardPassive("trapChainDamage", "함정 발동 시 주변 피해 5배", 5),
-    cardPassive("extraCardPlays", "매턴 카드 1장 추가 사용", 1),
   ]),
   passiveCard("archer-passive-piercing-charge", "관통 차지", "차지", "에픽", [
     cardPassive("overkillSplashRange", "처치 잔여 피해 6칸 전이", 6),
     cardPassive("chargeStackMultiplier", "차지 스택 효과 2배", 2),
-  ]),
-  passiveCard("archer-passive-double-draw", "쌍궁 운용", "공용", "전설", [
-    cardPassive("extraCardPlays", "매턴 카드 3장 추가 사용", 3),
   ]),
   passiveCard("archer-passive-finale-sense", "결말 감각", "다단중첩", "전설", [
     cardPassive("thirdHitDamage", "세 번째 명중 피해 200% 증가", 2),
@@ -2030,15 +2021,16 @@ async function resolveCardEndEffects(actor, cardData, cardContext) {
 
 function applyPassiveAction(actor, action) {
   actor.permanent = actor.permanent ?? {};
-  if (action.effect) actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + (action.amount ?? 1);
+  const amount = passiveActionAmount(action);
+  if (action.effect) actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + amount;
   if (action.effect === "baseAtkPercent") {
     const definition = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
-    const increase = Math.max(1, Math.round((definition.baseAtk ?? actor.baseAtk ?? 1) * (action.amount ?? 0)));
+    const increase = Math.max(1, Math.round((definition.baseAtk ?? actor.baseAtk ?? 1) * amount));
     actor.baseAtk = (actor.baseAtk ?? 0) + increase;
   }
   if (action.effect === "maxHpPercent") {
     const definition = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
-    const increase = Math.max(1, Math.round((definition.maxHp ?? actor.maxHp ?? 1) * (action.amount ?? 0)));
+    const increase = Math.max(1, Math.round((definition.maxHp ?? actor.maxHp ?? 1) * amount));
     actor.maxHp = (actor.maxHp ?? 0) + increase;
     actor.hp = Math.min(actor.maxHp, (actor.hp ?? 0) + increase);
   }
@@ -2058,6 +2050,14 @@ function applyPassiveAction(actor, action) {
     actor.permanent[rangeKey] = Math.max(actor.permanent[rangeKey] ?? 0, action.range);
   }
   log(`${actor.name} 패시브: ${passiveEffectLabel(action)}`);
+}
+
+function passiveActionAmount(action) {
+  const amount = action.amount ?? 1;
+  if (action.effect === "baseAtkPercent" || action.effect === "maxHpPercent") {
+    return Math.min(amount, STAT_PERCENT_PASSIVE_CAP);
+  }
+  return amount;
 }
 
 function applyEffect(actor, action) {
@@ -5311,8 +5311,8 @@ function trapLabel(action) {
 
 function passiveEffectLabel(action) {
   const labels = {
-    baseAtkPercent: `공격력 ${percentChangeLabel(action.amount)}`,
-    maxHpPercent: `최대 체력 ${percentChangeLabel(action.amount)}`,
+    baseAtkPercent: `공격력 ${percentChangeLabel(passiveActionAmount(action))}`,
+    maxHpPercent: `최대 체력 ${percentChangeLabel(passiveActionAmount(action))}`,
     extraCardPlays: `매턴 카드 ${action.amount}장 추가 사용`,
     firstTurnExtraCardPlays: `첫 턴 카드 ${action.amount}장 추가 사용`,
     comboDamage: `연타 피해 ${percentChangeLabel(action.amount)}`,
