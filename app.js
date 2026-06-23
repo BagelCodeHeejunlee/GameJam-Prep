@@ -76,6 +76,9 @@ const elements = {
   rewardCards: document.querySelector("#rewardCards"),
   iconHelpOverlay: document.querySelector("#iconHelpOverlay"),
   closeHelpButton: document.querySelector("#closeHelpButton"),
+  cardPreviewOverlay: document.querySelector("#cardPreviewOverlay"),
+  cardPreviewMount: document.querySelector("#cardPreviewMount"),
+  closeCardPreviewButton: document.querySelector("#closeCardPreviewButton"),
   newRunButton: document.querySelector("#newRunButton"),
   pauseButton: document.querySelector("#pauseButton"),
   speedButton: document.querySelector("#speedButton"),
@@ -4616,7 +4619,7 @@ function renderPlayerHud() {
         <div class="pile-row">
           <span title="덱">${pileIcon()}<b>${state.deck.length}</b><em>덱</em></span>
           <span title="버림">${pileIcon()}<b>${state.discard.length}</b><em>버림</em></span>
-          <span title="차지">${actionIcon("charge")}<b>${player.charge ?? 0}</b><em>차지</em></span>
+          <span title="공격력">${actionIcon("melee")}<b>${Math.max(0, player.baseAtk ?? character.baseAtk ?? 0)}</b><em>공격</em></span>
         </div>
       </div>
     `;
@@ -4626,6 +4629,12 @@ function renderPlayerHud() {
     focusCard.innerHTML = currentEntry && !state.suppressPlayerCard
       ? renderHudCard(currentEntry.card, timelinePriority(currentEntry))
       : renderHudCard(null);
+    if (currentEntry && !state.suppressPlayerCard) {
+      focusCard.dataset.cardKey = cardRuntimeKey(currentEntry.card);
+      focusCard.setAttribute("role", "button");
+      focusCard.tabIndex = 0;
+      focusCard.setAttribute("aria-label", `${currentEntry.card.name} 확대`);
+    }
     slot.append(focusCard);
     elements.playerHud.append(slot);
   });
@@ -4731,6 +4740,32 @@ function renderHudCard(cardData, priorityOverride = null) {
     return `<div class="card-mount hud-mount is-empty"><span>카드 대기</span></div>`;
   }
   return cardMount(cardData, "hud-mount", priorityOverride);
+}
+
+function cardRuntimeKey(cardData) {
+  return String(cardData?.instanceId ?? cardData?.id ?? "");
+}
+
+function findCurrentTimelineCard(cardKey) {
+  if (!cardKey) return null;
+  const entry = state.currentTimeline.find((item, index) => {
+    if (item.actorType !== "player" || state.completedTimelineIndexes?.has(index)) return false;
+    return cardRuntimeKey(item.card) === cardKey;
+  });
+  return entry ?? null;
+}
+
+function openCardPreview(cardKey) {
+  const entry = findCurrentTimelineCard(cardKey);
+  if (!entry || !elements.cardPreviewOverlay || !elements.cardPreviewMount) return;
+  elements.cardPreviewMount.innerHTML = cardMount(entry.card, "preview-mount", timelinePriority(entry));
+  elements.cardPreviewOverlay.classList.remove("hidden");
+}
+
+function closeCardPreview() {
+  if (!elements.cardPreviewOverlay || !elements.cardPreviewMount) return;
+  elements.cardPreviewOverlay.classList.add("hidden");
+  elements.cardPreviewMount.innerHTML = "";
 }
 
 function pileIcon() {
@@ -5924,11 +5959,37 @@ elements.boardPanel.addEventListener("pointerdown", beginBoardCameraDrag);
 elements.boardPanel.addEventListener("pointermove", moveBoardCameraDrag);
 elements.boardPanel.addEventListener("pointerup", endBoardCameraDrag);
 elements.boardPanel.addEventListener("pointercancel", endBoardCameraDrag);
+elements.playerHud.addEventListener("click", (event) => {
+  const cardSlot = event.target.closest(".current-action-card:not(.waiting-card)");
+  if (!cardSlot?.dataset.cardKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openCardPreview(cardSlot.dataset.cardKey);
+});
+elements.playerHud.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const cardSlot = event.target.closest(".current-action-card:not(.waiting-card)");
+  if (!cardSlot?.dataset.cardKey) return;
+  event.preventDefault();
+  openCardPreview(cardSlot.dataset.cardKey);
+});
 elements.closeHelpButton.addEventListener("click", () => {
   elements.iconHelpOverlay.classList.add("hidden");
 });
 elements.iconHelpOverlay.addEventListener("click", (event) => {
   if (event.target === elements.iconHelpOverlay) {
+    elements.iconHelpOverlay.classList.add("hidden");
+  }
+});
+elements.closeCardPreviewButton.addEventListener("click", closeCardPreview);
+elements.cardPreviewOverlay.addEventListener("click", (event) => {
+  if (event.target === elements.cardPreviewOverlay) {
+    closeCardPreview();
+  }
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeCardPreview();
     elements.iconHelpOverlay.classList.add("hidden");
   }
 });

@@ -22,6 +22,15 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+.app-shell {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -48,10 +57,12 @@ button {
   color: var(--text);
   cursor: pointer;
   font: inherit;
+  touch-action: manipulation;
 }
 
 a {
   color: inherit;
+  touch-action: manipulation;
 }
 
 button:hover {
@@ -3043,6 +3054,7 @@ body.turn-cue-active .turn-scrim {
   place-items: center;
   padding: 20px;
   background: rgba(0, 0, 0, 0.66);
+  touch-action: manipulation;
 }
 
 .overlay.hidden {
@@ -3075,6 +3087,59 @@ body.turn-cue-active .turn-scrim {
 .icon-button {
   width: 34px;
   height: 34px;
+}
+
+.card-preview-overlay {
+  z-index: 70;
+  background:
+    radial-gradient(80% 65% at 50% 45%, rgba(56, 119, 145, 0.26), transparent 70%),
+    rgba(4, 10, 16, 0.74);
+}
+
+.card-preview-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 420px);
+  min-height: min(100%, 560px);
+  padding: 18px;
+}
+
+.card-preview-close {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.84);
+  border-radius: 50%;
+  background: rgba(25, 46, 58, 0.92);
+  color: #fff6df;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.34);
+}
+
+.card-preview-mount {
+  display: grid;
+  place-items: center;
+}
+
+.card-preview-overlay .preview-mount {
+  --cps: 0.52;
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.58));
+}
+
+@media (max-width: 390px) {
+  .card-preview-overlay {
+    padding: 12px;
+  }
+
+  .card-preview-stage {
+    min-height: min(100%, 500px);
+    padding: 12px;
+  }
+
+  .card-preview-overlay .preview-mount {
+    --cps: 0.46;
+  }
 }
 
 /* ── Roguelike victory / card-reward screen ───────────────── */
@@ -4492,6 +4557,18 @@ body.turn-cue-active .turn-scrim {
   justify-items: center;
   width: var(--hud-card-width);
   min-width: 0;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.current-action-card:not(.waiting-card) {
+  cursor: pointer;
+}
+
+.current-action-card:not(.waiting-card):focus-visible {
+  outline: 2px solid rgba(255, 244, 190, 0.95);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 
 .current-action-card .card-mount {
@@ -4622,6 +4699,10 @@ body.turn-cue-active .turn-scrim {
     --hud-card-scale: 0.105;
     width: min(calc(100vw - 14px), 295px);
   }
+
+  .player-hud .pile-row span em {
+    display: none;
+  }
 }
 
 @media (max-width: 390px) {
@@ -4655,10 +4736,6 @@ body.turn-cue-active .turn-scrim {
   .current-action-card,
   .current-action-card .card-mount {
     width: var(--hud-card-width);
-  }
-
-  .player-hud.trio .pile-row span:nth-child(n + 2) {
-    display: none;
   }
 
   .player-hud.trio .compact-card-title span {
