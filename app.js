@@ -1315,6 +1315,7 @@ function card(id, name, route, rarity, priority, actions, copies = 1) {
 
 async function newRun() {
   state?.planResolver?.();
+  clearPlannerDrag();
   const renderToken = ++rewardRenderToken;
   const character = getSelectedCharacter();
   state = {
@@ -1396,6 +1397,7 @@ async function newRun() {
 }
 
 function startWave(index) {
+  clearPlannerDrag();
   const wave = waves[index];
   const character = getSelectedCharacter();
   const previousPlayer = state.entities.find((entity) => entity.side === "player");
@@ -1840,6 +1842,7 @@ function confirmTurnPlan() {
 
 function reorderPlannedCardToIndex(draggedKey, targetIndex) {
   if (!state?.turnPlanning || !draggedKey) return;
+  const previousRects = plannerCardRects();
   const orderedKeys = [...(state.plannedCardKeys ?? [])];
   const fromIndex = orderedKeys.indexOf(draggedKey);
   if (fromIndex < 0) return;
@@ -1850,11 +1853,17 @@ function reorderPlannedCardToIndex(draggedKey, targetIndex) {
   state.plannedCardKeys = orderedKeys;
   refreshPlannedTimeline();
   render();
+  animatePlannerCardReorder(previousRects);
 }
 
 function refreshPlannedTimeline() {
   state.currentTimeline = plannedPlayerEntriesFromState().concat(state.enemyPlanEntries ?? []);
   assignPlanOrders(state.currentTimeline);
+}
+
+function clearPlannerDrag() {
+  plannerDrag?.ghost?.remove();
+  plannerDrag = null;
 }
 
 function discardSkippedPlayerCard(cardData) {
@@ -5001,6 +5010,7 @@ function renderTurnPlanner() {
   const host = elements.turnPlanner;
   if (!host) return;
   if (!state.turnPlanning) {
+    clearPlannerDrag();
     host.classList.add("hidden");
     host.innerHTML = "";
     return;
@@ -5996,6 +6006,9 @@ function beginPlannerDrag(event) {
     startX: event.clientX,
     startY: event.clientY,
     active: false,
+    ghost: null,
+    offsetX: 0,
+    offsetY: 0,
   };
   elements.turnPlanner?.setPointerCapture?.(event.pointerId);
 }
@@ -6006,9 +6019,11 @@ function movePlannerDrag(event) {
   if (!plannerDrag.active && movedDistance < 8) return;
   event.preventDefault();
   if (!plannerDrag.active) {
+    activatePlannerDrag(event);
     plannerDrag.active = true;
     render();
   }
+  updatePlannerDragGhost(event);
   reorderPlannedCardAtPoint(plannerDrag.cardKey, event.clientX, event.clientY);
 }
 
@@ -6018,11 +6033,34 @@ function endPlannerDrag(event) {
   if (elements.turnPlanner?.hasPointerCapture?.(event.pointerId)) {
     elements.turnPlanner.releasePointerCapture(event.pointerId);
   }
-  plannerDrag = null;
+  clearPlannerDrag();
   if (wasActive) {
     event.preventDefault();
     render();
   }
+}
+
+function activatePlannerDrag(event) {
+  const source = findPlannerCardElement(plannerDrag.cardKey);
+  if (!source) return;
+  const rect = source.getBoundingClientRect();
+  const ghost = source.cloneNode(true);
+  ghost.classList.remove("dragging");
+  ghost.classList.add("planner-drag-ghost");
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.height = `${rect.height}px`;
+  plannerDrag.ghost = ghost;
+  plannerDrag.offsetX = event.clientX - rect.left;
+  plannerDrag.offsetY = event.clientY - rect.top;
+  document.body.append(ghost);
+  updatePlannerDragGhost(event);
+}
+
+function updatePlannerDragGhost(event) {
+  if (!plannerDrag?.ghost) return;
+  plannerDrag.ghost.style.left = `${event.clientX - plannerDrag.offsetX}px`;
+  plannerDrag.ghost.style.top = `${event.clientY - plannerDrag.offsetY}px`;
 }
 
 function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
@@ -6046,6 +6084,38 @@ function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
   let targetIndex = cardPositions.findIndex((item) => clientX < item.centerX);
   if (targetIndex < 0) targetIndex = cardPositions.length;
   reorderPlannedCardToIndex(draggedKey, targetIndex);
+}
+
+function plannerCardRects() {
+  return new Map([...(elements.turnPlanner?.querySelectorAll(".planner-card") ?? [])]
+    .filter((cardElement) => cardElement.dataset.cardKey)
+    .map((cardElement) => [cardElement.dataset.cardKey, cardElement.getBoundingClientRect()]));
+}
+
+function animatePlannerCardReorder(previousRects) {
+  if (!previousRects?.size) return;
+  const animate = window.requestAnimationFrame ?? ((callback) => window.setTimeout(callback, 0));
+  [...elements.turnPlanner.querySelectorAll(".planner-card")].forEach((cardElement) => {
+    const key = cardElement.dataset.cardKey;
+    if (!key || key === plannerDrag?.cardKey) return;
+    const previousRect = previousRects.get(key);
+    if (!previousRect) return;
+    const nextRect = cardElement.getBoundingClientRect();
+    const deltaX = previousRect.left - nextRect.left;
+    const deltaY = previousRect.top - nextRect.top;
+    if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return;
+    cardElement.style.transition = "none";
+    cardElement.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+    animate(() => {
+      cardElement.style.transition = "";
+      cardElement.style.transform = "";
+    });
+  });
+}
+
+function findPlannerCardElement(cardKey) {
+  return [...(elements.turnPlanner?.querySelectorAll(".planner-card") ?? [])]
+    .find((cardElement) => cardElement.dataset.cardKey === cardKey) ?? null;
 }
 
 function clampCameraDragFrame(frame, metrics) {

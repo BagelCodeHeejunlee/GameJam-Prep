@@ -5099,18 +5099,27 @@ body {
   touch-action: none;
   transition:
     transform 160ms ease,
+    opacity 160ms ease,
     filter 160ms ease;
 }
 
 .planner-card.dragging {
   border-color: rgba(255, 205, 74, 0.98);
-  background: rgba(255, 242, 183, 0.86);
+  background: rgba(255, 242, 183, 0.42);
   cursor: grabbing;
-  opacity: 0.92;
+  opacity: 0.34;
+}
+
+.planner-card.planner-drag-ghost {
+  position: fixed;
+  z-index: 90;
+  margin: 0;
+  opacity: 0.98;
+  pointer-events: none;
+  transform: scale(1.05) rotate(1deg);
   box-shadow:
-    0 0 0 2px rgba(255, 245, 187, 0.54),
-    0 0 18px rgba(255, 201, 69, 0.42);
-  transform: translateY(-14px) scale(1.03);
+    0 0 0 2px rgba(255, 245, 187, 0.64),
+    0 18px 26px rgba(58, 42, 23, 0.32);
 }
 
 .planner-mount {
