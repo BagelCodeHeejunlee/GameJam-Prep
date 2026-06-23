@@ -1716,7 +1716,7 @@ async function runTurn() {
   const enemyEntries = drawEnemyPlanEntries();
   state.planningChoices = playerChoices;
   state.enemyPlanEntries = enemyEntries;
-  state.plannedCardKeys = defaultPlannedCardKeys(playerChoices);
+  state.plannedCardKeys = defaultPlannedCardKeys();
   state.focusTargetId = currentFocusTargetId();
   state.turnPlanning = true;
   state.currentTimeline = plannedPlayerEntriesFromState().concat(enemyEntries);
@@ -1796,10 +1796,8 @@ function playerTurnPlayLimit(player = getPlayer()) {
   return Math.max(1, PLAYER_TURN_PLAY_COUNT + bonusPlays);
 }
 
-function defaultPlannedCardKeys(choices) {
-  return choices
-    .slice(0, Math.min(playerTurnPlayLimit(), choices.length))
-    .map((entry) => cardRuntimeKey(entry.card));
+function defaultPlannedCardKeys() {
+  return [];
 }
 
 function plannedPlayerEntriesFromState() {
