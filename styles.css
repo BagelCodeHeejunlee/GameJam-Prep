@@ -4705,3 +4705,168 @@ body.turn-cue-active .turn-scrim {
     height: 20px;
   }
 }
+
+/* Casual art asset pass */
+html,
+body {
+  background: #79d7ee url("assets/casual/bg-meadow.png") center / cover no-repeat fixed;
+}
+
+.board-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(43, 109, 91, 0.2) 54%, rgba(28, 84, 73, 0.34)),
+    url("assets/casual/bg-meadow.png") center / cover no-repeat;
+  background-color: #79d7ee;
+}
+
+.board-panel::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 34%),
+    radial-gradient(90% 44% at 50% 62%, rgba(255, 226, 138, 0.24), transparent 70%);
+  content: "";
+  pointer-events: none;
+}
+
+.board {
+  filter: drop-shadow(0 18px 18px rgba(49, 82, 40, 0.14));
+}
+
+.hex {
+  background: transparent;
+  filter: drop-shadow(0 4px 2px rgba(52, 92, 34, 0.2));
+}
+
+.hex::after {
+  inset: 0;
+  clip-path: none;
+  background: url("assets/casual/hex-grass.png") center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.hex.wall::after {
+  background: url("assets/casual/hex-stone.png") center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.hex.obstacle::after {
+  background: url("assets/casual/hex-earth.png") center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.hex.trap-attack::after {
+  background:
+    radial-gradient(circle at 50% 52%, rgba(246, 106, 86, 0.8) 0 16%, transparent 18%),
+    url("assets/casual/hex-earth.png") center / 100% 100% no-repeat;
+}
+
+.hex.trap-block::after {
+  background:
+    radial-gradient(circle at 50% 52%, rgba(96, 169, 255, 0.8) 0 16%, transparent 18%),
+    url("assets/casual/hex-stone.png") center / 100% 100% no-repeat;
+}
+
+.hex.trap-rune::after {
+  background:
+    radial-gradient(circle at 50% 52%, rgba(164, 130, 255, 0.82) 0 15%, rgba(110, 218, 212, 0.34) 16% 34%, transparent 36%),
+    url("assets/casual/hex-grass.png") center / 100% 100% no-repeat;
+}
+
+.hex.in-range::after {
+  background:
+    radial-gradient(circle at 50% 52%, rgba(255, 248, 144, 0.42) 0 46%, transparent 48%),
+    url("assets/casual/hex-grass.png") center / 100% 100% no-repeat;
+  filter: brightness(1.12) saturate(1.12);
+}
+
+.top-bar h1,
+#runSummary,
+.controls button,
+.tool-link {
+  border: 0;
+  background: url("assets/casual/button-pill.png") center / 100% 100% no-repeat;
+  box-shadow: none;
+  color: #5c3413;
+  text-shadow: 0 1px 0 rgba(255, 251, 216, 0.75);
+}
+
+.top-bar h1 {
+  min-height: 34px;
+  padding: 7px 16px;
+}
+
+#runSummary {
+  min-height: 30px;
+  padding: 6px 13px;
+  color: #5d4624;
+}
+
+.controls button,
+.tool-link {
+  min-height: 34px;
+  padding: 7px 13px;
+}
+
+.controls button.active {
+  background:
+    linear-gradient(rgba(255, 154, 70, 0.32), rgba(255, 154, 70, 0.32)),
+    url("assets/casual/button-pill.png") center / 100% 100% no-repeat;
+}
+
+.resource-hud,
+.player-block,
+.reward-modal,
+.help-modal {
+  border: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.1)),
+    url("assets/casual/hud-panel.png") center / 100% 100% no-repeat;
+  box-shadow: 0 10px 18px rgba(82, 56, 28, 0.16);
+}
+
+.player-block {
+  padding: 9px;
+  color: #4a3821;
+}
+
+.player-block.active {
+  box-shadow:
+    0 0 0 2px rgba(255, 223, 93, 0.7),
+    0 12px 20px rgba(82, 56, 28, 0.2);
+}
+
+.player-heading {
+  color: #2e7d49;
+  text-shadow: 0 1px 0 rgba(255, 255, 220, 0.65);
+}
+
+.pile-row span,
+.pile-row span:last-child {
+  border: 1px solid rgba(135, 96, 26, 0.22);
+  background: rgba(255, 248, 202, 0.72);
+  color: #5b4321;
+}
+
+.priority-item {
+  filter: drop-shadow(0 5px 4px rgba(58, 42, 23, 0.18));
+}
+
+.priority-item.active {
+  filter:
+    drop-shadow(0 4px 3px rgba(58, 42, 23, 0.18))
+    drop-shadow(0 0 12px rgba(255, 231, 112, 0.95));
+}
+
+.priority-item.done {
+  filter: grayscale(0.12) opacity(0.56);
+}
+
+.enemy-summary-priority,
+.compact-card-title span {
+  border: 0;
+  background: url("assets/casual/hud-token.png") center / 100% 100% no-repeat;
+  color: #5c3413;
+  text-shadow: 0 1px 0 rgba(255, 251, 216, 0.75);
+  box-shadow: none;
+}
