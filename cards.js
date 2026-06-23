@@ -30,6 +30,14 @@ const ACTION_TYPES = [
   "applyEffect",
   "passive",
 ];
+const PATTERN_EDITOR_RADIUS = 2;
+const PATTERN_MODES = [
+  { id: "hit", label: "타격" },
+  { id: "self", label: "나" },
+  { id: "enemy", label: "적" },
+  { id: "ally", label: "동료" },
+  { id: "clear", label: "삭제" },
+];
 const ROUTE_ORDER = {
   archer: ["기본", "공용", "다단중첩", "함정", "차지"],
   warrior: ["기본", "공용", "광전", "돌진", "범위 공격"],
@@ -312,6 +320,7 @@ function bindCardEditor(cardData) {
   };
 
   const syncRowsToJson = () => {
+    rows.querySelectorAll("[data-action-row]").forEach(syncActionRowType);
     const actions = actionsFromQuickRows(rows);
     jsonInput.value = JSON.stringify(actions, null, 2);
     updateEditorPreview(form, actions);
@@ -323,13 +332,29 @@ function bindCardEditor(cardData) {
 
   rows.addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-action]");
-    if (!removeButton) return;
-    const row = removeButton.closest("[data-action-row]");
-    row?.remove();
-    renumberActionRows(rows);
-    const actions = actionsFromQuickRows(rows);
-    jsonInput.value = JSON.stringify(actions, null, 2);
-    updateEditorPreview(form, actions);
+    if (removeButton) {
+      const row = removeButton.closest("[data-action-row]");
+      row?.remove();
+      renumberActionRows(rows);
+      const actions = actionsFromQuickRows(rows);
+      jsonInput.value = JSON.stringify(actions, null, 2);
+      updateEditorPreview(form, actions);
+      return;
+    }
+
+    const modeButton = event.target.closest("button[data-pattern-mode]");
+    if (modeButton) {
+      const editor = modeButton.closest("[data-pattern-editor]");
+      setPatternEditorMode(editor, modeButton.dataset.patternMode);
+      return;
+    }
+
+    const tileButton = event.target.closest("[data-pattern-tile]");
+    if (tileButton) {
+      const editor = tileButton.closest("[data-pattern-editor]");
+      updatePatternTile(editor, tileButton);
+      syncRowsToJson();
+    }
   });
 
   form.querySelector("[data-add-action]").addEventListener("click", () => {
@@ -460,6 +485,12 @@ function actionsFromQuickRows(container) {
     if ((action.type === "attack" || action.type === "patternAttack") && !Object.hasOwn(action, "range")) {
       action.range = 1;
     }
+    if (action.type === "patternAttack") {
+      action.patternTiles = patternTilesFromRow(row);
+      action.pattern = detectPatternName(action.patternTiles);
+    } else {
+      delete action.patternTiles;
+    }
 
     return action;
   });
@@ -492,9 +523,167 @@ function renumberActionRows(container) {
   });
 }
 
+function syncActionRowType(row) {
+  const type = row.querySelector("[name='actionType']").value;
+  row.dataset.actionType = type;
+}
+
+function setPatternEditorMode(editor, mode) {
+  if (!editor) return;
+  editor.dataset.patternMode = mode;
+  editor.querySelectorAll("[data-pattern-mode]").forEach((button) => {
+    const active = button.dataset.patternMode === mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function updatePatternTile(editor, tile) {
+  const mode = editor?.dataset.patternMode || "hit";
+  if (!editor || !tile) return;
+  if (mode === "hit") {
+    tile.dataset.hit = tile.dataset.hit === "true" ? "false" : "true";
+    syncPatternTileGlyph(tile);
+    return;
+  }
+  if (mode === "clear") {
+    tile.dataset.hit = "false";
+    tile.dataset.role = "";
+    syncPatternTileGlyph(tile);
+    return;
+  }
+
+  editor.querySelectorAll(`[data-role='${mode}']`).forEach((roleTile) => {
+    if (roleTile !== tile) {
+      roleTile.dataset.role = "";
+      syncPatternTileGlyph(roleTile);
+    }
+  });
+  tile.dataset.role = tile.dataset.role === mode ? "" : mode;
+  syncPatternTileGlyph(tile);
+}
+
+function syncPatternTileGlyph(tile) {
+  const glyph = patternTileGlyph({ role: tile.dataset.role || "" });
+  tile.querySelector("span").textContent = glyph;
+}
+
+function patternTilesFromRow(row) {
+  return [...row.querySelectorAll("[data-pattern-tile]")]
+    .map((tile) => ({
+      q: Number(tile.dataset.q),
+      r: Number(tile.dataset.r),
+      hit: tile.dataset.hit === "true",
+      role: tile.dataset.role || "",
+    }))
+    .filter((tile) => tile.hit || tile.role)
+    .map((tile) => {
+      const output = { q: tile.q, r: tile.r };
+      if (tile.hit) output.hit = true;
+      if (tile.role) output.role = tile.role;
+      return output;
+    });
+}
+
+function normalizePatternTiles(action) {
+  const source = Array.isArray(action.patternTiles) && action.patternTiles.length
+    ? action.patternTiles
+    : legacyPatternTiles(action.pattern);
+  return source
+    .filter((tile) => Number.isFinite(Number(tile.q)) && Number.isFinite(Number(tile.r)))
+    .map((tile) => ({
+      q: Number(tile.q),
+      r: Number(tile.r),
+      hit: Boolean(tile.hit || tile.kind === "hit"),
+      role: ["self", "enemy", "ally"].includes(tile.role || tile.kind) ? (tile.role || tile.kind) : "",
+    }));
+}
+
+function legacyPatternTiles(pattern) {
+  if (pattern === "adjacent-triple") {
+    return [
+      { q: 0, r: 0, hit: true, role: "enemy" },
+      { q: 1, r: 0, hit: true },
+      { q: 0, r: 1, hit: true },
+    ];
+  }
+  return [
+    { q: 0, r: 0, hit: true, role: "enemy" },
+    { q: 1, r: 0, hit: true },
+  ];
+}
+
+function detectPatternName(tiles) {
+  const hits = tiles
+    .filter((tile) => tile.hit)
+    .map((tile) => `${tile.q},${tile.r}`)
+    .sort();
+  if (hits.length === 2 && hits.join("|") === "0,0|1,0") return "adjacent-pair";
+  if (hits.length === 3 && hits.join("|") === "0,0|0,1|1,0") return "adjacent-triple";
+  return "custom";
+}
+
+function patternEditor(action) {
+  const tiles = normalizePatternTiles(action);
+  const tileMap = new Map(tiles.map((tile) => [`${tile.q},${tile.r}`, tile]));
+  return `
+    <section class="pattern-editor" data-pattern-editor data-pattern-mode="hit">
+      <div class="pattern-mode-strip" aria-label="패턴 편집 모드">
+        ${PATTERN_MODES.map((mode, index) => `
+          <button type="button" class="pattern-mode ${index === 0 ? "active" : ""}" data-pattern-mode="${mode.id}" aria-pressed="${index === 0 ? "true" : "false"}">${mode.label}</button>
+        `).join("")}
+      </div>
+      <div class="pattern-board" aria-label="패턴 타일">
+        ${patternEditorCells(tileMap)}
+      </div>
+    </section>
+  `;
+}
+
+function patternEditorCells(tileMap) {
+  const cells = [];
+  for (let r = -PATTERN_EDITOR_RADIUS; r <= PATTERN_EDITOR_RADIUS; r += 1) {
+    for (let q = -PATTERN_EDITOR_RADIUS; q <= PATTERN_EDITOR_RADIUS; q += 1) {
+      if (Math.abs(q + r) > PATTERN_EDITOR_RADIUS) continue;
+      const tile = tileMap.get(`${q},${r}`) || {};
+      const role = tile.role || "";
+      cells.push(`
+        <button
+          type="button"
+          class="pattern-tile"
+          data-pattern-tile
+          data-q="${q}"
+          data-r="${r}"
+          data-hit="${tile.hit ? "true" : "false"}"
+          data-role="${role}"
+          style="--pattern-q: ${q}; --pattern-r: ${r};"
+          aria-label="${patternTileLabel(q, r, tile)}"
+        >
+          <span>${patternTileGlyph(tile)}</span>
+        </button>
+      `);
+    }
+  }
+  return cells.join("");
+}
+
+function patternTileGlyph(tile) {
+  if (tile.role === "self") return "나";
+  if (tile.role === "enemy") return "적";
+  if (tile.role === "ally") return "동";
+  return "";
+}
+
+function patternTileLabel(q, r, tile) {
+  const parts = [`q ${q}`, `r ${r}`];
+  if (tile.hit) parts.push("타격");
+  if (tile.role) parts.push({ self: "나", enemy: "적", ally: "동료" }[tile.role]);
+  return parts.join(", ");
+}
+
 function actionEditorRow(action, index) {
   return `
-    <article class="action-editor-row" data-action-row>
+    <article class="action-editor-row" data-action-row data-action-type="${escapeHtml(action.type || "move")}">
       <input name="actionRaw" type="hidden" value="${escapeHtml(JSON.stringify(action))}" />
       <div class="action-row-top">
         <span class="action-row-index">${index + 1}</span>
@@ -515,6 +704,7 @@ function actionEditorRow(action, index) {
         ${compactNumberField("pull", "당기기", action.pull)}
         ${compactNumberField("percent", "비율", action.percent, "0.05")}
       </div>
+      ${patternEditor(action)}
     </article>
   `;
 }
@@ -810,7 +1000,7 @@ function renderActionLine(action) {
   if (action.type === "patternAttack") {
     const attackKind = action.melee ? "melee" : "ranged";
     return `<span class="action-line">${actionGroup("attack", [
-      patternIcon(action.pattern),
+      patternIcon(action.pattern, action.patternTiles),
       actionStat(attackKind, attackKind === "melee" ? "근거리 공격" : "원거리 공격", action.mult),
       ...(attackKind === "melee" ? [] : [actionStat("range", "사거리", action.range)]),
     ])}</span>`;
@@ -939,10 +1129,14 @@ function patternLabel(pattern) {
     "adjacent-pair": "붙은 두 칸",
     "adjacent-triple": "붙은 세 칸",
     "front-pair": "전방 두 칸",
+    custom: "커스텀 패턴",
   }[pattern] || pattern || "패턴";
 }
 
-function patternIcon(pattern) {
+function patternIcon(pattern, tiles = null) {
+  if (Array.isArray(tiles) && tiles.length) {
+    return `<span class="pattern-icon custom-pattern" title="${escapeHtml(patternLabel(pattern))}">${patternIconCells(normalizePatternTiles({ pattern, patternTiles: tiles }))}</span>`;
+  }
   if (pattern === "adjacent-pair") {
     return `<span class="pattern-icon adjacent-pair" title="붙은 두 칸"><i></i><i></i></span>`;
   }
@@ -950,6 +1144,19 @@ function patternIcon(pattern) {
     return `<span class="pattern-icon adjacent-triple" title="붙은 세 칸"><i></i><i></i><i></i></span>`;
   }
   return "";
+}
+
+function patternIconCells(tiles) {
+  return tiles
+    .filter((tile) => tile.hit || tile.role)
+    .map((tile) => `
+      <i
+        data-hit="${tile.hit ? "true" : "false"}"
+        data-role="${escapeHtml(tile.role || "")}"
+        style="--pattern-q: ${tile.q}; --pattern-r: ${tile.r};"
+      ></i>
+    `)
+    .join("");
 }
 
 function passiveLabel(action) {
