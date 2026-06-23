@@ -3741,7 +3741,7 @@ function showRewards() {
     pick.tabIndex = 0;
     pick.innerHTML = `
       <div class="reward-pick-card">
-        ${cardMount(reward, "reward-mount")}
+        ${cardMount(reward, "reward-mount", null, getSelectedCharacter())}
         <button type="button" class="card-help-btn" aria-label="이 카드 아이콘 설명">?</button>
       </div>
     `;
@@ -4627,7 +4627,7 @@ function renderPlayerHud() {
     const focusCard = document.createElement("div");
     focusCard.className = `current-action-card ${currentEntry && !state.suppressPlayerCard ? "" : "waiting-card"}`;
     focusCard.innerHTML = currentEntry && !state.suppressPlayerCard
-      ? renderHudCard(currentEntry.card, timelinePriority(currentEntry))
+      ? renderHudCard(currentEntry.card, timelinePriority(currentEntry), character)
       : renderHudCard(null);
     if (currentEntry && !state.suppressPlayerCard) {
       focusCard.dataset.cardKey = cardRuntimeKey(currentEntry.card);
@@ -4714,14 +4714,21 @@ function baseStat(kind, label, value) {
   return `<span class="base-stat" title="${label}"><span class="action-icon ${kind}">${actionIcon(kind)}</span><b>${value}</b></span>`;
 }
 
-function cardPrefab(card, priorityOverride = null) {
+function cardPrefab(card, priorityOverride = null, character = null) {
   if (!card) return "";
   const priority = priorityOverride ?? card.priority;
   const typeLabel = isPassiveCard(card) ? "패시브" : isTurnSustainCard(card) ? "턴 지속" : "";
   const footerLabel = typeLabel ? `<div class="cp-type-label">${typeLabel}</div>` : "";
+  const characterArt = character ? `
+      <div class="cp-character-watermark" style="background-image: url('${character.image}')" aria-hidden="true"></div>
+      <div class="cp-character-badge" aria-label="${character.name} 카드">
+        <img src="${character.image}" alt="" />
+      </div>
+    ` : "";
   return `
     <div class="card-prefab ${rarityClass(card.rarity)}">
       <div class="cp-bg"></div>
+      ${characterArt}
       <div class="cp-banner"></div>
       <div class="cp-priority">${priority}</div>
       <div class="cp-name">${card.name}</div>
@@ -4731,15 +4738,15 @@ function cardPrefab(card, priorityOverride = null) {
   `;
 }
 
-function cardMount(card, cls = "", priorityOverride = null) {
-  return `<div class="card-mount ${cls}">${cardPrefab(card, priorityOverride)}</div>`;
+function cardMount(card, cls = "", priorityOverride = null, character = null) {
+  return `<div class="card-mount ${cls}">${cardPrefab(card, priorityOverride, character)}</div>`;
 }
 
-function renderHudCard(cardData, priorityOverride = null) {
+function renderHudCard(cardData, priorityOverride = null, character = null) {
   if (!cardData) {
     return `<div class="card-mount hud-mount is-empty"><span>카드 대기</span></div>`;
   }
-  return cardMount(cardData, "hud-mount", priorityOverride);
+  return cardMount(cardData, "hud-mount", priorityOverride, character);
 }
 
 function cardRuntimeKey(cardData) {
@@ -4758,7 +4765,7 @@ function findCurrentTimelineCard(cardKey) {
 function openCardPreview(cardKey) {
   const entry = findCurrentTimelineCard(cardKey);
   if (!entry || !elements.cardPreviewOverlay || !elements.cardPreviewMount) return;
-  elements.cardPreviewMount.innerHTML = cardMount(entry.card, "preview-mount", timelinePriority(entry));
+  elements.cardPreviewMount.innerHTML = cardMount(entry.card, "preview-mount", timelinePriority(entry), getSelectedCharacter());
   elements.cardPreviewOverlay.classList.remove("hidden");
 }
 
@@ -4935,7 +4942,7 @@ function showDrawnCardReveal(entriesOrCard, ownerLabel = "내 카드", side = "p
       const className = `reveal-mount ${isFastest ? "fastest" : ""}`.trim();
       return `
         <div class="drawn-reveal-card-wrap">
-          ${cardMount(entry.card, className, timelinePriority(entry))}
+          ${cardMount(entry.card, className, timelinePriority(entry), side === "player" ? getSelectedCharacter() : null)}
           ${entry.card.priority !== timelinePriority(entry) ? `<span class="base-priority">원래 ${entry.card.priority}</span>` : ""}
         </div>
       `;

@@ -206,7 +206,7 @@ function renderCardSections() {
             <span>${countLabel}</span>
           </div>
           <div class="card-grid">
-            ${cards.map(renderCard).join("")}
+            ${cards.map((cardData) => renderCard(cardData, character)).join("")}
           </div>
         </section>
       `;
@@ -217,10 +217,10 @@ function renderCardSections() {
   els.cardSections.innerHTML = sections || `<div class="empty-state">조건에 맞는 카드가 없습니다.</div>`;
 }
 
-function renderCard(cardData) {
+function renderCard(cardData, character) {
   return `
     <a class="manager-card" href="${cardEditorUrl(cardData)}" aria-label="${escapeHtml(cardData.name)} 카드 편집">
-      ${cardMount(cardData)}
+      ${cardMount(cardData, character)}
     </a>
   `;
 }
@@ -250,7 +250,7 @@ function renderCardEditor() {
 
       <div class="card-editor-layout">
         <aside class="card-editor-preview" aria-label="카드 미리보기">
-          ${cardMount(cardData)}
+          ${cardMount(cardData, character)}
         </aside>
 
         <form id="cardEditorForm" class="card-editor-form">
@@ -405,7 +405,7 @@ function updateEditorPreview(form, actions) {
   const located = findCardLocation(state.cardId, state.characterId) || findCardLocation(state.cardId);
   if (!located) return;
   try {
-    preview.innerHTML = cardMount(cardFromEditorForm(form, actions, located.card));
+    preview.innerHTML = cardMount(cardFromEditorForm(form, actions, located.card), located.character);
   } catch {
     // Keep the last valid preview while the user is mid-edit.
   }
@@ -726,16 +726,23 @@ function sumCopies(cards) {
   return cards.reduce((sum, cardData) => sum + (cardData.copies || 1), 0);
 }
 
-function cardMount(cardData) {
-  return `<div class="card-mount">${cardPrefab(cardData)}</div>`;
+function cardMount(cardData, character = null) {
+  return `<div class="card-mount">${cardPrefab(cardData, character)}</div>`;
 }
 
-function cardPrefab(cardData) {
+function cardPrefab(cardData, character = null) {
   const typeLabel = isPassiveCard(cardData) ? "패시브" : isTurnSustainCard(cardData) ? "턴 지속" : "";
   const footerLabel = typeLabel ? `<div class="cp-type-label">${typeLabel}</div>` : "";
+  const characterArt = character ? `
+      <div class="cp-character-watermark" style="background-image: url('${escapeHtml(character.image)}')" aria-hidden="true"></div>
+      <div class="cp-character-badge" aria-label="${escapeHtml(character.name)} 카드">
+        <img src="${escapeHtml(character.image)}" alt="" />
+      </div>
+    ` : "";
   return `
     <div class="card-prefab ${rarityClass(cardData.rarity)}">
       <div class="cp-bg"></div>
+      ${characterArt}
       <div class="cp-banner"></div>
       <div class="cp-priority">${cardData.priority}</div>
       <div class="cp-name">${escapeHtml(cardData.name)}</div>
