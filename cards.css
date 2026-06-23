@@ -720,36 +720,19 @@ p {
   cursor: pointer;
 }
 
-.pattern-tile[data-hit="true"] {
+.pattern-tile[data-kind="enemy"] {
   border-color: rgba(123, 52, 40, 0.54);
   background: #d66f59;
-  color: #fff8ed;
 }
 
-.pattern-tile[data-role="self"] {
-  box-shadow: inset 0 0 0 3px #2772b9;
+.pattern-tile[data-kind="self"] {
+  border-color: rgba(28, 92, 151, 0.58);
+  background: #4d93d1;
 }
 
-.pattern-tile[data-role="enemy"] {
-  box-shadow: inset 0 0 0 3px #9e332e;
-}
-
-.pattern-tile[data-role="ally"] {
-  box-shadow: inset 0 0 0 3px #2f854a;
-}
-
-.pattern-tile span {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 20px;
-  border-radius: 999px;
-  background: rgba(255, 253, 246, 0.74);
-  color: var(--gallery-ink);
-}
-
-.pattern-tile span:empty {
-  display: none;
+.pattern-tile[data-kind="ally"] {
+  border-color: rgba(36, 106, 60, 0.58);
+  background: #58a66c;
 }
 
 .card-prefab .pattern-icon.custom-pattern {
@@ -768,20 +751,16 @@ p {
   transform: translate(-50%, -50%);
 }
 
-.card-prefab .pattern-icon.custom-pattern i[data-hit="true"] {
+.card-prefab .pattern-icon.custom-pattern i[data-kind="enemy"] {
   background: rgba(217, 107, 95, 0.86);
 }
 
-.card-prefab .pattern-icon.custom-pattern i[data-role="self"] {
-  outline: 2px solid #2772b9;
+.card-prefab .pattern-icon.custom-pattern i[data-kind="self"] {
+  background: rgba(77, 147, 209, 0.86);
 }
 
-.card-prefab .pattern-icon.custom-pattern i[data-role="enemy"] {
-  outline: 2px solid #9e332e;
-}
-
-.card-prefab .pattern-icon.custom-pattern i[data-role="ally"] {
-  outline: 2px solid #2f854a;
+.card-prefab .pattern-icon.custom-pattern i[data-kind="ally"] {
+  background: rgba(88, 166, 108, 0.86);
 }
 
 .editor-field.compact span {

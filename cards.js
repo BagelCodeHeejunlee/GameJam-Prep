@@ -32,9 +32,8 @@ const ACTION_TYPES = [
 ];
 const PATTERN_EDITOR_RADIUS = 2;
 const PATTERN_MODES = [
-  { id: "hit", label: "타격" },
-  { id: "self", label: "나" },
   { id: "enemy", label: "적" },
+  { id: "self", label: "나" },
   { id: "ally", label: "동료" },
   { id: "clear", label: "삭제" },
 ];
@@ -539,33 +538,14 @@ function setPatternEditorMode(editor, mode) {
 }
 
 function updatePatternTile(editor, tile) {
-  const mode = editor?.dataset.patternMode || "hit";
+  const mode = editor?.dataset.patternMode || "enemy";
   if (!editor || !tile) return;
-  if (mode === "hit") {
-    tile.dataset.hit = tile.dataset.hit === "true" ? "false" : "true";
-    syncPatternTileGlyph(tile);
-    return;
-  }
   if (mode === "clear") {
-    tile.dataset.hit = "false";
-    tile.dataset.role = "";
-    syncPatternTileGlyph(tile);
+    tile.dataset.kind = "";
     return;
   }
 
-  editor.querySelectorAll(`[data-role='${mode}']`).forEach((roleTile) => {
-    if (roleTile !== tile) {
-      roleTile.dataset.role = "";
-      syncPatternTileGlyph(roleTile);
-    }
-  });
-  tile.dataset.role = tile.dataset.role === mode ? "" : mode;
-  syncPatternTileGlyph(tile);
-}
-
-function syncPatternTileGlyph(tile) {
-  const glyph = patternTileGlyph({ role: tile.dataset.role || "" });
-  tile.querySelector("span").textContent = glyph;
+  tile.dataset.kind = tile.dataset.kind === mode ? "" : mode;
 }
 
 function patternTilesFromRow(row) {
@@ -573,16 +553,9 @@ function patternTilesFromRow(row) {
     .map((tile) => ({
       q: Number(tile.dataset.q),
       r: Number(tile.dataset.r),
-      hit: tile.dataset.hit === "true",
-      role: tile.dataset.role || "",
+      kind: tile.dataset.kind || "",
     }))
-    .filter((tile) => tile.hit || tile.role)
-    .map((tile) => {
-      const output = { q: tile.q, r: tile.r };
-      if (tile.hit) output.hit = true;
-      if (tile.role) output.role = tile.role;
-      return output;
-    });
+    .filter((tile) => ["enemy", "self", "ally"].includes(tile.kind));
 }
 
 function normalizePatternTiles(action) {
@@ -594,32 +567,39 @@ function normalizePatternTiles(action) {
     .map((tile) => ({
       q: Number(tile.q),
       r: Number(tile.r),
-      hit: Boolean(tile.hit || tile.kind === "hit"),
-      role: ["self", "enemy", "ally"].includes(tile.role || tile.kind) ? (tile.role || tile.kind) : "",
-    }));
+      kind: normalizePatternKind(tile),
+    }))
+    .filter((tile) => tile.kind);
+}
+
+function normalizePatternKind(tile) {
+  const kind = tile.kind || tile.role;
+  if (["enemy", "self", "ally"].includes(kind)) return kind;
+  if (tile.hit || kind === "hit") return "enemy";
+  return "";
 }
 
 function legacyPatternTiles(pattern) {
   if (pattern === "adjacent-triple") {
     return [
-      { q: 0, r: 0, hit: true, role: "enemy" },
-      { q: 1, r: 0, hit: true },
-      { q: 0, r: 1, hit: true },
+      { q: 0, r: 0, kind: "enemy" },
+      { q: 1, r: 0, kind: "enemy" },
+      { q: 0, r: 1, kind: "enemy" },
     ];
   }
   return [
-    { q: 0, r: 0, hit: true, role: "enemy" },
-    { q: 1, r: 0, hit: true },
+    { q: 0, r: 0, kind: "enemy" },
+    { q: 1, r: 0, kind: "enemy" },
   ];
 }
 
 function detectPatternName(tiles) {
-  const hits = tiles
-    .filter((tile) => tile.hit)
+  const enemyTiles = tiles
+    .filter((tile) => tile.kind === "enemy")
     .map((tile) => `${tile.q},${tile.r}`)
     .sort();
-  if (hits.length === 2 && hits.join("|") === "0,0|1,0") return "adjacent-pair";
-  if (hits.length === 3 && hits.join("|") === "0,0|0,1|1,0") return "adjacent-triple";
+  if (enemyTiles.length === 2 && enemyTiles.join("|") === "0,0|1,0") return "adjacent-pair";
+  if (enemyTiles.length === 3 && enemyTiles.join("|") === "0,0|0,1|1,0") return "adjacent-triple";
   return "custom";
 }
 
@@ -627,7 +607,7 @@ function patternEditor(action) {
   const tiles = normalizePatternTiles(action);
   const tileMap = new Map(tiles.map((tile) => [`${tile.q},${tile.r}`, tile]));
   return `
-    <section class="pattern-editor" data-pattern-editor data-pattern-mode="hit">
+    <section class="pattern-editor" data-pattern-editor data-pattern-mode="enemy">
       <div class="pattern-mode-strip" aria-label="패턴 편집 모드">
         ${PATTERN_MODES.map((mode, index) => `
           <button type="button" class="pattern-mode ${index === 0 ? "active" : ""}" data-pattern-mode="${mode.id}" aria-pressed="${index === 0 ? "true" : "false"}">${mode.label}</button>
@@ -646,7 +626,7 @@ function patternEditorCells(tileMap) {
     for (let q = -PATTERN_EDITOR_RADIUS; q <= PATTERN_EDITOR_RADIUS; q += 1) {
       if (Math.abs(q + r) > PATTERN_EDITOR_RADIUS) continue;
       const tile = tileMap.get(`${q},${r}`) || {};
-      const role = tile.role || "";
+      const kind = tile.kind || "";
       cells.push(`
         <button
           type="button"
@@ -654,30 +634,19 @@ function patternEditorCells(tileMap) {
           data-pattern-tile
           data-q="${q}"
           data-r="${r}"
-          data-hit="${tile.hit ? "true" : "false"}"
-          data-role="${role}"
+          data-kind="${kind}"
           style="--pattern-q: ${q}; --pattern-r: ${r};"
           aria-label="${patternTileLabel(q, r, tile)}"
-        >
-          <span>${patternTileGlyph(tile)}</span>
-        </button>
+        ></button>
       `);
     }
   }
   return cells.join("");
 }
 
-function patternTileGlyph(tile) {
-  if (tile.role === "self") return "나";
-  if (tile.role === "enemy") return "적";
-  if (tile.role === "ally") return "동";
-  return "";
-}
-
 function patternTileLabel(q, r, tile) {
   const parts = [`q ${q}`, `r ${r}`];
-  if (tile.hit) parts.push("타격");
-  if (tile.role) parts.push({ self: "나", enemy: "적", ally: "동료" }[tile.role]);
+  if (tile.kind) parts.push({ self: "나", enemy: "적", ally: "동료" }[tile.kind]);
   return parts.join(", ");
 }
 
@@ -1148,11 +1117,10 @@ function patternIcon(pattern, tiles = null) {
 
 function patternIconCells(tiles) {
   return tiles
-    .filter((tile) => tile.hit || tile.role)
+    .filter((tile) => tile.kind)
     .map((tile) => `
       <i
-        data-hit="${tile.hit ? "true" : "false"}"
-        data-role="${escapeHtml(tile.role || "")}"
+        data-kind="${escapeHtml(tile.kind)}"
         style="--pattern-q: ${tile.q}; --pattern-r: ${tile.r};"
       ></i>
     `)
