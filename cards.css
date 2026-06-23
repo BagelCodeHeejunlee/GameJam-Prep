@@ -689,6 +689,10 @@ p {
 }
 
 .pattern-board {
+  --pattern-hex-w: 42px;
+  --pattern-hex-h: 48px;
+  --pattern-step-x: var(--pattern-hex-w);
+  --pattern-step-y: calc(var(--pattern-hex-h) * 0.75);
   position: relative;
   width: min(100%, 360px);
   height: 250px;
@@ -702,12 +706,12 @@ p {
 
 .pattern-tile {
   position: absolute;
-  left: calc(50% + (var(--pattern-q) * 42px) + (var(--pattern-r) * 21px));
-  top: calc(50% + (var(--pattern-r) * 36px));
+  left: calc(50% + (var(--pattern-q) * var(--pattern-step-x)) + (var(--pattern-r) * var(--pattern-step-x) / 2));
+  top: calc(50% + (var(--pattern-r) * var(--pattern-step-y)));
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 38px;
+  width: var(--pattern-hex-w);
+  height: var(--pattern-hex-h);
   padding: 0;
   border: 1px solid rgba(81, 55, 31, 0.22);
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
@@ -716,7 +720,7 @@ p {
   font: inherit;
   font-size: 12px;
   font-weight: 950;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(1.018);
   cursor: pointer;
 }
 
@@ -736,19 +740,23 @@ p {
 }
 
 .card-prefab .pattern-icon.custom-pattern {
+  --pattern-icon-w: 16px;
+  --pattern-icon-h: 18px;
+  --pattern-icon-step-x: var(--pattern-icon-w);
+  --pattern-icon-step-y: calc(var(--pattern-icon-h) * 0.75);
   flex: 0 0 96px;
   width: 96px;
   height: 76px;
 }
 
 .card-prefab .pattern-icon.custom-pattern i {
-  left: calc(50% + (var(--pattern-q) * 15px) + (var(--pattern-r) * 7.5px));
-  top: calc(50% + (var(--pattern-r) * 13px));
-  width: 16px;
-  height: 15px;
+  left: calc(50% + (var(--pattern-q) * var(--pattern-icon-step-x)) + (var(--pattern-r) * var(--pattern-icon-step-x) / 2));
+  top: calc(50% + (var(--pattern-r) * var(--pattern-icon-step-y)));
+  width: var(--pattern-icon-w);
+  height: var(--pattern-icon-h);
   border-width: 1px;
   background: rgba(255, 253, 246, 0.72);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(1.018);
 }
 
 .card-prefab .pattern-icon.custom-pattern i[data-kind="enemy"] {
@@ -840,9 +848,9 @@ p {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .pattern-tile {
-    left: calc(50% + (var(--pattern-q) * 36px) + (var(--pattern-r) * 18px));
-    top: calc(50% + (var(--pattern-r) * 31px));
+  .pattern-board {
+    --pattern-hex-w: 36px;
+    --pattern-hex-h: 42px;
   }
 }
 
