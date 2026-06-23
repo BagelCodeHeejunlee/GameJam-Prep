@@ -15,7 +15,13 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
-const STAT_PERCENT_PASSIVE_CAP = 0.3;
+const STAT_PERCENT_PASSIVE_CAP_BY_RARITY = {
+  "기본": 0.1,
+  "노말": 0.1,
+  "레어": 0.15,
+  "에픽": 0.2,
+  "전설": 0.3,
+};
 const NORMAL_REWARD_RARITY_WEIGHT_TIERS = [
   {
     maxWave: 5,
@@ -859,10 +865,10 @@ const mageRewardPool = [
 
 const archerPassivePool = [
   passiveCard("archer-passive-sharp-bow", "예리한 활", "공용", "노말", [
-    cardPassive("baseAtkPercent", "공격력 30% 증가", 0.3),
+    cardPassive("baseAtkPercent", "공격력 10% 증가", 0.1),
   ]),
   passiveCard("archer-passive-light-armor", "가벼운 방호", "공용", "노말", [
-    cardPassive("maxHpPercent", "최대 체력 30% 증가", 0.3),
+    cardPassive("maxHpPercent", "최대 체력 10% 증가", 0.1),
     { type: "passive", label: "받는 피해 15% 감소", modifiers: [{ stat: "damageTaken", amount: -0.15 }] },
   ]),
   passiveCard("archer-passive-repeat-rhythm", "반복 리듬", "다단중첩", "노말", [
@@ -1851,7 +1857,7 @@ async function executeAction(actor, action, cardData) {
     return false;
   }
   if (isPassiveAction(action)) {
-    applyPassiveAction(actor, action);
+    applyPassiveAction(actor, action, cardData);
     return false;
   }
   if (action.type === "placeTrapBehindTarget") {
@@ -2019,9 +2025,9 @@ async function resolveCardEndEffects(actor, cardData, cardContext) {
   }
 }
 
-function applyPassiveAction(actor, action) {
+function applyPassiveAction(actor, action, cardData = null) {
   actor.permanent = actor.permanent ?? {};
-  const amount = passiveActionAmount(action);
+  const amount = passiveActionAmount(action, cardData);
   if (action.effect) actor.permanent[action.effect] = (actor.permanent[action.effect] ?? 0) + amount;
   if (action.effect === "baseAtkPercent") {
     const definition = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
@@ -2037,7 +2043,7 @@ function applyPassiveAction(actor, action) {
   if (action.modifiers?.length) {
     applyEffect(actor, {
       type: "applyEffect",
-      label: passiveEffectLabel(action),
+      label: passiveEffectLabel(action, cardData),
       duration: "stage",
       modifiers: action.modifiers,
     });
@@ -2049,15 +2055,19 @@ function applyPassiveAction(actor, action) {
     const rangeKey = `${action.effect}Range`;
     actor.permanent[rangeKey] = Math.max(actor.permanent[rangeKey] ?? 0, action.range);
   }
-  log(`${actor.name} 패시브: ${passiveEffectLabel(action)}`);
+  log(`${actor.name} 패시브: ${passiveEffectLabel(action, cardData)}`);
 }
 
-function passiveActionAmount(action) {
+function passiveActionAmount(action, cardData = null) {
   const amount = action.amount ?? 1;
   if (action.effect === "baseAtkPercent" || action.effect === "maxHpPercent") {
-    return Math.min(amount, STAT_PERCENT_PASSIVE_CAP);
+    return Math.min(amount, statPercentPassiveCap(cardData));
   }
   return amount;
+}
+
+function statPercentPassiveCap(cardData) {
+  return STAT_PERCENT_PASSIVE_CAP_BY_RARITY[cardData?.rarity] ?? STAT_PERCENT_PASSIVE_CAP_BY_RARITY["전설"];
 }
 
 function applyEffect(actor, action) {
@@ -4067,7 +4077,7 @@ function applyPassiveReward(cardData) {
   if (!player) return;
   state.passiveCards = state.passiveCards ?? [];
   state.passiveCards.push(cardData);
-  cardData.actions.filter(isPassiveAction).forEach((action) => applyPassiveAction(player, action));
+  cardData.actions.filter(isPassiveAction).forEach((action) => applyPassiveAction(player, action, cardData));
 }
 
 function render() {
@@ -5309,10 +5319,10 @@ function trapLabel(action) {
   return (action.trap ?? action.obstacle) === "block" ? "봉쇄 함정" : "공격 함정";
 }
 
-function passiveEffectLabel(action) {
+function passiveEffectLabel(action, cardData = null) {
   const labels = {
-    baseAtkPercent: `공격력 ${percentChangeLabel(passiveActionAmount(action))}`,
-    maxHpPercent: `최대 체력 ${percentChangeLabel(passiveActionAmount(action))}`,
+    baseAtkPercent: `공격력 ${percentChangeLabel(passiveActionAmount(action, cardData))}`,
+    maxHpPercent: `최대 체력 ${percentChangeLabel(passiveActionAmount(action, cardData))}`,
     extraCardPlays: `매턴 카드 ${action.amount}장 추가 사용`,
     firstTurnExtraCardPlays: `첫 턴 카드 ${action.amount}장 추가 사용`,
     comboDamage: `연타 피해 ${percentChangeLabel(action.amount)}`,
