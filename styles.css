@@ -4195,6 +4195,9 @@ body.turn-cue-active .turn-scrim {
 }
 
 .battle-top-hud {
+  --priority-card-scale: 0.13;
+  --priority-card-width: calc(512px * var(--priority-card-scale));
+  --priority-card-height: calc(768px * var(--priority-card-scale));
   position: fixed;
   z-index: 34;
   top: calc(max(8px, env(safe-area-inset-top)) + 76px);
@@ -4210,6 +4213,10 @@ body.turn-cue-active .turn-scrim {
 
 .enemy-action-hud {
   display: none !important;
+}
+
+.enemy-summary-panel {
+  display: none;
 }
 
 .enemy-summary-panel,
@@ -4331,88 +4338,65 @@ body.turn-cue-active .turn-scrim {
 
 .priority-panel {
   display: block;
-  padding: 5px 6px;
-  border-radius: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.priority-panel h2 {
+  display: none;
 }
 
 .priority-strip {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  gap: 5px;
-  min-height: 26px;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: var(--priority-card-height);
   max-height: none;
   padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.priority-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .priority-item {
-  width: auto;
-  min-width: 46px;
-  height: 25px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 0 8px 0 22px;
-  border-radius: 999px;
-  background: rgba(53, 90, 106, 0.12);
-  box-shadow: none;
-}
-
-.priority-item .pc-portrait {
-  inset: auto;
-  left: 3px;
-  width: 19px;
-  height: 19px;
-  background: linear-gradient(160deg, var(--portrait-top), var(--portrait-bottom));
-}
-
-.priority-item .pc-emblem {
-  font-size: 10px;
-}
-
-.priority-item .pc-art {
-  width: 150%;
-  height: 150%;
-}
-
-.priority-item .pc-badge {
-  position: static;
-  min-width: 0;
-  height: auto;
+  position: relative;
+  flex: 0 0 var(--priority-card-width);
+  width: var(--priority-card-width);
+  height: var(--priority-card-height);
+  display: block;
   padding: 0;
-  border: 0;
-  background: transparent !important;
-  color: #463527;
-  font-size: 11px;
-  transform: none;
-  box-shadow: none;
-}
-
-.priority-item .pc-count {
-  position: static;
-  min-width: 0;
-  height: auto;
-  padding: 0;
-  border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: #6d5746;
-  font-size: 9px;
   box-shadow: none;
+}
+
+.priority-card-mount {
+  --cps: var(--priority-card-scale);
 }
 
 .priority-item.active {
-  color: #fff4d6;
-  background: linear-gradient(#e99c3f, #bc553a);
-  transform: none;
-  box-shadow: 0 4px 10px rgba(188, 85, 58, 0.28);
+  transform: translateY(2px);
+  filter:
+    drop-shadow(0 0 0 rgba(0, 0, 0, 0))
+    drop-shadow(0 0 12px rgba(255, 224, 130, 0.9));
 }
 
-.priority-item.active .pc-badge,
-.priority-item.active .pc-count {
-  color: #fff4d6;
+.priority-item.active .priority-card-mount::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid rgba(255, 232, 132, 0.95);
+  border-radius: 9px;
+  pointer-events: none;
+  box-shadow: 0 0 18px rgba(255, 218, 108, 0.7);
 }
 
 .priority-item.active::before,
@@ -4423,6 +4407,26 @@ body.turn-cue-active .turn-scrim {
 .priority-item.done {
   opacity: 0.42;
   transform: none;
+}
+
+.pc-owner {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 2;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 250, 228, 0.7);
+  border-radius: 999px;
+  background: rgba(38, 48, 52, 0.82);
+  color: #fff4d6;
+  font-size: 9px;
+  font-weight: 950;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .player-hud {
@@ -4485,20 +4489,23 @@ body.turn-cue-active .turn-scrim {
 
 .player-block {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   width: 100%;
   height: auto;
-  min-height: 82px;
+  min-height: 96px;
   padding: 7px;
   border: 1px solid rgba(255, 250, 228, 0.42);
   border-radius: 10px;
   background: rgba(255, 239, 209, 0.94);
   box-shadow: 0 7px 16px rgba(50, 28, 15, 0.16);
   overflow: hidden;
+  pointer-events: none;
 }
 
 .player-hud.solo .player-block {
   width: 100%;
-  min-height: 82px;
+  min-height: 96px;
 }
 
 .player-block.active {
@@ -4508,7 +4515,12 @@ body.turn-cue-active .turn-scrim {
 }
 
 .player-info {
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: space-between;
   gap: 6px;
+  min-width: 0;
+  min-height: 0;
 }
 
 .player-head {
@@ -4574,28 +4586,34 @@ body.turn-cue-active .turn-scrim {
 }
 
 .pile-row {
-  display: flex;
-  gap: 3px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
   min-width: 0;
-  overflow: hidden;
 }
 
 .pile-row span,
 .pile-row span:last-child {
   grid-column: auto;
   justify-content: center;
+  gap: 1px;
   min-width: 0;
-  min-height: 20px;
-  padding: 3px 5px;
+  min-height: 19px;
+  padding: 2px 1px;
   border-radius: 6px;
-  font-size: 9px;
+  font-size: 8px;
+  overflow: hidden;
+}
+
+.player-hud .pile-row span em {
+  display: none;
 }
 
 .pile-row svg,
 .pile-row .action-icon,
 .pile-row .action-icon svg {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 .current-action-card {
@@ -4697,7 +4715,7 @@ body.turn-cue-active .turn-scrim {
 }
 
 .player-hud.trio .player-block {
-  min-height: 78px;
+  min-height: 92px;
   padding: 6px;
 }
 
@@ -4724,27 +4742,31 @@ body.turn-cue-active .turn-scrim {
 }
 
 @media (max-width: 490px) {
+  .battle-top-hud {
+    --priority-card-scale: 0.105;
+  }
+
   .player-hud {
-    --hero-panel-width: 86px;
+    --hero-panel-width: 104px;
     --hero-slot-gap: 4px;
     --hud-card-scale: 0.105;
   }
 
   .player-hud.solo {
-    --hero-panel-width: 86px;
+    --hero-panel-width: 104px;
     --hud-card-scale: 0.105;
-    width: min(calc(100vw - 14px), 144px);
+    width: min(calc(100vw - 14px), 162px);
   }
 
   .player-hud.duo {
-    width: min(calc(100vw - 14px), 295px);
+    width: min(calc(100vw - 14px), 331px);
   }
 
   .player-hud.trio {
     --party-cols: 2;
-    --hero-panel-width: 86px;
+    --hero-panel-width: 104px;
     --hud-card-scale: 0.105;
-    width: min(calc(100vw - 14px), 295px);
+    width: min(calc(100vw - 14px), 331px);
   }
 
   .player-hud .pile-row span em {

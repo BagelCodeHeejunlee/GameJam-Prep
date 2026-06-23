@@ -4465,7 +4465,7 @@ function renderEnemyActionHud() {
       </div>
       ${sample ? renderBaseStats(sample) : ""}
     </div>
-    ${cardMount(entry.card, "enemy-action-mount")}
+    ${cardMount(entry.card, "enemy-action-mount monster-card-mount")}
   `;
 }
 
@@ -4481,22 +4481,22 @@ function renderPriorityStrip() {
     return;
   }
 
-  const displayEntries = displayTimelineEntries();
-  const timelineKeys = displayEntries.map(priorityEntryKey);
+  const timelineEntries = state.currentTimeline;
+  const timelineKeys = timelineEntries.map(priorityEntryKey);
   const signature = timelineKeys.join("|");
   const activeKeys = new Set(timelineKeys);
   state.priorityStripItems.forEach((item, key) => {
     if (!activeKeys.has(key)) state.priorityStripItems.delete(key);
   });
 
-  displayEntries.forEach((entry, index) => {
+  timelineEntries.forEach((entry, index) => {
     const key = timelineKeys[index];
     let item = state.priorityStripItems.get(key);
     if (!item) {
       item = createPriorityItem();
       state.priorityStripItems.set(key, item);
     }
-    updatePriorityItem(item, entry);
+    updatePriorityItem(item, entry, index);
   });
 
   if (state.priorityStripSignature !== signature) {
@@ -4508,9 +4508,6 @@ function renderPriorityStrip() {
 }
 
 function priorityEntryKey(entry) {
-  if (entry.displayType === "playerGroup") {
-    return `${entry.displayType}:${entry.actorId}:${timelinePriority(entry)}`;
-  }
   return `${entry.actorType}:${entry.actorId}:${entry.card.instanceId ?? entry.card.id}`;
 }
 
@@ -4524,52 +4521,39 @@ function priorityEmptyElement() {
 function createPriorityItem() {
   const item = document.createElement("div");
   item.className = "priority-item";
-  item.innerHTML = `
-    <span class="pc-portrait"></span>
-    <span class="pc-badge"></span>
-  `;
   return item;
 }
 
-function updatePriorityItem(item, entry) {
+function updatePriorityItem(item, entry, timelineIndex = -1) {
   const isPlayer = entry.actorType === "player";
   const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
   const boss = groupEnemies.some((e) => e.boss);
-  const count = isPlayer ? entry.displayEntries?.length ?? 1 : groupEnemies.length;
-  const emblem = isPlayer ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId);
-  const portraitImage = isPlayer ? getSelectedCharacter().image : monsterDefinitions[entry.actorId]?.image;
+  const count = isPlayer ? 1 : groupEnemies.length;
+  const ownerLabel = isPlayer ? "나" : monsterLabel(entry.actorId);
   const className = [
     "priority-item",
     isPlayer ? "player" : "enemy",
     boss ? "boss" : "",
-    displayEntryDone(entry) ? "done" : "",
-    displayEntryActive(entry) ? "active" : "",
+    state.completedTimelineIndexes?.has(timelineIndex) ? "done" : "",
+    timelineIndex === state.activeTimelineIndex ? "active" : "",
   ]
     .filter(Boolean)
     .join(" ");
   const priority = timelinePriority(entry);
-  const contentSignature = `${portraitImage ?? ""}:${emblem}:${priority}:${count}`;
+  const cardKey = cardRuntimeKey(entry.card);
+  const contentSignature = `${cardKey}:${priority}:${ownerLabel}:${count}`;
 
   if (item.dataset.contentSignature !== contentSignature) {
-    item.querySelector(".pc-portrait").innerHTML = portraitContent(portraitImage, emblem, "pc-art");
-    item.querySelector(".pc-badge").textContent = priority;
-    let countElement = item.querySelector(".pc-count");
-    if (count > 1) {
-      if (!countElement) {
-        countElement = document.createElement("span");
-        countElement.className = "pc-count";
-        item.append(countElement);
-      }
-      countElement.textContent = `×${count}`;
-    } else {
-      countElement?.remove();
-    }
+    const cardMountClass = `priority-card-mount ${isPlayer ? "" : "monster-card-mount"}`.trim();
+    item.innerHTML = `
+      ${cardMount(entry.card, cardMountClass, priority)}
+      <span class="pc-owner">${ownerLabel}${count > 1 ? ` ×${count}` : ""}</span>
+    `;
     item.dataset.contentSignature = contentSignature;
   }
 
   item.className = className;
-  const titleCard = count > 1 ? `${count}장` : entry.card.name;
-  item.title = `${entryLabel(entry)} · ${titleCard} · PRI ${priority}`;
+  item.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${priority}`;
 }
 
 function renderPlayerHud() {
