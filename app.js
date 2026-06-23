@@ -4625,21 +4625,9 @@ function renderPlayerHud() {
   const activeEntry = state.activeTimelineIndex >= 0
     ? state.currentTimeline[state.activeTimelineIndex]
     : null;
-  const currentEntryByPlayer = new Map();
-  state.currentTimeline.forEach((entry, index) => {
-    if (entry.actorType !== "player" || state.completedTimelineIndexes?.has(index)) return;
-    if (activeEntry === entry) {
-      currentEntryByPlayer.set(entry.actorId, entry);
-      return;
-    }
-    if (!currentEntryByPlayer.has(entry.actorId)) {
-      currentEntryByPlayer.set(entry.actorId, entry);
-    }
-  });
 
   shownPlayers.forEach((player) => {
     const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
-    const currentEntry = currentEntryByPlayer.get(player.id);
     const isActive = activeEntry?.actorType === "player" && activeEntry.actorId === player.id;
     const slot = document.createElement("div");
     slot.className = `hero-action-slot ${isActive ? "active" : ""}`;
@@ -4653,7 +4641,6 @@ function renderPlayerHud() {
             <div class="combatant-heading player-heading">
               <strong>${character.name}</strong>
             </div>
-            ${renderHudHp(player)}
           </div>
         </div>
         <div class="pile-row">
@@ -4664,42 +4651,8 @@ function renderPlayerHud() {
       </div>
     `;
     slot.append(article);
-    const focusCard = document.createElement("div");
-    focusCard.className = `current-action-card ${currentEntry && !state.suppressPlayerCard ? "" : "waiting-card"}`;
-    focusCard.innerHTML = currentEntry && !state.suppressPlayerCard
-      ? renderHudCard(currentEntry.card, timelinePriority(currentEntry), character)
-      : renderHudCard(null);
-    if (currentEntry && !state.suppressPlayerCard) {
-      focusCard.dataset.cardKey = cardRuntimeKey(currentEntry.card);
-      focusCard.setAttribute("role", "button");
-      focusCard.tabIndex = 0;
-      focusCard.setAttribute("aria-label", `${currentEntry.card.name} 확대`);
-    }
-    slot.append(focusCard);
     elements.playerHud.append(slot);
   });
-
-  const drawnCardId = shownPlayers
-    .map((player) => currentEntryByPlayer.get(player.id)?.card)
-    .filter(Boolean)
-    .map((card) => card.instanceId ?? card.id)
-    .join("|");
-  if (drawnCardId && elements.playerHud.dataset.cardId !== drawnCardId) {
-    const freshCard = elements.playerHud.querySelector(".hero-action-slot.active .current-action-card .card-mount")
-      ?? elements.playerHud.querySelector(".current-action-card .card-mount");
-    if (freshCard) freshCard.classList.add("card-just-drawn");
-  }
-  elements.playerHud.dataset.cardId = drawnCardId ?? "";
-}
-
-function renderHudHp(player) {
-  const pct = Math.max(0, Math.min(100, ((player.hp ?? 0) / Math.max(1, player.maxHp ?? 1)) * 100));
-  return `
-    <div class="hud-hp">
-      <span><i style="width: ${pct}%"></i></span>
-      <b>HP ${Math.max(0, player.hp ?? 0)} / ${player.maxHp ?? 0}</b>
-    </div>
-  `;
 }
 
 function compactCardText(cardData) {
@@ -5015,9 +4968,7 @@ function flyRevealToPriorityBoard() {
     document.querySelector("#priorityStrip .priority-item.player:not(.done) .card-mount") ||
     document.querySelector("#priorityStrip .priority-item.player .card-mount") ||
     document.querySelector("#priorityStrip .priority-item.player") ||
-    document.querySelector("#priorityStrip") ||
-    document.querySelector("#playerHud .current-action-card:not(.waiting-card) .card-mount") ||
-    document.querySelector("#playerHud .card-mount");
+    document.querySelector("#priorityStrip");
   if (!target) {
     hideDrawnCardReveal();
     return;
@@ -5763,7 +5714,7 @@ function commitCameraFrame(frame) {
 }
 
 function cameraPlayArea(panelHeight) {
-  const topRects = [document.querySelector(".top-bar"), document.querySelector(".character-select")]
+  const topRects = [document.querySelector(".top-bar")]
     .map((element) => element?.getBoundingClientRect())
     .filter(Boolean);
   const playerHudRect = elements.playerHud?.getBoundingClientRect();
@@ -6013,20 +5964,6 @@ elements.boardPanel.addEventListener("pointerdown", beginBoardCameraDrag);
 elements.boardPanel.addEventListener("pointermove", moveBoardCameraDrag);
 elements.boardPanel.addEventListener("pointerup", endBoardCameraDrag);
 elements.boardPanel.addEventListener("pointercancel", endBoardCameraDrag);
-elements.playerHud.addEventListener("click", (event) => {
-  const cardSlot = event.target.closest(".current-action-card:not(.waiting-card)");
-  if (!cardSlot?.dataset.cardKey) return;
-  event.preventDefault();
-  event.stopPropagation();
-  openCardPreview(cardSlot.dataset.cardKey);
-});
-elements.playerHud.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  const cardSlot = event.target.closest(".current-action-card:not(.waiting-card)");
-  if (!cardSlot?.dataset.cardKey) return;
-  event.preventDefault();
-  openCardPreview(cardSlot.dataset.cardKey);
-});
 elements.priorityStrip.addEventListener("click", (event) => {
   const cardSlot = event.target.closest(".priority-item");
   if (!cardSlot?.dataset.cardKey) return;
