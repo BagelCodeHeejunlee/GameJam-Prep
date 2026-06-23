@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>궁수 아트 캐스팅보드</title>
+    <meta name="theme-color" content="#f2ead8" />
+    <meta property="og:title" content="궁수 아트 캐스팅보드" />
+    <meta property="og:description" content="새 아트 방향 선택을 위한 궁수 스타일 시안 8종" />
+    <meta property="og:image" content="assets/casting/archer/archer-casting-contact.png" />
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f2ead8;
+        --ink: #2b251d;
+        --muted: #6f6556;
+        --line: #d9cbb3;
+        --card: #fffaf0;
+        --accent: #177d73;
+        --accent-2: #c15f3d;
+        --shadow: rgba(52, 42, 29, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      main {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: end;
+        padding-bottom: 22px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(30px, 5vw, 68px);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        max-width: 760px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .meta span {
+        display: inline-flex;
+        min-height: 32px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        background: rgba(255, 250, 240, 0.72);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px;
+        padding-top: 24px;
+      }
+
+      article {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: 0 10px 30px var(--shadow);
+      }
+
+      figure {
+        margin: 0;
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        background: #fbf4e8;
+      }
+
+      figcaption {
+        display: grid;
+        gap: 8px;
+        min-height: 168px;
+        padding: 14px;
+      }
+
+      .style-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .number {
+        color: var(--accent-2);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      h2 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 18px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .tag {
+        flex: 0 0 auto;
+        border-radius: 8px;
+        background: #dff1e8;
+        color: var(--accent);
+        padding: 5px 8px;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .note {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .fit {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-self: end;
+      }
+
+      .fit span {
+        border: 1px solid #eadbc2;
+        border-radius: 8px;
+        padding: 5px 7px;
+        color: #574b3c;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      a {
+        color: var(--accent);
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 1100px) {
+        .board {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        main {
+          padding: 18px;
+        }
+
+        header {
+          grid-template-columns: 1fr;
+        }
+
+        .meta {
+          justify-content: flex-start;
+        }
+
+        .board {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        figcaption {
+          min-height: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>궁수 아트 캐스팅보드</h1>
+          <p class="summary">
+            기존 자산을 기준으로 삼지 않고, 게임 전체 아트 방향을 새로 정하기 위한 궁수 스타일 시안 8종입니다.
+            작은 헥사 보드 토큰에서도 활, 자세, 성격이 읽히는지를 우선해서 비교합니다.
+          </p>
+        </div>
+        <div class="meta" aria-label="캐스팅보드 정보">
+          <span>캐주얼 오토배틀 RPG</span>
+          <span>궁수 8종</span>
+          <span>2026-06-23</span>
+        </div>
+      </header>
+
+      <section class="board" aria-label="궁수 스타일 시안 8종">
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-01-2d-illustration.png" alt="2D 일러스트 궁수 시안" loading="eager" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">01</div>
+                  <h2>2D 일러스트</h2>
+                </div>
+                <span class="tag">Hero</span>
+              </div>
+              <p class="note">가장 정통적인 캐주얼 RPG 방향. 카드 일러스트, 캐릭터 선택 화면, 마케팅 이미지까지 확장성이 높습니다.</p>
+              <div class="fit"><span>고급감</span><span>카드 적합</span><span>제작량 큼</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-02-3d-toy.png" alt="3D 토이 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">02</div>
+                  <h2>3D 토이</h2>
+                </div>
+                <span class="tag">Toy</span>
+              </div>
+              <p class="note">말랑한 피규어 감성. 전투 보드 유닛, 성장 연출, 스킨 판매 구조에 가장 잘 맞는 방향입니다.</p>
+              <div class="fit"><span>보드 가독성</span><span>스킨 확장</span><span>따뜻함</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-03-pixel-art.png" alt="도트 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">03</div>
+                  <h2>도트</h2>
+                </div>
+                <span class="tag">Pixel</span>
+              </div>
+              <p class="note">게임잼 생산성이 좋고 전투 규칙을 명확하게 보여줍니다. 감성은 강하지만 카드 보상 화면은 별도 보강이 필요합니다.</p>
+              <div class="fit"><span>빠른 제작</span><span>전투 명확</span><span>레트로</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-04-bold-cartoon.png" alt="굵은 카툰 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">04</div>
+                  <h2>굵은 카툰</h2>
+                </div>
+                <span class="tag">Action</span>
+              </div>
+              <p class="note">실루엣과 표정이 가장 강합니다. 모바일 작은 화면에서 캐릭터 성격을 즉시 전달하기 좋습니다.</p>
+              <div class="fit"><span>강한 실루엣</span><span>표정 좋음</span><span>캐주얼</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-05-anime-cel.png" alt="애니 셀 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">05</div>
+                  <h2>애니 셀</h2>
+                </div>
+                <span class="tag">Cool</span>
+              </div>
+              <p class="note">캐릭터 팬덤형 방향. 궁수의 차지 샷, 연사, 보스전 컷인 같은 연출을 멋있게 가져가기 좋습니다.</p>
+              <div class="fit"><span>팬덤성</span><span>연출 강함</span><span>톤 높음</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-06-paper-cutout.png" alt="페이퍼컷 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">06</div>
+                  <h2>페이퍼컷</h2>
+                </div>
+                <span class="tag">Craft</span>
+              </div>
+              <p class="note">카드, 보드게임, 헥사 타일과 잘 붙는 수공예 방향. 전투가 복잡해져도 화면 피로도가 낮습니다.</p>
+              <div class="fit"><span>보드게임 감성</span><span>편안함</span><span>독자성</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-07-low-poly.png" alt="로우폴리 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">07</div>
+                  <h2>로우폴리</h2>
+                </div>
+                <span class="tag">Board</span>
+              </div>
+              <p class="note">전술 보드와 가장 자연스럽게 이어지는 3D 방향. 애니메이션과 타일 상호작용을 단순하게 만들 수 있습니다.</p>
+              <div class="fit"><span>전술 보드</span><span>단순 제작</span><span>입체감</span></div>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <img src="assets/casting/archer/archer-08-token-flat.png" alt="토큰 플랫 궁수 시안" loading="lazy" />
+            <figcaption>
+              <div class="style-row">
+                <div>
+                  <div class="number">08</div>
+                  <h2>토큰 플랫</h2>
+                </div>
+                <span class="tag">UI</span>
+              </div>
+              <p class="note">헥사 보드 유닛과 UI 아이콘에 바로 쓰기 좋은 방향. 제작 범위가 작을 때 가장 안정적입니다.</p>
+              <div class="fit"><span>UI 호환</span><span>작은 화면</span><span>효율적</span></div>
+            </figcaption>
+          </figure>
+        </article>
+      </section>
+
+      <footer>
+        <span>Generated with the built-in image generation tool. Existing character art was not used as reference.</span>
+        <a href="./">프로토타입으로 돌아가기</a>
+      </footer>
+    </main>
+  </body>
+</html>
