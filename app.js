@@ -1551,10 +1551,7 @@ async function runTurn() {
   if (state.paused || state.busy || state.waitingReward || state.finished) return;
   state.busy = true;
   state.turn += 1;
-  state.currentTimeline = [];
   state.activeTimelineIndex = -1;
-  state.completedTimelineCount = 0;
-  state.completedTimelineIndexes = new Set();
   state.comboHits = {};
   processMeteors();
   if (checkEndConditions()) {
@@ -4848,13 +4845,13 @@ async function playPriorityReveal(drawnEntries, sortedEntries) {
   // 4) 1초 대기 (카드 읽기)
   await sleep(turnDelay(1.85));
 
-  // 5) 우선권 재정렬 + 카드가 하단 궁수 카드 자리로 날아가 안착
+  // 5) 우선권 재정렬 + 카드가 상단 우선권 보드로 날아가 안착
   state.currentTimeline = sortedEntries;
   state.priorityRevealMode = "sorted";
   renderPriorityStrip();
   renderDrawnCards();
   renderBoard();
-  flyRevealToHud();
+  flyRevealToPriorityBoard();
   await sleep(540);
   state.suppressPlayerCard = false;
   renderPlayerHud();
@@ -4967,14 +4964,17 @@ function hideDrawnCardReveal() {
   if (host) host.classList.remove("show");
 }
 
-function flyRevealToHud() {
+function flyRevealToPriorityBoard() {
   const host = document.querySelector("#drawnCardReveal");
   if (!host) return;
   const target =
-    document.querySelector("#playerHud .current-action-card:not(.waiting-card) .card-mount") ||
-    document.querySelector("#playerHud .card-mount") ||
+    document.querySelector("#priorityStrip .priority-item.player.active .card-mount") ||
+    document.querySelector("#priorityStrip .priority-item.player:not(.done) .card-mount") ||
+    document.querySelector("#priorityStrip .priority-item.player .card-mount") ||
     document.querySelector("#priorityStrip .priority-item.player") ||
-    document.querySelector("#priorityStrip");
+    document.querySelector("#priorityStrip") ||
+    document.querySelector("#playerHud .current-action-card:not(.waiting-card) .card-mount") ||
+    document.querySelector("#playerHud .card-mount");
   if (!target) {
     hideDrawnCardReveal();
     return;
