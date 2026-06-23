@@ -1496,7 +1496,7 @@ function expandCards(cards) {
 
 function buildWaves() {
   return [
-    wave(3, [], [
+    wave(3, [{ q: 0, r: 0 }], [
       enemy(-2, -1, 5, { baseAtk: 2 }),
       enemy(2, -2, 5, { kind: "skirmisher", baseAtk: 2 }),
     ]),
