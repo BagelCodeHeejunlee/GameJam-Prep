@@ -5000,93 +5000,24 @@ function renderTurnPlanner() {
   }
 
   const requiredCount = Math.min(playerTurnPlayLimit(), state.planningChoices.length);
-  const focusTarget = state.focusTargetId
-    ? state.entities.find((entity) => entity.id === state.focusTargetId && isAlive(entity))
-    : null;
   const ready = (state.plannedCardKeys ?? []).length >= requiredCount;
   const selectedOrders = new Map((state.plannedCardKeys ?? []).map((key, index) => [key, index + 1]));
-  const enemyPlans = state.enemyPlanEntries ?? [];
 
   host.classList.remove("hidden");
   host.innerHTML = `
-    <div class="planner-head">
-      <div>
-        <span class="planner-kicker">TURN ${state.turn}</span>
-        <strong>카드 ${requiredCount}장 실행 순서</strong>
-      </div>
-      <button type="button" class="planner-confirm" ${ready ? "" : "disabled"}>실행</button>
-    </div>
-    <div class="planner-target">
-      <span>집중 대상</span>
-      <strong>${focusTarget ? focusTarget.name : "자동"}</strong>
-    </div>
-    <div class="planner-target-list" aria-label="집중 대상 선택">
-      ${aliveEnemies().map((enemy) => `
-        <button type="button" class="planner-target-chip ${enemy.id === state.focusTargetId ? "active" : ""}" data-target-id="${enemy.id}">
-          <span>${enemy.label ?? "적"}</span>
-          <strong>${enemy.name}</strong>
-          <em>${enemy.hp}/${enemy.maxHp}</em>
-        </button>
-      `).join("")}
-    </div>
-    <div class="planner-enemies" aria-label="적 행동 예고">
-      ${enemyPlans.map(renderEnemyPlanChip).join("")}
-    </div>
+    <button type="button" class="planner-confirm" aria-label="선택한 카드 실행" ${ready ? "" : "disabled"}>실행</button>
     <div class="planner-cards">
       ${(state.planningChoices ?? []).map((entry) => {
         const key = cardRuntimeKey(entry.card);
         const order = selectedOrders.get(key);
         return `
-          <button type="button" class="planner-card ${order ? "selected" : ""}" data-card-key="${key}">
+          <button type="button" class="planner-card ${order ? "selected" : ""}" data-card-key="${key}" aria-label="${entry.card.name}">
             ${cardMount(entry.card, "planner-mount", order ?? "", getSelectedCharacter())}
-            <span class="planner-card-name">${entry.card.name}</span>
-            <span class="planner-card-detail" data-card-key="${key}" role="button" tabindex="0">상세</span>
           </button>
         `;
       }).join("")}
     </div>
   `;
-}
-
-function renderEnemyPlanChip(entry) {
-  const definition = monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
-  const enemies = aliveEnemies().filter((enemy) => enemy.kind === entry.actorId);
-  const target = entry.targetId
-    ? state.entities.find((entity) => entity.id === entry.targetId && isAlive(entity))
-    : null;
-  return `
-    <button type="button" class="enemy-plan-chip" data-card-key="${cardRuntimeKey(entry.card)}" data-enemy-kind="${entry.actorId}">
-      <span class="enemy-plan-face">${portraitContent(definition.image, definition.label ?? "적", "portrait-art")}</span>
-      <span class="enemy-plan-main">
-        <strong>${definition.name} x${enemies.length}</strong>
-        <em>${entry.card.name} → ${target ? target.name : "재탐색"}</em>
-      </span>
-      <span class="enemy-plan-icons">${renderCompactActionList(entry.card)}</span>
-    </button>
-  `;
-}
-
-function compactCardText(cardData) {
-  return cardData.actions
-    .slice(0, 3)
-    .map(compactActionText)
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function compactActionText(action) {
-  if (action.type === "move") return `이동 ${action.amount}`;
-  if (action.type === "flee" || action.type === "fleeToRune") return `후퇴 ${action.amount}`;
-  if (action.type === "attack") return `${action.melee || action.range <= 1 ? "근접" : "원거리"} 공격 ${action.mult}`;
-  if (action.type === "patternAttack") return `범위 공격 ${action.mult}`;
-  if (action.type === "charge") return `차지 ${action.amount}`;
-  if (action.type === "placeTrap" || action.type === "placeObstacle" || action.type === "placeTrapBehindTarget") return "함정";
-  if (action.type === "placeRune") return "룬";
-  if (action.type === "placeMeteor") return "운석 예고";
-  if (action.type === "selfDamagePercent") return "체력 소모";
-  if (action.type === "healPercent") return "회복";
-  if (isPassiveAction(action)) return "지속 효과";
-  return "";
 }
 
 function enemyGroups() {
@@ -6395,39 +6326,10 @@ elements.turnPlanner?.addEventListener("click", (event) => {
     return;
   }
 
-  const targetChip = event.target.closest(".planner-target-chip");
-  if (targetChip?.dataset.targetId) {
-    setFocusTarget(targetChip.dataset.targetId);
-    return;
-  }
-
-  const detailButton = event.target.closest(".planner-card-detail");
-  if (detailButton?.dataset.cardKey) {
-    event.preventDefault();
-    event.stopPropagation();
-    openCardPreview(detailButton.dataset.cardKey);
-    return;
-  }
-
-  const enemyPlan = event.target.closest(".enemy-plan-chip");
-  if (enemyPlan?.dataset.cardKey) {
-    event.preventDefault();
-    event.stopPropagation();
-    openCardPreview(enemyPlan.dataset.cardKey);
-    return;
-  }
-
   const plannerCard = event.target.closest(".planner-card");
   if (plannerCard?.dataset.cardKey) {
     togglePlanCard(plannerCard.dataset.cardKey);
   }
-});
-elements.turnPlanner?.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  const detailButton = event.target.closest(".planner-card-detail");
-  if (!detailButton?.dataset.cardKey) return;
-  event.preventDefault();
-  openCardPreview(detailButton.dataset.cardKey);
 });
 elements.priorityStrip.addEventListener("click", (event) => {
   const cardSlot = event.target.closest(".priority-item");
