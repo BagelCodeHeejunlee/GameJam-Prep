@@ -3687,6 +3687,11 @@ body.turn-cue-active .turn-scrim {
   --cp-banner: url("assets/card-legendary-overlay.png");
 }
 
+.card-mount.monster-card-mount .card-prefab {
+  --cp-frame: url("assets/card-red-v2.png");
+  --cp-banner: url("assets/card-red-overlay.png");
+}
+
 /* Background frame (rarity) */
 .cp-bg {
   position: absolute;
