@@ -4813,12 +4813,12 @@ body {
 .hex::after {
   inset: 0;
   clip-path: none;
-  background: url("assets/casual/hex-grass.png") center / 100% 100% no-repeat;
+  background: url("assets/casual/hex-grass.png?v=20260623-boulder-wall") center / 100% 100% no-repeat;
   box-shadow: none;
 }
 
 .hex.wall::after {
-  background: url("assets/casual/hex-stone.png") center / 100% 100% no-repeat;
+  background: url("assets/casual/hex-stone.png?v=20260623-boulder-wall") center / 100% 100% no-repeat;
   box-shadow: none;
 }
 
@@ -4836,19 +4836,19 @@ body {
 .hex.trap-block::after {
   background:
     radial-gradient(circle at 50% 52%, rgba(96, 169, 255, 0.8) 0 16%, transparent 18%),
-    url("assets/casual/hex-stone.png") center / 100% 100% no-repeat;
+    url("assets/casual/hex-stone.png?v=20260623-boulder-wall") center / 100% 100% no-repeat;
 }
 
 .hex.trap-rune::after {
   background:
     radial-gradient(circle at 50% 52%, rgba(164, 130, 255, 0.82) 0 15%, rgba(110, 218, 212, 0.34) 16% 34%, transparent 36%),
-    url("assets/casual/hex-grass.png") center / 100% 100% no-repeat;
+    url("assets/casual/hex-grass.png?v=20260623-boulder-wall") center / 100% 100% no-repeat;
 }
 
 .hex.in-range::after {
   background:
     radial-gradient(circle at 50% 52%, rgba(255, 248, 144, 0.42) 0 46%, transparent 48%),
-    url("assets/casual/hex-grass.png") center / 100% 100% no-repeat;
+    url("assets/casual/hex-grass.png?v=20260623-boulder-wall") center / 100% 100% no-repeat;
   filter: brightness(1.12) saturate(1.12);
 }
 

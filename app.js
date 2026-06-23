@@ -1099,8 +1099,8 @@ selectedCharacterId = initialSelectedCharacterId();
 
 const coreVisualAssetUrls = [
   "assets/casual/bg-meadow.png",
-  "assets/casual/hex-grass.png",
-  "assets/casual/hex-stone.png",
+  "assets/casual/hex-grass.png?v=20260623-boulder-wall",
+  "assets/casual/hex-stone.png?v=20260623-boulder-wall",
   "assets/casual/hex-earth.png",
   "assets/casual/hud-panel.png",
   "assets/casual/button-pill.png",
