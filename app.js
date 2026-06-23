@@ -15,8 +15,6 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
-const PLAYER_TURN_DRAW_COUNT = 3;
-const PLAYER_TURN_PLAY_COUNT = 2;
 const STAT_PERCENT_PASSIVE_CAP_BY_RARITY = {
   "기본": 0.1,
   "노말": 0.1,
@@ -96,6 +94,7 @@ const elements = {
 
 let selectedCharacterId = "archer";
 let speedMultiplier = 1;
+let plannerDrag = null;
 
 const baseArcherCards = [
   card("advance-shot", "전진 사격", "기본", "기본", 54, [
@@ -1716,7 +1715,7 @@ async function runTurn() {
   const enemyEntries = drawEnemyPlanEntries();
   state.planningChoices = playerChoices;
   state.enemyPlanEntries = enemyEntries;
-  state.plannedCardKeys = defaultPlannedCardKeys();
+  state.plannedCardKeys = defaultPlannedCardKeys(playerChoices);
   state.focusTargetId = currentFocusTargetId();
   state.turnPlanning = true;
   state.currentTimeline = plannedPlayerEntriesFromState().concat(enemyEntries);
@@ -1787,17 +1786,26 @@ async function runTurn() {
   scheduleTurn();
 }
 
-function playerTurnDrawCount(player) {
-  return Math.max(PLAYER_TURN_DRAW_COUNT, playerTurnPlayLimit(player) + 1);
+function playerTurnDrawCount() {
+  return playerTurnCardCount();
 }
 
-function playerTurnPlayLimit(player = getPlayer()) {
-  const bonusPlays = Math.max(0, cardsPerPlayerTurn(player) - 1);
-  return Math.max(1, PLAYER_TURN_PLAY_COUNT + bonusPlays);
+function playerTurnPlayLimit() {
+  return playerTurnCardCount();
 }
 
-function defaultPlannedCardKeys() {
-  return [];
+function playerTurnCardCount() {
+  return playerPartySize() >= 3 ? 3 : 2;
+}
+
+function playerPartySize() {
+  const players = state?.entities?.filter((entity) => entity.side === "player") ?? [];
+  const alivePlayers = players.filter(isAlive);
+  return Math.max(1, alivePlayers.length || players.length);
+}
+
+function defaultPlannedCardKeys(choices) {
+  return choices.map((entry) => cardRuntimeKey(entry.card));
 }
 
 function plannedPlayerEntriesFromState() {
@@ -1830,20 +1838,23 @@ function confirmTurnPlan() {
   resolve?.();
 }
 
-function togglePlanCard(cardKey) {
-  if (!state?.turnPlanning || !cardKey) return;
-  const selected = state.plannedCardKeys ?? [];
-  const selectedIndex = selected.indexOf(cardKey);
-  if (selectedIndex >= 0) {
-    selected.splice(selectedIndex, 1);
-  } else {
-    selected.push(cardKey);
-    while (selected.length > playerTurnPlayLimit()) selected.shift();
-  }
-  state.plannedCardKeys = [...selected];
+function reorderPlannedCardToIndex(draggedKey, targetIndex) {
+  if (!state?.turnPlanning || !draggedKey) return;
+  const orderedKeys = [...(state.plannedCardKeys ?? [])];
+  const fromIndex = orderedKeys.indexOf(draggedKey);
+  if (fromIndex < 0) return;
+  const [dragged] = orderedKeys.splice(fromIndex, 1);
+  const boundedIndex = Math.max(0, Math.min(targetIndex, orderedKeys.length));
+  orderedKeys.splice(boundedIndex, 0, dragged);
+  if (orderedKeys.join("|") === (state.plannedCardKeys ?? []).join("|")) return;
+  state.plannedCardKeys = orderedKeys;
+  refreshPlannedTimeline();
+  render();
+}
+
+function refreshPlannedTimeline() {
   state.currentTimeline = plannedPlayerEntriesFromState().concat(state.enemyPlanEntries ?? []);
   assignPlanOrders(state.currentTimeline);
-  render();
 }
 
 function discardSkippedPlayerCard(cardData) {
@@ -2149,10 +2160,8 @@ function drawPlayerCards(count = 1) {
   return cards;
 }
 
-function cardsPerPlayerTurn(player) {
-  const everyTurnBonus = Math.floor(player?.permanent?.extraCardPlays ?? 0);
-  const firstTurnBonus = state.turn === 1 ? Math.floor(player?.permanent?.firstTurnExtraCardPlays ?? 0) : 0;
-  return Math.max(1, 1 + everyTurnBonus + firstTurnBonus);
+function cardsPerPlayerTurn() {
+  return playerTurnCardCount();
 }
 
 function drawEnemyCard(kind) {
@@ -4999,17 +5008,18 @@ function renderTurnPlanner() {
 
   const requiredCount = Math.min(playerTurnPlayLimit(), state.planningChoices.length);
   const ready = (state.plannedCardKeys ?? []).length >= requiredCount;
-  const selectedOrders = new Map((state.plannedCardKeys ?? []).map((key, index) => [key, index + 1]));
+  const plannerEntries = plannedPlayerEntriesFromState();
 
   host.classList.remove("hidden");
   host.innerHTML = `
     <button type="button" class="planner-confirm" aria-label="선택한 카드 실행" ${ready ? "" : "disabled"}>실행</button>
     <div class="planner-cards">
-      ${(state.planningChoices ?? []).map((entry) => {
+      ${plannerEntries.map((entry) => {
         const key = cardRuntimeKey(entry.card);
-        const order = selectedOrders.get(key);
+        const order = entry.planOrder;
+        const dragging = plannerDrag?.active && plannerDrag.cardKey === key;
         return `
-          <button type="button" class="planner-card ${order ? "selected" : ""}" data-card-key="${key}" aria-label="${entry.card.name}">
+          <button type="button" class="planner-card ${dragging ? "dragging" : ""}" data-card-key="${key}" aria-label="${entry.card.name} 순서 ${order ?? ""}">
             ${cardMount(entry.card, "planner-mount", order ?? "", getSelectedCharacter())}
           </button>
         `;
@@ -5975,6 +5985,69 @@ function endBoardCameraDrag(event) {
   }
 }
 
+function beginPlannerDrag(event) {
+  if (!state?.turnPlanning || event.target.closest(".planner-confirm")) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const cardElement = event.target.closest(".planner-card");
+  if (!cardElement?.dataset.cardKey) return;
+  plannerDrag = {
+    pointerId: event.pointerId,
+    cardKey: cardElement.dataset.cardKey,
+    startX: event.clientX,
+    startY: event.clientY,
+    active: false,
+  };
+  elements.turnPlanner?.setPointerCapture?.(event.pointerId);
+}
+
+function movePlannerDrag(event) {
+  if (!plannerDrag || plannerDrag.pointerId !== event.pointerId || !state?.turnPlanning) return;
+  const movedDistance = Math.hypot(event.clientX - plannerDrag.startX, event.clientY - plannerDrag.startY);
+  if (!plannerDrag.active && movedDistance < 8) return;
+  event.preventDefault();
+  if (!plannerDrag.active) {
+    plannerDrag.active = true;
+    render();
+  }
+  reorderPlannedCardAtPoint(plannerDrag.cardKey, event.clientX, event.clientY);
+}
+
+function endPlannerDrag(event) {
+  if (!plannerDrag || plannerDrag.pointerId !== event.pointerId) return;
+  const wasActive = plannerDrag.active;
+  if (elements.turnPlanner?.hasPointerCapture?.(event.pointerId)) {
+    elements.turnPlanner.releasePointerCapture(event.pointerId);
+  }
+  plannerDrag = null;
+  if (wasActive) {
+    event.preventDefault();
+    render();
+  }
+}
+
+function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
+  const cards = [...(elements.turnPlanner?.querySelectorAll(".planner-card") ?? [])]
+    .filter((cardElement) => cardElement.dataset.cardKey && cardElement.dataset.cardKey !== draggedKey);
+  if (!cards.length) return;
+  const cardPositions = cards
+    .map((cardElement) => {
+      const rect = cardElement.getBoundingClientRect();
+      return {
+        cardElement,
+        rect,
+        centerX: rect.left + rect.width / 2,
+      };
+    })
+    .sort((a, b) => a.rect.left - b.rect.left);
+  const top = Math.min(...cardPositions.map((item) => item.rect.top));
+  const bottom = Math.max(...cardPositions.map((item) => item.rect.bottom));
+  const verticalSlack = Math.max(60, (bottom - top) * 0.45);
+  if (clientY < top - verticalSlack || clientY > bottom + verticalSlack) return;
+  let targetIndex = cardPositions.findIndex((item) => clientX < item.centerX);
+  if (targetIndex < 0) targetIndex = cardPositions.length;
+  reorderPlannedCardToIndex(draggedKey, targetIndex);
+}
+
 function clampCameraDragFrame(frame, metrics) {
   const focusClamp = state.cameraMode === "focus";
   const visibleTop = focusClamp ? metrics.playArea.top : 0;
@@ -6321,14 +6394,12 @@ elements.turnPlanner?.addEventListener("click", (event) => {
   const confirmButton = event.target.closest(".planner-confirm");
   if (confirmButton) {
     confirmTurnPlan();
-    return;
-  }
-
-  const plannerCard = event.target.closest(".planner-card");
-  if (plannerCard?.dataset.cardKey) {
-    togglePlanCard(plannerCard.dataset.cardKey);
   }
 });
+elements.turnPlanner?.addEventListener("pointerdown", beginPlannerDrag);
+elements.turnPlanner?.addEventListener("pointermove", movePlannerDrag);
+elements.turnPlanner?.addEventListener("pointerup", endPlannerDrag);
+elements.turnPlanner?.addEventListener("pointercancel", endPlannerDrag);
 elements.priorityStrip.addEventListener("click", (event) => {
   const cardSlot = event.target.closest(".priority-item");
   if (!cardSlot?.dataset.cardKey) return;

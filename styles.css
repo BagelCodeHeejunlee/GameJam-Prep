@@ -5094,19 +5094,23 @@ body {
   border-radius: 12px;
   background: rgba(255, 247, 219, 0.36);
   color: #4d341f;
+  cursor: grab;
   filter: drop-shadow(0 8px 8px rgba(58, 42, 23, 0.22));
+  touch-action: none;
   transition:
     transform 160ms ease,
     filter 160ms ease;
 }
 
-.planner-card.selected {
+.planner-card.dragging {
   border-color: rgba(255, 205, 74, 0.98);
   background: rgba(255, 242, 183, 0.86);
+  cursor: grabbing;
+  opacity: 0.92;
   box-shadow:
     0 0 0 2px rgba(255, 245, 187, 0.54),
     0 0 18px rgba(255, 201, 69, 0.42);
-  transform: translateY(-12px);
+  transform: translateY(-14px) scale(1.03);
 }
 
 .planner-mount {
