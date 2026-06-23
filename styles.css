@@ -4781,24 +4781,16 @@ body.turn-cue-active .turn-scrim {
 /* Casual art asset pass */
 html,
 body {
-  background: #79d7ee url("assets/casual/bg-meadow.png") center / cover no-repeat fixed;
+  background: #79d7ee url("assets/casual/bg-meadow.png?v=20260623-bg-image") center / cover no-repeat fixed;
 }
 
 .board-panel {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(43, 109, 91, 0.2) 54%, rgba(28, 84, 73, 0.34)),
-    url("assets/casual/bg-meadow.png") center / cover no-repeat;
+  background: url("assets/casual/bg-meadow.png?v=20260623-bg-image") center / cover no-repeat;
   background-color: #79d7ee;
 }
 
 .board-panel::before {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 34%),
-    radial-gradient(90% 44% at 50% 62%, rgba(255, 226, 138, 0.24), transparent 70%);
-  content: "";
-  pointer-events: none;
+  display: none;
 }
 
 .board {

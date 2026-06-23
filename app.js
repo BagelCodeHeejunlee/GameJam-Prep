@@ -1098,7 +1098,7 @@ const characterDefinitions = {
 selectedCharacterId = initialSelectedCharacterId();
 
 const coreVisualAssetUrls = [
-  "assets/casual/bg-meadow.png",
+  "assets/casual/bg-meadow.png?v=20260623-bg-image",
   "assets/casual/hex-grass.png?v=20260623-boulder-wall",
   "assets/casual/hex-stone.png?v=20260623-boulder-wall",
   "assets/casual/hex-earth.png",
