@@ -4430,6 +4430,10 @@ function renderEnemyActionHud() {
     elements.enemyActionHud.className = "enemy-action-hud";
     elements.enemyActionHud.innerHTML = "";
     elements.enemyActionHud.dataset.signature = "";
+    delete elements.enemyActionHud.dataset.cardKey;
+    elements.enemyActionHud.removeAttribute("role");
+    elements.enemyActionHud.removeAttribute("tabindex");
+    elements.enemyActionHud.removeAttribute("aria-label");
     return;
   }
 
@@ -4440,6 +4444,10 @@ function renderEnemyActionHud() {
     elements.enemyActionHud.className = "enemy-action-hud";
     elements.enemyActionHud.innerHTML = "";
     elements.enemyActionHud.dataset.signature = "";
+    delete elements.enemyActionHud.dataset.cardKey;
+    elements.enemyActionHud.removeAttribute("role");
+    elements.enemyActionHud.removeAttribute("tabindex");
+    elements.enemyActionHud.removeAttribute("aria-label");
     return;
   }
 
@@ -4448,11 +4456,16 @@ function renderEnemyActionHud() {
   const boss = groupEnemies.some((enemy) => enemy.boss);
   const name = boss && sample ? sample.name : definition.name;
   const count = groupEnemies.length;
-  const signature = `${entry.actorId}:${entry.card.instanceId ?? entry.card.id}:${count}:${boss}`;
+  const cardKey = cardRuntimeKey(entry.card);
+  const signature = `${entry.actorId}:${cardKey}:${count}:${boss}`;
 
   elements.enemyActionHud.className = `enemy-action-hud show ${boss ? "boss" : ""}`;
   if (elements.enemyActionHud.dataset.signature === signature) return;
   elements.enemyActionHud.dataset.signature = signature;
+  elements.enemyActionHud.dataset.cardKey = cardKey;
+  elements.enemyActionHud.setAttribute("role", "button");
+  elements.enemyActionHud.tabIndex = 0;
+  elements.enemyActionHud.setAttribute("aria-label", `${entry.card.name} 확대`);
   elements.enemyActionHud.innerHTML = `
     <div class="enemy-action-info">
       <span class="enemy-action-kicker">적 행동</span>
@@ -4529,7 +4542,6 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
   const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
   const boss = groupEnemies.some((e) => e.boss);
   const count = isPlayer ? 1 : groupEnemies.length;
-  const ownerLabel = isPlayer ? "나" : monsterLabel(entry.actorId);
   const cardOwner = isPlayer ? getSelectedCharacter() : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
   const className = [
     "priority-item",
@@ -4542,18 +4554,21 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
     .join(" ");
   const priority = timelinePriority(entry);
   const cardKey = cardRuntimeKey(entry.card);
-  const contentSignature = `${cardKey}:${priority}:${ownerLabel}:${count}:${cardOwner.image ?? ""}`;
+  const contentSignature = `${cardKey}:${priority}:${count}:${cardOwner.image ?? ""}`;
 
   if (item.dataset.contentSignature !== contentSignature) {
     const cardMountClass = `priority-card-mount ${isPlayer ? "" : "monster-card-mount"}`.trim();
     item.innerHTML = `
       ${cardMount(entry.card, cardMountClass, priority, cardOwner)}
-      <span class="pc-owner">${ownerLabel}${count > 1 ? ` ×${count}` : ""}</span>
     `;
     item.dataset.contentSignature = contentSignature;
   }
 
   item.className = className;
+  item.dataset.cardKey = cardKey;
+  item.setAttribute("role", "button");
+  item.tabIndex = 0;
+  item.setAttribute("aria-label", `${entry.card.name} 확대`);
   item.title = `${entryLabel(entry)} · ${entry.card.name} · PRI ${priority}`;
 }
 
@@ -4738,19 +4753,23 @@ function cardRuntimeKey(cardData) {
   return String(cardData?.instanceId ?? cardData?.id ?? "");
 }
 
-function findCurrentTimelineCard(cardKey) {
+function findTimelineCard(cardKey, playerOnly = false) {
   if (!cardKey) return null;
   const entry = state.currentTimeline.find((item, index) => {
-    if (item.actorType !== "player" || state.completedTimelineIndexes?.has(index)) return false;
+    if (playerOnly && item.actorType !== "player") return false;
+    if (playerOnly && state.completedTimelineIndexes?.has(index)) return false;
     return cardRuntimeKey(item.card) === cardKey;
   });
   return entry ?? null;
 }
 
 function openCardPreview(cardKey) {
-  const entry = findCurrentTimelineCard(cardKey);
+  const entry = findTimelineCard(cardKey);
   if (!entry || !elements.cardPreviewOverlay || !elements.cardPreviewMount) return;
-  elements.cardPreviewMount.innerHTML = cardMount(entry.card, "preview-mount", timelinePriority(entry), getSelectedCharacter());
+  const isPlayer = entry.actorType === "player";
+  const owner = isPlayer ? getSelectedCharacter() : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
+  const mountClass = `preview-mount ${isPlayer ? "" : "monster-card-mount"}`.trim();
+  elements.cardPreviewMount.innerHTML = cardMount(entry.card, mountClass, timelinePriority(entry), owner);
   elements.cardPreviewOverlay.classList.remove("hidden");
 }
 
@@ -5964,6 +5983,32 @@ elements.playerHud.addEventListener("keydown", (event) => {
   if (!cardSlot?.dataset.cardKey) return;
   event.preventDefault();
   openCardPreview(cardSlot.dataset.cardKey);
+});
+elements.priorityStrip.addEventListener("click", (event) => {
+  const cardSlot = event.target.closest(".priority-item");
+  if (!cardSlot?.dataset.cardKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openCardPreview(cardSlot.dataset.cardKey);
+});
+elements.priorityStrip.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const cardSlot = event.target.closest(".priority-item");
+  if (!cardSlot?.dataset.cardKey) return;
+  event.preventDefault();
+  openCardPreview(cardSlot.dataset.cardKey);
+});
+elements.enemyActionHud.addEventListener("click", (event) => {
+  if (!elements.enemyActionHud.dataset.cardKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openCardPreview(elements.enemyActionHud.dataset.cardKey);
+});
+elements.enemyActionHud.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  if (!elements.enemyActionHud.dataset.cardKey) return;
+  event.preventDefault();
+  openCardPreview(elements.enemyActionHud.dataset.cardKey);
 });
 elements.closeHelpButton.addEventListener("click", () => {
   elements.iconHelpOverlay.classList.add("hidden");

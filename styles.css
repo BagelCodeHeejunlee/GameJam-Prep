@@ -1827,6 +1827,15 @@ body.turn-cue-active .turn-scrim {
   justify-self: end;
 }
 
+.enemy-action-hud.show {
+  cursor: pointer;
+}
+
+.enemy-action-hud.show:focus-visible {
+  outline: 2px solid rgba(255, 244, 190, 0.95);
+  outline-offset: 3px;
+}
+
 @keyframes enemy-action-in {
   from {
     opacity: 0;
@@ -4381,6 +4390,7 @@ body.turn-cue-active .turn-scrim {
   border-radius: 8px;
   background: transparent;
   box-shadow: none;
+  cursor: pointer;
 }
 
 .priority-card-mount {
@@ -4413,29 +4423,14 @@ body.turn-cue-active .turn-scrim {
   display: none;
 }
 
+.priority-item:focus-visible {
+  outline: 2px solid rgba(255, 244, 190, 0.95);
+  outline-offset: 3px;
+}
+
 .priority-item.done {
   opacity: 0.42;
   transform: none;
-}
-
-.pc-owner {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  z-index: 2;
-  max-width: calc(100% - 8px);
-  overflow: hidden;
-  padding: 2px 5px;
-  border: 1px solid rgba(255, 250, 228, 0.7);
-  border-radius: 999px;
-  background: rgba(38, 48, 52, 0.82);
-  color: #fff4d6;
-  font-size: 9px;
-  font-weight: 950;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
 }
 
 .player-hud {
