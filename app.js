@@ -1211,7 +1211,7 @@ function characterTokenImage(entity, character, bounds = null) {
 }
 
 function characterTokenViewKey(entity, bounds = null) {
-  const target = nearestOpponent(entity);
+  const target = state?.entityFacingTargets?.get(entity.id) ?? nearestOpponent(entity);
   return characterTokenViewKeyToward(entity, target, bounds);
 }
 
@@ -1353,6 +1353,7 @@ async function newRun() {
     cameraScale: 0,
     cameraDrag: null,
     cameraDeadZoneSuppressed: false,
+    entityFacingTargets: new Map(),
     offscreenIndicatorElements: new Map(),
     offscreenIndicatorFrame: 0,
     pendingOffscreenBounds: null,
@@ -2797,35 +2798,40 @@ async function animateActorPath(actor, path) {
 }
 
 async function slideActorTo(actor, from, to) {
-  renderBoard();
-  const bounds = boardBounds();
-  const entityElement = elements.board.querySelector(`[data-entity-id="${actor.id}"]`);
-  if (!entityElement) {
-    actor.q = to.q;
-    actor.r = to.r;
+  state.entityFacingTargets?.set(actor.id, to);
+  try {
     renderBoard();
-    return;
+    const bounds = boardBounds();
+    const entityElement = elements.board.querySelector(`[data-entity-id="${actor.id}"]`);
+    if (!entityElement) {
+      actor.q = to.q;
+      actor.r = to.r;
+      renderBoard();
+      return;
+    }
+
+    const fromPoint = hexToPixel(from, bounds);
+    const toPoint = hexToPixel(to, bounds);
+    const deltaX = fromPoint.x - toPoint.x;
+    const deltaY = fromPoint.y - toPoint.y;
+    entityElement.classList.remove("moving");
+    entityElement.style.transition = "none";
+    entityElement.style.left = `${toPoint.x}px`;
+    entityElement.style.top = `${toPoint.y}px`;
+    entityElement.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+    entityElement.getBoundingClientRect();
+
+    await nextFrame();
+    entityElement.style.transition = "";
+    entityElement.classList.add("moving");
+    const cameraFollow = animateCameraFollowForActor(actor, from, to);
+    await nextFrame();
+    entityElement.style.transform = "";
+    await sleep(240);
+    if (cameraFollow) await cameraFollow;
+  } finally {
+    state.entityFacingTargets?.delete(actor.id);
   }
-
-  const fromPoint = hexToPixel(from, bounds);
-  const toPoint = hexToPixel(to, bounds);
-  const deltaX = fromPoint.x - toPoint.x;
-  const deltaY = fromPoint.y - toPoint.y;
-  entityElement.classList.remove("moving");
-  entityElement.style.transition = "none";
-  entityElement.style.left = `${toPoint.x}px`;
-  entityElement.style.top = `${toPoint.y}px`;
-  entityElement.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
-  entityElement.getBoundingClientRect();
-
-  await nextFrame();
-  entityElement.style.transition = "";
-  entityElement.classList.add("moving");
-  const cameraFollow = animateCameraFollowForActor(actor, from, to);
-  await nextFrame();
-  entityElement.style.transform = "";
-  await sleep(240);
-  if (cameraFollow) await cameraFollow;
 }
 
 function animateCameraFollowForActor(actor, from, to) {
