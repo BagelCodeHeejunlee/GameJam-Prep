@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>풀 타일 캐스팅보드</title>
+    <meta name="theme-color" content="#eaf7d8" />
+    <meta property="og:title" content="풀 타일 캐스팅보드" />
+    <meta property="og:description" content="궁수 토큰과 맞춘 풀 바닥 타일 시안 8종" />
+    <meta property="og:image" content="assets/casting/tiles/grass/grass-tile-contact-sheet.png" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eaf7d8;
+        --bg-deep: #bfe7a5;
+        --ink: #21351b;
+        --muted: #668155;
+        --line: rgba(78, 125, 50, 0.22);
+        --card: rgba(255, 252, 229, 0.88);
+        --green: #58bd36;
+        --orange: #df7c33;
+        --shadow: rgba(51, 93, 36, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background:
+          radial-gradient(circle at 17% 16%, rgba(255, 255, 255, 0.74), transparent 0 92px, transparent 93px),
+          radial-gradient(circle at 86% 10%, rgba(255, 235, 132, 0.24), transparent 0 180px, transparent 181px),
+          linear-gradient(180deg, var(--bg), var(--bg-deep));
+        color: var(--ink);
+        font-family:
+          Inter, ui-rounded, "Apple SD Gothic Neo", "Malgun Gothic", system-ui,
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1380px, 100%);
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: end;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 780px;
+        font-size: clamp(34px, 5vw, 74px);
+        font-weight: 950;
+        line-height: 0.95;
+      }
+
+      .summary {
+        max-width: 780px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.6;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .nav a {
+        display: inline-flex;
+        min-height: 34px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 11px;
+        background: rgba(255, 252, 229, 0.74);
+        color: #35642a;
+        font-size: 13px;
+        font-weight: 900;
+        text-decoration: none;
+      }
+
+      .board-preview {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 0;
+        width: min(880px, 100%);
+        margin: 24px auto 8px;
+        padding: 18px 22px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.64);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.24);
+        box-shadow: 0 18px 46px rgba(68, 118, 39, 0.16);
+      }
+
+      .board-preview img {
+        width: 112%;
+        max-width: none;
+        margin-left: -6%;
+        filter: drop-shadow(0 7px 4px rgba(44, 82, 31, 0.15));
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px;
+        padding-top: 24px;
+      }
+
+      article {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: 0 14px 34px var(--shadow);
+      }
+
+      .tile-stage {
+        position: relative;
+        display: grid;
+        min-height: 280px;
+        place-items: center;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 60%, rgba(112, 181, 68, 0.2), transparent 0 118px),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(232, 249, 214, 0.88));
+      }
+
+      .tile-stage::after {
+        position: absolute;
+        right: 18px;
+        bottom: 16px;
+        width: 104px;
+        height: 120px;
+        background: url("assets/characters/archer-token/archer-token-v2-front-right.png") center / contain no-repeat;
+        content: "";
+        filter: drop-shadow(0 8px 6px rgba(47, 86, 33, 0.22));
+      }
+
+      .tile-stage img {
+        width: min(72%, 240px);
+        height: auto;
+        filter: drop-shadow(0 12px 8px rgba(47, 86, 33, 0.22));
+      }
+
+      figcaption {
+        display: grid;
+        gap: 10px;
+        min-height: 138px;
+        padding: 15px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .number {
+        color: var(--orange);
+        font-size: 13px;
+        font-weight: 950;
+      }
+
+      h2 {
+        font-size: 18px;
+        font-weight: 950;
+        line-height: 1.2;
+      }
+
+      .tag {
+        flex: 0 0 auto;
+        border-radius: 8px;
+        background: rgba(88, 189, 54, 0.16);
+        color: #39742a;
+        padding: 5px 8px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .note {
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+      }
+
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      footer a {
+        color: #39742a;
+        font-weight: 950;
+        text-decoration: none;
+      }
+
+      @media (max-width: 1100px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .board-preview {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
+      @media (max-width: 720px) {
+        main {
+          padding: 18px;
+        }
+
+        header {
+          grid-template-columns: 1fr;
+        }
+
+        .nav {
+          justify-content: flex-start;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        .tile-stage {
+          min-height: 252px;
+        }
+
+        figcaption {
+          min-height: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>풀 타일 캐스팅보드</h1>
+          <p class="summary">
+            궁수 토큰의 밝은 캐주얼 톤에 맞춘 풀 바닥 후보 8종입니다. 모두 같은 헥사 규격이라 이후 실제 보드에
+            자연스럽게 섞어 쓸 수 있습니다.
+          </p>
+        </div>
+        <nav class="nav" aria-label="관련 페이지">
+          <a href="index.html">플레이 화면</a>
+          <a href="archer-casting-board.html">궁수 보드</a>
+        </nav>
+      </header>
+
+      <section class="board-preview" aria-label="풀 타일 믹스 프리뷰">
+        <img src="assets/casting/tiles/grass/grass-tile-01-clean.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-02-lush.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-03-flowers.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-04-clover.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-05-moss.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-06-tall-grass.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-07-leafy.png" alt="" />
+        <img src="assets/casting/tiles/grass/grass-tile-08-worn.png" alt="" />
+      </section>
+
+      <section class="grid" aria-label="풀 타일 후보 8종">
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-01-clean.png" alt="깨끗한 밝은 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">01</span><span class="tag">Base</span></div>
+              <h2>밝은 기본 풀</h2>
+              <p class="note">가장 안전한 기본형. 캐릭터 색을 방해하지 않는 밝은 녹색 톤입니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-02-lush.png" alt="풍성한 진한 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">02</span><span class="tag">Lush</span></div>
+              <h2>풍성한 풀</h2>
+              <p class="note">음영을 조금 더 넣은 변주. 필드에 깊이를 줄 때 쓰기 좋습니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-03-flowers.png" alt="작은 꽃이 있는 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">03</span><span class="tag">Flower</span></div>
+              <h2>작은 꽃 풀밭</h2>
+              <p class="note">필드가 단조로울 때 포인트용으로 섞을 수 있는 컬러 액센트입니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-04-clover.png" alt="클로버가 있는 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">04</span><span class="tag">Clover</span></div>
+              <h2>클로버 풀밭</h2>
+              <p class="note">작은 잎 모양으로 귀여운 느낌을 강화한 후보입니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-05-moss.png" alt="이끼가 섞인 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">05</span><span class="tag">Moss</span></div>
+              <h2>이끼 풀밭</h2>
+              <p class="note">조금 습한 지형 느낌. 초록 계열 안에서 분위기만 바꿉니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-06-tall-grass.png" alt="긴 풀이 있는 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">06</span><span class="tag">Blade</span></div>
+              <h2>긴 풀결</h2>
+              <p class="note">움직임 있는 브러시감. 보드가 너무 평면적으로 보일 때 유리합니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-07-leafy.png" alt="잎사귀가 섞인 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">07</span><span class="tag">Leaf</span></div>
+              <h2>잎사귀 풀밭</h2>
+              <p class="note">디테일은 많지만 색 대비는 낮게 둔 자연 장식용 후보입니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article>
+          <figure>
+            <div class="tile-stage"><img src="assets/casting/tiles/grass/grass-tile-08-worn.png" alt="살짝 밟힌 풀 타일" /></div>
+            <figcaption>
+              <div class="row"><span class="number">08</span><span class="tag">Path</span></div>
+              <h2>밟힌 풀길</h2>
+              <p class="note">갈색 길 대신 녹색 안에서만 눌린 느낌을 준 변주입니다.</p>
+            </figcaption>
+          </figure>
+        </article>
+      </section>
+
+      <footer>
+        <span>256x296 RGBA PNG, 기존 헥사 타일 실루엣 유지</span>
+        <a href="index.html">게임으로 돌아가기</a>
+      </footer>
+    </main>
+  </body>
+</html>
