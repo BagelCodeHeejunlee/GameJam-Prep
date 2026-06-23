@@ -1212,6 +1212,16 @@ function characterTokenImage(entity, character, bounds = null) {
 
 function characterTokenViewKey(entity, bounds = null) {
   const target = nearestOpponent(entity);
+  return characterTokenViewKeyToward(entity, target, bounds);
+}
+
+function characterTokenImageToward(entity, character, target, bounds = null) {
+  const tokenImages = character.tokenImages ?? {};
+  const viewKey = characterTokenViewKeyToward(entity, target, bounds);
+  return tokenImages[viewKey] ?? tokenImages.front ?? character.image;
+}
+
+function characterTokenViewKeyToward(entity, target, bounds = null) {
   if (!target) return "front";
 
   const vector = bounds
@@ -2174,6 +2184,7 @@ async function attack(actor, action) {
 
   const chargeBonus = consumeChargeForAttack(actor);
   if (state.activeCardContext?.actorId === actor.id) state.activeCardContext.didAttack = true;
+  await animateActorAttack(actor, targets[0], action);
   for (const target of targets) {
     if (!isAlive(actor)) return true;
     if (!isAlive(target)) continue;
@@ -2208,6 +2219,73 @@ async function attack(actor, action) {
   }
   consumeEffects(actor, "attack");
   return true;
+}
+
+async function animateActorAttack(actor, target, action) {
+  if (!isAlive(actor) || !target) return;
+  const character = actor.side === "player"
+    ? characterDefinitions[actor.characterId] ?? getSelectedCharacter()
+    : null;
+  if (!character?.tokenImages) return;
+
+  renderBoard();
+  const bounds = boardBounds();
+  const entityElement = elements.board.querySelector(entityDomSelector(actor.id));
+  const art = entityElement?.querySelector(".entity-art");
+  if (!entityElement || !art) return;
+  if (!entityElement.style?.setProperty || !elements.board?.append) return;
+
+  const facingImage = characterTokenImageToward(actor, character, target, bounds);
+  if (facingImage) {
+    art.src = facingImage;
+    entityElement.dataset.image = facingImage;
+  }
+
+  const fromPoint = hexToPixel(actor, bounds);
+  const toPoint = hexToPixel(target, bounds);
+  const dx = toPoint.x - fromPoint.x;
+  const dy = toPoint.y - fromPoint.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / length;
+  const uy = dy / length;
+  const duration = Math.max(130, turnDelay(action.melee || action.range <= 1 ? 0.26 : 0.34));
+  const lunge = action.melee || action.range <= 1 ? 12 : 7;
+  const recoil = action.melee || action.range <= 1 ? 5 : 9;
+
+  entityElement.style.setProperty("--attack-duration", `${duration}ms`);
+  entityElement.style.setProperty("--attack-x", `${ux * lunge}px`);
+  entityElement.style.setProperty("--attack-y", `${uy * lunge}px`);
+  entityElement.style.setProperty("--attack-recoil-x", `${-ux * recoil}px`);
+  entityElement.style.setProperty("--attack-recoil-y", `${-uy * recoil}px`);
+  entityElement.classList.add("attacking");
+
+  const projectile = !action.melee && (action.range ?? 1) > 1
+    ? createAttackProjectile(fromPoint, toPoint, duration)
+    : null;
+  if (projectile) elements.board.append(projectile);
+
+  await sleep(duration);
+  entityElement.classList.remove("attacking");
+  projectile?.remove();
+}
+
+function createAttackProjectile(fromPoint, toPoint, duration) {
+  const dx = toPoint.x - fromPoint.x;
+  const dy = toPoint.y - fromPoint.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / length;
+  const uy = dy / length;
+  const startOffset = 24;
+  const endOffset = 20;
+  const span = document.createElement("span");
+  span.className = "attack-projectile";
+  span.style.left = `${fromPoint.x + ux * startOffset}px`;
+  span.style.top = `${fromPoint.y + uy * startOffset}px`;
+  span.style.setProperty("--projectile-duration", `${duration}ms`);
+  span.style.setProperty("--projectile-dx", `${dx - ux * (startOffset + endOffset)}px`);
+  span.style.setProperty("--projectile-dy", `${dy - uy * (startOffset + endOffset)}px`);
+  span.style.setProperty("--projectile-angle", `${Math.atan2(dy, dx)}rad`);
+  return span;
 }
 
 function patternAttack(actor, action) {

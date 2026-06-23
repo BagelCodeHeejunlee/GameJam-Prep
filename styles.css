@@ -445,6 +445,10 @@ h2 {
   animation: entity-art-acting-bob 1000ms ease-in-out infinite;
 }
 
+.entity.has-art.attacking .entity-art {
+  animation: entity-art-attack var(--attack-duration, 190ms) cubic-bezier(0.22, 0.9, 0.28, 1.16) both !important;
+}
+
 @keyframes entity-art-acting-bob {
   0%,
   100% {
@@ -452,6 +456,67 @@ h2 {
   }
   50% {
     transform: translateX(-50%) scale(1.12);
+  }
+}
+
+@keyframes entity-art-attack {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  34% {
+    transform: translate(calc(-50% + var(--attack-x, 0px)), var(--attack-y, 0px)) scale(1.12, 0.96);
+  }
+  58% {
+    transform: translate(calc(-50% + var(--attack-recoil-x, 0px)), var(--attack-recoil-y, 0px)) scale(0.96, 1.06);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+.attack-projectile {
+  position: absolute;
+  z-index: 8;
+  display: block;
+  width: 34px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 247, 197, 0), #fff6a8 20%, #f5b83d 70%, #7b4b1e 100%);
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  filter:
+    drop-shadow(0 0 5px rgba(255, 230, 120, 0.85))
+    drop-shadow(0 2px 1px rgba(80, 50, 24, 0.26));
+  animation: attack-projectile-flight var(--projectile-duration, 190ms) linear both;
+}
+
+.attack-projectile::after {
+  position: absolute;
+  top: 50%;
+  right: -7px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 11px solid #6f3e17;
+  content: "";
+  transform: translateY(-50%);
+}
+
+@keyframes attack-projectile-flight {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0, 0) rotate(var(--projectile-angle, 0rad)) scaleX(0.4);
+  }
+  16% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--projectile-dx, 0px), var(--projectile-dy, 0px)) rotate(var(--projectile-angle, 0rad)) scaleX(1.05);
   }
 }
 
