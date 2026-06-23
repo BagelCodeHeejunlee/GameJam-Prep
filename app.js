@@ -4352,8 +4352,9 @@ async function pickReward(reward, button) {
   await sleep(840);
 
   const deckTarget =
-    document.querySelector('.player-hud .pile-row span[title="덱"]') ||
-    document.querySelector(".player-hud");
+    document.querySelector('.resource-item[data-resource="deck"]') ||
+    document.querySelector(".resource-hud") ||
+    document.querySelector(".battle-top-hud");
   flyer.classList.remove("to-center");
   if (passiveReward) {
     flyer.style.transform = `translate(${centerX}px, ${centerY}px) scale(1.35)`;
@@ -4378,11 +4379,10 @@ async function pickReward(reward, button) {
     else state.deck.push(reward);
   }
   renderPlayerHud();
-  const deckPile = document.querySelector('.player-hud .pile-row span[title="덱"]');
-  if (!passiveReward && deckPile) {
-    deckPile.classList.remove("pile-pop");
-    void deckPile.offsetWidth;
-    deckPile.classList.add("pile-pop");
+  if (!passiveReward && deckTarget) {
+    deckTarget.classList.remove("resource-pop");
+    void deckTarget.offsetWidth;
+    deckTarget.classList.add("resource-pop");
   }
   await sleep(440);
   flyer.remove();
@@ -4986,46 +4986,8 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
 }
 
 function renderPlayerHud() {
-  const players = state.entities.filter((entity) => entity.side === "player");
-  const alivePlayers = players.filter(isAlive);
-  const visiblePlayers = alivePlayers.length ? alivePlayers : players;
+  if (!elements.playerHud) return;
   elements.playerHud.innerHTML = "";
-  const shownPlayers = visiblePlayers.slice(0, 3);
-  elements.playerHud.classList.toggle("solo", shownPlayers.length <= 1);
-  elements.playerHud.classList.toggle("duo", shownPlayers.length === 2);
-  elements.playerHud.classList.toggle("trio", shownPlayers.length >= 3);
-
-  const activeEntry = state.activeTimelineIndex >= 0
-    ? state.currentTimeline[state.activeTimelineIndex]
-    : null;
-
-  shownPlayers.forEach((player) => {
-    const character = characterDefinitions[player.characterId] ?? getSelectedCharacter();
-    const isActive = activeEntry?.actorType === "player" && activeEntry.actorId === player.id;
-    const slot = document.createElement("div");
-    slot.className = `hero-action-slot ${isActive ? "active" : ""}`;
-    const article = document.createElement("article");
-    article.className = `player-block ${isActive ? "active" : ""}`;
-    article.innerHTML = `
-      <div class="player-info">
-        <div class="player-head">
-          <div class="combatant-portrait player-portrait">${portraitContent(character.image, character.shortLabel, "portrait-art")}</div>
-          <div class="player-vitals">
-            <div class="combatant-heading player-heading">
-              <strong>${character.name}</strong>
-            </div>
-          </div>
-        </div>
-        <div class="pile-row">
-          <span title="덱">${pileIcon()}<b>${state.deck.length}</b><em>덱</em></span>
-          <span title="버림">${pileIcon()}<b>${state.discard.length}</b><em>버림</em></span>
-          <span title="공격력">${actionIcon("melee")}<b>${Math.max(0, player.baseAtk ?? character.baseAtk ?? 0)}</b><em>공격</em></span>
-        </div>
-      </div>
-    `;
-    slot.append(article);
-    elements.playerHud.append(slot);
-  });
 }
 
 function renderTurnPlanner() {
@@ -6171,9 +6133,12 @@ function cameraPlayArea(panelHeight) {
   const topRects = [document.querySelector(".top-bar")]
     .map((element) => element?.getBoundingClientRect())
     .filter(Boolean);
-  const playerHudRect = elements.playerHud?.getBoundingClientRect();
+  const bottomRects = [elements.turnPlanner]
+    .filter((element) => element && !element.classList.contains("hidden"))
+    .map((element) => element.getBoundingClientRect())
+    .filter((rect) => rect.height > 0 && rect.top < panelHeight);
   const top = topRects.length ? Math.max(...topRects.map((rect) => rect.bottom)) + CAMERA_UI_GAP : panelHeight * 0.14;
-  const bottom = playerHudRect?.height ? playerHudRect.top - CAMERA_UI_GAP : panelHeight * 0.84;
+  const bottom = bottomRects.length ? Math.min(...bottomRects.map((rect) => rect.top)) - CAMERA_UI_GAP : panelHeight * 0.88;
   const safeBottom = Math.max(top + 140, bottom);
   return {
     top,

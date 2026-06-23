@@ -21,7 +21,7 @@
     <link rel="preload" as="image" href="assets/casual/hud-token.png" />
     <link rel="preload" as="image" href="assets/casting/archer/archer-01-2d-illustration-cutout.png" />
     <link rel="preload" as="image" href="assets/characters/archer-token/archer-token-v2-front.png" />
-    <link rel="stylesheet" href="styles.css?v=20260623-bg-image" />
+    <link rel="stylesheet" href="styles.css?v=20260623-turn-planner-ui" />
   </head>
   <body>
     <main class="app-shell">
@@ -42,8 +42,18 @@
       <section class="game-layout">
         <section class="board-panel">
           <div class="resource-hud" aria-label="전투 자원">
-            <span>차지</span>
-            <strong id="chargeHud">0</strong>
+            <div class="resource-item" data-resource="charge">
+              <span>차지</span>
+              <strong id="chargeHud">0</strong>
+            </div>
+            <div class="resource-item" data-resource="deck">
+              <span>덱</span>
+              <strong id="deckCount">10</strong>
+            </div>
+            <div class="resource-item" data-resource="discard">
+              <span>버림</span>
+              <strong id="discardCount">0</strong>
+            </div>
           </div>
           <div id="board" class="board" aria-label="hex battle board"></div>
         </section>
@@ -59,7 +69,7 @@
           <section id="enemyActionHud" class="enemy-action-hud" aria-label="적 행동 카드" aria-live="polite"></section>
         </section>
 
-        <section id="playerHud" class="player-hud" aria-label="플레이어 정보"></section>
+        <section id="playerHud" class="player-hud" aria-label="플레이어 정보" aria-hidden="true"></section>
         <section id="turnPlanner" class="turn-planner hidden" aria-label="턴 계획"></section>
 
         <aside class="side-panel">
@@ -70,11 +80,11 @@
             </div>
             <div>
               <span>덱</span>
-              <strong id="deckCount">10</strong>
+              <strong>10</strong>
             </div>
             <div>
               <span>버림</span>
-              <strong id="discardCount">0</strong>
+              <strong>0</strong>
             </div>
             <div>
               <span>차지</span>
@@ -133,6 +143,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260623-bg-image"></script>
+    <script src="app.js?v=20260623-turn-planner-ui"></script>
   </body>
 </html>
