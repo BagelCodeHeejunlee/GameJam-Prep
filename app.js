@@ -1040,12 +1040,22 @@ const magePassivePool = [
   ]),
 ];
 
+const archerTokenImages = {
+  front: "assets/characters/archer-token/archer-token-front.png",
+  frontRight: "assets/characters/archer-token/archer-token-front-right.png",
+  right: "assets/characters/archer-token/archer-token-right.png",
+  back: "assets/characters/archer-token/archer-token-back.png",
+  backLeft: "assets/characters/archer-token/archer-token-back-left.png",
+  left: "assets/characters/archer-token/archer-token-left.png",
+};
+
 const characterDefinitions = {
   archer: {
     id: "archer",
     name: "궁수",
     shortLabel: "궁",
-    image: "assets/characters/archer.png",
+    image: "assets/casting/archer/archer-01-2d-illustration.png",
+    tokenImages: archerTokenImages,
     title: "궁수 오토배틀 프로토타입",
     maxHp: 80,
     baseAtk: 10,
@@ -1131,8 +1141,15 @@ function preloadRewardAssets(character = getSelectedCharacter()) {
   return Promise.all([
     ...coreVisualAssetUrls,
     ...rewardCardAssetUrls,
-    character?.image,
+    ...characterImageUrls(character),
   ].map((url) => preloadImage(url)));
+}
+
+function characterImageUrls(character) {
+  return [
+    character?.image,
+    ...Object.values(character?.tokenImages ?? {}),
+  ].filter(Boolean);
 }
 
 function initialSelectedCharacterId() {
@@ -1178,11 +1195,55 @@ function entityLabel(entity) {
   return entity.label ?? (entity.side === "player" ? getSelectedCharacter().shortLabel : entity.monsterIndex);
 }
 
-function entityImage(entity) {
+function entityImage(entity, bounds = null) {
   if (entity.side === "player") {
-    return (characterDefinitions[entity.characterId] ?? getSelectedCharacter()).image;
+    const character = characterDefinitions[entity.characterId] ?? getSelectedCharacter();
+    if (character.tokenImages) return characterTokenImage(entity, character, bounds);
+    return character.image;
   }
   return monsterDefinitions[entity.kind]?.image;
+}
+
+function characterTokenImage(entity, character, bounds = null) {
+  const tokenImages = character.tokenImages ?? {};
+  const viewKey = characterTokenViewKey(entity, bounds);
+  return tokenImages[viewKey] ?? tokenImages.front ?? character.image;
+}
+
+function characterTokenViewKey(entity, bounds = null) {
+  const target = nearestOpponent(entity);
+  if (!target) return "front";
+
+  const vector = bounds
+    ? screenVectorBetween(entity, target, bounds)
+    : { x: target.q - entity.q, y: target.r - entity.r };
+  const absX = Math.abs(vector.x);
+  const absY = Math.abs(vector.y);
+
+  if (absX > absY * 1.35) return vector.x >= 0 ? "right" : "left";
+  if (absY > absX * 1.35) return vector.y >= 0 ? "front" : "back";
+  if (vector.y >= 0 && vector.x >= 0) return "frontRight";
+  if (vector.y >= 0 && vector.x < 0) return "left";
+  if (vector.y < 0 && vector.x < 0) return "backLeft";
+  return "right";
+}
+
+function screenVectorBetween(from, to, bounds) {
+  const fromPoint = hexToPixel(from, bounds);
+  const toPoint = hexToPixel(to, bounds);
+  return {
+    x: toPoint.x - fromPoint.x,
+    y: toPoint.y - fromPoint.y,
+  };
+}
+
+function nearestOpponent(entity) {
+  return aliveOpponents(entity)
+    .sort((a, b) => {
+      const distance = axialDistance(entity, a) - axialDistance(entity, b);
+      if (distance) return distance;
+      return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
+    })[0] ?? null;
 }
 
 function entityDomSelector(id) {
@@ -4218,7 +4279,11 @@ function renderBoard() {
         (activeEntry.actorType !== "player" &&
           entity.side !== "player" &&
           entity.kind === activeEntry.actorId));
-    const image = entityImage(entity);
+    const character = entity.side === "player"
+      ? characterDefinitions[entity.characterId] ?? getSelectedCharacter()
+      : null;
+    const image = entityImage(entity, bounds);
+    const hasToken = Boolean(character?.tokenImages);
     const label = entityLabel(entity);
     let div = elements.board.querySelector(entityDomSelector(entity.id));
     if (!div) {
@@ -4226,7 +4291,7 @@ function renderBoard() {
       div.dataset.entityId = entity.id;
       elements.board.append(div);
     }
-    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${image ? "has-art" : ""}`;
+    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${image ? "has-art" : ""} ${hasToken ? "has-token" : ""}`;
     if (div.className !== className) div.className = className;
     div.dataset.entityId = entity.id;
     if (div.dataset.image !== (image ?? "") || div.dataset.label !== label) {

@@ -400,6 +400,13 @@ h2 {
   height: 64px;
 }
 
+.entity.player.has-token .entity-art {
+  bottom: -11px;
+  width: 76px;
+  height: 76px;
+  filter: drop-shadow(0 6px 3px rgba(28, 28, 18, 0.34));
+}
+
 .entity.boss .entity-art {
   width: 82px;
   height: 82px;
