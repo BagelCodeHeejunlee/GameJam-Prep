@@ -4357,6 +4357,7 @@ body.turn-cue-active .turn-scrim {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  pointer-events: auto;
 }
 
 .priority-panel h2 {
@@ -4375,6 +4376,7 @@ body.turn-cue-active .turn-scrim {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+  pointer-events: auto;
 }
 
 .priority-strip::-webkit-scrollbar {
@@ -4392,6 +4394,7 @@ body.turn-cue-active .turn-scrim {
   background: transparent;
   box-shadow: none;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .priority-card-mount {
