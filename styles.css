@@ -3664,6 +3664,7 @@ body.turn-cue-active .turn-scrim {
   flex: 0 0 auto;
   width: calc(512px * var(--cps));
   height: calc(768px * var(--cps));
+  contain: layout style;
 }
 
 .card-prefab {
@@ -4026,6 +4027,7 @@ body.turn-cue-active .turn-scrim {
   border: 0;
   background: transparent;
   cursor: pointer;
+  contain: layout style;
   animation: reward-card-rise 460ms cubic-bezier(0.2, 0.85, 0.3, 1.2) both;
 }
 

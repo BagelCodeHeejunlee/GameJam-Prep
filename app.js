@@ -1090,6 +1090,43 @@ const characterDefinitions = {
 
 selectedCharacterId = initialSelectedCharacterId();
 
+const rewardCardAssetUrls = [
+  "assets/card-normal-v2.png",
+  "assets/card-rare-v2.png",
+  "assets/card-epic-v2.png",
+  "assets/card-legendary-v2.png",
+  "assets/card-normal-overlay.png",
+  "assets/card-rare-overlay.png",
+  "assets/card-epic-overlay.png",
+  "assets/card-legendary-overlay.png",
+];
+const preloadedImageUrls = new Set();
+let rewardRenderToken = 0;
+
+function preloadImage(url) {
+  if (!url || preloadedImageUrls.has(url)) return Promise.resolve();
+  preloadedImageUrls.add(url);
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      if (image.decode) {
+        image.decode().catch(() => {}).finally(resolve);
+      } else {
+        resolve();
+      }
+    };
+    image.onerror = resolve;
+    image.src = url;
+  });
+}
+
+function preloadRewardAssets(character = getSelectedCharacter()) {
+  return Promise.all([
+    ...rewardCardAssetUrls,
+    character?.image,
+  ].map((url) => preloadImage(url)));
+}
+
 function initialSelectedCharacterId() {
   const queryCharacter = new URLSearchParams(window.location.search).get("character");
   if (queryCharacter && characterDefinitions[queryCharacter]) {
@@ -1195,7 +1232,8 @@ function card(id, name, route, rarity, priority, actions, copies = 1) {
   return { id, name, route, rarity, type: "기본", priority, actions, copies };
 }
 
-function newRun() {
+async function newRun() {
+  const renderToken = ++rewardRenderToken;
   const character = getSelectedCharacter();
   state = {
     paused: false,
@@ -1262,6 +1300,8 @@ function newRun() {
   state.preStartReward = true;
   state.rewardPhase = "passive";
   render();
+  await preloadRewardAssets(character);
+  if (renderToken !== rewardRenderToken) return;
   showRewards();
 }
 
@@ -3696,8 +3736,9 @@ function checkEndConditions() {
   return false;
 }
 
-function clearWave() {
+async function clearWave() {
   if (state.waitingReward || state.finished) return;
+  const renderToken = ++rewardRenderToken;
   log(`웨이브 ${state.waveIndex + 1} 클리어`);
   if (state.waveIndex >= waves.length - 1) {
     finishRun(true);
@@ -3707,6 +3748,8 @@ function clearWave() {
   state.rewardPhase = "passive";
   state.discard = [];
   state.deck = shuffle([...state.playerCards]);
+  await preloadRewardAssets(getSelectedCharacter());
+  if (renderToken !== rewardRenderToken || !state.waitingReward || state.finished) return;
   showRewards();
 }
 
