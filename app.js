@@ -6044,12 +6044,20 @@ function activatePlannerDrag(event) {
   const source = findPlannerCardElement(plannerDrag.cardKey);
   if (!source) return;
   const rect = source.getBoundingClientRect();
+  const sourceMount = source.querySelector(".planner-mount");
+  const cardScale = sourceMount
+    ? getComputedStyle(sourceMount).getPropertyValue("--cps").trim()
+    : getComputedStyle(elements.turnPlanner).getPropertyValue("--planner-card-scale").trim();
   const ghost = source.cloneNode(true);
   ghost.classList.remove("dragging");
   ghost.classList.add("planner-drag-ghost");
   ghost.setAttribute("aria-hidden", "true");
   ghost.style.width = `${rect.width}px`;
   ghost.style.height = `${rect.height}px`;
+  if (cardScale) {
+    ghost.style.setProperty("--planner-card-scale", cardScale);
+    ghost.querySelector(".planner-mount")?.style.setProperty("--cps", cardScale);
+  }
   plannerDrag.ghost = ghost;
   plannerDrag.offsetX = event.clientX - rect.left;
   plannerDrag.offsetY = event.clientY - rect.top;

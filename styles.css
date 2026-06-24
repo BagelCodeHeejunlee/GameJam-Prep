@@ -5125,7 +5125,7 @@ body {
 }
 
 .planner-mount {
-  --cps: var(--planner-card-scale);
+  --cps: var(--planner-card-scale, 0.13);
 }
 
 @media (max-width: 520px) {
