@@ -5018,7 +5018,7 @@ body {
 }
 
 .turn-planner {
-  --planner-card-scale: 0.14;
+  --planner-card-scale: 0.2;
   --planner-card-width: calc(512px * var(--planner-card-scale));
   position: fixed;
   z-index: 38;
@@ -5026,14 +5026,15 @@ body {
   left: 50%;
   width: min(760px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
-  max-height: min(140px, 24vh);
+  height: calc((768px * var(--planner-card-scale)) + 38px);
+  max-height: calc(100vh - max(12px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
   display: block;
   box-sizing: border-box;
   padding: 28px 8px 0;
   border: 0;
   background: transparent;
   box-shadow: none;
-  overflow-y: auto;
+  overflow: visible;
   pointer-events: auto;
   scrollbar-width: none;
   transform: translateX(-50%);
@@ -5131,21 +5132,9 @@ body {
 
 @media (max-width: 520px) {
   .turn-planner {
-    --planner-card-scale: 0.13;
     left: 50%;
     width: calc(100vw - 14px);
     max-width: calc(100vw - 14px);
-    max-height: min(130px, 22vh);
     padding: 27px 7px 0;
-  }
-
-  .planner-cards {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 390px) {
-  .turn-planner {
-    --planner-card-scale: 0.12;
   }
 }

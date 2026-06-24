@@ -5020,6 +5020,7 @@ function renderTurnPlanner() {
     return;
   }
 
+  host.style.setProperty("--planner-card-scale", plannerCardScaleForViewport());
   const requiredCount = Math.min(playerTurnPlayLimit(), state.planningChoices.length);
   const ready = (state.plannedCardKeys ?? []).length >= requiredCount;
   const plannerEntries = plannedPlayerEntriesFromState();
@@ -5040,6 +5041,20 @@ function renderTurnPlanner() {
       }).join("")}
     </div>
   `;
+}
+
+function plannerCardScaleForViewport() {
+  const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 390);
+  const compact = viewportWidth <= 520;
+  const hostWidth = Math.min(760, viewportWidth - (compact ? 14 : 16));
+  const hostPaddingX = compact ? 14 : 16;
+  const cardsPaddingX = 8;
+  const threeCardGaps = 12;
+  const cardChromeX = 8 * 3;
+  const usableCardWidth = hostWidth - hostPaddingX - cardsPaddingX - threeCardGaps - cardChromeX;
+  const scale = usableCardWidth / (512 * 3);
+  const boundedScale = Math.max(0.155, Math.min(scale, 0.22));
+  return String(Math.round(boundedScale * 10000) / 10000);
 }
 
 function enemyGroups() {
@@ -6567,6 +6582,7 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("resize", () => {
   renderBoard();
+  renderTurnPlanner();
 });
 
 newRun();
