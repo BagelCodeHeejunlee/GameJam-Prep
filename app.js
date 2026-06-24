@@ -1302,11 +1302,17 @@ const monsterDecks = {
 };
 
 const waves = buildWaves();
+const testPlayerPartyIds = ["archer", "warrior", "mage"];
 
 let state;
 
 function getSelectedCharacter() {
   return characterDefinitions[selectedCharacterId] ?? characterDefinitions.archer;
+}
+
+function characterForActorId(actorId) {
+  const entity = state?.entities?.find((item) => item.id === actorId);
+  return characterDefinitions[entity?.characterId] ?? getSelectedCharacter();
 }
 
 function card(id, name, route, rarity, priority, actions, copies = 1) {
@@ -1399,8 +1405,12 @@ async function newRun() {
 function startWave(index) {
   clearPlannerDrag();
   const wave = waves[index];
-  const character = getSelectedCharacter();
-  const previousPlayer = state.entities.find((entity) => entity.side === "player");
+  const partyCharacters = playerPartyCharacters();
+  const previousPlayers = new Map(
+    state.entities
+      .filter((entity) => entity.side === "player")
+      .map((entity) => [entity.characterId ?? entity.id, entity]),
+  );
   state.turn = 0;
   state.tiles = makeMap(wave.radius ?? 3);
   state.walls = wave.walls.map((item) => ({ ...item }));
@@ -1429,27 +1439,14 @@ function startWave(index) {
   state.offscreenIndicatorFrame = 0;
   state.pendingOffscreenBounds = null;
   const start = wave.playerStart ?? { q: 0, r: Math.min(2, (wave.radius ?? 3) - 1) };
-  state.entities = [
-    {
-      id: character.id,
-      characterId: character.id,
-      name: character.name,
-      label: character.shortLabel,
-      side: "player",
-      q: start.q,
-      r: start.r,
-      hp: previousPlayer?.hp ?? character.maxHp,
-      maxHp: previousPlayer?.maxHp ?? character.maxHp,
-      baseAtk: previousPlayer?.baseAtk ?? character.baseAtk,
-      baseRange: character.baseRange,
-      baseMove: character.baseMove,
-      charge: 0,
-      permanent: { ...(previousPlayer?.permanent ?? {}) },
-      temporary: {},
-      effects: (previousPlayer?.effects ?? []).filter((effect) => effect.duration === "stage"),
-      sustainedCards: [],
-    },
-  ];
+  const playerStarts = playerStartPositions(start, partyCharacters.length);
+  state.entities = partyCharacters.map((partyCharacter, partyIndex) => (
+    createPlayerEntity(
+      partyCharacter,
+      playerStarts[partyIndex] ?? start,
+      previousPlayers.get(partyCharacter.id),
+    )
+  ));
 
   wave.enemies.forEach((enemy) => {
     const indexNumber = state.nextEnemyIndex++;
@@ -1502,6 +1499,56 @@ function startWave(index) {
   state.enemyTargetIds = {};
   state.focusTargetId = firstAliveEnemyId();
   state.planResolver = null;
+}
+
+function playerPartyCharacters() {
+  return testPlayerPartyIds
+    .map((id) => characterDefinitions[id])
+    .filter(Boolean);
+}
+
+function createPlayerEntity(character, position, previousPlayer = null) {
+  return {
+    id: character.id,
+    characterId: character.id,
+    name: character.name,
+    label: character.shortLabel,
+    side: "player",
+    q: position.q,
+    r: position.r,
+    hp: previousPlayer?.hp ?? character.maxHp,
+    maxHp: previousPlayer?.maxHp ?? character.maxHp,
+    baseAtk: previousPlayer?.baseAtk ?? character.baseAtk,
+    baseRange: character.baseRange,
+    baseMove: character.baseMove,
+    charge: 0,
+    permanent: { ...(previousPlayer?.permanent ?? {}) },
+    temporary: {},
+    effects: (previousPlayer?.effects ?? []).filter((effect) => effect.duration === "stage"),
+    sustainedCards: [],
+  };
+}
+
+function playerStartPositions(start, count) {
+  const candidates = [
+    start,
+    { q: start.q - 1, r: start.r },
+    { q: start.q + 1, r: start.r - 1 },
+    { q: start.q, r: start.r - 1 },
+    { q: start.q - 1, r: start.r + 1 },
+    { q: start.q + 1, r: start.r },
+  ];
+  const positions = [];
+  const seen = new Set();
+  candidates.forEach((candidate) => {
+    const key = hexKey(candidate);
+    if (positions.length >= count || seen.has(key)) return;
+    if (!isTile(candidate) || isWall(candidate) || isObstacle(candidate)) return;
+    seen.add(key);
+    positions.push(candidate);
+  });
+  while (positions.length < count) positions.push(start);
+  return positions;
 }
 
 function expandCards(cards) {
@@ -1699,7 +1746,8 @@ async function runTurn() {
     return;
   }
 
-  const player = getPlayer();
+  const players = alivePlayers();
+  const player = players[0];
   if (!player) {
     finishRun(false);
     return;
@@ -1710,7 +1758,7 @@ async function runTurn() {
   const playerCards = drawPlayerCards(playerTurnDrawCount(player));
   const playerChoices = playerCards.map((cardData, index) => ({
     actorType: "player",
-    actorId: player.id,
+    actorId: (players[index % players.length] ?? player).id,
     card: cardData,
     playIndex: index,
   }));
@@ -1778,7 +1826,10 @@ async function runTurn() {
   }
 
   if (!state.waitingReward && !state.finished) {
-    plannedPlayerEntries.forEach((entry) => discardResolvedCard(entry.card, player));
+    plannedPlayerEntries.forEach((entry) => {
+      const actor = state.entities.find((entity) => entity.id === entry.actorId) ?? player;
+      discardResolvedCard(entry.card, actor);
+    });
     skippedPlayerCards.forEach((cardData) => discardSkippedPlayerCard(cardData));
     enemyEntries.forEach((entry) => discardEnemyCard(entry.card, entry.actorId));
   }
@@ -4584,7 +4635,7 @@ function renderBoard() {
       state.activeTimelineIndex >= 0 ? state.currentTimeline[state.activeTimelineIndex] : null;
     const acting =
       activeEntry &&
-      ((activeEntry.actorType === "player" && entity.side === "player") ||
+      ((activeEntry.actorType === "player" && entity.id === activeEntry.actorId) ||
         (activeEntry.actorType !== "player" &&
           entity.side !== "player" &&
           entity.kind === activeEntry.actorId));
@@ -4980,7 +5031,7 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
   const groupEnemies = isPlayer ? [] : aliveEnemies().filter((e) => e.kind === entry.actorId);
   const boss = groupEnemies.some((e) => e.boss);
   const count = isPlayer ? 1 : groupEnemies.length;
-  const cardOwner = isPlayer ? getSelectedCharacter() : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
+  const cardOwner = isPlayer ? characterForActorId(entry.actorId) : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
   const className = [
     "priority-item",
     isPlayer ? "player" : "enemy",
@@ -5038,9 +5089,10 @@ function renderTurnPlanner() {
         const key = cardRuntimeKey(entry.card);
         const order = entry.planOrder;
         const dragging = plannerDrag?.active && plannerDrag.cardKey === key;
+        const owner = characterForActorId(entry.actorId);
         return `
           <button type="button" class="planner-card ${dragging ? "dragging" : ""}" data-card-key="${key}" aria-label="${entry.card.name} 순서 ${order ?? ""}">
-            ${cardMount(entry.card, "planner-mount", order ?? "", getSelectedCharacter())}
+            ${cardMount(entry.card, "planner-mount", order ?? "", owner)}
           </button>
         `;
       }).join("")}
@@ -5149,7 +5201,7 @@ function openCardPreview(cardKey) {
   const entry = findTimelineCard(cardKey);
   if (!entry || !elements.cardPreviewOverlay || !elements.cardPreviewMount) return;
   const isPlayer = entry.actorType === "player";
-  const owner = isPlayer ? getSelectedCharacter() : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
+  const owner = isPlayer ? characterForActorId(entry.actorId) : monsterDefinitions[entry.actorId] ?? monsterDefinitions.brute;
   const mountClass = `preview-mount ${isPlayer ? "" : "monster-card-mount"}`.trim();
   elements.cardPreviewMount.innerHTML = cardMount(entry.card, mountClass, timelinePriority(entry), owner);
   elements.cardPreviewOverlay.classList.remove("hidden");
@@ -5178,7 +5230,7 @@ function renderDrawnCards() {
     const count = entry.displayEntries?.length ?? 1;
     div.className = `order-chip ${entry.actorType === "player" ? "player" : "enemy"} ${statusClass}`;
     div.title = `${entryLabel(entry)} · ${count > 1 ? `${count}장` : entry.card.name} · 순서 ${timelinePriority(entry)}`;
-    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? getSelectedCharacter().shortLabel : monsterLabel(entry.actorId)}${count > 1 ? `×${count}` : ""}</strong>`;
+    div.innerHTML = `<span>${index + 1}</span><strong>${entry.actorType === "player" ? characterForActorId(entry.actorId).shortLabel : monsterLabel(entry.actorId)}${count > 1 ? `×${count}` : ""}</strong>`;
     elements.drawnCards.append(div);
   });
 }
@@ -5326,9 +5378,10 @@ function showDrawnCardReveal(entriesOrCard, ownerLabel = "내 카드", side = "p
     .map((entry) => {
       const isFastest = entry.card.priority === fastestBasePriority;
       const className = `reveal-mount ${isFastest ? "fastest" : ""}`.trim();
+      const cardOwner = side === "player" ? characterForActorId(entry.actorId) : null;
       return `
         <div class="drawn-reveal-card-wrap">
-          ${cardMount(entry.card, className, timelinePriority(entry), side === "player" ? getSelectedCharacter() : null)}
+          ${cardMount(entry.card, className, timelinePriority(entry), cardOwner)}
           ${entry.card.priority !== timelinePriority(entry) ? `<span class="base-priority">원래 ${entry.card.priority}</span>` : ""}
         </div>
       `;
@@ -5394,14 +5447,14 @@ async function playTurnCue(entry, index = 0) {
   if (!isFirstPlayerEntryInPriorityGroup(entry, index)) return;
   const host = document.querySelector("#turnCue");
   if (!host) return;
-  const character = getSelectedCharacter();
+  const character = characterForActorId(entry.actorId);
   host.className = "turn-cue player";
   host.innerHTML = `
     <div class="turn-cue-panel">
       <span class="turn-cue-avatar">${portraitContent(character.image, character.shortLabel, "turn-cue-art")}</span>
       <div class="turn-cue-body">
         <span class="turn-cue-kicker">MY TURN</span>
-        <strong class="turn-cue-name">내 차례</strong>
+        <strong class="turn-cue-name">${character.name} 차례</strong>
       </div>
     </div>
   `;
@@ -5415,7 +5468,7 @@ async function playTurnCue(entry, index = 0) {
 }
 
 function entryOwnerLabel(entry) {
-  if (entry.actorType === "player") return getSelectedCharacter().name;
+  if (entry.actorType === "player") return characterForActorId(entry.actorId).name;
   return monsterDefinitions[entry.actorId]?.name ?? entry.actorId;
 }
 
@@ -5814,7 +5867,7 @@ function describeAction(action) {
 }
 
 function entryLabel(entry) {
-  return entry.actorType === "player" ? getSelectedCharacter().name : (monsterDefinitions[entry.actorId]?.name ?? "적");
+  return entry.actorType === "player" ? characterForActorId(entry.actorId).name : (monsterDefinitions[entry.actorId]?.name ?? "적");
 }
 
 function monsterLabel(kind) {
@@ -6368,6 +6421,10 @@ function hexVertices(hex) {
 
 function getPlayer() {
   return state.entities.find((entity) => entity.side === "player" && isAlive(entity));
+}
+
+function alivePlayers() {
+  return state.entities.filter((entity) => entity.side === "player" && isAlive(entity));
 }
 
 function aliveEnemies() {
