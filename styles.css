@@ -5021,8 +5021,8 @@ body {
   --planner-card-scale: 0.2;
   --planner-card-width: calc(512px * var(--planner-card-scale));
   --planner-card-height: calc(768px * var(--planner-card-scale));
-  --planner-card-slot-height: calc(var(--planner-card-height) + 22px);
-  --planner-card-offset-y: 6px;
+  --planner-card-slot-height: calc(var(--planner-card-height) + 36px);
+  --planner-card-offset-y: 10px;
   --planner-border-top: 52px;
   --planner-border-x: 54px;
   --planner-border-bottom: 46px;
@@ -5150,6 +5150,7 @@ body {
   background: transparent;
   color: #4d341f;
   cursor: grab;
+  overflow: visible;
   box-shadow: none;
   filter: drop-shadow(0 10px 10px rgba(58, 42, 23, 0.22));
   touch-action: none;
@@ -5192,6 +5193,7 @@ body {
 
 .planner-mount {
   --cps: var(--planner-card-scale, 0.13);
+  overflow: visible;
 }
 
 @media (max-width: 520px) {
