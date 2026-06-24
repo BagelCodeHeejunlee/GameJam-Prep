@@ -5021,6 +5021,8 @@ body {
   --planner-card-scale: 0.2;
   --planner-card-width: calc(512px * var(--planner-card-scale));
   --planner-card-height: calc(768px * var(--planner-card-scale));
+  --planner-card-slot-height: calc(var(--planner-card-height) + 22px);
+  --planner-card-offset-y: 6px;
   --planner-border-top: 52px;
   --planner-border-x: 54px;
   --planner-border-bottom: 46px;
@@ -5122,12 +5124,13 @@ body {
   z-index: 1;
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   overflow-x: auto;
-  height: var(--planner-card-height);
-  min-height: var(--planner-card-height);
-  padding: 0 4px;
+  overflow-y: hidden;
+  height: var(--planner-card-slot-height);
+  min-height: var(--planner-card-slot-height);
+  padding: var(--planner-card-offset-y) 4px 0;
   scrollbar-width: none;
 }
 
