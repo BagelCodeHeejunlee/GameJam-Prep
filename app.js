@@ -1840,7 +1840,7 @@ function confirmTurnPlan() {
   resolve?.();
 }
 
-function reorderPlannedCardToIndex(draggedKey, targetIndex) {
+function reorderPlannedCardToIndex(draggedKey, targetIndex, options = {}) {
   if (!state?.turnPlanning || !draggedKey) return;
   const orderedKeys = [...(state.plannedCardKeys ?? [])];
   const fromIndex = orderedKeys.indexOf(draggedKey);
@@ -1852,7 +1852,12 @@ function reorderPlannedCardToIndex(draggedKey, targetIndex) {
   const previousRects = plannerCardRects();
   state.plannedCardKeys = orderedKeys;
   refreshPlannedTimeline();
-  render();
+  if (options.plannerOnly) {
+    renderTurnPlanner();
+    renderPriorityStrip();
+  } else {
+    render();
+  }
   animatePlannerCardReorder(previousRects);
 }
 
@@ -6033,6 +6038,7 @@ function beginPlannerDrag(event) {
     width: 0,
     height: 0,
     frameId: 0,
+    lastReorderAt: 0,
   };
   elements.turnPlanner?.setPointerCapture?.(event.pointerId);
 }
@@ -6171,7 +6177,10 @@ function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
   if (!targetZone) return;
   const targetIndex = orderedKeys.indexOf(targetZone.key);
   if (targetIndex < 0 || targetIndex === currentIndex) return;
-  reorderPlannedCardToIndex(draggedKey, targetIndex);
+  const now = window.performance?.now?.() ?? Date.now();
+  if (plannerDrag?.lastReorderAt && now - plannerDrag.lastReorderAt < 70) return;
+  if (plannerDrag) plannerDrag.lastReorderAt = now;
+  reorderPlannedCardToIndex(draggedKey, targetIndex, { plannerOnly: true });
 }
 
 function plannerCardDropZones(cardPositions) {
