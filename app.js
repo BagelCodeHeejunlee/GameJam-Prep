@@ -6165,7 +6165,7 @@ function capturePlannerDragSlots(draggedKey) {
     top: Math.min(...slots.map((slot) => slot.top)),
     bottom: Math.max(...slots.map((slot) => slot.bottom)),
     boundaries: slots.slice(0, -1).map((slot, index) => (slot.centerX + slots[index + 1].centerX) / 2),
-    hysteresis: Math.max(6, Math.min(14, averageWidth * 0.08)),
+    hysteresis: Math.max(18, Math.min(28, averageWidth * 0.2)),
   };
 }
 
