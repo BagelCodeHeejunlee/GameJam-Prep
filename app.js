@@ -6030,6 +6030,8 @@ function beginPlannerDrag(event) {
     ghost: null,
     offsetX: 0,
     offsetY: 0,
+    width: 0,
+    height: 0,
     frameId: 0,
   };
   elements.turnPlanner?.setPointerCapture?.(event.pointerId);
@@ -6093,13 +6095,33 @@ function activatePlannerDrag(event) {
   plannerDrag.ghost = ghost;
   plannerDrag.offsetX = event.clientX - rect.left;
   plannerDrag.offsetY = event.clientY - rect.top;
+  plannerDrag.width = rect.width;
+  plannerDrag.height = rect.height;
   document.body.append(ghost);
   updatePlannerDragGhost(event);
 }
 
 function updatePlannerDragGhost(event) {
   if (!plannerDrag?.ghost) return;
-  plannerDrag.ghost.style.transform = `translate3d(${event.clientX - plannerDrag.offsetX}px, ${event.clientY - plannerDrag.offsetY}px, 0)`;
+  const bounds = plannerDraggedBounds(event.clientX, event.clientY);
+  plannerDrag.ghost.style.transform = `translate3d(${bounds.left}px, ${bounds.top}px, 0)`;
+}
+
+function plannerDraggedBounds(clientX, clientY) {
+  const width = plannerDrag?.width || plannerDrag?.ghost?.getBoundingClientRect().width || 0;
+  const height = plannerDrag?.height || plannerDrag?.ghost?.getBoundingClientRect().height || 0;
+  const left = clientX - (plannerDrag?.offsetX ?? 0);
+  const top = clientY - (plannerDrag?.offsetY ?? 0);
+  return {
+    left,
+    right: left + width,
+    top,
+    bottom: top + height,
+    width,
+    height,
+    centerX: left + width / 2,
+    centerY: top + height / 2,
+  };
 }
 
 function schedulePlannerDragFrame() {
@@ -6115,7 +6137,7 @@ function schedulePlannerDragFrame() {
 
 function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
   const cards = [...(elements.turnPlanner?.querySelectorAll(".planner-card") ?? [])]
-    .filter((cardElement) => cardElement.dataset.cardKey && cardElement.dataset.cardKey !== draggedKey);
+    .filter((cardElement) => cardElement.dataset.cardKey);
   if (!cards.length) return;
   const cardPositions = cards
     .map((cardElement) => {
@@ -6123,6 +6145,7 @@ function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
       return {
         cardElement,
         rect,
+        key: cardElement.dataset.cardKey,
         centerX: rect.left + rect.width / 2,
       };
     })
@@ -6130,24 +6153,38 @@ function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
   const top = Math.min(...cardPositions.map((item) => item.rect.top));
   const bottom = Math.max(...cardPositions.map((item) => item.rect.bottom));
   const verticalSlack = Math.max(60, (bottom - top) * 0.45);
-  if (clientY < top - verticalSlack || clientY > bottom + verticalSlack) return;
+  const draggedBounds = plannerDraggedBounds(clientX, clientY);
+  if (draggedBounds.bottom < top - verticalSlack || draggedBounds.top > bottom + verticalSlack) return;
 
-  const currentIndex = (state.plannedCardKeys ?? []).indexOf(draggedKey);
+  const orderedKeys = state.plannedCardKeys ?? [];
+  const currentIndex = orderedKeys.indexOf(draggedKey);
   if (currentIndex < 0) return;
-  const averageWidth = cardPositions.reduce((sum, item) => sum + item.rect.width, 0) / cardPositions.length;
-  const swapSlack = Math.max(8, averageWidth * 0.18);
-  const previousCard = cardPositions[currentIndex - 1];
-  const nextCard = cardPositions[currentIndex];
-  let targetIndex = currentIndex;
-
-  if (previousCard && clientX < previousCard.centerX - swapSlack) {
-    targetIndex = currentIndex - 1;
-  } else if (nextCard && clientX > nextCard.centerX + swapSlack) {
-    targetIndex = currentIndex + 1;
-  }
-
-  if (targetIndex === currentIndex) return;
+  const targetZone = plannerCardDropZones(cardPositions)
+    .filter((zone) => zone.key !== draggedKey)
+    .map((zone) => {
+      const overlap = Math.min(draggedBounds.right, zone.right) - Math.max(draggedBounds.left, zone.left);
+      const centerInside = draggedBounds.centerX >= zone.left && draggedBounds.centerX <= zone.right;
+      return { ...zone, overlap: Math.max(0, overlap), centerInside };
+    })
+    .filter((zone) => zone.centerInside || zone.overlap >= Math.max(4, draggedBounds.width * 0.06))
+    .sort((a, b) => b.overlap - a.overlap || Math.abs(draggedBounds.centerX - a.centerX) - Math.abs(draggedBounds.centerX - b.centerX))[0];
+  if (!targetZone) return;
+  const targetIndex = orderedKeys.indexOf(targetZone.key);
+  if (targetIndex < 0 || targetIndex === currentIndex) return;
   reorderPlannedCardToIndex(draggedKey, targetIndex);
+}
+
+function plannerCardDropZones(cardPositions) {
+  return cardPositions.map((item, index) => {
+    const previousCenter = cardPositions[index - 1]?.centerX;
+    const nextCenter = cardPositions[index + 1]?.centerX;
+    return {
+      key: item.key,
+      centerX: item.centerX,
+      left: previousCenter == null ? item.rect.left : (previousCenter + item.centerX) / 2,
+      right: nextCenter == null ? item.rect.right : (item.centerX + nextCenter) / 2,
+    };
+  });
 }
 
 function plannerCardRects() {
