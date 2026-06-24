@@ -1842,7 +1842,6 @@ function confirmTurnPlan() {
 
 function reorderPlannedCardToIndex(draggedKey, targetIndex) {
   if (!state?.turnPlanning || !draggedKey) return;
-  const previousRects = plannerCardRects();
   const orderedKeys = [...(state.plannedCardKeys ?? [])];
   const fromIndex = orderedKeys.indexOf(draggedKey);
   if (fromIndex < 0) return;
@@ -1850,6 +1849,7 @@ function reorderPlannedCardToIndex(draggedKey, targetIndex) {
   const boundedIndex = Math.max(0, Math.min(targetIndex, orderedKeys.length));
   orderedKeys.splice(boundedIndex, 0, dragged);
   if (orderedKeys.join("|") === (state.plannedCardKeys ?? []).join("|")) return;
+  const previousRects = plannerCardRects();
   state.plannedCardKeys = orderedKeys;
   refreshPlannedTimeline();
   render();
@@ -1862,6 +1862,10 @@ function refreshPlannedTimeline() {
 }
 
 function clearPlannerDrag() {
+  if (plannerDrag?.frameId) {
+    const cancel = window.cancelAnimationFrame ?? window.clearTimeout;
+    cancel(plannerDrag.frameId);
+  }
   plannerDrag?.ghost?.remove();
   plannerDrag = null;
 }
@@ -6005,10 +6009,13 @@ function beginPlannerDrag(event) {
     cardKey: cardElement.dataset.cardKey,
     startX: event.clientX,
     startY: event.clientY,
+    latestX: event.clientX,
+    latestY: event.clientY,
     active: false,
     ghost: null,
     offsetX: 0,
     offsetY: 0,
+    frameId: 0,
   };
   elements.turnPlanner?.setPointerCapture?.(event.pointerId);
 }
@@ -6023,8 +6030,9 @@ function movePlannerDrag(event) {
     plannerDrag.active = true;
     render();
   }
-  updatePlannerDragGhost(event);
-  reorderPlannedCardAtPoint(plannerDrag.cardKey, event.clientX, event.clientY);
+  plannerDrag.latestX = event.clientX;
+  plannerDrag.latestY = event.clientY;
+  schedulePlannerDragFrame();
 }
 
 function endPlannerDrag(event) {
@@ -6045,18 +6053,27 @@ function activatePlannerDrag(event) {
   if (!source) return;
   const rect = source.getBoundingClientRect();
   const sourceMount = source.querySelector(".planner-mount");
-  const cardScale = sourceMount
-    ? getComputedStyle(sourceMount).getPropertyValue("--cps").trim()
-    : getComputedStyle(elements.turnPlanner).getPropertyValue("--planner-card-scale").trim();
+  const mountRect = sourceMount?.getBoundingClientRect();
+  const measuredScale = mountRect?.width
+    ? mountRect.width / 512
+    : parseFloat(getComputedStyle(elements.turnPlanner).getPropertyValue("--planner-card-scale"));
+  const cardScale = Number.isFinite(measuredScale) && measuredScale > 0
+    ? String(Math.round(measuredScale * 10000) / 10000)
+    : "0.13";
   const ghost = source.cloneNode(true);
   ghost.classList.remove("dragging");
   ghost.classList.add("planner-drag-ghost");
   ghost.setAttribute("aria-hidden", "true");
   ghost.style.width = `${rect.width}px`;
   ghost.style.height = `${rect.height}px`;
-  if (cardScale) {
-    ghost.style.setProperty("--planner-card-scale", cardScale);
-    ghost.querySelector(".planner-mount")?.style.setProperty("--cps", cardScale);
+  ghost.style.left = "0";
+  ghost.style.top = "0";
+  ghost.style.setProperty("--planner-card-scale", cardScale);
+  const ghostMount = ghost.querySelector(".planner-mount");
+  ghostMount?.style.setProperty("--cps", cardScale);
+  if (mountRect && ghostMount) {
+    ghostMount.style.width = `${mountRect.width}px`;
+    ghostMount.style.height = `${mountRect.height}px`;
   }
   plannerDrag.ghost = ghost;
   plannerDrag.offsetX = event.clientX - rect.left;
@@ -6067,8 +6084,18 @@ function activatePlannerDrag(event) {
 
 function updatePlannerDragGhost(event) {
   if (!plannerDrag?.ghost) return;
-  plannerDrag.ghost.style.left = `${event.clientX - plannerDrag.offsetX}px`;
-  plannerDrag.ghost.style.top = `${event.clientY - plannerDrag.offsetY}px`;
+  plannerDrag.ghost.style.transform = `translate3d(${event.clientX - plannerDrag.offsetX}px, ${event.clientY - plannerDrag.offsetY}px, 0)`;
+}
+
+function schedulePlannerDragFrame() {
+  if (!plannerDrag?.active || plannerDrag.frameId) return;
+  const schedule = window.requestAnimationFrame ?? ((callback) => window.setTimeout(callback, 16));
+  plannerDrag.frameId = schedule(() => {
+    if (!plannerDrag?.active) return;
+    plannerDrag.frameId = 0;
+    updatePlannerDragGhost({ clientX: plannerDrag.latestX, clientY: plannerDrag.latestY });
+    reorderPlannedCardAtPoint(plannerDrag.cardKey, plannerDrag.latestX, plannerDrag.latestY);
+  });
 }
 
 function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
@@ -6089,8 +6116,22 @@ function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
   const bottom = Math.max(...cardPositions.map((item) => item.rect.bottom));
   const verticalSlack = Math.max(60, (bottom - top) * 0.45);
   if (clientY < top - verticalSlack || clientY > bottom + verticalSlack) return;
-  let targetIndex = cardPositions.findIndex((item) => clientX < item.centerX);
-  if (targetIndex < 0) targetIndex = cardPositions.length;
+
+  const currentIndex = (state.plannedCardKeys ?? []).indexOf(draggedKey);
+  if (currentIndex < 0) return;
+  const averageWidth = cardPositions.reduce((sum, item) => sum + item.rect.width, 0) / cardPositions.length;
+  const swapSlack = Math.max(8, averageWidth * 0.18);
+  const previousCard = cardPositions[currentIndex - 1];
+  const nextCard = cardPositions[currentIndex];
+  let targetIndex = currentIndex;
+
+  if (previousCard && clientX < previousCard.centerX - swapSlack) {
+    targetIndex = currentIndex - 1;
+  } else if (nextCard && clientX > nextCard.centerX + swapSlack) {
+    targetIndex = currentIndex + 1;
+  }
+
+  if (targetIndex === currentIndex) return;
   reorderPlannedCardToIndex(draggedKey, targetIndex);
 }
 
