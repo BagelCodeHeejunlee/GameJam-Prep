@@ -6035,8 +6035,10 @@ function beginPlannerDrag(event) {
     ghost: null,
     offsetX: 0,
     offsetY: 0,
+    width: 0,
     frameId: 0,
-    lastReorderAt: 0,
+    slotState: null,
+    currentTargetIndex: null,
   };
   elements.turnPlanner?.setPointerCapture?.(event.pointerId);
 }
@@ -6099,6 +6101,9 @@ function activatePlannerDrag(event) {
   plannerDrag.ghost = ghost;
   plannerDrag.offsetX = event.clientX - rect.left;
   plannerDrag.offsetY = event.clientY - rect.top;
+  plannerDrag.width = rect.width;
+  plannerDrag.slotState = capturePlannerDragSlots(plannerDrag.cardKey);
+  plannerDrag.currentTargetIndex = plannerDrag.slotState?.initialIndex ?? null;
   document.body.append(ghost);
   updatePlannerDragGhost(event);
 }
@@ -6120,44 +6125,71 @@ function schedulePlannerDragFrame() {
 }
 
 function reorderPlannedCardAtPoint(draggedKey, clientX, clientY) {
-  const cards = [...(elements.turnPlanner?.querySelectorAll(".planner-card") ?? [])]
-    .filter((cardElement) => cardElement.dataset.cardKey && cardElement.dataset.cardKey !== draggedKey);
-  if (!cards.length) return;
-  const cardPositions = cards
-    .map((cardElement) => {
-      const rect = cardElement.getBoundingClientRect();
-      return {
-        cardElement,
-        rect,
-        centerX: rect.left + rect.width / 2,
-      };
-    })
-    .sort((a, b) => a.rect.left - b.rect.left);
-  const top = Math.min(...cardPositions.map((item) => item.rect.top));
-  const bottom = Math.max(...cardPositions.map((item) => item.rect.bottom));
-  const verticalSlack = Math.max(60, (bottom - top) * 0.45);
-  if (clientY < top - verticalSlack || clientY > bottom + verticalSlack) return;
+  const slotState = plannerDrag?.slotState;
+  if (!slotState?.slots?.length) return;
+  const verticalSlack = Math.max(60, (slotState.bottom - slotState.top) * 0.45);
+  if (clientY < slotState.top - verticalSlack || clientY > slotState.bottom + verticalSlack) return;
 
   const orderedKeys = state.plannedCardKeys ?? [];
   const currentIndex = orderedKeys.indexOf(draggedKey);
   if (currentIndex < 0) return;
-  const averageWidth = cardPositions.reduce((sum, item) => sum + item.rect.width, 0) / cardPositions.length;
-  const activationInset = Math.max(10, averageWidth * 0.22);
-  const previousCard = cardPositions[currentIndex - 1];
-  const nextCard = cardPositions[currentIndex];
-  let targetIndex = currentIndex;
-
-  if (previousCard && clientX < previousCard.rect.right - activationInset) {
-    targetIndex = currentIndex - 1;
-  } else if (nextCard && clientX > nextCard.rect.left + activationInset) {
-    targetIndex = currentIndex + 1;
-  }
+  const targetIndex = plannerTargetIndexForPoint(clientX);
+  if (targetIndex == null) return;
 
   if (targetIndex === currentIndex) return;
-  const now = window.performance?.now?.() ?? Date.now();
-  if (plannerDrag?.lastReorderAt && now - plannerDrag.lastReorderAt < 70) return;
-  if (plannerDrag) plannerDrag.lastReorderAt = now;
+  if (plannerDrag) plannerDrag.currentTargetIndex = targetIndex;
   reorderPlannedCardToIndex(draggedKey, targetIndex, { plannerOnly: true });
+}
+
+function capturePlannerDragSlots(draggedKey) {
+  const slots = [...(elements.turnPlanner?.querySelectorAll(".planner-card") ?? [])]
+    .filter((cardElement) => cardElement.dataset.cardKey)
+    .map((cardElement) => {
+      const rect = cardElement.getBoundingClientRect();
+      return {
+        key: cardElement.dataset.cardKey,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        centerX: rect.left + rect.width / 2,
+      };
+    })
+    .sort((a, b) => a.left - b.left);
+  if (!slots.length) return null;
+  const averageWidth = slots.reduce((sum, slot) => sum + slot.width, 0) / slots.length;
+  return {
+    slots,
+    initialIndex: Math.max(0, slots.findIndex((slot) => slot.key === draggedKey)),
+    top: Math.min(...slots.map((slot) => slot.top)),
+    bottom: Math.max(...slots.map((slot) => slot.bottom)),
+    boundaries: slots.slice(0, -1).map((slot, index) => (slot.centerX + slots[index + 1].centerX) / 2),
+    hysteresis: Math.max(6, Math.min(14, averageWidth * 0.08)),
+  };
+}
+
+function plannerTargetIndexForPoint(clientX) {
+  const slotState = plannerDrag?.slotState;
+  if (!slotState?.slots?.length) return null;
+  const dragCenterX = clientX - (plannerDrag.offsetX ?? 0) + (plannerDrag.width ?? 0) / 2;
+  let targetIndex = plannerDrag.currentTargetIndex ?? slotState.initialIndex;
+
+  while (
+    targetIndex < slotState.boundaries.length
+    && dragCenterX > slotState.boundaries[targetIndex] + slotState.hysteresis
+  ) {
+    targetIndex += 1;
+  }
+
+  while (
+    targetIndex > 0
+    && dragCenterX < slotState.boundaries[targetIndex - 1] - slotState.hysteresis
+  ) {
+    targetIndex -= 1;
+  }
+
+  return targetIndex;
 }
 
 function plannerCardRects() {
