@@ -2193,9 +2193,9 @@ function compareTimeline(a, b) {
 
 async function executeTimelineEntry(entry) {
   if (entry.actorType === "player") {
-    const player = getPlayer();
-    if (!player) return;
-    await executeCard(player, entry.card);
+    const actor = state.entities.find((entity) => entity.id === entry.actorId && entity.side === "player");
+    if (!actor || !isAlive(actor)) return;
+    await executeCard(actor, entry.card);
     return;
   }
 
