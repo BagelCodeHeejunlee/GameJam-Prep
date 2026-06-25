@@ -385,19 +385,27 @@ globalThis.__simExports = {
   characterDefinitions,
   monsterDecks,
   waves,
+  playerPartyCharacters,
   expandCards,
+  createInitialPlayerCardPiles,
   shuffle,
   startWave,
   drawPassiveRewards,
   drawCardRewards,
+  rewardOwnerId,
   recordRewardPick,
   isPassiveCard,
   applyPassiveReward,
+  addPlayerOwnedCard,
+  addPlayerCardToDeck,
+  playerCardPile,
   getPlayer,
+  alivePlayers,
   aliveEnemies,
   aliveEnemyKinds,
   drawPlayerCard,
   drawPlayerCards,
+  drawPlayerTurnEntries,
   cardsPerPlayerTurn,
   drawEnemyCard,
   applySharedPlayerPriority,
@@ -424,6 +432,9 @@ globalThis.__simExports = {
 function createInitialState(game) {
   game.setSelectedCharacter("archer");
   const character = game.getSelectedCharacter();
+  const partyCharacters = game.playerPartyCharacters();
+  const playerCardPiles = game.createInitialPlayerCardPiles(partyCharacters);
+  const primaryPile = playerCardPiles[character.id] ?? Object.values(playerCardPiles)[0];
   game.setState({
     paused: false,
     busy: false,
@@ -439,7 +450,8 @@ function createInitialState(game) {
     entities: [],
     characterId: character.id,
     character,
-    playerCards: game.expandCards(character.baseCards),
+    playerCards: primaryPile?.cards ?? game.expandCards(character.baseCards),
+    playerCardPiles,
     deck: [],
     discard: [],
     enemyDecks: {},
@@ -507,20 +519,20 @@ function sample(items, rng) {
 }
 
 function addReward(game, reward, preStart = false) {
-  const state = game.getState();
+  const ownerId = game.rewardOwnerId();
   game.recordRewardPick(reward, { countPick: !game.isPassiveCard(reward) });
   if (game.isPassiveCard(reward)) {
-    game.applyPassiveReward(reward);
+    game.applyPassiveReward(reward, ownerId);
     return;
   }
-  state.playerCards.push(reward);
-  if (preStart) state.deck.unshift(reward);
+  game.addPlayerOwnedCard(reward, ownerId);
+  if (preStart) game.addPlayerCardToDeck(reward, ownerId, { top: true });
 }
 
 async function simulateTurn(game) {
   const state = game.getState();
-  const player = game.getPlayer();
-  if (!player || !game.isAlive(player)) {
+  const players = game.alivePlayers();
+  if (!players.length) {
     state.finished = true;
     return;
   }
@@ -529,13 +541,7 @@ async function simulateTurn(game) {
   game.processMeteors();
   if (game.checkEndConditions()) return;
 
-  const playerCards = game.drawPlayerCards(game.cardsPerPlayerTurn(player));
-  const playerEntries = playerCards.map((card, index) => ({
-    actorType: "player",
-    actorId: player.id,
-    card,
-    playIndex: index,
-  }));
+  const playerEntries = game.drawPlayerTurnEntries(players);
   game.applySharedPlayerPriority(playerEntries);
   const enemyEntries = game.aliveEnemyKinds().map((kind) => ({
     actorType: "enemyGroup",
@@ -550,7 +556,7 @@ async function simulateTurn(game) {
   for (const entry of entries) {
     if (state.finished || state.waitingReward) break;
     if (entry.actorType === "player") {
-      const actor = game.getPlayer();
+      const actor = game.getState().entities.find((entity) => entity.id === entry.actorId);
       if (actor && game.isAlive(actor)) await game.executeCard(actor, entry.card);
     } else {
       const enemies = game.getState().entities
@@ -566,7 +572,10 @@ async function simulateTurn(game) {
   }
 
   if (!state.waitingReward && !state.finished) {
-    playerCards.forEach((card) => game.discardResolvedCard(card, game.getPlayer()));
+    playerEntries.forEach((entry) => {
+      const actor = game.getState().entities.find((entity) => entity.id === entry.actorId);
+      game.discardResolvedCard(entry.card, actor);
+    });
     enemyEntries.forEach((entry) => game.discardEnemyCard(entry.card, entry.actorId));
   }
 }

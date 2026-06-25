@@ -1312,7 +1312,7 @@ function getSelectedCharacter() {
 
 function characterForActorId(actorId) {
   const entity = state?.entities?.find((item) => item.id === actorId);
-  return characterDefinitions[entity?.characterId] ?? getSelectedCharacter();
+  return characterDefinitions[entity?.characterId] ?? characterDefinitions[actorId] ?? getSelectedCharacter();
 }
 
 function card(id, name, route, rarity, priority, actions, copies = 1) {
@@ -1324,6 +1324,9 @@ async function newRun() {
   clearPlannerDrag();
   const renderToken = ++rewardRenderToken;
   const character = getSelectedCharacter();
+  const partyCharacters = playerPartyCharacters();
+  const playerCardPiles = createInitialPlayerCardPiles(partyCharacters);
+  const primaryPile = playerCardPiles[character.id] ?? Object.values(playerCardPiles)[0];
   state = {
     paused: false,
     busy: false,
@@ -1339,7 +1342,8 @@ async function newRun() {
     entities: [],
     characterId: character.id,
     character,
-    playerCards: expandCards(character.baseCards),
+    playerCards: primaryPile?.cards ?? expandCards(character.baseCards),
+    playerCardPiles,
     deck: [],
     discard: [],
     enemyDeck: [],
@@ -1476,8 +1480,8 @@ function startWave(index) {
     });
   });
 
-  state.deck = shuffle([...state.playerCards]);
-  state.discard = [];
+  ensurePlayerCardPiles(partyCharacters);
+  resetPlayerDecksForWave(partyCharacters);
   state.enemyDecks = {};
   state.enemyDiscards = {};
   state.enemySustainedCards = {};
@@ -1505,6 +1509,105 @@ function playerPartyCharacters() {
   return testPlayerPartyIds
     .map((id) => characterDefinitions[id])
     .filter(Boolean);
+}
+
+function createInitialPlayerCardPiles(characters) {
+  return Object.fromEntries(
+    characters.map((character) => [character.id, createPlayerCardPile(character)]),
+  );
+}
+
+function createPlayerCardPile(character) {
+  return {
+    cards: expandCards(character.baseCards),
+    deck: [],
+    discard: [],
+  };
+}
+
+function ensurePlayerCardPiles(characters = playerPartyCharacters()) {
+  if (!state) return;
+  state.playerCardPiles = state.playerCardPiles ?? {};
+  characters.forEach((character) => {
+    state.playerCardPiles[character.id] = state.playerCardPiles[character.id] ?? createPlayerCardPile(character);
+  });
+  syncLegacyPlayerCardFields();
+}
+
+function resetPlayerDecksForWave(characters = playerPartyCharacters()) {
+  ensurePlayerCardPiles(characters);
+  characters.forEach((character) => {
+    const pile = state.playerCardPiles?.[character.id];
+    if (!pile) return;
+    pile.deck = shuffle([...(pile.cards ?? [])]);
+    pile.discard = [];
+  });
+  syncLegacyPlayerCardFields();
+}
+
+function resolvePlayerActorId(actorOrId = null) {
+  if (typeof actorOrId === "string") return actorOrId;
+  if (actorOrId?.id) return actorOrId.id;
+  return getPlayer()?.id ?? playerPartyCharacters()[0]?.id ?? selectedCharacterId;
+}
+
+function playerCardPile(actorOrId = null) {
+  const actorId = resolvePlayerActorId(actorOrId);
+  if (!actorId) return null;
+  ensurePlayerCardPiles();
+  const character = characterDefinitions[actorId] ?? characterDefinitions[state?.entities?.find((entity) => entity.id === actorId)?.characterId];
+  if (!state.playerCardPiles[actorId] && character) {
+    state.playerCardPiles[actorId] = createPlayerCardPile(character);
+    syncLegacyPlayerCardFields();
+  }
+  return state.playerCardPiles?.[actorId] ?? null;
+}
+
+function playerDiscardPile(actorOrId = null) {
+  return playerCardPile(actorOrId)?.discard ?? state.discard;
+}
+
+function syncLegacyPlayerCardFields() {
+  if (!state?.playerCardPiles) return;
+  const piles = Object.values(state.playerCardPiles);
+  state.deck = piles.flatMap((pile) => pile.deck ?? []);
+  state.discard = piles.flatMap((pile) => pile.discard ?? []);
+  const primaryPile = state.playerCardPiles[rewardOwnerId()] ?? piles[0];
+  if (primaryPile) state.playerCards = primaryPile.cards ?? [];
+}
+
+function totalPlayerDeckCount() {
+  return Object.values(state?.playerCardPiles ?? {})
+    .reduce((sum, pile) => sum + (pile.deck?.length ?? 0), 0);
+}
+
+function totalPlayerDiscardCount() {
+  return Object.values(state?.playerCardPiles ?? {})
+    .reduce((sum, pile) => sum + (pile.discard?.length ?? 0), 0);
+}
+
+function rewardOwnerId() {
+  const party = playerPartyCharacters();
+  if (party.some((character) => character.id === selectedCharacterId)) return selectedCharacterId;
+  return getPlayer()?.id ?? party[0]?.id ?? selectedCharacterId;
+}
+
+function addPlayerOwnedCard(cardData, actorOrId = rewardOwnerId()) {
+  const pile = playerCardPile(actorOrId);
+  if (!pile || !cardData) return;
+  pile.cards = pile.cards ?? [];
+  pile.cards.push(cardData);
+  syncLegacyPlayerCardFields();
+}
+
+function addPlayerCardToDeck(cardData, actorOrId = rewardOwnerId(), options = {}) {
+  const pile = playerCardPile(actorOrId);
+  if (!pile || !cardData) return;
+  pile.deck = pile.deck ?? [];
+  if (options.top) pile.deck.unshift(cardData);
+  else if (options.shuffle) pile.deck = shuffle([...pile.deck, cardData]);
+  else pile.deck.push(cardData);
+  syncLegacyPlayerCardFields();
 }
 
 function createPlayerEntity(character, position, previousPlayer = null) {
@@ -1755,13 +1858,7 @@ async function runTurn() {
 
   await playTurnStart();
 
-  const playerCards = drawPlayerCards(playerTurnDrawCount(player));
-  const playerChoices = playerCards.map((cardData, index) => ({
-    actorType: "player",
-    actorId: (players[index % players.length] ?? player).id,
-    card: cardData,
-    playIndex: index,
-  }));
+  const playerChoices = drawPlayerTurnEntries(players);
   const enemyEntries = drawEnemyPlanEntries();
   state.planningChoices = playerChoices;
   state.enemyPlanEntries = enemyEntries;
@@ -1785,9 +1882,8 @@ async function runTurn() {
   }
 
   const plannedPlayerEntries = plannedPlayerEntriesFromState();
-  const skippedPlayerCards = playerChoices
-    .filter((entry) => !state.plannedCardKeys.includes(cardRuntimeKey(entry.card)))
-    .map((entry) => entry.card);
+  const skippedPlayerEntries = playerChoices
+    .filter((entry) => !state.plannedCardKeys.includes(cardRuntimeKey(entry.card)));
   state.turnPlanning = false;
   state.planningChoices = [];
   state.planResolver = null;
@@ -1830,7 +1926,7 @@ async function runTurn() {
       const actor = state.entities.find((entity) => entity.id === entry.actorId) ?? player;
       discardResolvedCard(entry.card, actor);
     });
-    skippedPlayerCards.forEach((cardData) => discardSkippedPlayerCard(cardData));
+    skippedPlayerEntries.forEach((entry) => discardSkippedPlayerCard(entry.card, entry.actorId));
     enemyEntries.forEach((entry) => discardEnemyCard(entry.card, entry.actorId));
   }
   state.focusTargetId = currentFocusTargetId();
@@ -1845,6 +1941,38 @@ function playerTurnDrawCount() {
 
 function playerTurnPlayLimit() {
   return playerTurnCardCount();
+}
+
+function drawPlayerTurnEntries(players = alivePlayers()) {
+  const livePlayers = players.filter(isAlive);
+  if (!livePlayers.length) return [];
+  const entries = [];
+  if (livePlayers.length === 1) {
+    for (let index = 0; index < playerTurnCardCount(); index += 1) {
+      const cardData = drawPlayerCard(livePlayers[0]);
+      if (cardData) {
+        entries.push({
+          actorType: "player",
+          actorId: livePlayers[0].id,
+          card: cardData,
+          playIndex: index,
+        });
+      }
+    }
+    return entries;
+  }
+
+  livePlayers.slice(0, playerTurnCardCount()).forEach((actor, index) => {
+    const cardData = drawPlayerCard(actor);
+    if (!cardData) return;
+    entries.push({
+      actorType: "player",
+      actorId: actor.id,
+      card: cardData,
+      playIndex: index,
+    });
+  });
+  return entries;
 }
 
 function playerTurnCardCount() {
@@ -1926,9 +2054,12 @@ function clearPlannerDrag() {
   plannerDrag = null;
 }
 
-function discardSkippedPlayerCard(cardData) {
+function discardSkippedPlayerCard(cardData, actorOrId = getPlayer()) {
   if (!cardData) return;
-  state.discard.push(cardData);
+  const pile = playerCardPile(actorOrId);
+  if (pile) pile.discard.push(cardData);
+  else state.discard.push(cardData);
+  syncLegacyPlayerCardFields();
 }
 
 function drawEnemyPlanEntries() {
@@ -2212,18 +2343,22 @@ async function executeAction(actor, action, cardData) {
   return false;
 }
 
-function drawPlayerCard() {
-  if (!state.deck.length) {
-    state.deck = shuffle(state.discard);
-    state.discard = [];
+function drawPlayerCard(actorOrId = getPlayer()) {
+  const pile = playerCardPile(actorOrId);
+  if (!pile) return null;
+  if (!pile.deck.length) {
+    pile.deck = shuffle(pile.discard ?? []);
+    pile.discard = [];
   }
-  return state.deck.shift();
+  const cardData = pile.deck.shift();
+  syncLegacyPlayerCardFields();
+  return cardData;
 }
 
-function drawPlayerCards(count = 1) {
+function drawPlayerCards(count = 1, actorOrId = getPlayer()) {
   const cards = [];
   for (let index = 0; index < count; index += 1) {
-    const cardData = drawPlayerCard();
+    const cardData = drawPlayerCard(actorOrId);
     if (cardData) cards.push(cardData);
   }
   return cards;
@@ -2251,7 +2386,10 @@ function discardResolvedCard(cardData, actor) {
     actor.sustainedCards.push({ card: cardData, discardAfterTurn: state.turn + 1 });
     return;
   }
-  state.discard.push(cardData);
+  const pile = playerCardPile(actor);
+  if (pile) pile.discard.push(cardData);
+  else state.discard.push(cardData);
+  syncLegacyPlayerCardFields();
 }
 
 function discardEnemyCard(cardData, kind) {
@@ -2277,7 +2415,7 @@ function isTurnSustainCard(cardData) {
 function expireTurnEndEffects(entry) {
   if (entry.actorType === "player") {
     const actor = state.entities.find((entity) => entity.id === entry.actorId);
-    if (actor) expireActorTurnEndEffects(actor, state.discard);
+    if (actor) expireActorTurnEndEffects(actor, playerDiscardPile(actor));
     return;
   }
 
@@ -4187,8 +4325,7 @@ async function clearWave() {
   }
   state.waitingReward = true;
   state.rewardPhase = "passive";
-  state.discard = [];
-  state.deck = shuffle([...state.playerCards]);
+  resetPlayerDecksForWave(playerPartyCharacters());
   await preloadRewardAssets(getSelectedCharacter());
   if (renderToken !== rewardRenderToken || !state.waitingReward || state.finished) return;
   showRewards();
@@ -4392,6 +4529,7 @@ async function pickReward(reward, button) {
   state.rewardLocked = true;
   const preStartReward = state.preStartReward;
   const passiveReward = (state.rewardPhase ?? "passive") === "passive";
+  const rewardOwner = rewardOwnerId();
 
   const mount = button.querySelector(".reward-mount") || button;
   const startRect = mount.getBoundingClientRect();
@@ -4413,9 +4551,9 @@ async function pickReward(reward, button) {
   recordRewardPick(reward, { countPick: !passiveReward });
 
   if (passiveReward) {
-    applyPassiveReward(reward);
+    applyPassiveReward(reward, rewardOwner);
   } else {
-    state.playerCards.push(reward);
+    addPlayerOwnedCard(reward, rewardOwner);
   }
 
   const cardCx = startRect.left + startRect.width / 2;
@@ -4451,8 +4589,7 @@ async function pickReward(reward, button) {
 
   await sleep(360);
   if (!passiveReward) {
-    if (preStartReward) state.deck = shuffle([...state.deck, reward]);
-    else state.deck.push(reward);
+    addPlayerCardToDeck(reward, rewardOwner, { shuffle: preStartReward });
   }
   renderPlayerHud();
   if (!passiveReward && deckTarget) {
@@ -4492,8 +4629,9 @@ function isPassiveCard(cardData) {
   return cardData?.actions?.some(isPassiveAction);
 }
 
-function applyPassiveReward(cardData) {
-  const player = getPlayer();
+function applyPassiveReward(cardData, actorOrId = rewardOwnerId()) {
+  const actorId = resolvePlayerActorId(actorOrId);
+  const player = state.entities.find((entity) => entity.id === actorId && entity.side === "player") ?? getPlayer();
   if (!player) return;
   state.passiveCards = state.passiveCards ?? [];
   state.passiveCards.push(cardData);
@@ -4862,8 +5000,8 @@ function renderHud() {
     ? "런 종료"
     : `턴 ${state.turn}${waves[state.waveIndex]?.boss ? " / 보스" : ""}`;
   elements.playerHp.textContent = player ? `${player.hp} / ${player.maxHp}` : `0 / ${character.maxHp}`;
-  elements.deckCount.textContent = state.deck.length;
-  elements.discardCount.textContent = state.discard.length;
+  elements.deckCount.textContent = totalPlayerDeckCount();
+  elements.discardCount.textContent = totalPlayerDiscardCount();
   elements.chargeCount.textContent = player ? player.charge ?? 0 : 0;
   elements.chargeHud.textContent = player ? player.charge ?? 0 : 0;
   elements.pauseButton.textContent = state.paused ? "재개" : "일시정지";
