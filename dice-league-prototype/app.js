@@ -98,6 +98,44 @@ const DICE_ENEMIES = [
   { name: "검은 주사위", maxHp: 315, attack: 29, color: "#333333" },
 ];
 
+const ENEMY_FACE_CATALOG = {
+  strike: {
+    name: "강타",
+    kind: "enemyAttack",
+    base: 1,
+    color: "#252525",
+    icon: "claw",
+  },
+  guard: {
+    name: "암석 방어",
+    kind: "enemyGuard",
+    base: 0.85,
+    color: "#756c5a",
+    icon: "guard",
+  },
+  crush: {
+    name: "분쇄",
+    kind: "enemyAttack",
+    base: 1.35,
+    color: "#b45a48",
+    icon: "crush",
+  },
+  rage: {
+    name: "분노",
+    kind: "enemyRage",
+    base: 0.65,
+    color: "#d99a2b",
+    icon: "rage",
+  },
+  curse: {
+    name: "저주 파동",
+    kind: "enemyCurse",
+    base: 0.7,
+    color: "#6e63b6",
+    icon: "curse",
+  },
+};
+
 const MONSTERS = [
   {
     id: "wolf",
@@ -352,6 +390,9 @@ const state = {
     round: 0,
     activeBattle: false,
     rolling: false,
+    resolving: false,
+    resolveIndex: 0,
+    activeRollId: null,
     rolls: [],
     effects: [],
     effectSeq: 0,
@@ -401,6 +442,27 @@ function faceInfo(key) {
   };
 }
 
+function enemyFaceInfo(type, enemy = state.dice.enemy) {
+  const catalog = ENEMY_FACE_CATALOG[type];
+  const value = Math.max(1, Math.ceil((enemy?.attack || 12) * catalog.base));
+  return {
+    ...catalog,
+    type,
+    grade: 1,
+    key: `enemy_${type}`,
+    label: catalog.name,
+    value,
+  };
+}
+
+function enemyDiceTypes(enemy = state.dice.enemy) {
+  if (!enemy) return ["strike", "guard", "strike", "rage", "crush", "strike"];
+  if (enemy.name.includes("붉은")) return ["strike", "crush", "rage", "strike", "crush", "guard"];
+  if (enemy.name.includes("심판자")) return ["curse", "strike", "guard", "rage", "crush", "curse"];
+  if (enemy.name.includes("검은")) return ["curse", "rage", "crush", "strike", "curse", "guard"];
+  return ["strike", "guard", "strike", "rage", "crush", "guard"];
+}
+
 function faceIcon(face) {
   const paths = {
     slash: '<path d="M18 4 7 24l8-3 5-11 2 2-4 9 7-12z" fill="currentColor"/>',
@@ -414,8 +476,16 @@ function faceIcon(face) {
       '<path d="M14 4 18 12l8 2-8 2-4 8-4-8-8-2 8-2z" fill="currentColor"/>',
     venom:
       '<path d="M14 3c6 5 8 10 8 14a8 8 0 0 1-16 0c0-4 2-9 8-14z" fill="currentColor"/><circle cx="11" cy="17" r="1.6" fill="rgba(255,255,255,.65)"/><circle cx="17" cy="17" r="1.6" fill="rgba(255,255,255,.65)"/>',
+    claw:
+      '<path d="M8 23c3-8 3-14 2-20 4 6 5 13 2 21zm7 0c2-8 2-14 0-21 5 6 6 14 3 22zm7 0c2-7 1-13-1-19 5 5 6 12 4 19z" fill="currentColor"/>',
+    crush:
+      '<path d="M7 6h14l4 6-11 11L3 12z" fill="currentColor"/><path d="M9 10h10M12 14h8" stroke="rgba(255,255,255,.55)" stroke-width="2"/>',
+    rage:
+      '<path d="M14 3 24 14l-6 2 4 9L9 13l6-1z" fill="currentColor"/>',
+    curse:
+      '<path d="M14 4c6 0 10 4 10 10s-4 10-10 10S4 20 4 14 8 4 14 4z" fill="currentColor"/><path d="M10 11h8M10 17h8" stroke="rgba(255,255,255,.6)" stroke-width="2"/>',
   };
-  return `<span class="face-icon" style="--face-color:${face.color}"><svg viewBox="0 0 28 28" aria-hidden="true">${paths[face.icon]}</svg></span>`;
+  return `<span class="face-icon" style="--face-color:${face.color}"><svg viewBox="0 0 28 28" aria-hidden="true">${paths[face.icon] || paths.slash}</svg></span>`;
 }
 
 function heroArt(kind) {
@@ -675,7 +745,7 @@ function renderDiceBattle() {
   const enemy = state.dice.enemy || makeDiceEnemy();
   const hpPercent = clamp((enemy.hp / enemy.maxHp) * 100, 0, 100);
   $("#diceEnemyName").textContent = enemy.name;
-  $("#diceEnemyHp").textContent = `${Math.max(0, Math.ceil(enemy.hp))} / ${enemy.maxHp}`;
+  $("#diceEnemyHp").textContent = `${Math.max(0, Math.ceil(enemy.hp))}/${enemy.maxHp} · 보호 ${Math.ceil(enemy.shield || 0)}`;
   $("#diceEnemyHpBar").style.width = `${hpPercent}%`;
   $("#diceEnemyArt").style.background = `linear-gradient(145deg, ${enemy.color}, #252525)`;
   $("#diceEnemyArt").innerHTML = monsterArt({
@@ -697,8 +767,8 @@ function renderDiceBattle() {
 
   renderDiceRollStage();
   $("#startDiceBattle").disabled = state.dice.activeBattle || Boolean(state.dice.reward);
-  $("#rollDiceRound").disabled = !state.dice.activeBattle || state.dice.rolling || Boolean(state.dice.reward);
-  $("#rollDiceRound").textContent = state.dice.rolling ? "굴리는 중..." : "라운드 굴리기";
+  $("#rollDiceRound").disabled = !state.dice.activeBattle || state.dice.rolling || state.dice.resolving || Boolean(state.dice.reward);
+  $("#rollDiceRound").textContent = state.dice.rolling ? "굴리는 중..." : state.dice.resolving ? "행동 중..." : "라운드 굴리기";
 
 
   if (state.dice.reward) {
@@ -728,20 +798,23 @@ function renderDiceBattle() {
 
 function renderDiceRollStage() {
   const rollByHero = Object.fromEntries(state.dice.rolls.map((roll) => [roll.heroId, roll]));
+  const enemyRoll = state.dice.rolls.find((roll) => roll.actorType === "enemy");
+  const enemy = state.dice.enemy || makeDiceEnemy();
   const hasFx = state.dice.effects.length > 0;
   $("#diceRollStage").classList.toggle("has-fx", hasFx);
   $("#diceRollStage").innerHTML =
-    state.dice.heroes
-      .map((hero, index) => {
+    [
+      ...state.dice.heroes.map((hero, index) => {
         const roll = rollByHero[hero.id];
         const face = roll ? roll.face : faceInfo(hero.slots[index % hero.slots.length]);
         const active = Boolean(roll);
         const statusClass = state.dice.rolling && active ? "rolling" : active ? "result" : "";
+        const activeTurn = state.dice.activeRollId === roll?.id;
         return `
-          <article class="battle-die ${active ? "active" : ""} ${statusClass}" style="--face-color:${face.color}">
+          <article class="battle-die ${active ? "active" : ""} ${statusClass} ${activeTurn ? "active-turn" : ""}" style="--face-color:${face.color}">
             <div class="die-owner">
               <strong>${hero.short}</strong>
-              <span>${roll ? `${roll.slot + 1}번` : "대기"}</span>
+              <span>${activeTurn ? "행동 중" : roll ? `${roll.slot + 1}번` : "대기"}</span>
             </div>
             <div class="die-cube">${faceIcon(face)}</div>
             <div class="die-result-copy">
@@ -750,8 +823,27 @@ function renderDiceRollStage() {
             </div>
           </article>
         `;
-      })
-      .join("") +
+      }),
+      (() => {
+        const face = enemyRoll ? enemyRoll.face : enemyFaceInfo(enemyDiceTypes(enemy)[0], enemy);
+        const active = Boolean(enemyRoll);
+        const statusClass = state.dice.rolling && active ? "rolling" : active ? "result" : "";
+        const activeTurn = state.dice.activeRollId === enemyRoll?.id;
+        return `
+          <article class="battle-die enemy-die ${active ? "active" : ""} ${statusClass} ${activeTurn ? "active-turn" : ""}" style="--face-color:${face.color}">
+            <div class="die-owner">
+              <strong>몬스터</strong>
+              <span>${activeTurn ? "행동 중" : enemyRoll ? `${enemyRoll.slot + 1}번` : "대기"}</span>
+            </div>
+            <div class="die-cube">${faceIcon(face)}</div>
+            <div class="die-result-copy">
+              <strong>${enemyRoll ? face.label : "몬스터 주사위"}</strong>
+              <span>${enemyRoll ? `위력 ${face.value}` : "라운드 시작 전"}</span>
+            </div>
+          </article>
+        `;
+      })(),
+    ].join("") +
     state.dice.effects
       .map(
         (effect, index) => `
@@ -769,6 +861,8 @@ function makeDiceEnemy() {
     maxHp: template.maxHp + loop * 70,
     hp: template.maxHp + loop * 70,
     attack: template.attack + loop * 5,
+    shield: 0,
+    rage: 0,
     poison: 0,
   };
 }
@@ -830,6 +924,9 @@ function startDiceBattle() {
   state.dice.reward = null;
   state.dice.round = 0;
   state.dice.rolling = false;
+  state.dice.resolving = false;
+  state.dice.resolveIndex = 0;
+  state.dice.activeRollId = null;
   state.dice.rolls = [];
   state.dice.effects = [];
   state.dice.heroes.forEach((hero) => {
@@ -852,67 +949,122 @@ function startDiceBattle() {
 
 function rollDiceRound() {
   const enemy = state.dice.enemy;
-  if (!enemy || !state.dice.activeBattle || state.dice.rolling) return;
+  if (!enemy || !state.dice.activeBattle || state.dice.rolling || state.dice.resolving) return;
   state.dice.round += 1;
   state.dice.rolling = true;
+  state.dice.resolving = false;
+  state.dice.resolveIndex = 0;
+  state.dice.activeRollId = null;
   state.dice.effects = [];
-  state.dice.rolls = state.dice.heroes
+  const heroRolls = state.dice.heroes
     .filter((hero) => hero.hp > 0 && enemy.hp > 0)
     .map((hero) => {
       const slot = Math.floor(Math.random() * 6);
       return {
+        id: `hero-${hero.id}`,
+        actorType: "hero",
         heroId: hero.id,
         slot,
         face: faceInfo(hero.slots[slot]),
       };
     });
+  const enemyDice = enemyDiceTypes(enemy);
+  const enemySlot = Math.floor(Math.random() * enemyDice.length);
+  const enemyRoll = {
+    id: "enemy",
+    actorType: "enemy",
+    heroId: null,
+    slot: enemySlot,
+    face: enemyFaceInfo(enemyDice[enemySlot], enemy),
+  };
+  state.dice.rolls = [...heroRolls, enemyRoll];
   addDiceLog(`라운드 ${state.dice.round}: 주사위 굴림.`);
   renderDice();
 
   window.setTimeout(() => {
-    for (const roll of state.dice.rolls) {
-      const hero = state.dice.heroes.find((entry) => entry.id === roll.heroId);
-      if (!hero || hero.hp <= 0 || enemy.hp <= 0) continue;
-      resolveFace(hero, roll.face, roll.slot, enemy);
-    }
-
-    if (enemy.hp > 0 && enemy.poison > 0) {
-      const poisonDamage = enemy.poison * 3;
-      enemy.hp -= poisonDamage;
-      addDiceEffect("poison", `-${poisonDamage}`, "enemy");
-      addDiceLog(`${enemy.name}이 독으로 ${poisonDamage} 피해.`);
-    }
-
-    if (enemy.hp <= 0) {
-      state.dice.rolling = false;
-      winDiceBattle();
-      renderDice();
-      const effectSeq = state.dice.effectSeq;
-      window.setTimeout(() => {
-        if (state.dice.effectSeq !== effectSeq || state.dice.rolling) return;
-        state.dice.effects = [];
-        renderDiceBattle();
-      }, 980);
-      return;
-    }
-
-    enemyAttack();
-
-    if (state.dice.heroes.every((hero) => hero.hp <= 0)) {
-      state.dice.activeBattle = false;
-      state.dice.gold += 25;
-      addDiceLog("원정 실패. 보험금 25골드 획득.");
-    }
-
     state.dice.rolling = false;
+    state.dice.resolving = true;
+    state.dice.activeRollId = null;
+    addDiceLog("결과 공개. 순서대로 행동합니다.");
     renderDice();
-    const effectSeq = state.dice.effectSeq;
-    window.setTimeout(() => {
-      if (state.dice.effectSeq !== effectSeq || state.dice.rolling) return;
-      state.dice.effects = [];
-      renderDiceBattle();
-    }, 980);
+    window.setTimeout(resolveNextDiceRoll, 520);
   }, 680);
+}
+
+function resolveNextDiceRoll() {
+  if (!state.dice.resolving || !state.dice.activeBattle) return;
+  const roll = state.dice.rolls[state.dice.resolveIndex];
+  if (!roll) {
+    finishDiceRound();
+    return;
+  }
+
+  state.dice.activeRollId = roll.id;
+  state.dice.effects = [];
+
+  if (roll.actorType === "hero") {
+    const hero = state.dice.heroes.find((entry) => entry.id === roll.heroId);
+    if (hero && hero.hp > 0 && state.dice.enemy.hp > 0) {
+      resolveFace(hero, roll.face, roll.slot, state.dice.enemy);
+    }
+  } else if (state.dice.enemy.hp > 0) {
+    resolveEnemyFace(roll.face);
+  }
+
+  renderDice();
+
+  if (state.dice.enemy.hp <= 0) {
+    state.dice.resolving = false;
+    state.dice.activeRollId = null;
+    winDiceBattle();
+    renderDice();
+    queueDiceEffectClear();
+    return;
+  }
+
+  if (state.dice.heroes.every((hero) => hero.hp <= 0)) {
+    state.dice.resolving = false;
+    state.dice.activeBattle = false;
+    state.dice.gold += 25;
+    state.dice.activeRollId = null;
+    addDiceLog("원정 실패. 보험금 25골드 획득.");
+    renderDice();
+    queueDiceEffectClear();
+    return;
+  }
+
+  state.dice.resolveIndex += 1;
+  window.setTimeout(resolveNextDiceRoll, 900);
+}
+
+function finishDiceRound() {
+  const enemy = state.dice.enemy;
+  state.dice.effects = [];
+  if (enemy.hp > 0 && enemy.poison > 0) {
+    const poisonDamage = enemy.poison * 3;
+    enemy.hp -= poisonDamage;
+    addDiceEffect("poison", `-${poisonDamage}`, "enemy");
+    addDiceLog(`${enemy.name}이 독으로 ${poisonDamage} 피해.`);
+  }
+
+  state.dice.resolving = false;
+  state.dice.activeRollId = null;
+
+  if (enemy.hp <= 0) {
+    winDiceBattle();
+  }
+
+  renderDice();
+  queueDiceEffectClear();
+}
+
+function queueDiceEffectClear() {
+  const effectSeq = state.dice.effectSeq;
+  window.setTimeout(() => {
+    if (state.dice.effectSeq !== effectSeq || state.dice.rolling || state.dice.resolving) return;
+    state.dice.effects = [];
+    renderDiceBattle();
+  }, 980);
 }
 
 function resolveFace(hero, face, slot, enemy) {
@@ -994,26 +1146,79 @@ function resolveFace(hero, face, slot, enemy) {
     addDiceLog(`${hero.short}: 독 ${face.grade + 1} 누적.`);
   }
 
-  enemy.hp -= damage;
-  addDiceEffect(face.kind === "magic" ? "focus" : "damage", `-${damage}`, "enemy");
+  damageEnemy(damage, face.kind === "magic" ? "focus" : "damage");
   hero.lastOffense = true;
   addDiceLog(`${hero.short}: ${face.label}으로 ${damage} 피해.`);
 }
 
-function enemyAttack() {
+function damageEnemy(amount, kind = "damage") {
+  const enemy = state.dice.enemy;
+  const blocked = Math.min(enemy.shield || 0, amount);
+  enemy.shield = Math.max(0, (enemy.shield || 0) - blocked);
+  const damage = amount - blocked;
+  if (blocked > 0) addDiceEffect("guard", `방어 ${blocked}`, "enemy");
+  if (damage > 0) {
+    enemy.hp -= damage;
+    addDiceEffect(kind, `-${damage}`, "enemy");
+  }
+  return damage;
+}
+
+function resolveEnemyFace(face) {
+  const enemy = state.dice.enemy;
+  if (!enemy) return;
+  if (face.kind === "enemyGuard") {
+    const shield = face.value + Math.floor(state.dice.round * 2);
+    enemy.shield = (enemy.shield || 0) + shield;
+    addDiceEffect("guard", `+${shield}`, "enemy");
+    addDiceLog(`${enemy.name}: ${face.label}로 보호막 ${shield}.`);
+    return;
+  }
+
+  if (face.kind === "enemyRage") {
+    const rage = Math.max(4, face.value);
+    enemy.rage = (enemy.rage || 0) + rage;
+    addDiceEffect("focus", `분노 +${rage}`, "enemy");
+    addDiceLog(`${enemy.name}: 분노를 모아 다음 공격 +${rage}.`);
+    return;
+  }
+
+  if (face.kind === "enemyCurse") {
+    const damage = Math.max(3, face.value);
+    state.dice.heroes.forEach((hero) => {
+      if (hero.hp <= 0) return;
+      const blocked = Math.min(hero.shield, damage);
+      hero.shield -= blocked;
+      const finalDamage = damage - blocked;
+      hero.hp -= finalDamage;
+      if (blocked > 0) addDiceEffect("guard", `방어 ${blocked}`, "hero", hero.id);
+      if (finalDamage > 0) addDiceEffect("enemy", `-${finalDamage}`, "hero", hero.id);
+    });
+    addDiceLog(`${enemy.name}: ${face.label}으로 전원 피해 ${damage}.`);
+    return;
+  }
+
+  enemyAttack(face.value, face.label);
+}
+
+function enemyAttack(rawDamage = state.dice.enemy?.attack || 0, label = state.dice.enemy?.name || "몬스터") {
   const enemy = state.dice.enemy;
   const target = state.dice.heroes
     .filter((hero) => hero.hp > 0)
     .sort((a, b) => a.hp - b.hp)[0];
   if (!target) return;
-  let damage = enemy.attack + state.dice.round * 2;
+  let damage = rawDamage + state.dice.round * 2 + (enemy.rage || 0);
+  if (enemy.rage > 0) {
+    addDiceEffect("focus", `분노 +${enemy.rage}`, "enemy");
+    enemy.rage = 0;
+  }
   const blocked = Math.min(target.shield, damage);
   target.shield -= blocked;
   damage -= blocked;
   target.hp -= damage;
   if (blocked > 0) addDiceEffect("guard", `방어 ${blocked}`, "hero", target.id);
   if (damage > 0) addDiceEffect("enemy", `-${damage}`, "hero", target.id);
-  addDiceLog(`${enemy.name}: ${target.short} 공격. 피해 ${damage}, 방어 ${blocked}.`);
+  addDiceLog(`${enemy.name}: ${label}로 ${target.short} 공격. 피해 ${damage}, 방어 ${blocked}.`);
 }
 
 function winDiceBattle() {

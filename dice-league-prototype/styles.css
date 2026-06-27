@@ -663,9 +663,9 @@ h2 {
 .dice-roll-stage {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  min-height: 148px;
+  min-height: 262px;
   padding: 9px;
   border: 1px solid rgba(37, 37, 37, 0.1);
   border-radius: 8px;
@@ -692,7 +692,7 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  min-height: 130px;
+  min-height: 120px;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -704,6 +704,27 @@ h2 {
 .battle-die.active {
   border-color: var(--face-color);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--face-color) 24%, transparent);
+}
+
+.battle-die.enemy-die {
+  background: #f5e6df;
+}
+
+.battle-die.active-turn {
+  border-color: var(--yellow);
+  box-shadow:
+    0 0 0 2px rgba(217, 154, 43, 0.42),
+    0 12px 24px rgba(45, 37, 27, 0.14);
+}
+
+.battle-die.active-turn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid rgba(245, 201, 107, 0.8);
+  animation: turn-ring 900ms ease-in-out infinite;
+  pointer-events: none;
 }
 
 .battle-die.rolling .die-cube {
@@ -862,6 +883,16 @@ h2 {
   100% {
     opacity: 0;
     transform: translate(-50%, -36px) scale(1.05);
+  }
+}
+
+@keyframes turn-ring {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
