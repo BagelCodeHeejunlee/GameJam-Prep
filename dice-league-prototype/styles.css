@@ -663,9 +663,9 @@ h2 {
 .dice-roll-stage {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  min-height: 262px;
+  min-height: 268px;
   padding: 9px;
   border: 1px solid rgba(37, 37, 37, 0.1);
   border-radius: 8px;
@@ -707,6 +707,9 @@ h2 {
 }
 
 .battle-die.enemy-die {
+  grid-column: 1 / -1;
+  width: calc((100% - 16px) / 3);
+  justify-self: center;
   background: #f5e6df;
 }
 

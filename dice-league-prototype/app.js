@@ -804,6 +804,25 @@ function renderDiceRollStage() {
   $("#diceRollStage").classList.toggle("has-fx", hasFx);
   $("#diceRollStage").innerHTML =
     [
+      (() => {
+        const face = enemyRoll ? enemyRoll.face : enemyFaceInfo(enemyDiceTypes(enemy)[0], enemy);
+        const active = Boolean(enemyRoll);
+        const statusClass = state.dice.rolling && active ? "rolling" : active ? "result" : "";
+        const activeTurn = state.dice.activeRollId === enemyRoll?.id;
+        return `
+          <article class="battle-die enemy-die ${active ? "active" : ""} ${statusClass} ${activeTurn ? "active-turn" : ""}" style="--face-color:${face.color}">
+            <div class="die-owner">
+              <strong>몬스터</strong>
+              <span>${activeTurn ? "행동 중" : enemyRoll ? `${enemyRoll.slot + 1}번` : "대기"}</span>
+            </div>
+            <div class="die-cube">${faceIcon(face)}</div>
+            <div class="die-result-copy">
+              <strong>${enemyRoll ? face.label : "몬스터 주사위"}</strong>
+              <span>${enemyRoll ? `위력 ${face.value}` : "라운드 시작 전"}</span>
+            </div>
+          </article>
+        `;
+      })(),
       ...state.dice.heroes.map((hero, index) => {
         const roll = rollByHero[hero.id];
         const face = roll ? roll.face : faceInfo(hero.slots[index % hero.slots.length]);
@@ -824,25 +843,6 @@ function renderDiceRollStage() {
           </article>
         `;
       }),
-      (() => {
-        const face = enemyRoll ? enemyRoll.face : enemyFaceInfo(enemyDiceTypes(enemy)[0], enemy);
-        const active = Boolean(enemyRoll);
-        const statusClass = state.dice.rolling && active ? "rolling" : active ? "result" : "";
-        const activeTurn = state.dice.activeRollId === enemyRoll?.id;
-        return `
-          <article class="battle-die enemy-die ${active ? "active" : ""} ${statusClass} ${activeTurn ? "active-turn" : ""}" style="--face-color:${face.color}">
-            <div class="die-owner">
-              <strong>몬스터</strong>
-              <span>${activeTurn ? "행동 중" : enemyRoll ? `${enemyRoll.slot + 1}번` : "대기"}</span>
-            </div>
-            <div class="die-cube">${faceIcon(face)}</div>
-            <div class="die-result-copy">
-              <strong>${enemyRoll ? face.label : "몬스터 주사위"}</strong>
-              <span>${enemyRoll ? `위력 ${face.value}` : "라운드 시작 전"}</span>
-            </div>
-          </article>
-        `;
-      })(),
     ].join("") +
     state.dice.effects
       .map(
