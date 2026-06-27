@@ -738,6 +738,11 @@ h2 {
   animation: die-pop 420ms ease-out;
 }
 
+.battle-die.active-turn:not(.rolling) .die-cube {
+  animation: die-wiggle 520ms ease-in-out infinite;
+  transform-origin: 50% 86%;
+}
+
 .die-owner {
   display: flex;
   align-items: center;
@@ -862,6 +867,22 @@ h2 {
   100% {
     transform: scale(1);
     filter: brightness(1);
+  }
+}
+
+@keyframes die-wiggle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  22% {
+    transform: translateY(-2px) rotate(-5deg) scale(1.02);
+  }
+  48% {
+    transform: translateY(1px) rotate(4deg) scale(1);
+  }
+  72% {
+    transform: translateY(-1px) rotate(-3deg) scale(1.01);
   }
 }
 
@@ -991,46 +1012,200 @@ h2 {
   font-weight: 900;
 }
 
-.league-board {
+.league-deck-board {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  justify-items: center;
+  gap: 10px;
+  min-height: 388px;
+  padding: 10px;
+  border: 1px solid rgba(37, 37, 37, 0.1);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(37, 37, 37, 0.04), rgba(255, 250, 241, 0.7)),
+    var(--surface);
 }
 
-.league-board h2 {
-  margin-bottom: 6px;
+.deck-pile {
+  position: relative;
+  isolation: isolate;
+  width: min(164px, 58vw);
+  min-height: 78px;
+  padding: 12px 14px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  border: 1px solid rgba(37, 37, 37, 0.16);
+  border-radius: 8px;
+  color: #fffaf1;
+  text-align: center;
+  box-shadow: 0 10px 18px rgba(45, 37, 27, 0.14);
 }
 
-.lineup-list {
+.deck-pile::before,
+.deck-pile::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  z-index: -1;
+  border-radius: 8px;
+  border: 1px solid rgba(37, 37, 37, 0.1);
+  background: inherit;
+}
+
+.deck-pile::before {
+  transform: translateY(5px) rotate(-2deg);
+}
+
+.deck-pile::after {
+  transform: translateY(10px) rotate(2deg);
+  opacity: 0.72;
+}
+
+.deck-pile.enemy {
+  background: linear-gradient(145deg, #5b3b38, #d85f45);
+}
+
+.deck-pile.mine {
+  background: linear-gradient(145deg, #2f695f, #20887c);
+}
+
+.deck-pile strong {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.deck-pile span {
+  font-size: 11px;
+  font-weight: 850;
+  opacity: 0.88;
+}
+
+.draw-arena {
+  width: 100%;
+  display: grid;
+  grid-template-rows: minmax(112px, auto) 28px minmax(112px, auto);
+  gap: 6px;
+  align-items: center;
+}
+
+.versus-chip {
+  width: 42px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  border-radius: 999px;
+  background: #252525;
+  color: #fffaf1;
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 0 9px 18px rgba(45, 37, 27, 0.16);
+}
+
+.draw-card {
+  width: min(212px, 72vw);
+  min-height: 112px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 10px 18px rgba(45, 37, 27, 0.08);
+}
+
+.draw-card.enemy {
+  background: #f5e6df;
+}
+
+.draw-card.mine {
+  background: #ecf3ee;
+}
+
+.draw-card.empty {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  color: var(--muted);
+  background: rgba(255, 250, 241, 0.62);
+  border-style: dashed;
+}
+
+.draw-card.winner {
+  border-color: var(--yellow);
+  box-shadow:
+    0 0 0 2px rgba(245, 201, 107, 0.42),
+    0 12px 22px rgba(45, 37, 27, 0.16);
+}
+
+.draw-card.loser {
+  opacity: 0.68;
+}
+
+.draw-card.tie {
+  border-color: #b9b0a0;
+}
+
+.draw-card .monster-avatar {
+  aspect-ratio: 1;
+  min-width: 0;
+}
+
+.draw-card-copy {
+  min-width: 0;
   display: grid;
   gap: 5px;
 }
 
-.lineup-unit {
-  min-height: 38px;
-  padding: 6px 7px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-2);
-}
-
-.lineup-list.enemy .lineup-unit {
-  background: #f5e6df;
-}
-
-.lineup-unit strong {
-  min-width: 0;
+.draw-card-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1.15;
 }
 
-.lineup-unit span {
-  font-size: 13px;
-  font-weight: 900;
+.draw-card-copy span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.draw-power {
+  width: fit-content;
+  min-width: 42px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fffaf1;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.league-score-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.league-score-row span {
+  min-height: 36px;
+  padding: 7px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border-radius: 7px;
+  background: rgba(37, 37, 37, 0.06);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.league-score-row strong {
+  color: #252525;
+  font-size: 15px;
 }
 
 .monster-roster {

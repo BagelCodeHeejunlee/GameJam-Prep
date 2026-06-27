@@ -206,18 +206,22 @@
 
         <section id="leagueBattleView" class="app-view">
           <section class="panel league-battle">
-            <div class="league-board">
-              <div>
-                <h2>내 팀</h2>
-                <div id="myLineup" class="lineup-list"></div>
+            <div class="league-deck-board" aria-label="몬스터 리그 덱 배틀">
+              <div id="enemyDeckPile" class="deck-pile enemy"></div>
+              <div id="drawArena" class="draw-arena">
+                <div id="enemyDrawCard" class="draw-card enemy empty"></div>
+                <div class="versus-chip">VS</div>
+                <div id="myDrawCard" class="draw-card mine empty"></div>
               </div>
-              <div>
-                <h2>상대</h2>
-                <div id="enemyLineup" class="lineup-list enemy"></div>
-              </div>
+              <div id="myDeckPile" class="deck-pile mine"></div>
+            </div>
+            <div class="league-score-row">
+              <span>몬스터 <strong id="enemyScore">0</strong></span>
+              <span>라운드 <strong id="leagueDrawRound">0/6</strong></span>
+              <span>내 팀 <strong id="myScore">0</strong></span>
             </div>
             <div class="action-row">
-              <button id="startLeagueBattle" class="primary-button" type="button">리그전 시작</button>
+              <button id="startLeagueBattle" class="primary-button" type="button">덱 섞기</button>
               <button id="nextOpponent" class="primary-button secondary" type="button">상대 교체</button>
             </div>
             <div id="leagueReward" class="reward-row hidden"></div>

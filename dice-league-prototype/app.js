@@ -4,6 +4,14 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 const roman = ["", "I", "II", "III", "IV", "V"];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const randItem = (items) => items[Math.floor(Math.random() * items.length)];
+const shuffleItems = (items) => {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+};
 const keyOf = (type, grade) => `${type}_${grade}`;
 const parseFaceKey = (key) => {
   const [type, grade] = key.split("_");
@@ -424,8 +432,16 @@ const state = {
       core: 1,
     },
     opponent: [],
+    battleActive: false,
+    myDeck: [],
+    enemyDeck: [],
+    myDiscard: [],
+    enemyDiscard: [],
+    drawnPair: null,
+    score: { my: 0, enemy: 0 },
+    drawRound: 0,
     reward: null,
-    log: ["6마리 순서가 그대로 자동 전투 순서가 됩니다."],
+    log: ["6마리 팀을 덱으로 섞은 뒤 한 장씩 드로우합니다."],
   },
 };
 
@@ -1415,10 +1431,25 @@ function gearIcon(gear) {
 }
 
 function renderLeagueBattle() {
-  $("#myLineup").innerHTML = state.league.team.map((id) => lineupMarkup(id, monsterLevel(id))).join("");
-  $("#enemyLineup").innerHTML = state.league.opponent.map((entry) => lineupMarkup(entry.id, entry.level, null)).join("");
-  $("#startLeagueBattle").disabled = Boolean(state.league.reward);
-  $("#nextOpponent").disabled = Boolean(state.league.reward);
+  const totalRounds = Math.max(state.league.team.length, state.league.opponent.length);
+  $("#enemyDeckPile").innerHTML = deckPileMarkup("몬스터 덱", state.league.enemyDeck.length, state.league.enemyDiscard.length);
+  $("#myDeckPile").innerHTML = deckPileMarkup("내 덱", state.league.myDeck.length, state.league.myDiscard.length);
+  renderDrawSlot("#enemyDrawCard", "enemy", state.league.drawnPair?.enemy, state.league.drawnPair?.winner);
+  renderDrawSlot("#myDrawCard", "my", state.league.drawnPair?.mine, state.league.drawnPair?.winner);
+  $("#enemyScore").textContent = state.league.score.enemy;
+  $("#myScore").textContent = state.league.score.my;
+  $("#leagueDrawRound").textContent = `${state.league.drawRound}/${totalRounds || 6}`;
+
+  const startButton = $("#startLeagueBattle");
+  startButton.disabled = Boolean(state.league.reward);
+  if (state.league.reward) {
+    startButton.textContent = "보상 선택";
+  } else if (state.league.battleActive) {
+    startButton.textContent = "한 장 드로우";
+  } else {
+    startButton.textContent = "덱 섞기";
+  }
+  $("#nextOpponent").disabled = Boolean(state.league.reward) || state.league.battleActive;
 
   if (state.league.reward) {
     $("#leagueReward").classList.remove("hidden");
@@ -1445,12 +1476,38 @@ function renderLeagueBattle() {
   $("#leagueLog").innerHTML = state.league.log.map((line) => `<li>${line}</li>`).join("");
 }
 
-function lineupMarkup(id, level, gear = state.league.roster[id]?.gear) {
-  const monster = monsterById[id];
+function deckPileMarkup(label, deckCount, discardCount) {
   return `
-    <div class="lineup-unit">
-      <strong>${monster.name} Lv.${level}</strong>
-      <span>${monsterPower(id, level, gear)}</span>
+    <strong>${label}</strong>
+    <span>${deckCount}장 남음 · 사용 ${discardCount}장</span>
+  `;
+}
+
+function renderDrawSlot(selector, side, entry, winner) {
+  const element = $(selector);
+  const sideClass = side === "enemy" ? "enemy" : "mine";
+  if (!entry) {
+    element.className = `draw-card ${sideClass} empty`;
+    element.innerHTML = `
+      <strong>드로우 대기</strong>
+      <span>덱을 섞은 뒤 한 장씩 공개</span>
+    `;
+    return;
+  }
+  const resultClass = winner === "tie" ? "tie" : winner === side ? "winner" : "loser";
+  element.className = `draw-card ${sideClass} ${resultClass}`;
+  element.innerHTML = drawCardMarkup(entry);
+}
+
+function drawCardMarkup(entry) {
+  const monster = monsterById[entry.id];
+  const power = Math.max(1, Math.floor(entry.resultPower ?? entry.power));
+  return `
+    <div class="monster-avatar" style="--accent:${monster.color}">${monsterArt(monster)}</div>
+    <div class="draw-card-copy">
+      <strong>${monster.name}</strong>
+      <span>Lv.${entry.level} · ${monster.skill}</span>
+      <b class="draw-power" style="--accent:${monster.color}">${power}</b>
     </div>
   `;
 }
@@ -1502,6 +1559,7 @@ function assignMonster(id) {
     state.league.team[selectedIndex] = id;
   }
   state.league.selectedMonster = id;
+  resetLeagueDeckBattle();
   addLeagueLog(`${selectedIndex + 1}번 슬롯에 ${monsterById[id].name} 편성.`);
   renderLeague();
 }
@@ -1513,6 +1571,7 @@ function levelMonster(id) {
   info.shards -= cost.shards;
   info.level += 1;
   state.league.gold -= cost.gold;
+  resetLeagueDeckBattle();
   addLeagueLog(`${monsterById[id].name} Lv.${info.level} 강화.`);
   renderLeague();
 }
@@ -1526,6 +1585,7 @@ function equipLeagueGear(key) {
   if (oldKey) state.league.gearInventory[oldKey] = (state.league.gearInventory[oldKey] || 0) + 1;
   state.league.gearInventory[key] -= 1;
   info.gear[slot] = key;
+  resetLeagueDeckBattle();
   addLeagueLog(`${monsterById[id].name}에게 ${LEAGUE_GEAR[key].name} 장착.`);
   renderLeague();
 }
@@ -1536,6 +1596,7 @@ function autoTeam() {
     .slice(0, 6)
     .map((monster) => monster.id);
   state.league.selectedSlot = 0;
+  resetLeagueDeckBattle();
   addLeagueLog("전투력 상위 6마리로 재편성.");
   renderLeague();
 }
@@ -1546,6 +1607,7 @@ function ensureOpponent() {
 }
 
 function generateOpponent() {
+  resetLeagueDeckBattle();
   const offset = state.league.leagueStage % MONSTERS.length;
   const ids = [];
   for (let index = 0; index < 6; index += 1) {
@@ -1560,16 +1622,113 @@ function generateOpponent() {
 
 function startLeagueBattle() {
   if (state.league.reward) return;
-  const result = simulateLeagueBattle();
-  state.league.gold += result.win ? 80 : 32;
-  if (result.win) state.league.leagueStage += 1;
-  state.league.reward = {
-    amount: result.win ? 12 : 6,
-    ids: makeMonsterRewards(),
-    win: result.win,
-  };
-  addLeagueLog(result.win ? "승리 보상 80골드." : "패배 보상 32골드.");
+  if (!state.league.battleActive) {
+    beginLeagueDeckBattle();
+  } else {
+    drawLeagueCards();
+  }
   renderLeague();
+}
+
+function resetLeagueDeckBattle() {
+  state.league.battleActive = false;
+  state.league.myDeck = [];
+  state.league.enemyDeck = [];
+  state.league.myDiscard = [];
+  state.league.enemyDiscard = [];
+  state.league.drawnPair = null;
+  state.league.score = { my: 0, enemy: 0 };
+  state.league.drawRound = 0;
+}
+
+function beginLeagueDeckBattle() {
+  ensureOpponent();
+  state.league.log = [];
+  resetLeagueDeckBattle();
+  state.league.myDeck = shuffleItems(buildBattleTeam(state.league.team, "my"));
+  state.league.enemyDeck = shuffleItems(buildBattleTeam(state.league.opponent, "enemy"));
+  state.league.battleActive = true;
+  addLeagueLog(`양쪽 덱 ${state.league.myDeck.length}장씩 섞음.`);
+}
+
+function drawLeagueCards() {
+  if (!state.league.battleActive) return;
+  if (!state.league.myDeck.length || !state.league.enemyDeck.length) {
+    finishLeagueDeckBattle();
+    return;
+  }
+
+  const mine = state.league.myDeck.shift();
+  const enemy = state.league.enemyDeck.shift();
+  const round = state.league.drawRound + 1;
+
+  if (!mine.entered) {
+    applyEntryEffect(mine, enemy, state.league.myDeck, state.league.enemyDeck);
+    mine.entered = true;
+  }
+  if (!enemy.entered) {
+    applyEntryEffect(enemy, mine, state.league.enemyDeck, state.league.myDeck);
+    enemy.entered = true;
+  }
+
+  applyLastStand(mine, enemy);
+  applyLastStand(enemy, mine);
+
+  const myPower = Math.max(1, Math.floor(mine.power));
+  const enemyPower = Math.max(1, Math.floor(enemy.power));
+  mine.resultPower = myPower;
+  enemy.resultPower = enemyPower;
+
+  let winner = "tie";
+  if (myPower > enemyPower) {
+    winner = "my";
+    state.league.score.my += 1;
+    onWin(mine, enemy, state.league.myDeck, state.league.enemyDeck);
+    onLose(enemy, mine, state.league.enemyDeck, state.league.myDeck);
+    empowerReserveOnAllyLose(state.league.enemyDeck);
+  } else if (enemyPower > myPower) {
+    winner = "enemy";
+    state.league.score.enemy += 1;
+    onWin(enemy, mine, state.league.enemyDeck, state.league.myDeck);
+    onLose(mine, enemy, state.league.myDeck, state.league.enemyDeck);
+    empowerReserveOnAllyLose(state.league.myDeck);
+  }
+
+  state.league.drawnPair = { mine, enemy, winner };
+  state.league.myDiscard.push(mine);
+  state.league.enemyDiscard.push(enemy);
+  state.league.drawRound = round;
+
+  const resultText = winner === "tie" ? "동점" : winner === "my" ? "내 팀 승점" : "몬스터 승점";
+  addLeagueLog(`${round}라운드: ${mine.name} ${myPower} vs ${enemy.name} ${enemyPower}. ${resultText}.`);
+
+  if (!state.league.myDeck.length || !state.league.enemyDeck.length) {
+    finishLeagueDeckBattle();
+  }
+}
+
+function finishLeagueDeckBattle() {
+  state.league.battleActive = false;
+  const myScore = state.league.score.my;
+  const enemyScore = state.league.score.enemy;
+  const win = myScore > enemyScore;
+  const tie = myScore === enemyScore;
+  const gold = win ? 80 : tie ? 48 : 32;
+  const amount = win ? 12 : tie ? 8 : 6;
+  state.league.gold += gold;
+  if (win) state.league.leagueStage += 1;
+  state.league.reward = {
+    amount,
+    ids: makeMonsterRewards(),
+    win,
+  };
+  if (win) {
+    addLeagueLog(`최종 ${myScore}:${enemyScore}. 승리 보상 ${gold}골드.`);
+  } else if (tie) {
+    addLeagueLog(`최종 ${myScore}:${enemyScore}. 동점 보상 ${gold}골드.`);
+  } else {
+    addLeagueLog(`최종 ${myScore}:${enemyScore}. 패배 보상 ${gold}골드.`);
+  }
 }
 
 function makeMonsterRewards() {
