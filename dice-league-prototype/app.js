@@ -351,6 +351,10 @@ const state = {
     enemy: null,
     round: 0,
     activeBattle: false,
+    rolling: false,
+    rolls: [],
+    effects: [],
+    effectSeq: 0,
     reward: null,
     log: ["타란의 주사위 슬롯을 선택하고 면을 장착할 수 있습니다."],
   },
@@ -474,6 +478,20 @@ function diceTrainCost(hero) {
 function addDiceLog(text) {
   state.dice.log.unshift(text);
   state.dice.log = state.dice.log.slice(0, 22);
+}
+
+function addDiceEffect(kind, text, target = "enemy", heroId = null) {
+  const heroIndex = heroId ? state.dice.heroes.findIndex((hero) => hero.id === heroId) : -1;
+  const heroX = heroIndex >= 0 ? 17 + heroIndex * 33 : 50;
+  state.dice.effects.push({
+    id: state.dice.effectSeq,
+    kind,
+    text,
+    x: target === "hero" ? heroX : 50,
+    y: target === "hero" ? 70 : 18,
+  });
+  state.dice.effectSeq += 1;
+  state.dice.effects = state.dice.effects.slice(-8);
 }
 
 function addLeagueLog(text) {
@@ -677,8 +695,11 @@ function renderDiceBattle() {
     })
     .join("");
 
+  renderDiceRollStage();
   $("#startDiceBattle").disabled = state.dice.activeBattle || Boolean(state.dice.reward);
-  $("#rollDiceRound").disabled = !state.dice.activeBattle || Boolean(state.dice.reward);
+  $("#rollDiceRound").disabled = !state.dice.activeBattle || state.dice.rolling || Boolean(state.dice.reward);
+  $("#rollDiceRound").textContent = state.dice.rolling ? "굴리는 중..." : "라운드 굴리기";
+
 
   if (state.dice.reward) {
     $("#diceReward").classList.remove("hidden");
@@ -703,6 +724,41 @@ function renderDiceBattle() {
   }
 
   $("#diceLog").innerHTML = state.dice.log.map((line) => `<li>${line}</li>`).join("");
+}
+
+function renderDiceRollStage() {
+  const rollByHero = Object.fromEntries(state.dice.rolls.map((roll) => [roll.heroId, roll]));
+  const hasFx = state.dice.effects.length > 0;
+  $("#diceRollStage").classList.toggle("has-fx", hasFx);
+  $("#diceRollStage").innerHTML =
+    state.dice.heroes
+      .map((hero, index) => {
+        const roll = rollByHero[hero.id];
+        const face = roll ? roll.face : faceInfo(hero.slots[index % hero.slots.length]);
+        const active = Boolean(roll);
+        const statusClass = state.dice.rolling && active ? "rolling" : active ? "result" : "";
+        return `
+          <article class="battle-die ${active ? "active" : ""} ${statusClass}" style="--face-color:${face.color}">
+            <div class="die-owner">
+              <strong>${hero.short}</strong>
+              <span>${roll ? `${roll.slot + 1}번` : "대기"}</span>
+            </div>
+            <div class="die-cube">${faceIcon(face)}</div>
+            <div class="die-result-copy">
+              <strong>${roll ? face.label : "주사위 대기"}</strong>
+              <span>${roll ? `위력 ${face.value}` : "라운드 시작 전"}</span>
+            </div>
+          </article>
+        `;
+      })
+      .join("") +
+    state.dice.effects
+      .map(
+        (effect, index) => `
+          <span class="fx-float ${effect.kind}" style="--fx-x:${effect.x}%; --fx-y:${effect.y + index * 2}%">${effect.text}</span>
+        `,
+      )
+      .join("");
 }
 
 function makeDiceEnemy() {
@@ -773,6 +829,9 @@ function startDiceBattle() {
   state.dice.activeBattle = true;
   state.dice.reward = null;
   state.dice.round = 0;
+  state.dice.rolling = false;
+  state.dice.rolls = [];
+  state.dice.effects = [];
   state.dice.heroes.forEach((hero) => {
     hero.hp = hero.maxHp + (hero.level - 1) * 7;
     hero.shield = 0;
@@ -793,38 +852,67 @@ function startDiceBattle() {
 
 function rollDiceRound() {
   const enemy = state.dice.enemy;
-  if (!enemy || !state.dice.activeBattle) return;
+  if (!enemy || !state.dice.activeBattle || state.dice.rolling) return;
   state.dice.round += 1;
+  state.dice.rolling = true;
+  state.dice.effects = [];
+  state.dice.rolls = state.dice.heroes
+    .filter((hero) => hero.hp > 0 && enemy.hp > 0)
+    .map((hero) => {
+      const slot = Math.floor(Math.random() * 6);
+      return {
+        heroId: hero.id,
+        slot,
+        face: faceInfo(hero.slots[slot]),
+      };
+    });
   addDiceLog(`라운드 ${state.dice.round}: 주사위 굴림.`);
-
-  for (const hero of state.dice.heroes) {
-    if (hero.hp <= 0 || enemy.hp <= 0) continue;
-    const slot = Math.floor(Math.random() * 6);
-    const face = faceInfo(hero.slots[slot]);
-    resolveFace(hero, face, slot, enemy);
-  }
-
-  if (enemy.hp > 0 && enemy.poison > 0) {
-    const poisonDamage = enemy.poison * 3;
-    enemy.hp -= poisonDamage;
-    addDiceLog(`${enemy.name}이 독으로 ${poisonDamage} 피해.`);
-  }
-
-  if (enemy.hp <= 0) {
-    winDiceBattle();
-    renderDice();
-    return;
-  }
-
-  enemyAttack();
-
-  if (state.dice.heroes.every((hero) => hero.hp <= 0)) {
-    state.dice.activeBattle = false;
-    state.dice.gold += 25;
-    addDiceLog("원정 실패. 보험금 25골드 획득.");
-  }
-
   renderDice();
+
+  window.setTimeout(() => {
+    for (const roll of state.dice.rolls) {
+      const hero = state.dice.heroes.find((entry) => entry.id === roll.heroId);
+      if (!hero || hero.hp <= 0 || enemy.hp <= 0) continue;
+      resolveFace(hero, roll.face, roll.slot, enemy);
+    }
+
+    if (enemy.hp > 0 && enemy.poison > 0) {
+      const poisonDamage = enemy.poison * 3;
+      enemy.hp -= poisonDamage;
+      addDiceEffect("poison", `-${poisonDamage}`, "enemy");
+      addDiceLog(`${enemy.name}이 독으로 ${poisonDamage} 피해.`);
+    }
+
+    if (enemy.hp <= 0) {
+      state.dice.rolling = false;
+      winDiceBattle();
+      renderDice();
+      const effectSeq = state.dice.effectSeq;
+      window.setTimeout(() => {
+        if (state.dice.effectSeq !== effectSeq || state.dice.rolling) return;
+        state.dice.effects = [];
+        renderDiceBattle();
+      }, 980);
+      return;
+    }
+
+    enemyAttack();
+
+    if (state.dice.heroes.every((hero) => hero.hp <= 0)) {
+      state.dice.activeBattle = false;
+      state.dice.gold += 25;
+      addDiceLog("원정 실패. 보험금 25골드 획득.");
+    }
+
+    state.dice.rolling = false;
+    renderDice();
+    const effectSeq = state.dice.effectSeq;
+    window.setTimeout(() => {
+      if (state.dice.effectSeq !== effectSeq || state.dice.rolling) return;
+      state.dice.effects = [];
+      renderDiceBattle();
+    }, 980);
+  }, 680);
 }
 
 function resolveFace(hero, face, slot, enemy) {
@@ -833,12 +921,17 @@ function resolveFace(hero, face, slot, enemy) {
   if (face.kind === "guard") {
     let shield = amount;
     hero.shield += shield;
+    addDiceEffect("guard", `+${shield}`, "hero", hero.id);
     hero.lastOffense = false;
     if (hero.id === "taran") {
       hero.attackBoost += Math.ceil(shield * 0.55);
       if (slot === 5) {
         state.dice.heroes.forEach((ally) => {
-          if (ally.hp > 0) ally.shield += Math.ceil(shield * 0.35);
+          if (ally.hp > 0) {
+            const allyShield = Math.ceil(shield * 0.35);
+            ally.shield += allyShield;
+            addDiceEffect("guard", `+${allyShield}`, "hero", ally.id);
+          }
         });
         addDiceLog(`${hero.short}: 6번 수비로 전원 보호막.`);
       }
@@ -854,6 +947,7 @@ function resolveFace(hero, face, slot, enemy) {
     if (target) {
       const maxHp = target.maxHp + (target.level - 1) * 7;
       target.hp = Math.min(maxHp, target.hp + amount);
+      addDiceEffect("heal", `+${amount}`, "hero", target.id);
       addDiceLog(`${hero.short}: ${target.short} 회복 ${amount}.`);
     }
     hero.lastOffense = false;
@@ -863,6 +957,7 @@ function resolveFace(hero, face, slot, enemy) {
   if (face.kind === "focus") {
     hero.focus += face.grade + 1;
     if (hero.id === "noa") hero.focus += 1;
+    addDiceEffect("focus", `집중 +${face.grade + 1}`, "hero", hero.id);
     addDiceLog(`${hero.short}: 집중 ${hero.focus} 축적.`);
     hero.lastOffense = false;
     return;
@@ -895,10 +990,12 @@ function resolveFace(hero, face, slot, enemy) {
 
   if (face.kind === "poison") {
     enemy.poison += face.grade + 1;
+    addDiceEffect("poison", `독 +${face.grade + 1}`, "enemy");
     addDiceLog(`${hero.short}: 독 ${face.grade + 1} 누적.`);
   }
 
   enemy.hp -= damage;
+  addDiceEffect(face.kind === "magic" ? "focus" : "damage", `-${damage}`, "enemy");
   hero.lastOffense = true;
   addDiceLog(`${hero.short}: ${face.label}으로 ${damage} 피해.`);
 }
@@ -914,6 +1011,8 @@ function enemyAttack() {
   target.shield -= blocked;
   damage -= blocked;
   target.hp -= damage;
+  if (blocked > 0) addDiceEffect("guard", `방어 ${blocked}`, "hero", target.id);
+  if (damage > 0) addDiceEffect("enemy", `-${damage}`, "hero", target.id);
   addDiceLog(`${enemy.name}: ${target.short} 공격. 피해 ${damage}, 방어 ${blocked}.`);
 }
 
