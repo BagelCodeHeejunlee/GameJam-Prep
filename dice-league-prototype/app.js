@@ -441,7 +441,7 @@ const state = {
     score: { my: 0, enemy: 0 },
     drawRound: 0,
     reward: null,
-    log: ["6마리 팀을 덱으로 섞은 뒤 한 장씩 드로우합니다."],
+    log: ["이긴 몬스터는 남은 힘으로 전장에 계속 남습니다."],
   },
 };
 
@@ -1431,21 +1431,20 @@ function gearIcon(gear) {
 }
 
 function renderLeagueBattle() {
-  const totalRounds = Math.max(state.league.team.length, state.league.opponent.length);
   $("#enemyDeckPile").innerHTML = deckPileMarkup("몬스터 덱", state.league.enemyDeck.length, state.league.enemyDiscard.length);
   $("#myDeckPile").innerHTML = deckPileMarkup("내 덱", state.league.myDeck.length, state.league.myDiscard.length);
   renderDrawSlot("#enemyDrawCard", "enemy", state.league.drawnPair?.enemy, state.league.drawnPair?.winner);
   renderDrawSlot("#myDrawCard", "my", state.league.drawnPair?.mine, state.league.drawnPair?.winner);
   $("#enemyScore").textContent = state.league.score.enemy;
   $("#myScore").textContent = state.league.score.my;
-  $("#leagueDrawRound").textContent = `${state.league.drawRound}/${totalRounds || 6}`;
+  $("#leagueDrawRound").textContent = `${state.league.drawRound}회`;
 
   const startButton = $("#startLeagueBattle");
   startButton.disabled = Boolean(state.league.reward);
   if (state.league.reward) {
     startButton.textContent = "보상 선택";
   } else if (state.league.battleActive) {
-    startButton.textContent = "한 장 드로우";
+    startButton.textContent = state.league.drawRound === 0 ? "첫 카드 드로우" : "다음 카드";
   } else {
     startButton.textContent = "덱 섞기";
   }
@@ -1490,7 +1489,7 @@ function renderDrawSlot(selector, side, entry, winner) {
     element.className = `draw-card ${sideClass} empty`;
     element.innerHTML = `
       <strong>드로우 대기</strong>
-      <span>덱을 섞은 뒤 한 장씩 공개</span>
+      <span>빈 쪽만 다음 카드를 공개</span>
     `;
     return;
   }
@@ -1648,18 +1647,28 @@ function beginLeagueDeckBattle() {
   state.league.myDeck = shuffleItems(buildBattleTeam(state.league.team, "my"));
   state.league.enemyDeck = shuffleItems(buildBattleTeam(state.league.opponent, "enemy"));
   state.league.battleActive = true;
-  addLeagueLog(`양쪽 덱 ${state.league.myDeck.length}장씩 섞음.`);
+  addLeagueLog(`양쪽 덱 ${state.league.myDeck.length}장씩 섞음. 승자는 남은 힘으로 계속 버팁니다.`);
 }
 
 function drawLeagueCards() {
   if (!state.league.battleActive) return;
-  if (!state.league.myDeck.length || !state.league.enemyDeck.length) {
+  const pair = state.league.drawnPair || { mine: null, enemy: null, winner: null };
+  let mine = pair.mine;
+  let enemy = pair.enemy;
+
+  if (!mine && state.league.myDeck.length) {
+    mine = state.league.myDeck.shift();
+  }
+  if (!enemy && state.league.enemyDeck.length) {
+    enemy = state.league.enemyDeck.shift();
+  }
+
+  if (!mine || !enemy) {
+    state.league.drawnPair = { mine, enemy, winner: mine ? "my" : enemy ? "enemy" : "tie" };
     finishLeagueDeckBattle();
     return;
   }
 
-  const mine = state.league.myDeck.shift();
-  const enemy = state.league.enemyDeck.shift();
   const round = state.league.drawRound + 1;
 
   if (!mine.entered) {
@@ -1683,36 +1692,53 @@ function drawLeagueCards() {
   if (myPower > enemyPower) {
     winner = "my";
     state.league.score.my += 1;
+    mine.power = myPower - enemyPower;
     onWin(mine, enemy, state.league.myDeck, state.league.enemyDeck);
     onLose(enemy, mine, state.league.enemyDeck, state.league.myDeck);
     empowerReserveOnAllyLose(state.league.enemyDeck);
+    mine.resultPower = Math.max(1, Math.floor(mine.power));
+    enemy.resultPower = 0;
+    state.league.enemyDiscard.push(enemy);
+    state.league.drawnPair = { mine, enemy: null, winner };
   } else if (enemyPower > myPower) {
     winner = "enemy";
     state.league.score.enemy += 1;
+    enemy.power = enemyPower - myPower;
     onWin(enemy, mine, state.league.enemyDeck, state.league.myDeck);
     onLose(mine, enemy, state.league.myDeck, state.league.enemyDeck);
     empowerReserveOnAllyLose(state.league.myDeck);
+    enemy.resultPower = Math.max(1, Math.floor(enemy.power));
+    mine.resultPower = 0;
+    state.league.myDiscard.push(mine);
+    state.league.drawnPair = { mine: null, enemy, winner };
+  } else {
+    state.league.myDiscard.push(mine);
+    state.league.enemyDiscard.push(enemy);
+    state.league.drawnPair = { mine: null, enemy: null, winner };
   }
 
-  state.league.drawnPair = { mine, enemy, winner };
-  state.league.myDiscard.push(mine);
-  state.league.enemyDiscard.push(enemy);
   state.league.drawRound = round;
 
-  const resultText = winner === "tie" ? "동점" : winner === "my" ? "내 팀 승점" : "몬스터 승점";
+  const survivor = winner === "my" ? mine : winner === "enemy" ? enemy : null;
+  const resultText = survivor ? `${survivor.name} 생존, 남은 힘 ${Math.max(1, Math.floor(survivor.power))}` : "동점, 둘 다 퇴장";
   addLeagueLog(`${round}라운드: ${mine.name} ${myPower} vs ${enemy.name} ${enemyPower}. ${resultText}.`);
 
-  if (!state.league.myDeck.length || !state.league.enemyDeck.length) {
+  if (!canFieldLeagueSide("my") || !canFieldLeagueSide("enemy")) {
     finishLeagueDeckBattle();
   }
 }
 
+function canFieldLeagueSide(side) {
+  if (side === "my") return Boolean(state.league.drawnPair?.mine) || state.league.myDeck.length > 0;
+  return Boolean(state.league.drawnPair?.enemy) || state.league.enemyDeck.length > 0;
+}
+
 function finishLeagueDeckBattle() {
   state.league.battleActive = false;
-  const myScore = state.league.score.my;
-  const enemyScore = state.league.score.enemy;
-  const win = myScore > enemyScore;
-  const tie = myScore === enemyScore;
+  const myAlive = canFieldLeagueSide("my");
+  const enemyAlive = canFieldLeagueSide("enemy");
+  const win = myAlive && !enemyAlive;
+  const tie = myAlive === enemyAlive;
   const gold = win ? 80 : tie ? 48 : 32;
   const amount = win ? 12 : tie ? 8 : 6;
   state.league.gold += gold;
@@ -1722,12 +1748,13 @@ function finishLeagueDeckBattle() {
     ids: makeMonsterRewards(),
     win,
   };
+  const resultScore = `${state.league.score.my}처치/${state.league.score.enemy}손실`;
   if (win) {
-    addLeagueLog(`최종 ${myScore}:${enemyScore}. 승리 보상 ${gold}골드.`);
+    addLeagueLog(`최종 ${resultScore}. 승리 보상 ${gold}골드.`);
   } else if (tie) {
-    addLeagueLog(`최종 ${myScore}:${enemyScore}. 동점 보상 ${gold}골드.`);
+    addLeagueLog(`최종 ${resultScore}. 동점 보상 ${gold}골드.`);
   } else {
-    addLeagueLog(`최종 ${myScore}:${enemyScore}. 패배 보상 ${gold}골드.`);
+    addLeagueLog(`최종 ${resultScore}. 패배 보상 ${gold}골드.`);
   }
 }
 
