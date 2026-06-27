@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Dice Crew / Monster Number League</title>
+    <meta name="theme-color" content="#252525" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Prototype Duo" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="phone-shell">
+      <header class="app-header">
+        <div>
+          <p class="kicker">Mobile Prototype</p>
+          <h1 id="screenTitle">다이스 크루</h1>
+        </div>
+        <div class="save-chip">
+          <span>D1</span>
+          <strong id="dailyHook">희귀 면 제작 중</strong>
+        </div>
+      </header>
+
+      <nav class="game-tabs" aria-label="게임 선택">
+        <button id="showDice" class="tab-button active" type="button">다이스 크루</button>
+        <button id="showLeague" class="tab-button" type="button">넘버 리그</button>
+      </nav>
+
+      <section id="diceGame" class="game-view active" aria-label="다이스 크루 프로토타입">
+        <section class="resource-row">
+          <div class="resource-tile">
+            <span>골드</span>
+            <strong id="diceGold">0</strong>
+          </div>
+          <div class="resource-tile">
+            <span>면 보유</span>
+            <strong id="diceFaceTotal">0</strong>
+          </div>
+          <div class="resource-tile">
+            <span>원정</span>
+            <strong id="diceStage">1-1</strong>
+          </div>
+        </section>
+
+        <section id="diceHomeView" class="app-view active">
+          <section class="home-hero">
+            <div>
+              <p class="kicker">오늘의 원정</p>
+              <h2>주사위 면을 정비하고 다음 골렘을 공략하세요</h2>
+            </div>
+            <button class="primary-button go-battle" type="button">전투 준비</button>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>출전 영웅</h2>
+              <button class="small-button go-heroes" type="button">편집</button>
+            </div>
+            <div id="diceHomeTeam" class="compact-team"></div>
+          </section>
+          <section class="mission-grid">
+            <article class="mission-card">
+              <span>훈련</span>
+              <strong>영웅 1명 레벨업</strong>
+            </article>
+            <article class="mission-card">
+              <span>제작</span>
+              <strong>같은 면 3개 합성</strong>
+            </article>
+          </section>
+        </section>
+
+        <section id="diceHeroesView" class="app-view">
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>보유 영웅</h2>
+              <span class="sub-chip">출전 3/3</span>
+            </div>
+            <section id="diceParty" class="hero-strip" aria-label="다이스 크루 캐릭터"></section>
+          </section>
+
+          <section class="panel hero-detail">
+            <div id="diceHeroDetailHead" class="detail-head"></div>
+            <div class="detail-tabs">
+              <button id="diceLevelTab" class="detail-tab active" type="button">레벨업</button>
+              <button id="diceEquipTab" class="detail-tab" type="button">장비</button>
+            </div>
+            <div id="diceLevelPanel" class="detail-panel active">
+              <div id="diceLevelInfo" class="level-info"></div>
+              <button id="trainDiceHero" class="primary-button" type="button">훈련하기</button>
+            </div>
+            <div id="diceEquipPanel" class="detail-panel">
+              <div class="panel-heading">
+                <h2 id="diceBuilderTitle">주사위 세팅</h2>
+                <button id="autoEquipDice" class="small-button" type="button">자동 장착</button>
+              </div>
+              <div id="diceSlots" class="dice-slots" aria-label="장착된 주사위 면"></div>
+              <div id="faceInventory" class="face-inventory" aria-label="보유 주사위 면"></div>
+            </div>
+          </section>
+        </section>
+
+        <section id="diceBattleView" class="app-view">
+          <section class="panel battle-panel">
+            <div class="enemy-card">
+              <div id="diceEnemyArt" class="enemy-art"></div>
+              <div class="enemy-info">
+                <div class="bar-label">
+                  <span id="diceEnemyName">수련 골렘</span>
+                  <strong id="diceEnemyHp">0 / 0</strong>
+                </div>
+                <div class="hp-bar">
+                  <span id="diceEnemyHpBar"></span>
+                </div>
+              </div>
+            </div>
+            <div id="diceCombatants" class="combatants"></div>
+            <div class="action-row">
+              <button id="startDiceBattle" class="primary-button" type="button">전투 시작</button>
+              <button id="rollDiceRound" class="primary-button secondary" type="button">라운드 굴리기</button>
+            </div>
+            <div id="diceReward" class="reward-row hidden"></div>
+            <ol id="diceLog" class="battle-log"></ol>
+          </section>
+        </section>
+      </section>
+
+      <section id="leagueGame" class="game-view" aria-label="몬스터 넘버 리그 프로토타입">
+        <section class="resource-row">
+          <div class="resource-tile">
+            <span>골드</span>
+            <strong id="leagueGold">0</strong>
+          </div>
+          <div class="resource-tile">
+            <span>리그</span>
+            <strong id="leagueStage">브론즈 1</strong>
+          </div>
+          <div class="resource-tile">
+            <span>도감</span>
+            <strong>20</strong>
+          </div>
+        </section>
+
+        <section id="leagueHomeView" class="app-view">
+          <section class="home-hero league">
+            <div>
+              <p class="kicker">오늘의 리그</p>
+              <h2>키운 몬스터 6마리로 다음 상대를 넘어서세요</h2>
+            </div>
+            <button class="primary-button go-battle" type="button">리그전</button>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>출전 팀</h2>
+              <button class="small-button go-heroes" type="button">편집</button>
+            </div>
+            <div id="leagueHomeTeam" class="compact-team"></div>
+          </section>
+          <section class="mission-grid">
+            <article class="mission-card">
+              <span>성장</span>
+              <strong>조각으로 몬스터 강화</strong>
+            </article>
+            <article class="mission-card">
+              <span>장비</span>
+              <strong>전투 부적 장착</strong>
+            </article>
+          </section>
+        </section>
+
+        <section id="leagueHeroesView" class="app-view">
+          <section class="panel team-panel">
+            <div class="panel-heading">
+              <h2>출전 6마리</h2>
+              <button id="autoTeam" class="small-button" type="button">전투력 순</button>
+            </div>
+            <div id="leagueTeam" class="team-grid" aria-label="출전 팀"></div>
+          </section>
+
+          <section class="panel hero-detail">
+            <div id="leagueHeroDetailHead" class="detail-head"></div>
+            <div class="detail-tabs">
+              <button id="leagueLevelTab" class="detail-tab active" type="button">레벨업</button>
+              <button id="leagueEquipTab" class="detail-tab" type="button">장비</button>
+            </div>
+            <div id="leagueLevelPanel" class="detail-panel active">
+              <div id="leagueLevelInfo" class="level-info"></div>
+              <button id="levelSelectedMonster" class="primary-button" type="button">강화하기</button>
+            </div>
+            <div id="leagueEquipPanel" class="detail-panel">
+              <div id="leagueGearSlots" class="gear-slots"></div>
+              <div id="leagueGearInventory" class="gear-inventory"></div>
+            </div>
+          </section>
+
+          <section class="panel roster-panel">
+            <div class="panel-heading">
+              <h2>보유 몬스터</h2>
+              <span id="teamSlotHint" class="sub-chip">1번 슬롯 선택됨</span>
+            </div>
+            <div id="monsterRoster" class="monster-roster" aria-label="몬스터 카드 목록"></div>
+          </section>
+        </section>
+
+        <section id="leagueBattleView" class="app-view">
+          <section class="panel league-battle">
+            <div class="league-board">
+              <div>
+                <h2>내 팀</h2>
+                <div id="myLineup" class="lineup-list"></div>
+              </div>
+              <div>
+                <h2>상대</h2>
+                <div id="enemyLineup" class="lineup-list enemy"></div>
+              </div>
+            </div>
+            <div class="action-row">
+              <button id="startLeagueBattle" class="primary-button" type="button">리그전 시작</button>
+              <button id="nextOpponent" class="primary-button secondary" type="button">상대 교체</button>
+            </div>
+            <div id="leagueReward" class="reward-row hidden"></div>
+            <ol id="leagueLog" class="battle-log"></ol>
+          </section>
+        </section>
+      </section>
+
+      <nav class="bottom-nav" aria-label="메인 메뉴">
+        <button id="navHome" class="bottom-tab active" type="button">
+          <span>홈</span>
+        </button>
+        <button id="navHeroes" class="bottom-tab" type="button">
+          <span>영웅</span>
+        </button>
+        <button id="navBattle" class="bottom-tab" type="button">
+          <span>전투</span>
+        </button>
+      </nav>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
