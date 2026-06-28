@@ -400,39 +400,6 @@ const LEAGUE_GEAR = {
   },
 };
 
-const LEAGUE_TACTICS = {
-  rally: {
-    name: "선봉 고양",
-    mark: "A",
-    color: "#d99a2b",
-    desc: "아군 생존 카드, 없으면 다음 카드 힘 +14",
-  },
-  mend: {
-    name: "전열 정비",
-    mark: "M",
-    color: "#4f9b63",
-    desc: "아군 생존 카드 힘 +20, 없으면 다음 카드 +10",
-  },
-  snare: {
-    name: "약점 포착",
-    mark: "W",
-    color: "#4777b8",
-    desc: "상대 생존 카드, 없으면 다음 카드 힘 -12",
-  },
-  reserve: {
-    name: "예비대 호출",
-    mark: "R",
-    color: "#6e63b6",
-    desc: "최근 손실 카드 1장을 힘 35%로 덱 위에 복귀",
-  },
-  formation: {
-    name: "진형 압축",
-    mark: "F",
-    color: "#20887c",
-    desc: "내 덱 위 카드 2장 힘 +8",
-  },
-};
-
 const state = {
   activeGame: "dice",
   currentView: "home",
@@ -510,7 +477,10 @@ const state = {
     drawnPair: null,
     score: { my: 0, enemy: 0 },
     drawRound: 0,
-    tacticOffer: null,
+    runCards: [],
+    runWins: 0,
+    maxEncounters: 10,
+    cardReward: null,
     animating: false,
     clashPhase: null,
     pendingClash: null,
@@ -1485,7 +1455,8 @@ function levelCost(id) {
 function renderLeague() {
   ensureOpponent();
   $("#leagueGold").textContent = state.league.gold;
-  $("#leagueStage").textContent = `브론즈 ${state.league.leagueStage}`;
+  const runLabel = state.league.runCards.length || state.league.cardReward ? ` · ${Math.min(state.league.runWins + 1, state.league.maxEncounters)}/${state.league.maxEncounters}` : "";
+  $("#leagueStage").textContent = `브론즈 ${state.league.leagueStage}${runLabel}`;
   $("#teamSlotHint").textContent = `${state.league.selectedSlot + 1}번 슬롯 선택됨`;
   renderLeagueHome();
   renderLeagueTeam();
@@ -1632,36 +1603,38 @@ function renderLeagueBattle() {
   $("#leagueDrawRound").textContent = `${state.league.drawRound + (state.league.animating ? 1 : 0)}회`;
 
   const startButton = $("#startLeagueBattle");
-  startButton.disabled = Boolean(state.league.reward || state.league.tacticOffer || state.league.animating);
+  startButton.disabled = Boolean(state.league.reward || state.league.cardReward || state.league.animating);
   if (state.league.reward) {
-    startButton.textContent = "보상 선택";
-  } else if (state.league.tacticOffer) {
-    startButton.textContent = "전술 선택";
+    startButton.textContent = "최종 보상 선택";
+  } else if (state.league.cardReward) {
+    startButton.textContent = "카드 보상 선택";
   } else if (state.league.animating) {
     startButton.textContent = state.league.clashPhase === "draw" ? "드로우 중..." : "충돌 중...";
   } else if (state.league.battleActive) {
     startButton.textContent = state.league.drawRound === 0 ? "첫 카드 드로우" : "다음 카드";
+  } else if (state.league.runCards.length) {
+    startButton.textContent = "다음 배틀 시작";
   } else {
-    startButton.textContent = "덱 섞기";
+    startButton.textContent = "스테이지 시작";
   }
-  $("#nextOpponent").disabled = Boolean(state.league.reward || state.league.tacticOffer || state.league.animating) || state.league.battleActive;
+  $("#nextOpponent").disabled = Boolean(state.league.reward || state.league.cardReward || state.league.animating || state.league.runCards.length) || state.league.battleActive;
 
-  if (state.league.tacticOffer) {
+  if (state.league.cardReward) {
     $("#leagueReward").classList.remove("hidden");
-    $("#leagueReward").innerHTML = state.league.tacticOffer
-      .map((key) => {
-        const tactic = LEAGUE_TACTICS[key];
+    $("#leagueReward").innerHTML = state.league.cardReward.ids
+      .map((id) => {
+        const monster = monsterById[id];
         return `
-          <button class="reward-card league-tactic-card" data-tactic="${key}" type="button" style="--accent:${tactic.color}">
-            <span class="glyph-badge" style="--glyph-color:${tactic.color}">${tactic.mark}</span>
-            <strong class="face-name">${tactic.name}</strong>
-            <span class="unit-meta">${tactic.desc}</span>
+          <button class="reward-card league-card-reward-card" data-monster="${id}" type="button" style="--accent:${monster.color}">
+            <div class="monster-avatar">${monsterArt(monster)}</div>
+            <strong class="face-name">${monster.name}</strong>
+            <span class="unit-meta">이번 스테이지 덱에 추가 · Lv.${monsterLevel(id)}</span>
           </button>
         `;
       })
       .join("");
-    $$(".league-tactic-card").forEach((button) => {
-      button.addEventListener("click", () => claimLeagueTactic(button.dataset.tactic));
+    $$(".league-card-reward-card").forEach((button) => {
+      button.addEventListener("click", () => claimLeagueCardReward(button.dataset.monster));
     });
   } else if (state.league.reward) {
     $("#leagueReward").classList.remove("hidden");
@@ -1776,7 +1749,7 @@ function assignMonster(id) {
     state.league.team[selectedIndex] = id;
   }
   state.league.selectedMonster = id;
-  resetLeagueDeckBattle();
+  resetLeagueRun();
   addLeagueLog(`${selectedIndex + 1}번 슬롯에 ${monsterById[id].name} 편성.`);
   renderLeague();
 }
@@ -1788,7 +1761,7 @@ function levelMonster(id) {
   info.shards -= cost.shards;
   info.level += 1;
   state.league.gold -= cost.gold;
-  resetLeagueDeckBattle();
+  resetLeagueRun();
   addLeagueLog(`${monsterById[id].name} Lv.${info.level} 강화.`);
   renderLeague();
 }
@@ -1802,7 +1775,7 @@ function equipLeagueGear(key) {
   if (oldKey) state.league.gearInventory[oldKey] = (state.league.gearInventory[oldKey] || 0) + 1;
   state.league.gearInventory[key] -= 1;
   info.gear[slot] = key;
-  resetLeagueDeckBattle();
+  resetLeagueRun();
   addLeagueLog(`${monsterById[id].name}에게 ${LEAGUE_GEAR[key].name} 장착.`);
   renderLeague();
 }
@@ -1813,7 +1786,7 @@ function autoTeam() {
     .slice(0, 6)
     .map((monster) => monster.id);
   state.league.selectedSlot = 0;
-  resetLeagueDeckBattle();
+  resetLeagueRun();
   addLeagueLog("전투력 상위 6마리로 재편성.");
   renderLeague();
 }
@@ -1825,20 +1798,20 @@ function ensureOpponent() {
 
 function generateOpponent() {
   resetLeagueDeckBattle();
-  const offset = state.league.leagueStage % MONSTERS.length;
+  const offset = (state.league.leagueStage + state.league.runWins) % MONSTERS.length;
   const ids = [];
   for (let index = 0; index < 6; index += 1) {
     ids.push(MONSTERS[(offset + index * 3) % MONSTERS.length].id);
   }
   state.league.opponent = ids.map((id, index) => ({
     id,
-    level: Math.max(1, state.league.leagueStage + (index % 3)),
+    level: Math.max(1, state.league.leagueStage + Math.floor(state.league.runWins / 2) + (index % 3)),
   }));
-  addLeagueLog("새 상대 팀이 등록됨.");
+  addLeagueLog(`${state.league.runWins + 1}/${state.league.maxEncounters} 상대 덱 등록.`);
 }
 
 function startLeagueBattle() {
-  if (state.league.reward || state.league.tacticOffer || state.league.animating) return;
+  if (state.league.reward || state.league.cardReward || state.league.animating) return;
   if (!state.league.battleActive) {
     beginLeagueDeckBattle();
   } else {
@@ -1856,21 +1829,34 @@ function resetLeagueDeckBattle() {
   state.league.drawnPair = null;
   state.league.score = { my: 0, enemy: 0 };
   state.league.drawRound = 0;
-  state.league.tacticOffer = null;
   state.league.animating = false;
   state.league.clashPhase = null;
   state.league.pendingClash = null;
   state.league.battleFx = [];
 }
 
+function resetLeagueRun() {
+  resetLeagueDeckBattle();
+  state.league.runCards = [];
+  state.league.runWins = 0;
+  state.league.cardReward = null;
+  state.league.reward = null;
+  state.league.opponent = [];
+}
+
 function beginLeagueDeckBattle() {
   ensureOpponent();
-  state.league.log = [];
+  if (!state.league.runCards.length) {
+    state.league.log = [];
+    state.league.runCards = [...state.league.team];
+    state.league.runWins = 0;
+    addLeagueLog(`스테이지 시작. 기본 덱 ${state.league.runCards.length}장.`);
+  }
   resetLeagueDeckBattle();
-  state.league.myDeck = shuffleItems(buildBattleTeam(state.league.team, "my"));
+  state.league.myDeck = shuffleItems(buildBattleTeam(state.league.runCards, "my"));
   state.league.enemyDeck = shuffleItems(buildBattleTeam(state.league.opponent, "enemy"));
   state.league.battleActive = true;
-  addLeagueLog(`양쪽 덱 ${state.league.myDeck.length}장씩 섞음. 승자는 남은 힘으로 계속 버팁니다.`);
+  addLeagueLog(`${state.league.runWins + 1}/${state.league.maxEncounters} 배틀 시작. 내 덱 ${state.league.myDeck.length}장.`);
 }
 
 function drawLeagueCards() {
@@ -2007,8 +1993,6 @@ function resolvePreparedLeagueClash() {
 
   if (!canFieldLeagueSide("my") || !canFieldLeagueSide("enemy")) {
     finishLeagueDeckBattle();
-  } else {
-    maybeOfferLeagueTactic();
   }
   renderLeague();
 }
@@ -2018,16 +2002,8 @@ function canFieldLeagueSide(side) {
   return Boolean(state.league.drawnPair?.enemy) || state.league.enemyDeck.length > 0;
 }
 
-function maybeOfferLeagueTactic() {
-  if (state.league.reward || state.league.tacticOffer) return;
-  if (state.league.drawRound <= 0 || state.league.drawRound % 2 !== 0) return;
-  state.league.tacticOffer = shuffleItems(Object.keys(LEAGUE_TACTICS)).slice(0, 3);
-  addLeagueLog("전술 선택지 등장. 카드 추가 대신 이번 리그의 흐름을 바꿉니다.");
-}
-
 function finishLeagueDeckBattle() {
   state.league.battleActive = false;
-  state.league.tacticOffer = null;
   state.league.animating = false;
   state.league.clashPhase = null;
   state.league.pendingClash = null;
@@ -2036,78 +2012,49 @@ function finishLeagueDeckBattle() {
   const enemyAlive = canFieldLeagueSide("enemy");
   const win = myAlive && !enemyAlive;
   const tie = myAlive === enemyAlive;
-  const gold = win ? 80 : tie ? 48 : 32;
-  const amount = win ? 12 : tie ? 8 : 6;
+  const resultScore = `${state.league.score.my}처치/${state.league.score.enemy}손실`;
+
+  if (win) {
+    state.league.gold += 20;
+    state.league.runWins += 1;
+    addLeagueLog(`${state.league.runWins}/${state.league.maxEncounters} 배틀 클리어. ${resultScore}.`);
+    if (state.league.runWins >= state.league.maxEncounters) {
+      state.league.gold += 120;
+      state.league.leagueStage += 1;
+      state.league.reward = {
+        amount: 16,
+        ids: makeMonsterRewards(),
+        win: true,
+      };
+      addLeagueLog(`스테이지 완주. 최종 보상 120골드.`);
+    } else {
+      state.league.cardReward = {
+        ids: makeMonsterRewards(),
+      };
+      addLeagueLog("카드 보상 선택 후 다음 배틀로 진행.");
+    }
+    return;
+  }
+
+  const gold = tie ? 48 : 32;
+  const amount = tie ? 8 : 6;
   state.league.gold += gold;
-  if (win) state.league.leagueStage += 1;
   state.league.reward = {
     amount,
     ids: makeMonsterRewards(),
-    win,
+    win: false,
   };
-  const resultScore = `${state.league.score.my}처치/${state.league.score.enemy}손실`;
-  if (win) {
-    addLeagueLog(`최종 ${resultScore}. 승리 보상 ${gold}골드.`);
-  } else if (tie) {
-    addLeagueLog(`최종 ${resultScore}. 동점 보상 ${gold}골드.`);
-  } else {
-    addLeagueLog(`최종 ${resultScore}. 패배 보상 ${gold}골드.`);
-  }
+  addLeagueLog(`${tie ? "동점" : "패배"}로 스테이지 종료. ${resultScore}. 보상 ${gold}골드.`);
 }
 
-function claimLeagueTactic(key) {
-  const tactic = LEAGUE_TACTICS[key];
-  if (!tactic || !state.league.tacticOffer) return;
-
-  if (key === "rally") {
-    const target = state.league.drawnPair?.mine || state.league.myDeck[0];
-    buffLeagueEntry(target, 14, tactic.name);
-  }
-
-  if (key === "mend") {
-    const active = state.league.drawnPair?.mine;
-    if (active) {
-      buffLeagueEntry(active, 20, tactic.name);
-    } else {
-      buffLeagueEntry(state.league.myDeck[0], 10, tactic.name);
-    }
-  }
-
-  if (key === "snare") {
-    const target = state.league.drawnPair?.enemy || state.league.enemyDeck[0];
-    buffLeagueEntry(target, -12, tactic.name);
-  }
-
-  if (key === "reserve") {
-    const revived = state.league.myDiscard.pop();
-    if (revived) {
-      revived.entered = false;
-      revived.used = false;
-      revived.power = Math.max(8, Math.floor(monsterPower(revived.id, revived.level) * 0.35));
-      revived.resultPower = Math.floor(revived.power);
-      state.league.myDeck.unshift(revived);
-      addLeagueLog(`${tactic.name}: ${revived.name}이 힘 ${revived.resultPower}로 덱 위에 복귀.`);
-    } else {
-      buffLeagueEntry(state.league.myDeck[0] || state.league.drawnPair?.mine, 8, tactic.name);
-    }
-  }
-
-  if (key === "formation") {
-    state.league.myDeck.slice(0, 2).forEach((entry) => buffLeagueEntry(entry, 8, tactic.name));
-    if (!state.league.myDeck.length) buffLeagueEntry(state.league.drawnPair?.mine, 8, tactic.name);
-  }
-
-  state.league.tacticOffer = null;
+function claimLeagueCardReward(id) {
+  if (!state.league.cardReward) return;
+  state.league.runCards.push(id);
+  state.league.cardReward = null;
+  state.league.opponent = [];
+  ensureOpponent();
+  addLeagueLog(`${monsterById[id].name} 카드가 이번 스테이지 덱에 추가됨. 현재 ${state.league.runCards.length}장.`);
   renderLeague();
-}
-
-function buffLeagueEntry(entry, amount, label) {
-  if (!entry) return;
-  const before = Math.floor(entry.power);
-  entry.power = Math.max(1, entry.power + amount);
-  entry.resultPower = Math.max(1, Math.floor(entry.power));
-  const delta = entry.resultPower - before;
-  addLeagueLog(`${label}: ${entry.name} ${delta >= 0 ? "+" : ""}${delta}.`);
 }
 
 function makeMonsterRewards() {
@@ -2123,6 +2070,9 @@ function claimLeagueReward(id) {
   state.league.roster[id].shards += state.league.reward.amount;
   addLeagueLog(`${monsterById[id].name} 조각 +${state.league.reward.amount}.`);
   state.league.reward = null;
+  state.league.runCards = [];
+  state.league.runWins = 0;
+  state.league.cardReward = null;
   state.league.opponent = [];
   ensureOpponent();
   renderLeague();
