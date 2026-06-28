@@ -400,6 +400,10 @@ const LEAGUE_GEAR = {
   },
 };
 
+const LEAGUE_BASE_DECK_COUNTS = [3, 2, 2, 1, 1, 1];
+const LEAGUE_CHEER_LIMIT = 3;
+const LEAGUE_CHEER_POWER = 8;
+
 const state = {
   activeGame: "dice",
   currentView: "home",
@@ -474,6 +478,8 @@ const state = {
     enemyDeck: [],
     myDiscard: [],
     enemyDiscard: [],
+    cheerBench: [],
+    battleLostByCheer: false,
     drawnPair: null,
     score: { my: 0, enemy: 0 },
     drawRound: 0,
@@ -612,6 +618,19 @@ function selectedLeagueMonster() {
   };
 }
 
+function teamSlotCopyCount(index) {
+  return LEAGUE_BASE_DECK_COUNTS[index] || 1;
+}
+
+function makeLeagueBaseDeck(entries = state.league.team) {
+  return entries.flatMap((entry, index) => Array.from({ length: teamSlotCopyCount(index) }, () => entry));
+}
+
+function runCardCount(id) {
+  const cards = state.league.runCards.length ? state.league.runCards : makeLeagueBaseDeck();
+  return cards.filter((cardId) => cardId === id).length;
+}
+
 function gearBonus(gear = []) {
   return gear.reduce((sum, key) => sum + (key ? LEAGUE_GEAR[key].bonus : 0), 0);
 }
@@ -645,6 +664,7 @@ function addLeagueLog(text) {
 }
 
 function renderApp() {
+  document.body.classList.toggle("league-battle-focus", state.activeGame === "league" && state.currentView === "battle");
   $("#screenTitle").textContent = state.activeGame === "dice" ? "다이스 크루" : "몬스터 넘버 리그";
   $("#dailyHook").textContent = state.activeGame === "dice" ? "희귀 면 제작 중" : "내일 조각 상자";
   $("#showDice").classList.toggle("active", state.activeGame === "dice");
@@ -1468,13 +1488,14 @@ function renderLeague() {
 function renderLeagueHome() {
   $("#leagueHomeTeam").innerHTML = state.league.team
     .slice(0, 6)
-    .map((id) => {
+    .map((id, index) => {
       const monster = monsterById[id];
       return `
         <article class="compact-unit" style="--accent:${monster.color}">
+          <span class="deck-count-badge">x${teamSlotCopyCount(index)}</span>
           <div class="monster-avatar">${monsterArt(monster)}</div>
           <strong>${monster.name}</strong>
-          <span class="unit-meta">Lv.${monsterLevel(id)} · ${monsterPower(id)}</span>
+          <span class="unit-meta">Lv.${monsterLevel(id)} · 기본덱 ${teamSlotCopyCount(index)}장</span>
         </article>
       `;
     })
@@ -1489,6 +1510,7 @@ function renderLeagueTeam() {
       return `
         <button class="team-slot ${state.league.selectedSlot === index ? "selected" : ""}" data-slot="${index}" type="button" style="--accent:${monster.color}">
           <span class="slot-tag">${index + 1}</span>
+          <span class="deck-count-badge">x${teamSlotCopyCount(index)}</span>
           <div class="monster-avatar">${monsterArt(monster)}</div>
           <h3>${monster.name}</h3>
           <div class="unit-stat-row">
@@ -1601,6 +1623,12 @@ function renderLeagueBattle() {
   $("#enemyScore").textContent = state.league.score.enemy;
   $("#myScore").textContent = state.league.score.my;
   $("#leagueDrawRound").textContent = `${state.league.drawRound + (state.league.animating ? 1 : 0)}회`;
+  $("#leagueBattleStage").textContent = state.league.runCards.length || state.league.cardReward
+    ? `${Math.min(state.league.runWins + 1, state.league.maxEncounters)}/${state.league.maxEncounters}`
+    : "준비";
+  $("#leagueBattleDeckSize").textContent = `${state.league.runCards.length || makeLeagueBaseDeck().length}장`;
+  $("#leagueCheerState").textContent = `${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
+  renderCheerBench();
 
   const startButton = $("#startLeagueBattle");
   startButton.disabled = Boolean(state.league.reward || state.league.cardReward || state.league.animating);
@@ -1624,11 +1652,13 @@ function renderLeagueBattle() {
     $("#leagueReward").innerHTML = state.league.cardReward.ids
       .map((id) => {
         const monster = monsterById[id];
+        const currentCount = runCardCount(id);
+        const copyLabel = currentCount > 0 ? `중복 선택 · 현재 x${currentCount} → x${currentCount + 1}` : "새 이름 · 응원석 새 칸 사용";
         return `
           <button class="reward-card league-card-reward-card" data-monster="${id}" type="button" style="--accent:${monster.color}">
             <div class="monster-avatar">${monsterArt(monster)}</div>
             <strong class="face-name">${monster.name}</strong>
-            <span class="unit-meta">이번 스테이지 덱에 추가 · Lv.${monsterLevel(id)}</span>
+            <span class="unit-meta">${copyLabel}</span>
           </button>
         `;
       })
@@ -1661,10 +1691,35 @@ function renderLeagueBattle() {
   $("#leagueLog").innerHTML = state.league.log.map((line) => `<li>${line}</li>`).join("");
 }
 
+function renderCheerBench() {
+  const bench = [...state.league.cheerBench];
+  while (bench.length < LEAGUE_CHEER_LIMIT) bench.push(null);
+  $("#cheerBench").innerHTML = bench
+    .map((slot) => {
+      if (!slot) {
+        return `
+          <div class="cheer-slot empty">
+            <span>빈 응원석</span>
+          </div>
+        `;
+      }
+      const monster = monsterById[slot.id];
+      return `
+        <div class="cheer-slot" style="--accent:${monster.color}">
+          <div class="monster-avatar">${monsterArt(monster)}</div>
+          <strong>${monster.name}</strong>
+          <span>x${slot.count} · 등장 시 +${slot.count * LEAGUE_CHEER_POWER}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function deckPileMarkup(label, deckCount, discardCount) {
   return `
     <strong>${label}</strong>
-    <span>${deckCount}장 남음 · 사용 ${discardCount}장</span>
+    <span>남음 ${deckCount}장</span>
+    <span>사용 ${discardCount}장</span>
   `;
 }
 
@@ -1692,12 +1747,14 @@ function renderDrawSlot(selector, side, entry, winner) {
 function drawCardMarkup(entry) {
   const monster = monsterById[entry.id];
   const power = Math.max(1, Math.floor(entry.resultPower ?? entry.power));
+  const cheer = entry.cheerBonus ? `<em class="cheer-power">응원 +${entry.cheerBonus}</em>` : "";
   return `
     <div class="monster-avatar" style="--accent:${monster.color}">${monsterArt(monster)}</div>
     <div class="draw-card-copy">
       <strong>${monster.name}</strong>
       <span>Lv.${entry.level} · ${monster.skill}</span>
       <b class="draw-power" style="--accent:${monster.color}">${power}</b>
+      ${cheer}
     </div>
   `;
 }
@@ -1826,6 +1883,8 @@ function resetLeagueDeckBattle() {
   state.league.enemyDeck = [];
   state.league.myDiscard = [];
   state.league.enemyDiscard = [];
+  state.league.cheerBench = [];
+  state.league.battleLostByCheer = false;
   state.league.drawnPair = null;
   state.league.score = { my: 0, enemy: 0 };
   state.league.drawRound = 0;
@@ -1848,13 +1907,13 @@ function beginLeagueDeckBattle() {
   ensureOpponent();
   if (!state.league.runCards.length) {
     state.league.log = [];
-    state.league.runCards = [...state.league.team];
+    state.league.runCards = makeLeagueBaseDeck();
     state.league.runWins = 0;
     addLeagueLog(`스테이지 시작. 기본 덱 ${state.league.runCards.length}장.`);
   }
   resetLeagueDeckBattle();
   state.league.myDeck = shuffleItems(buildBattleTeam(state.league.runCards, "my"));
-  state.league.enemyDeck = shuffleItems(buildBattleTeam(state.league.opponent, "enemy"));
+  state.league.enemyDeck = shuffleItems(buildBattleTeam(makeLeagueBaseDeck(state.league.opponent), "enemy"));
   state.league.battleActive = true;
   addLeagueLog(`${state.league.runWins + 1}/${state.league.maxEncounters} 배틀 시작. 내 덱 ${state.league.myDeck.length}장.`);
 }
@@ -1904,6 +1963,7 @@ function prepareLeagueClash() {
 
   const round = state.league.drawRound + 1;
   if (!mine.entered) {
+    applyCheerBonus(mine);
     applyEntryEffect(mine, enemy, state.league.myDeck, state.league.enemyDeck);
     mine.entered = true;
   }
@@ -1974,10 +2034,12 @@ function resolvePreparedLeagueClash() {
     enemy.resultPower = Math.max(1, Math.floor(enemy.power));
     mine.resultPower = 0;
     state.league.myDiscard.push(mine);
+    sendToCheerBench(mine);
     state.league.drawnPair = { mine: null, enemy, winner };
   } else {
     state.league.myDiscard.push(mine);
     state.league.enemyDiscard.push(enemy);
+    sendToCheerBench(mine);
     state.league.drawnPair = { mine: null, enemy: null, winner };
   }
 
@@ -1991,7 +2053,7 @@ function resolvePreparedLeagueClash() {
   const resultText = survivor ? `${survivor.name} 생존, 남은 힘 ${Math.max(1, Math.floor(survivor.power))}` : "동점, 둘 다 퇴장";
   addLeagueLog(`${round}라운드: ${mine.name} ${myPower} vs ${enemy.name} ${enemyPower}. ${resultText}.`);
 
-  if (!canFieldLeagueSide("my") || !canFieldLeagueSide("enemy")) {
+  if (state.league.battleLostByCheer || !canFieldLeagueSide("my") || !canFieldLeagueSide("enemy")) {
     finishLeagueDeckBattle();
   }
   renderLeague();
@@ -2002,6 +2064,37 @@ function canFieldLeagueSide(side) {
   return Boolean(state.league.drawnPair?.enemy) || state.league.enemyDeck.length > 0;
 }
 
+function applyCheerBonus(entry) {
+  if (!entry || entry.side !== "my" || entry.cheerApplied) return;
+  const slot = state.league.cheerBench.find((benchSlot) => benchSlot.id === entry.id);
+  if (!slot) return;
+  const gain = slot.count * LEAGUE_CHEER_POWER;
+  entry.power += gain;
+  entry.cheerBonus = (entry.cheerBonus || 0) + gain;
+  entry.cheerApplied = true;
+  addLeagueLog(`${entry.name}: 응원 x${slot.count} 힘 +${gain}.`);
+}
+
+function sendToCheerBench(entry) {
+  if (!entry || entry.side !== "my") return true;
+  const existing = state.league.cheerBench.find((slot) => slot.id === entry.id);
+  if (existing) {
+    existing.count += 1;
+    addLeagueLog(`${entry.name} 응원석 합류. x${existing.count}`);
+    return true;
+  }
+  if (state.league.cheerBench.length >= LEAGUE_CHEER_LIMIT) {
+    state.league.battleLostByCheer = true;
+    state.league.myDeck = [];
+    state.league.drawnPair = { mine: null, enemy: state.league.drawnPair?.enemy || null, winner: "enemy" };
+    addLeagueLog(`응원석 초과. ${entry.name}이 들어갈 칸이 없어 배틀 패배.`);
+    return false;
+  }
+  state.league.cheerBench.push({ id: entry.id, count: 1 });
+  addLeagueLog(`${entry.name} 응원석 합류. 새 칸 사용.`);
+  return true;
+}
+
 function finishLeagueDeckBattle() {
   state.league.battleActive = false;
   state.league.animating = false;
@@ -2010,8 +2103,8 @@ function finishLeagueDeckBattle() {
   state.league.battleFx = [];
   const myAlive = canFieldLeagueSide("my");
   const enemyAlive = canFieldLeagueSide("enemy");
-  const win = myAlive && !enemyAlive;
-  const tie = myAlive === enemyAlive;
+  const win = !state.league.battleLostByCheer && myAlive && !enemyAlive;
+  const tie = !state.league.battleLostByCheer && myAlive === enemyAlive;
   const resultScore = `${state.league.score.my}처치/${state.league.score.enemy}손실`;
 
   if (win) {
@@ -2059,8 +2152,9 @@ function claimLeagueCardReward(id) {
 
 function makeMonsterRewards() {
   const reward = new Set();
+  const currentDeckIds = [...new Set(state.league.runCards.length ? state.league.runCards : makeLeagueBaseDeck())];
   while (reward.size < 3) {
-    const weighted = Math.random() < 0.62 ? state.league.team : MONSTERS.map((monster) => monster.id);
+    const weighted = Math.random() < 0.66 ? currentDeckIds : MONSTERS.map((monster) => monster.id);
     reward.add(randItem(weighted));
   }
   return [...reward];

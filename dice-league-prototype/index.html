@@ -206,6 +206,20 @@
 
         <section id="leagueBattleView" class="app-view">
           <section class="panel league-battle">
+            <div class="league-battle-top">
+              <div>
+                <span>스테이지</span>
+                <strong id="leagueBattleStage">준비</strong>
+              </div>
+              <div>
+                <span>내 덱</span>
+                <strong id="leagueBattleDeckSize">10장</strong>
+              </div>
+              <div>
+                <span>응원석</span>
+                <strong id="leagueCheerState">0/3</strong>
+              </div>
+            </div>
             <div class="league-deck-board" aria-label="몬스터 리그 덱 배틀">
               <div id="enemyDeckPile" class="deck-pile enemy"></div>
               <div id="drawArena" class="draw-arena">
@@ -219,6 +233,13 @@
               <span>손실 <strong id="enemyScore">0</strong></span>
               <span>대결 <strong id="leagueDrawRound">0회</strong></span>
               <span>처치 <strong id="myScore">0</strong></span>
+            </div>
+            <div class="cheer-panel">
+              <div class="cheer-heading">
+                <strong>응원석</strong>
+                <span>3칸 초과 시 이번 배틀 패배</span>
+              </div>
+              <div id="cheerBench" class="cheer-bench" aria-label="응원석"></div>
             </div>
             <div class="action-row">
               <button id="startLeagueBattle" class="primary-button" type="button">덱 섞기</button>
