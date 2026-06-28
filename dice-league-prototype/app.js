@@ -511,6 +511,10 @@ const state = {
     score: { my: 0, enemy: 0 },
     drawRound: 0,
     tacticOffer: null,
+    animating: false,
+    clashPhase: null,
+    pendingClash: null,
+    battleFx: [],
     reward: null,
     log: ["이긴 몬스터는 남은 힘으로 전장에 계속 남습니다."],
   },
@@ -1625,20 +1629,22 @@ function renderLeagueBattle() {
   renderDrawSlot("#myDrawCard", "my", state.league.drawnPair?.mine, state.league.drawnPair?.winner);
   $("#enemyScore").textContent = state.league.score.enemy;
   $("#myScore").textContent = state.league.score.my;
-  $("#leagueDrawRound").textContent = `${state.league.drawRound}회`;
+  $("#leagueDrawRound").textContent = `${state.league.drawRound + (state.league.animating ? 1 : 0)}회`;
 
   const startButton = $("#startLeagueBattle");
-  startButton.disabled = Boolean(state.league.reward || state.league.tacticOffer);
+  startButton.disabled = Boolean(state.league.reward || state.league.tacticOffer || state.league.animating);
   if (state.league.reward) {
     startButton.textContent = "보상 선택";
   } else if (state.league.tacticOffer) {
     startButton.textContent = "전술 선택";
+  } else if (state.league.animating) {
+    startButton.textContent = state.league.clashPhase === "draw" ? "드로우 중..." : "충돌 중...";
   } else if (state.league.battleActive) {
     startButton.textContent = state.league.drawRound === 0 ? "첫 카드 드로우" : "다음 카드";
   } else {
     startButton.textContent = "덱 섞기";
   }
-  $("#nextOpponent").disabled = Boolean(state.league.reward || state.league.tacticOffer) || state.league.battleActive;
+  $("#nextOpponent").disabled = Boolean(state.league.reward || state.league.tacticOffer || state.league.animating) || state.league.battleActive;
 
   if (state.league.tacticOffer) {
     $("#leagueReward").classList.remove("hidden");
@@ -1692,6 +1698,7 @@ function deckPileMarkup(label, deckCount, discardCount) {
 function renderDrawSlot(selector, side, entry, winner) {
   const element = $(selector);
   const sideClass = side === "enemy" ? "enemy" : "mine";
+  const phaseClass = state.league.clashPhase === "hit" && entry ? " clashing" : "";
   if (!entry) {
     element.className = `draw-card ${sideClass} empty`;
     element.innerHTML = `
@@ -1700,9 +1707,13 @@ function renderDrawSlot(selector, side, entry, winner) {
     `;
     return;
   }
-  const resultClass = winner === "tie" ? "tie" : winner === side ? "winner" : "loser";
-  element.className = `draw-card ${sideClass} ${resultClass}`;
-  element.innerHTML = drawCardMarkup(entry);
+  const resultClass = !winner ? "revealed" : winner === "tie" ? "tie" : winner === side ? "winner" : "loser";
+  const fx = state.league.battleFx
+    .filter((effect) => effect.side === side)
+    .map((effect) => `<span class="league-hit-fx">${effect.text}</span>`)
+    .join("");
+  element.className = `draw-card ${sideClass} ${resultClass}${phaseClass}`;
+  element.innerHTML = drawCardMarkup(entry) + fx;
 }
 
 function drawCardMarkup(entry) {
@@ -1827,7 +1838,7 @@ function generateOpponent() {
 }
 
 function startLeagueBattle() {
-  if (state.league.reward || state.league.tacticOffer) return;
+  if (state.league.reward || state.league.tacticOffer || state.league.animating) return;
   if (!state.league.battleActive) {
     beginLeagueDeckBattle();
   } else {
@@ -1846,6 +1857,10 @@ function resetLeagueDeckBattle() {
   state.league.score = { my: 0, enemy: 0 };
   state.league.drawRound = 0;
   state.league.tacticOffer = null;
+  state.league.animating = false;
+  state.league.clashPhase = null;
+  state.league.pendingClash = null;
+  state.league.battleFx = [];
 }
 
 function beginLeagueDeckBattle() {
@@ -1859,7 +1874,7 @@ function beginLeagueDeckBattle() {
 }
 
 function drawLeagueCards() {
-  if (!state.league.battleActive) return;
+  if (!state.league.battleActive || state.league.animating) return;
   const pair = state.league.drawnPair || { mine: null, enemy: null, winner: null };
   let mine = pair.mine;
   let enemy = pair.enemy;
@@ -1874,11 +1889,34 @@ function drawLeagueCards() {
   if (!mine || !enemy) {
     state.league.drawnPair = { mine, enemy, winner: mine ? "my" : enemy ? "enemy" : "tie" };
     finishLeagueDeckBattle();
+    renderLeague();
+    return;
+  }
+
+  state.league.drawnPair = { mine, enemy, winner: null };
+  state.league.pendingClash = null;
+  state.league.battleFx = [];
+  state.league.animating = true;
+  state.league.clashPhase = "draw";
+  addLeagueLog(`${state.league.drawRound + 1}라운드: 양쪽 카드 공개.`);
+  renderLeague();
+
+  window.setTimeout(() => {
+    if (!state.league.animating || state.league.clashPhase !== "draw") return;
+    prepareLeagueClash();
+  }, 520);
+}
+
+function prepareLeagueClash() {
+  const mine = state.league.drawnPair?.mine;
+  const enemy = state.league.drawnPair?.enemy;
+  if (!mine || !enemy) {
+    finishLeagueDeckBattle();
+    renderLeague();
     return;
   }
 
   const round = state.league.drawRound + 1;
-
   if (!mine.entered) {
     applyEntryEffect(mine, enemy, state.league.myDeck, state.league.enemyDeck);
     mine.entered = true;
@@ -1899,6 +1937,39 @@ function drawLeagueCards() {
   let winner = "tie";
   if (myPower > enemyPower) {
     winner = "my";
+  } else if (enemyPower > myPower) {
+    winner = "enemy";
+  }
+
+  state.league.pendingClash = { round, myPower, enemyPower, winner };
+  state.league.battleFx = [
+    { side: "my", text: `-${enemyPower}` },
+    { side: "enemy", text: `-${myPower}` },
+  ];
+  state.league.clashPhase = "hit";
+  renderLeague();
+
+  window.setTimeout(() => {
+    if (!state.league.animating || state.league.clashPhase !== "hit") return;
+    resolvePreparedLeagueClash();
+  }, 680);
+}
+
+function resolvePreparedLeagueClash() {
+  const mine = state.league.drawnPair?.mine;
+  const enemy = state.league.drawnPair?.enemy;
+  const clash = state.league.pendingClash;
+  if (!mine || !enemy || !clash) {
+    state.league.animating = false;
+    state.league.clashPhase = null;
+    state.league.pendingClash = null;
+    state.league.battleFx = [];
+    renderLeague();
+    return;
+  }
+
+  const { round, myPower, enemyPower, winner } = clash;
+  if (winner === "my") {
     state.league.score.my += 1;
     mine.power = myPower - enemyPower;
     onWin(mine, enemy, state.league.myDeck, state.league.enemyDeck);
@@ -1908,8 +1979,7 @@ function drawLeagueCards() {
     enemy.resultPower = 0;
     state.league.enemyDiscard.push(enemy);
     state.league.drawnPair = { mine, enemy: null, winner };
-  } else if (enemyPower > myPower) {
-    winner = "enemy";
+  } else if (winner === "enemy") {
     state.league.score.enemy += 1;
     enemy.power = enemyPower - myPower;
     onWin(enemy, mine, state.league.enemyDeck, state.league.myDeck);
@@ -1926,6 +1996,10 @@ function drawLeagueCards() {
   }
 
   state.league.drawRound = round;
+  state.league.animating = false;
+  state.league.clashPhase = null;
+  state.league.pendingClash = null;
+  state.league.battleFx = [];
 
   const survivor = winner === "my" ? mine : winner === "enemy" ? enemy : null;
   const resultText = survivor ? `${survivor.name} 생존, 남은 힘 ${Math.max(1, Math.floor(survivor.power))}` : "동점, 둘 다 퇴장";
@@ -1936,6 +2010,7 @@ function drawLeagueCards() {
   } else {
     maybeOfferLeagueTactic();
   }
+  renderLeague();
 }
 
 function canFieldLeagueSide(side) {
@@ -1953,6 +2028,10 @@ function maybeOfferLeagueTactic() {
 function finishLeagueDeckBattle() {
   state.league.battleActive = false;
   state.league.tacticOffer = null;
+  state.league.animating = false;
+  state.league.clashPhase = null;
+  state.league.pendingClash = null;
+  state.league.battleFx = [];
   const myAlive = canFieldLeagueSide("my");
   const enemyAlive = canFieldLeagueSide("enemy");
   const win = myAlive && !enemyAlive;

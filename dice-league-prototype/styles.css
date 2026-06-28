@@ -903,6 +903,41 @@ h2 {
   }
 }
 
+@keyframes league-clash-enemy {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  48% {
+    transform: translateY(24px) scale(1.04);
+  }
+}
+
+@keyframes league-clash-mine {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  48% {
+    transform: translateY(-24px) scale(1.04);
+  }
+}
+
+@keyframes league-hit-fx {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.82);
+  }
+  24% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-24px) scale(1);
+  }
+}
+
 @keyframes stage-flash {
   0%,
   100% {
@@ -1121,6 +1156,7 @@ h2 {
 }
 
 .draw-card {
+  position: relative;
   width: min(212px, 72vw);
   min-height: 112px;
   padding: 8px;
@@ -1148,6 +1184,18 @@ h2 {
   color: var(--muted);
   background: rgba(255, 250, 241, 0.62);
   border-style: dashed;
+}
+
+.draw-card.revealed {
+  border-color: rgba(37, 37, 37, 0.22);
+}
+
+.draw-card.clashing.enemy {
+  animation: league-clash-enemy 520ms ease-in-out both;
+}
+
+.draw-card.clashing.mine {
+  animation: league-clash-mine 520ms ease-in-out both;
 }
 
 .draw-card.winner {
@@ -1199,6 +1247,23 @@ h2 {
   color: #fffaf1;
   font-size: 14px;
   font-weight: 950;
+}
+
+.league-hit-fx {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  min-width: 42px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fffaf1;
+  font-size: 14px;
+  font-weight: 950;
+  text-align: center;
+  box-shadow: 0 9px 18px rgba(45, 37, 27, 0.18);
+  animation: league-hit-fx 720ms ease-out both;
+  pointer-events: none;
 }
 
 .league-score-row {
