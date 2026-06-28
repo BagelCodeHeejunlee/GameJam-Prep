@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>자동 디펜스 프로토타입</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <span>WAVE</span>
+          <strong id="waveLabel">1</strong>
+        </div>
+        <div>
+          <span>GATE</span>
+          <strong id="gateLabel">30</strong>
+        </div>
+        <div>
+          <span>KILL</span>
+          <strong id="killLabel">0</strong>
+        </div>
+        <button id="restartButton" type="button" aria-label="다시 시작">↻</button>
+      </header>
+
+      <section class="board-wrap">
+        <div id="board" class="board" aria-label="전투 보드"></div>
+        <div class="gate">성문 <strong id="gateGuardLabel">방어선 유지</strong></div>
+      </section>
+
+      <section class="party" aria-label="파티">
+        <article class="hero archer">
+          <div class="hero-face">궁</div>
+          <div>
+            <strong>궁수</strong>
+            <span id="archerBuild">함정 · 연타</span>
+          </div>
+        </article>
+        <article class="hero warrior">
+          <div class="hero-face">전</div>
+          <div>
+            <strong>전사</strong>
+            <span id="warriorBuild">돌진 · 광전</span>
+          </div>
+        </article>
+        <article class="hero mage">
+          <div class="hero-face">법</div>
+          <div>
+            <strong>마법사</strong>
+            <span id="mageBuild">연쇄 · 룬 · 운석</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="status-panel">
+        <div>
+          <strong>현재 효과</strong>
+          <div id="upgradeChips" class="chips"></div>
+        </div>
+        <div>
+          <strong>전투 로그</strong>
+          <div id="battleLog" class="battle-log"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="rewardOverlay" class="overlay hidden">
+      <section class="reward-modal">
+        <span class="eyebrow">UPGRADE</span>
+        <h1>선택지 1개 고르기</h1>
+        <div id="rewardChoices" class="reward-choices"></div>
+      </section>
+    </div>
+
+    <div id="resultOverlay" class="overlay hidden">
+      <section class="reward-modal compact">
+        <span class="eyebrow">RESULT</span>
+        <h1 id="resultTitle">결과</h1>
+        <p id="resultText"></p>
+        <button id="retryButton" type="button">다시 시작</button>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
