@@ -8,6 +8,7 @@
       color: "#d85f45",
       skill: "이기면 힘 증가",
       effect: "wolf",
+      cheer: "beastPack",
     },
     {
       id: "slime",
@@ -17,6 +18,7 @@
       color: "#45a68e",
       skill: "지면 다음 아군 강화",
       effect: "slime",
+      cheer: "smallGel",
     },
     {
       id: "golem",
@@ -26,6 +28,7 @@
       color: "#827b68",
       skill: "한 번 버팀",
       effect: "golem",
+      cheer: "stoneWall",
     },
     {
       id: "bat",
@@ -35,6 +38,7 @@
       color: "#6e63b6",
       skill: "상대와 후속열 약화",
       effect: "bat",
+      cheer: "skyWing",
     },
     {
       id: "ogre",
@@ -53,6 +57,7 @@
       color: "#79a441",
       skill: "고블린 수만큼 강화",
       effect: "goblin",
+      cheer: "mobShout",
     },
     {
       id: "dragon",
@@ -71,6 +76,7 @@
       color: "#7d9b42",
       skill: "승리하면 다음 적 약화",
       effect: "manticore",
+      cheer: "venomTrap",
     },
     {
       id: "skeleton",
@@ -80,6 +86,7 @@
       color: "#b5aa92",
       skill: "패배 직전 뼈갑옷",
       effect: "skeleton",
+      cheer: "undeadMarch",
     },
     {
       id: "ghost",
@@ -89,6 +96,7 @@
       color: "#8ca7b8",
       skill: "첫 상대 힘 흡수",
       effect: "ghost",
+      cheer: "fearWhisper",
     },
     {
       id: "mimic",
@@ -107,6 +115,7 @@
       color: "#9a6fb0",
       skill: "양옆 아군 강화",
       effect: "shaman",
+      cheer: "tribeRitual",
     },
     {
       id: "bear",
@@ -125,6 +134,7 @@
       color: "#548f72",
       skill: "입장 시 석화",
       effect: "medusa",
+      cheer: "heavyGaze",
     },
     {
       id: "phoenix",
@@ -134,6 +144,7 @@
       color: "#df7a33",
       skill: "지면 다음 아군 점화",
       effect: "phoenix",
+      cheer: "comebackFlame",
     },
     {
       id: "scorpion",
@@ -143,6 +154,7 @@
       color: "#b4812f",
       skill: "지면 상대 힘 감소",
       effect: "scorpion",
+      cheer: "venomTrap",
     },
     {
       id: "harpy",
@@ -152,6 +164,7 @@
       color: "#4777b8",
       skill: "상대 힘을 훔침",
       effect: "harpy",
+      cheer: "aerialRaid",
     },
     {
       id: "treant",
@@ -161,6 +174,7 @@
       color: "#4f9b63",
       skill: "뒤 두 칸 보호",
       effect: "treant",
+      cheer: "forestShelter",
     },
     {
       id: "orc",
@@ -170,6 +184,7 @@
       color: "#5f9243",
       skill: "근접 몬스터 강화",
       effect: "orc",
+      cheer: "frontBanner",
     },
     {
       id: "kraken",
@@ -179,6 +194,7 @@
       color: "#426bb0",
       skill: "큰 상대를 묶음",
       effect: "kraken",
+      cheer: "deepBind",
     },
   ];
 
@@ -205,10 +221,30 @@
     { key: "kraken", name: "심해 속박", timing: "전투 시작", summary: "큰 상대 힘 제한" },
   ];
 
+  const cheers = [
+    { key: "", name: "없음", summary: "응원 효과 없음" },
+    { key: "beastPack", name: "야수 포효", summary: "내 야수 카드 힘 +6" },
+    { key: "smallGel", name: "점액 코팅", summary: "내 기본 힘 30 이하 카드 힘 +7" },
+    { key: "stoneWall", name: "바위 방벽", summary: "내 고대/거인/심해 카드 힘 +8" },
+    { key: "skyWing", name: "날개 편대", summary: "내 비행 카드 힘 +6" },
+    { key: "mobShout", name: "무리 함성", summary: "내 무리 카드 힘 +7" },
+    { key: "venomTrap", name: "독성 견제", summary: "적 야수/거인/무리 카드 힘 -6" },
+    { key: "undeadMarch", name: "망자 행진", summary: "내 언데드 카드 힘 +7" },
+    { key: "fearWhisper", name: "공포 속삭임", summary: "적 기본 힘 30 이하 카드 힘 -5" },
+    { key: "tribeRitual", name: "다종족 의식", summary: "내 응원석 타입 3종 이상이면 내 카드 힘 +10" },
+    { key: "heavyGaze", name: "무거운 시선", summary: "적 기본 힘 35 이상 카드 힘 -8" },
+    { key: "comebackFlame", name: "역전 불씨", summary: "내 카드가 밀리면 힘 +10" },
+    { key: "aerialRaid", name: "공중 교란", summary: "적 비행이 아닌 카드 힘 -5" },
+    { key: "forestShelter", name: "숲의 은신처", summary: "내 기본 힘 35 이하 카드 힘 +6" },
+    { key: "frontBanner", name: "전열 깃발", summary: "내 야수/무리/거인 카드 힘 +5" },
+    { key: "deepBind", name: "심해 압박", summary: "적 힘 50 이상 카드 힘 -10" },
+  ];
+
   window.LEAGUE_CARD_DATA = {
     storageKey: "dice-league-monster-card-overrides-v1",
     baseMonsters,
     effects,
+    cheers,
     types: [...new Set(baseMonsters.map((monster) => monster.type))],
   };
 }());

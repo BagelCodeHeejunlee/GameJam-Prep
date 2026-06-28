@@ -184,12 +184,14 @@ const LEAGUE_CARD_DATA = window.LEAGUE_CARD_DATA || {};
 const LEAGUE_CARD_STORAGE_KEY = LEAGUE_CARD_DATA.storageKey || "dice-league-monster-card-overrides-v1";
 const BASE_MONSTERS = Array.isArray(LEAGUE_CARD_DATA.baseMonsters) ? LEAGUE_CARD_DATA.baseMonsters : [];
 const VALID_MONSTER_EFFECTS = new Set((LEAGUE_CARD_DATA.effects || []).map((effect) => effect.key));
+const VALID_MONSTER_CHEERS = new Set((LEAGUE_CARD_DATA.cheers || []).map((cheer) => cheer.key));
 const leagueCardOverrides = loadLeagueCardOverrides();
 const MONSTERS = BASE_MONSTERS.map((monster) => ({
   ...monster,
   ...sanitizeLeagueCardOverride(monster, leagueCardOverrides[monster.id]),
 }));
 const monsterById = Object.fromEntries(MONSTERS.map((monster) => [monster.id, monster]));
+const cheerByKey = Object.fromEntries((LEAGUE_CARD_DATA.cheers || []).map((cheer) => [cheer.key, cheer]));
 
 function loadLeagueCardOverrides() {
   try {
@@ -208,12 +210,14 @@ function sanitizeLeagueCardOverride(baseMonster, override) {
   const base = Number(override.base);
   const color = cleanCardEditText(override.color);
   const effect = cleanCardEditText(override.effect);
+  const cheer = cleanCardEditText(override.cheer);
 
   if (name) next.name = name.slice(0, 18);
   if (type) next.type = type.slice(0, 8);
   if (Number.isFinite(base)) next.base = clamp(Math.round(base), 1, 120);
   if (/^#[0-9a-f]{6}$/i.test(color)) next.color = color;
   if (VALID_MONSTER_EFFECTS.has(effect)) next.effect = effect;
+  if (VALID_MONSTER_CHEERS.has(cheer)) next.cheer = cheer;
   if (next.effect && next.effect !== baseMonster.effect) {
     const effectMeta = LEAGUE_CARD_DATA.effects?.find((item) => item.key === next.effect);
     if (effectMeta) next.skill = effectMeta.summary;
@@ -223,6 +227,15 @@ function sanitizeLeagueCardOverride(baseMonster, override) {
 
 function cleanCardEditText(value) {
   return String(value ?? "").trim();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 const LEAGUE_GEAR = {
@@ -262,7 +275,6 @@ const LEAGUE_GEAR = {
 
 const LEAGUE_BASE_DECK_COUNTS = [3, 2, 2, 1, 1, 1];
 const LEAGUE_CHEER_LIMIT = 5;
-const LEAGUE_CHEER_POWER = 8;
 const LEAGUE_EFFECT_DELAY = 520;
 const LEAGUE_PHASE_LABELS = {
   draw: "드로우 중...",
@@ -362,7 +374,7 @@ const state = {
     battleFx: [],
     effectQueue: [],
     reward: null,
-    log: ["진 카드는 자기 응원석으로 가고, 같은 카드가 다시 나오면 힘 +8씩 받습니다."],
+    log: ["진 카드는 자기 응원석으로 가고, 일부 몬스터는 조건부 응원 효과를 켭니다."],
   },
 };
 
@@ -562,6 +574,18 @@ function monsterSkillText(id, level = monsterLevel(id), gear = state.league.rost
 function monsterSkillMarkup(id, level = monsterLevel(id), gear = state.league.roster[id]?.gear) {
   const skill = monsterSkillParts(id, level, gear);
   return skill.timing ? `<b>${skill.timing}:</b> ${skill.effect}` : skill.effect;
+}
+
+function monsterCheerParts(id) {
+  const monster = typeof id === "string" ? monsterById[id] : id;
+  const cheer = cheerByKey[monster?.cheer || ""];
+  if (!cheer || !cheer.key) return { timing: "응원", effect: "응원 효과 없음", active: false };
+  return { timing: "응원", effect: cheer.summary, active: true };
+}
+
+function monsterCheerMarkup(id) {
+  const cheer = monsterCheerParts(id);
+  return `<b>${cheer.timing}:</b> ${cheer.effect}`;
 }
 
 function gearBonus(gear = []) {
@@ -1474,6 +1498,7 @@ function renderLeagueDetail() {
     <div class="detail-copy">
       <h2>${monster.name}</h2>
       <p class="unit-meta">${monster.type} · ${monsterSkillMarkup(selected.id, selected.level, selected.gear)}</p>
+      <p class="unit-meta">${monsterCheerMarkup(selected.id)}</p>
       <div class="detail-stats">
         <span class="level-pill">Lv.${selected.level}</span>
         <span class="power-pill">힘 ${monsterPower(selected.id)}</span>
@@ -1589,7 +1614,10 @@ function renderLeagueBattle() {
       .map((id) => {
         const monster = monsterById[id];
         const currentCount = runCardCount(id);
-        const copyLabel = currentCount > 0 ? `중복 선택 · 현재 x${currentCount} → x${currentCount + 1}` : "새 이름 · 응원석 새 칸 사용";
+        const cheer = monsterCheerParts(id);
+        const copyLabel = currentCount > 0
+          ? `중복 선택 · 응원석 같은 칸에 쌓임`
+          : cheer.active ? cheer.effect : "응원 없음 · 새 칸 사용";
         return `
           <button class="reward-card league-card-reward-card" data-monster="${id}" type="button" style="--accent:${monster.color}">
             <div class="monster-avatar">${monsterArt(monster)}</div>
@@ -1640,11 +1668,13 @@ function renderCheerBench(selector, cheerBench) {
         `;
       }
       const monster = monsterById[slot.id];
+      const cheer = monsterCheerParts(monster);
+      const countLabel = slot.count > 1 ? `x${slot.count} · ` : "";
       return `
         <div class="cheer-slot" style="--accent:${monster.color}">
           <div class="monster-avatar">${monsterArt(monster)}</div>
           <strong>${monster.name}</strong>
-          <span>x${slot.count} · 등장 시 +${slot.count * LEAGUE_CHEER_POWER}</span>
+          <span>${countLabel}${cheer.effect}</span>
         </div>
       `;
     })
@@ -1683,7 +1713,8 @@ function renderDrawSlot(selector, side, entry, winner) {
 function drawCardMarkup(entry) {
   const monster = monsterById[entry.id];
   const power = Math.max(1, Math.floor(entry.resultPower ?? entry.power));
-  const cheer = entry.cheerBonus ? `<em class="cheer-power">응원 +${entry.cheerBonus}</em>` : "";
+  const cheerNote = entry.cheerNotes?.length ? entry.cheerNotes.at(-1) : "";
+  const cheer = cheerNote ? `<em class="cheer-power">${escapeHtml(cheerNote)}</em>` : "";
   return `
     <div class="monster-avatar" style="--accent:${monster.color}">${monsterArt(monster)}</div>
     <div class="draw-card-copy">
@@ -1709,6 +1740,7 @@ function renderMonsterRoster() {
           <span class="power-pill">${monsterPower(monster.id, info.level)}</span>
         </div>
         <p class="skill">${monsterSkillMarkup(monster.id, info.level, info.gear)}</p>
+        <p class="skill cheer-skill">${monsterCheerMarkup(monster.id)}</p>
         <span class="unit-meta">조각 ${info.shards} · 장비 +${gearBonus(info.gear)}</span>
         <div class="card-actions">
           <button class="mini-action view-monster" data-monster="${monster.id}" type="button">상세</button>
@@ -1924,8 +1956,8 @@ function makeStartEffectQueue(mine, enemy) {
 
 function makeCheerEffectQueue(mine, enemy) {
   const queue = [];
-  queueCheerBonus(queue, mine);
-  queueCheerBonus(queue, enemy);
+  queueBenchCheerEffects(queue, "my", mine, enemy);
+  queueBenchCheerEffects(queue, "enemy", enemy, mine);
   return queue;
 }
 
@@ -2053,26 +2085,97 @@ function queueEntryEffects(queue, fighter, opponent, ownQueue, opponentQueue) {
   }
 }
 
-function queueCheerBonus(queue, entry) {
-  if (!entry || entry.cheerApplied) return;
-  const bench = cheerBenchForSide(entry.side);
-  const slot = bench.find((benchSlot) => benchSlot.id === entry.id);
-  if (!slot) return;
+function queueBenchCheerEffects(queue, side, ally, opponent) {
+  const bench = cheerBenchForSide(side);
+  bench.forEach((slot) => {
+    const source = monsterById[slot.id];
+    if (!source?.cheer) return;
+    queueCheerSlotEffect(queue, { side, source, slot, ally, opponent, bench });
+  });
+}
+
+function queueCheerSlotEffect(queue, context) {
+  const { source, slot, ally, opponent, bench } = context;
+  const count = slot.count || 1;
+  switch (source.cheer) {
+    case "beastPack":
+      if (ally?.type === "야수") queueCheerPower(queue, context, ally, 6 * count, "야수 포효");
+      break;
+    case "smallGel":
+      if (ally?.base <= 30) queueCheerPower(queue, context, ally, 7 * count, "점액 코팅");
+      break;
+    case "stoneWall":
+      if (["고대", "거인", "심해"].includes(ally?.type)) queueCheerPower(queue, context, ally, 8 * count, "바위 방벽");
+      break;
+    case "skyWing":
+      if (ally?.type === "비행") queueCheerPower(queue, context, ally, 6 * count, "날개 편대");
+      break;
+    case "mobShout":
+      if (ally?.type === "무리") queueCheerPower(queue, context, ally, 7 * count, "무리 함성");
+      break;
+    case "venomTrap":
+      if (["야수", "거인", "무리"].includes(opponent?.type)) queueCheerPower(queue, context, opponent, -6 * count, "독성 견제");
+      break;
+    case "undeadMarch":
+      if (ally?.type === "언데드") queueCheerPower(queue, context, ally, 7 * count, "망자 행진");
+      break;
+    case "fearWhisper":
+      if (opponent?.base <= 30) queueCheerPower(queue, context, opponent, -5 * count, "공포 속삭임");
+      break;
+    case "tribeRitual":
+      if (new Set(bench.map((benchSlot) => monsterById[benchSlot.id]?.type).filter(Boolean)).size >= 3) {
+        queueCheerPower(queue, context, ally, 10 * count, "다종족 의식");
+      }
+      break;
+    case "heavyGaze":
+      if (opponent?.base >= 35) queueCheerPower(queue, context, opponent, -8 * count, "무거운 시선");
+      break;
+    case "comebackFlame":
+      queueCheerPower(queue, context, ally, () => (ally.power < opponent.power ? 10 * count : 0), "역전 불씨");
+      break;
+    case "aerialRaid":
+      if (opponent?.type !== "비행") queueCheerPower(queue, context, opponent, -5 * count, "공중 교란");
+      break;
+    case "forestShelter":
+      if (ally?.base <= 35) queueCheerPower(queue, context, ally, 6 * count, "숲의 은신처");
+      break;
+    case "frontBanner":
+      if (["야수", "무리", "거인"].includes(ally?.type)) queueCheerPower(queue, context, ally, 5 * count, "전열 깃발");
+      break;
+    case "deepBind":
+      queueCheerPower(queue, context, opponent, () => (opponent.power >= 50 ? -10 * count : 0), "심해 압박");
+      break;
+    default:
+      break;
+  }
+}
+
+function queueCheerPower(queue, context, target, amount, label) {
+  if (!target) return;
   queue.push({
     phase: "cheer",
     apply: () => {
-      if (entry.cheerApplied) return {};
-      const gain = slot.count * LEAGUE_CHEER_POWER;
-      entry.power += gain;
-      entry.cheerBonus = (entry.cheerBonus || 0) + gain;
-      entry.cheerApplied = true;
-      entry.resultPower = Math.max(1, Math.floor(entry.power));
+      const delta = typeof amount === "function" ? amount() : amount;
+      if (!delta) return {};
+      const mark = `${context.source.id}:${context.source.cheer}:${label}:${target.side}`;
+      if (!markCheer(target, mark)) return {};
+      const result = applyPowerDelta(target, delta, `${context.source.name} 응원: ${label}`);
+      if (!result.log) return {};
+      const note = `${label} ${delta > 0 ? "+" : ""}${delta}`;
+      target.cheerNotes = [...(target.cheerNotes || []), note].slice(-3);
       return {
-        fx: [{ side: entry.side, text: `응원 +${gain}`, kind: "cheer" }],
-        log: `${sideLabel(entry.side)} ${entry.name}: 응원 x${slot.count} 힘 +${gain}.`,
+        ...result,
+        fx: [{ side: target.side, text: `응원 ${delta > 0 ? "+" : ""}${delta}`, kind: delta > 0 ? "cheer" : "debuff" }],
       };
     },
   });
+}
+
+function markCheer(target, key) {
+  target.cheerMarks ||= {};
+  if (target.cheerMarks[key]) return false;
+  target.cheerMarks[key] = true;
+  return true;
 }
 
 function queueLastStand(queue, fighter, opponent) {
@@ -2280,18 +2383,6 @@ function canFieldLeagueSide(side) {
   return Boolean(state.league.drawnPair?.enemy) || state.league.enemyDeck.length > 0;
 }
 
-function applyCheerBonus(entry) {
-  if (!entry || entry.cheerApplied) return;
-  const bench = cheerBenchForSide(entry.side);
-  const slot = bench.find((benchSlot) => benchSlot.id === entry.id);
-  if (!slot) return;
-  const gain = slot.count * LEAGUE_CHEER_POWER;
-  entry.power += gain;
-  entry.cheerBonus = (entry.cheerBonus || 0) + gain;
-  entry.cheerApplied = true;
-  addLeagueLog(`${sideLabel(entry.side)} ${entry.name}: 응원 x${slot.count} 힘 +${gain}.`);
-}
-
 function sendToCheerBench(entry) {
   if (!entry) return true;
   if (state.league.battleLostByCheer) return false;
@@ -2299,7 +2390,7 @@ function sendToCheerBench(entry) {
   const existing = bench.find((slot) => slot.id === entry.id);
   if (existing) {
     existing.count += 1;
-    addLeagueLog(`${sideLabel(entry.side)} ${entry.name} 응원석 합류. x${existing.count}`);
+    addLeagueLog(`${sideLabel(entry.side)} ${entry.name} 응원석 합류. 같은 칸 x${existing.count}.`);
     return true;
   }
   if (bench.length >= LEAGUE_CHEER_LIMIT) {
@@ -2315,7 +2406,7 @@ function sendToCheerBench(entry) {
     return false;
   }
   bench.push({ id: entry.id, count: 1 });
-  addLeagueLog(`${sideLabel(entry.side)} ${entry.name} 응원석 합류. 새 칸 사용.`);
+  addLeagueLog(`${sideLabel(entry.side)} ${entry.name} 응원석 합류. ${monsterCheerParts(entry.id).effect}.`);
   return true;
 }
 
@@ -2409,17 +2500,23 @@ function buildBattleTeam(entries, side) {
     const id = typeof entry === "string" ? entry : entry.id;
     const level = typeof entry === "string" ? monsterLevel(id) : entry.level;
     const gear = typeof entry === "string" ? state.league.roster[id]?.gear : null;
+    const monster = monsterById[id];
     return {
       id,
       side,
       index,
       level,
       gear,
-      name: monsterById[id].name,
-      effect: monsterById[id].effect,
+      name: monster.name,
+      type: monster.type,
+      base: monster.base,
+      effect: monster.effect,
+      cheer: monster.cheer || "",
       power: monsterPower(id, level, gear),
       entered: false,
       used: false,
+      cheerMarks: {},
+      cheerNotes: [],
     };
   });
 

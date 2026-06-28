@@ -2,9 +2,12 @@ const DATA = window.LEAGUE_CARD_DATA || {};
 const STORAGE_KEY = DATA.storageKey || "dice-league-monster-card-overrides-v1";
 const BASE_MONSTERS = Array.isArray(DATA.baseMonsters) ? DATA.baseMonsters : [];
 const EFFECTS = Array.isArray(DATA.effects) ? DATA.effects : [];
+const CHEERS = Array.isArray(DATA.cheers) ? DATA.cheers : [];
 const EFFECT_BY_KEY = Object.fromEntries(EFFECTS.map((effect) => [effect.key, effect]));
+const CHEER_BY_KEY = Object.fromEntries(CHEERS.map((cheer) => [cheer.key, cheer]));
 const BASE_BY_ID = Object.fromEntries(BASE_MONSTERS.map((monster) => [monster.id, monster]));
 const VALID_EFFECTS = new Set(EFFECTS.map((effect) => effect.key));
+const VALID_CHEERS = new Set(CHEERS.map((cheer) => cheer.key));
 
 const els = {
   summary: document.querySelector("#librarySummary"),
@@ -191,6 +194,7 @@ function renderEditor() {
           ${field("base", "기본 힘", monster.base, "number")}
           ${field("color", "색", monster.color, "color")}
           ${effectField(monster.effect)}
+          ${cheerField(monster.cheer || "")}
         </div>
         <p id="editorStatus" class="editor-status" data-tone="${state.message?.tone || ""}">${escapeHtml(state.message?.text || "")}</p>
         <div class="editor-actions">
@@ -237,14 +241,17 @@ function cardMarkup(monster, options = {}) {
 
 function cardInnerMarkup(monster) {
   const skill = monsterSkillParts(monster);
+  const cheer = monsterCheerParts(monster);
   return `
     <div class="monster-avatar" style="--accent:${escapeHtml(monster.color)}">${monsterArt(monster)}</div>
     <h3>${escapeHtml(monster.name)}</h3>
     <div class="card-tag-row">
       <span class="type-badge">${escapeHtml(monster.type)}</span>
       <span class="timing-badge">${escapeHtml(skill.timing)}</span>
+      <span class="timing-badge ${cheer.active ? "cheer-on" : ""}">${cheer.active ? "응원 있음" : "응원 없음"}</span>
     </div>
     <p class="effect-text"><b>${escapeHtml(skill.timing)}:</b> ${escapeHtml(skill.effect)}</p>
+    <p class="effect-text cheer-effect"><b>응원:</b> ${escapeHtml(cheer.effect)}</p>
     <div class="card-stat-row">
       <span class="power-pill">힘 ${monster.base}</span>
       <span class="card-id">${escapeHtml(monster.id)}</span>
@@ -269,6 +276,21 @@ function effectField(value) {
         ${EFFECTS.map((effect) => `
           <option value="${escapeHtml(effect.key)}" ${effect.key === value ? "selected" : ""}>
             ${escapeHtml(`${effect.timing}: ${effect.name} - ${effect.summary}`)}
+          </option>
+        `).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function cheerField(value) {
+  return `
+    <label class="editor-field wide-field">
+      <span>응원 규칙</span>
+      <select name="cheer">
+        ${CHEERS.map((cheer) => `
+          <option value="${escapeHtml(cheer.key)}" ${cheer.key === value ? "selected" : ""}>
+            ${escapeHtml(`${cheer.name} - ${cheer.summary}`)}
           </option>
         `).join("")}
       </select>
@@ -301,10 +323,12 @@ function monsterFromForm(form) {
   const power = Number(data.get("base"));
   const color = cleanText(data.get("color"));
   const effect = cleanText(data.get("effect"));
+  const cheer = cleanText(data.get("cheer"));
   if (!Number.isFinite(power)) throw new Error("기본 힘은 숫자로 입력해주세요.");
   if (power < 1 || power > 120) throw new Error("기본 힘은 1부터 120 사이여야 합니다.");
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error("색상 값이 올바르지 않습니다.");
   if (!VALID_EFFECTS.has(effect)) throw new Error("효과 규칙을 선택해주세요.");
+  if (!VALID_CHEERS.has(cheer)) throw new Error("응원 규칙을 선택해주세요.");
 
   const effectMeta = EFFECT_BY_KEY[effect];
   return {
@@ -314,12 +338,13 @@ function monsterFromForm(form) {
     base: Math.round(power),
     color,
     effect,
+    cheer,
     skill: effectMeta?.summary || base.skill,
   };
 }
 
 function diffFromBase(base, monster) {
-  const keys = ["name", "type", "base", "color", "effect"];
+  const keys = ["name", "type", "base", "color", "effect", "cheer"];
   return keys.reduce((diff, key) => {
     if (monster[key] !== base[key]) diff[key] = monster[key];
     return diff;
@@ -336,6 +361,8 @@ function filteredMonsters() {
       skill.timing,
       skill.effect,
       EFFECT_BY_KEY[monster.effect]?.name || "",
+      monsterCheerParts(monster).effect,
+      CHEER_BY_KEY[monster.cheer || ""]?.name || "",
     ].join(" ").toLowerCase();
     if (state.search && !haystack.includes(state.search)) return false;
     if (state.type !== "all" && monster.type !== state.type) return false;
@@ -406,11 +433,13 @@ function sanitizeOverride(edit) {
   const base = Number(edit.base);
   const color = cleanText(edit.color);
   const effect = cleanText(edit.effect);
+  const cheer = cleanText(edit.cheer);
   if (name) next.name = name.slice(0, 18);
   if (type) next.type = type.slice(0, 8);
   if (Number.isFinite(base)) next.base = Math.max(1, Math.min(120, Math.round(base)));
   if (/^#[0-9a-f]{6}$/i.test(color)) next.color = color;
   if (VALID_EFFECTS.has(effect)) next.effect = effect;
+  if (VALID_CHEERS.has(cheer)) next.cheer = cheer;
   return next;
 }
 
@@ -459,6 +488,12 @@ function monsterSkillParts(monster, level = 3) {
     default:
       return { timing: "효과", effect: monster.skill || "효과 없음" };
   }
+}
+
+function monsterCheerParts(monster) {
+  const cheer = CHEER_BY_KEY[monster.cheer || ""];
+  if (!cheer || !cheer.key) return { effect: "응원 효과 없음", active: false };
+  return { effect: cheer.summary, active: true };
 }
 
 function scaled(level, base) {

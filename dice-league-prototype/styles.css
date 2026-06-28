@@ -1523,7 +1523,7 @@ body.league-battle-focus .cheer-heading span {
 }
 
 .cheer-slot {
-  min-height: 34px;
+  min-height: 42px;
   padding: 4px;
   display: grid;
   gap: 2px;
@@ -1604,7 +1604,7 @@ body.league-battle-focus .battle-log li {
 }
 
 .monster-card {
-  min-height: 196px;
+  min-height: 222px;
   padding: 8px;
   display: grid;
   gap: 6px;
@@ -1632,6 +1632,10 @@ body.league-battle-focus .battle-log li {
 
 .monster-card .skill {
   min-height: 28px;
+}
+
+.monster-card .cheer-skill {
+  min-height: 24px;
 }
 
 .card-actions {
