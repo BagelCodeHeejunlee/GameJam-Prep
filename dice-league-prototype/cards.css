@@ -1,0 +1,366 @@
+.card-library-body {
+  min-width: 320px;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+.card-library-shell {
+  width: min(100vw, 430px);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: max(14px, env(safe-area-inset-top)) 12px max(18px, env(safe-area-inset-bottom));
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  background: rgba(255, 250, 241, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.library-header {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 0 4px;
+}
+
+.library-header h1 {
+  overflow-wrap: anywhere;
+}
+
+.back-button,
+.icon-button,
+.mini-action {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.icon-button {
+  min-width: 42px;
+  font-size: 18px;
+}
+
+.library-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.summary-chip {
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.summary-chip span,
+.library-tools span,
+.editor-field span,
+.card-id,
+.section-title span,
+.io-panel textarea::placeholder {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.summary-chip strong {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.card-editor-panel,
+.library-tools,
+.io-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 241, 0.9);
+  padding: 10px;
+}
+
+.card-editor-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.editor-card-preview {
+  min-width: 0;
+}
+
+.card-edit-form {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.editor-field,
+.search-field,
+.filter-row label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.field-grid .wide-field {
+  grid-column: 1 / -1;
+}
+
+.editor-field input,
+.editor-field select,
+.search-field input,
+.filter-row select,
+.io-panel textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid rgba(37, 37, 37, 0.14);
+  border-radius: 8px;
+  background: #fffaf1;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 8px 9px;
+}
+
+.editor-field input[type="color"] {
+  padding: 4px;
+}
+
+.editor-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 7px;
+}
+
+.editor-status {
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.editor-status[data-tone="ok"] {
+  color: var(--teal);
+}
+
+.editor-status[data-tone="error"] {
+  color: var(--red);
+}
+
+.library-tools {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.section-title {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mini-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mini-action {
+  min-height: 30px;
+  padding: 0 9px;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.library-card {
+  position: relative;
+  min-width: 0;
+  min-height: 246px;
+  padding: 8px;
+  display: grid;
+  grid-template-rows: 86px auto auto 1fr auto;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  overflow: hidden;
+}
+
+.library-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-top: 4px solid var(--accent);
+  pointer-events: none;
+}
+
+.library-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.library-card.edited::after {
+  content: "EDIT";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #4e3511;
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.library-card.large {
+  min-height: 226px;
+  grid-template-rows: 82px auto auto 1fr auto;
+  pointer-events: none;
+}
+
+.library-card .monster-avatar {
+  width: 100%;
+  aspect-ratio: auto;
+  min-height: 82px;
+}
+
+.library-card h3 {
+  min-width: 0;
+  min-height: 32px;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.card-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-stat-row,
+.card-tag-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.card-stat-row .power-pill {
+  min-width: 54px;
+  background: var(--accent);
+  color: #fffaf1;
+}
+
+.timing-badge,
+.type-badge {
+  min-height: 22px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(37, 37, 37, 0.08);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.timing-badge {
+  background: rgba(110, 99, 182, 0.14);
+  color: #413979;
+}
+
+.effect-text {
+  min-height: 42px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 780;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.effect-text b {
+  color: var(--ink);
+  font-weight: 950;
+}
+
+.io-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.io-panel textarea {
+  min-height: 86px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.empty-library {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+@media (max-width: 360px) {
+  .card-library-shell {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .editor-layout {
+    grid-template-columns: 124px minmax(0, 1fr);
+  }
+
+  .library-card {
+    min-height: 236px;
+  }
+}

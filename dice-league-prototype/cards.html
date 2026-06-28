@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>몬스터 카드 편집 - Number League</title>
+    <meta name="theme-color" content="#252525" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="cards.css" />
+  </head>
+  <body class="card-library-body">
+    <main class="card-library-shell">
+      <header class="library-header">
+        <a class="back-button" href="index.html">전투</a>
+        <div>
+          <p class="kicker">Number League</p>
+          <h1>몬스터 카드</h1>
+        </div>
+        <button id="resetAllCards" class="icon-button" type="button" aria-label="전체 초기화">↺</button>
+      </header>
+
+      <section id="librarySummary" class="library-summary" aria-label="카드 요약"></section>
+
+      <section id="editorPanel" class="card-editor-panel" aria-live="polite"></section>
+
+      <section class="library-tools" aria-label="카드 필터">
+        <label class="search-field">
+          <span>검색</span>
+          <input id="cardSearch" type="search" placeholder="이름, 타입, 효과" autocomplete="off" />
+        </label>
+        <div class="filter-row">
+          <label>
+            <span>타입</span>
+            <select id="typeFilter"></select>
+          </label>
+          <label>
+            <span>타이밍</span>
+            <select id="timingFilter"></select>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <h2>전체 카드</h2>
+          <span id="visibleCount">20장</span>
+        </div>
+        <div id="cardGrid" class="library-grid" aria-label="몬스터 카드 목록"></div>
+      </section>
+
+      <section class="io-panel">
+        <div class="section-title">
+          <h2>편집 데이터</h2>
+          <div class="mini-actions">
+            <button id="exportCards" class="mini-action" type="button">내보내기</button>
+            <button id="importCards" class="mini-action" type="button">가져오기</button>
+          </div>
+        </div>
+        <textarea id="cardDataBox" spellcheck="false" placeholder="내보낸 JSON 또는 가져올 JSON"></textarea>
+      </section>
+    </main>
+
+    <script src="league-card-data.js"></script>
+    <script src="cards.js"></script>
+  </body>
+</html>

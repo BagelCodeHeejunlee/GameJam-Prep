@@ -180,190 +180,50 @@ const ENEMY_FACE_CATALOG = {
   },
 };
 
-const MONSTERS = [
-  {
-    id: "wolf",
-    name: "송곳니 늑대",
-    type: "야수",
-    base: 28,
-    color: "#d85f45",
-    skill: "이기면 힘 증가",
-    effect: "wolf",
-  },
-  {
-    id: "slime",
-    name: "청록 슬라임",
-    type: "점액",
-    base: 17,
-    color: "#45a68e",
-    skill: "지면 다음 아군 강화",
-    effect: "slime",
-  },
-  {
-    id: "golem",
-    name: "바위 골렘",
-    type: "고대",
-    base: 42,
-    color: "#827b68",
-    skill: "한 번 버팀",
-    effect: "golem",
-  },
-  {
-    id: "bat",
-    name: "밤날개 박쥐",
-    type: "비행",
-    base: 20,
-    color: "#6e63b6",
-    skill: "상대와 후속열 약화",
-    effect: "bat",
-  },
-  {
-    id: "ogre",
-    name: "거친 오우거",
-    type: "거인",
-    base: 56,
-    color: "#b36b35",
-    skill: "강하지만 승리 후 지침",
-    effect: "ogre",
-  },
-  {
-    id: "goblin",
-    name: "초록 고블린",
-    type: "무리",
-    base: 15,
-    color: "#79a441",
-    skill: "고블린 수만큼 강화",
-    effect: "goblin",
-  },
-  {
-    id: "dragon",
-    name: "어린 드래곤",
-    type: "용",
-    base: 48,
-    color: "#d66a2e",
-    skill: "입장 시 화염 피해",
-    effect: "dragon",
-  },
-  {
-    id: "manticore",
-    name: "독꼬리 만티코어",
-    type: "야수",
-    base: 35,
-    color: "#7d9b42",
-    skill: "승리하면 다음 적 약화",
-    effect: "manticore",
-  },
-  {
-    id: "skeleton",
-    name: "해골 기사",
-    type: "언데드",
-    base: 31,
-    color: "#b5aa92",
-    skill: "패배 직전 뼈갑옷",
-    effect: "skeleton",
-  },
-  {
-    id: "ghost",
-    name: "흐린 유령",
-    type: "언데드",
-    base: 24,
-    color: "#8ca7b8",
-    skill: "첫 상대 힘 흡수",
-    effect: "ghost",
-  },
-  {
-    id: "mimic",
-    name: "웃는 미믹",
-    type: "기묘",
-    base: 26,
-    color: "#c18b42",
-    skill: "상대 힘 일부 복사",
-    effect: "mimic",
-  },
-  {
-    id: "shaman",
-    name: "버섯 주술사",
-    type: "주술",
-    base: 22,
-    color: "#9a6fb0",
-    skill: "양옆 아군 강화",
-    effect: "shaman",
-  },
-  {
-    id: "bear",
-    name: "겨울 곰",
-    type: "야수",
-    base: 44,
-    color: "#8c6f54",
-    skill: "아군이 지면 분노",
-    effect: "bear",
-  },
-  {
-    id: "medusa",
-    name: "비늘 메두사",
-    type: "저주",
-    base: 33,
-    color: "#548f72",
-    skill: "입장 시 석화",
-    effect: "medusa",
-  },
-  {
-    id: "phoenix",
-    name: "작은 피닉스",
-    type: "비행",
-    base: 30,
-    color: "#df7a33",
-    skill: "지면 다음 아군 점화",
-    effect: "phoenix",
-  },
-  {
-    id: "scorpion",
-    name: "사막 전갈",
-    type: "독",
-    base: 29,
-    color: "#b4812f",
-    skill: "지면 상대 힘 감소",
-    effect: "scorpion",
-  },
-  {
-    id: "harpy",
-    name: "갈고리 하피",
-    type: "비행",
-    base: 27,
-    color: "#4777b8",
-    skill: "상대 힘을 훔침",
-    effect: "harpy",
-  },
-  {
-    id: "treant",
-    name: "묵은 트렌트",
-    type: "숲",
-    base: 38,
-    color: "#4f9b63",
-    skill: "뒤 두 칸 보호",
-    effect: "treant",
-  },
-  {
-    id: "orc",
-    name: "오크 대장",
-    type: "무리",
-    base: 36,
-    color: "#5f9243",
-    skill: "근접 몬스터 강화",
-    effect: "orc",
-  },
-  {
-    id: "kraken",
-    name: "새끼 크라켄",
-    type: "심해",
-    base: 40,
-    color: "#426bb0",
-    skill: "큰 상대를 묶음",
-    effect: "kraken",
-  },
-];
-
+const LEAGUE_CARD_DATA = window.LEAGUE_CARD_DATA || {};
+const LEAGUE_CARD_STORAGE_KEY = LEAGUE_CARD_DATA.storageKey || "dice-league-monster-card-overrides-v1";
+const BASE_MONSTERS = Array.isArray(LEAGUE_CARD_DATA.baseMonsters) ? LEAGUE_CARD_DATA.baseMonsters : [];
+const VALID_MONSTER_EFFECTS = new Set((LEAGUE_CARD_DATA.effects || []).map((effect) => effect.key));
+const leagueCardOverrides = loadLeagueCardOverrides();
+const MONSTERS = BASE_MONSTERS.map((monster) => ({
+  ...monster,
+  ...sanitizeLeagueCardOverride(monster, leagueCardOverrides[monster.id]),
+}));
 const monsterById = Object.fromEntries(MONSTERS.map((monster) => [monster.id, monster]));
+
+function loadLeagueCardOverrides() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LEAGUE_CARD_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function sanitizeLeagueCardOverride(baseMonster, override) {
+  if (!override || typeof override !== "object" || Array.isArray(override)) return {};
+  const next = {};
+  const name = cleanCardEditText(override.name);
+  const type = cleanCardEditText(override.type);
+  const base = Number(override.base);
+  const color = cleanCardEditText(override.color);
+  const effect = cleanCardEditText(override.effect);
+
+  if (name) next.name = name.slice(0, 18);
+  if (type) next.type = type.slice(0, 8);
+  if (Number.isFinite(base)) next.base = clamp(Math.round(base), 1, 120);
+  if (/^#[0-9a-f]{6}$/i.test(color)) next.color = color;
+  if (VALID_MONSTER_EFFECTS.has(effect)) next.effect = effect;
+  if (next.effect && next.effect !== baseMonster.effect) {
+    const effectMeta = LEAGUE_CARD_DATA.effects?.find((item) => item.key === next.effect);
+    if (effectMeta) next.skill = effectMeta.summary;
+  }
+  return next;
+}
+
+function cleanCardEditText(value) {
+  return String(value ?? "").trim();
+}
 
 const LEAGUE_GEAR = {
   fang: {

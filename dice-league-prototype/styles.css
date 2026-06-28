@@ -94,6 +94,14 @@ body.league-battle-focus #leagueBattleView {
   min-width: 0;
 }
 
+.header-actions {
+  flex: 0 0 158px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 7px;
+}
+
 .kicker {
   margin: 0 0 2px;
   color: var(--teal);
@@ -123,7 +131,6 @@ h2 {
 
 .save-chip {
   display: grid;
-  flex: 0 0 110px;
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid rgba(37, 37, 37, 0.1);
@@ -143,6 +150,21 @@ h2 {
 .save-chip strong {
   font-size: 12px;
   line-height: 1.15;
+}
+
+.tool-chip {
+  display: grid;
+  min-width: 0;
+  min-height: 100%;
+  place-items: center;
+  border: 1px solid rgba(37, 37, 37, 0.14);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
 }
 
 .game-tabs {
