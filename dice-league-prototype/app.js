@@ -63,6 +63,39 @@ const FACE_CATALOG = {
   },
 };
 
+const DICE_GLYPHS = {
+  flame: {
+    name: "화염 룬",
+    mark: "F",
+    color: "#e26a2c",
+    desc: "공격 면은 화상을 남기고, 지원 면은 불꽃 피해를 더함",
+  },
+  frost: {
+    name: "빙결 룬",
+    mark: "I",
+    color: "#4777b8",
+    desc: "적 다음 공격 위력을 낮춤",
+  },
+  echo: {
+    name: "메아리 룬",
+    mark: "R",
+    color: "#6e63b6",
+    desc: "나온 면 효과를 한 번 더 약하게 반복",
+  },
+  ward: {
+    name: "수호 룬",
+    mark: "S",
+    color: "#20887c",
+    desc: "발동 후 전원에게 작은 보호막",
+  },
+  surge: {
+    name: "과충전 룬",
+    mark: "+",
+    color: "#d99a2b",
+    desc: "면 위력이 크게 증가",
+  },
+};
+
 const DICE_HEROES = [
   {
     id: "taran",
@@ -72,6 +105,7 @@ const DICE_HEROES = [
     role: "수비 연계",
     maxHp: 86,
     slots: ["slash_1", "guard_1", "guard_1", "heal_1", "focus_1", "slash_2"],
+    glyphs: [null, "ward", null, null, null, null],
     passive: "수비 면이 다음 공격을 키움",
     art: "knight",
   },
@@ -83,6 +117,7 @@ const DICE_HEROES = [
     role: "연속 공격",
     maxHp: 64,
     slots: ["slash_1", "slash_1", "venom_1", "focus_1", "heal_1", "slash_2"],
+    glyphs: ["echo", null, null, null, null, null],
     passive: "공격이 이어지면 추가타",
     art: "rogue",
   },
@@ -94,6 +129,7 @@ const DICE_HEROES = [
     role: "집중 폭발",
     maxHp: 58,
     slots: ["ember_1", "focus_1", "ember_1", "guard_1", "heal_1", "ember_2"],
+    glyphs: ["flame", null, null, null, null, null],
     passive: "집중 뒤 속성 면 강화",
     art: "mage",
   },
@@ -364,6 +400,39 @@ const LEAGUE_GEAR = {
   },
 };
 
+const LEAGUE_TACTICS = {
+  rally: {
+    name: "선봉 고양",
+    mark: "A",
+    color: "#d99a2b",
+    desc: "아군 생존 카드, 없으면 다음 카드 힘 +14",
+  },
+  mend: {
+    name: "전열 정비",
+    mark: "M",
+    color: "#4f9b63",
+    desc: "아군 생존 카드 힘 +20, 없으면 다음 카드 +10",
+  },
+  snare: {
+    name: "약점 포착",
+    mark: "W",
+    color: "#4777b8",
+    desc: "상대 생존 카드, 없으면 다음 카드 힘 -12",
+  },
+  reserve: {
+    name: "예비대 호출",
+    mark: "R",
+    color: "#6e63b6",
+    desc: "최근 손실 카드 1장을 힘 35%로 덱 위에 복귀",
+  },
+  formation: {
+    name: "진형 압축",
+    mark: "F",
+    color: "#20887c",
+    desc: "내 덱 위 카드 2장 힘 +8",
+  },
+};
+
 const state = {
   activeGame: "dice",
   currentView: "home",
@@ -383,6 +452,7 @@ const state = {
       attackBoost: 0,
       lastOffense: false,
       slots: [...hero.slots],
+      glyphs: [...hero.glyphs],
     })),
     inventory: {
       slash_1: 5,
@@ -440,6 +510,7 @@ const state = {
     drawnPair: null,
     score: { my: 0, enemy: 0 },
     drawRound: 0,
+    tacticOffer: null,
     reward: null,
     log: ["이긴 몬스터는 남은 힘으로 전장에 계속 남습니다."],
   },
@@ -456,6 +527,20 @@ function faceInfo(key) {
     label: `${catalog.name} ${roman[parsed.grade]}`,
     value: catalog.base + (parsed.grade - 1) * 6,
   };
+}
+
+function glyphInfo(key) {
+  if (!key) return null;
+  return {
+    ...DICE_GLYPHS[key],
+    key,
+  };
+}
+
+function glyphBadge(key) {
+  const glyph = glyphInfo(key);
+  if (!glyph) return "";
+  return `<span class="glyph-badge" style="--glyph-color:${glyph.color}">${glyph.mark}</span>`;
 }
 
 function enemyFaceInfo(type, enemy = state.dice.enemy) {
@@ -702,11 +787,13 @@ function renderDiceBuilder() {
   $("#diceSlots").innerHTML = hero.slots
     .map((key, index) => {
       const face = faceInfo(key);
+      const glyph = glyphInfo(hero.glyphs[index]);
       return `
         <button class="die-slot ${state.dice.selectedSlot === index ? "selected" : ""}" data-slot="${index}" type="button">
           <span class="slot-number"><b>${index + 1}</b><span>${face.value}</span></span>
-          ${faceIcon(face)}
+          <span class="face-stack">${faceIcon(face)}${glyphBadge(glyph?.key)}</span>
           <strong class="face-name">${face.label}</strong>
+          <span class="unit-meta">${glyph ? glyph.name : "룬 없음"}</span>
         </button>
       `;
     })
@@ -760,8 +847,13 @@ function renderDiceBuilder() {
 function renderDiceBattle() {
   const enemy = state.dice.enemy || makeDiceEnemy();
   const hpPercent = clamp((enemy.hp / enemy.maxHp) * 100, 0, 100);
+  const enemyTags = [
+    enemy.shield ? `보호 ${Math.ceil(enemy.shield)}` : "",
+    enemy.burn ? `화상 ${enemy.burn}` : "",
+    enemy.chill ? `빙결 ${enemy.chill}` : "",
+  ].filter(Boolean);
   $("#diceEnemyName").textContent = enemy.name;
-  $("#diceEnemyHp").textContent = `${Math.max(0, Math.ceil(enemy.hp))}/${enemy.maxHp} · 보호 ${Math.ceil(enemy.shield || 0)}`;
+  $("#diceEnemyHp").textContent = `${Math.max(0, Math.ceil(enemy.hp))}/${enemy.maxHp}${enemyTags.length ? ` · ${enemyTags.join(" · ")}` : ""}`;
   $("#diceEnemyHpBar").style.width = `${hpPercent}%`;
   $("#diceEnemyArt").style.background = `linear-gradient(145deg, ${enemy.color}, #252525)`;
   $("#diceEnemyArt").innerHTML = monsterArt({
@@ -788,21 +880,24 @@ function renderDiceBattle() {
 
 
   if (state.dice.reward) {
+    const hero = selectedDiceHero();
+    const targetFace = faceInfo(hero.slots[state.dice.selectedSlot]);
     $("#diceReward").classList.remove("hidden");
     $("#diceReward").innerHTML = state.dice.reward
       .map((key) => {
-        const face = faceInfo(key);
+        const glyph = glyphInfo(key);
         return `
-          <button class="reward-card dice-reward-card" data-face="${key}" type="button">
-            ${faceIcon(face)}
-            <strong class="face-name">${face.label}</strong>
-            <span class="unit-meta">보상 면 획득</span>
+          <button class="reward-card dice-reward-card" data-glyph="${key}" type="button">
+            ${glyphBadge(key)}
+            <strong class="face-name">${glyph.name}</strong>
+            <span class="unit-meta">${hero.short} ${state.dice.selectedSlot + 1}번 ${targetFace.name} 면에 부착</span>
+            <span class="unit-meta">${glyph.desc}</span>
           </button>
         `;
       })
       .join("");
     $$(".dice-reward-card").forEach((button) => {
-      button.addEventListener("click", () => claimDiceReward(button.dataset.face));
+      button.addEventListener("click", () => claimDiceReward(button.dataset.glyph));
     });
   } else {
     $("#diceReward").classList.add("hidden");
@@ -842,6 +937,7 @@ function renderDiceRollStage() {
       ...state.dice.heroes.map((hero, index) => {
         const roll = rollByHero[hero.id];
         const face = roll ? roll.face : faceInfo(hero.slots[index % hero.slots.length]);
+        const glyph = roll ? roll.glyph : glyphInfo(hero.glyphs[index % hero.glyphs.length]);
         const active = Boolean(roll);
         const statusClass = state.dice.rolling && active ? "rolling" : active ? "result" : "";
         const activeTurn = state.dice.activeRollId === roll?.id;
@@ -851,10 +947,10 @@ function renderDiceRollStage() {
               <strong>${hero.short}</strong>
               <span>${activeTurn ? "행동 중" : roll ? `${roll.slot + 1}번` : "대기"}</span>
             </div>
-            <div class="die-cube">${faceIcon(face)}</div>
+            <div class="die-cube">${faceIcon(face)}${glyphBadge(glyph?.key)}</div>
             <div class="die-result-copy">
               <strong>${roll ? face.label : "주사위 대기"}</strong>
-              <span>${roll ? `위력 ${face.value}` : "라운드 시작 전"}</span>
+              <span>${roll ? `위력 ${face.value}${glyph ? ` · ${glyph.name}` : ""}` : glyph ? glyph.name : "라운드 시작 전"}</span>
             </div>
           </article>
         `;
@@ -880,6 +976,8 @@ function makeDiceEnemy() {
     shield: 0,
     rage: 0,
     poison: 0,
+    burn: 0,
+    chill: 0,
   };
 }
 
@@ -982,6 +1080,7 @@ function rollDiceRound() {
         heroId: hero.id,
         slot,
         face: faceInfo(hero.slots[slot]),
+        glyph: glyphInfo(hero.glyphs[slot]),
       };
     });
   const enemyDice = enemyDiceTypes(enemy);
@@ -1062,6 +1161,13 @@ function finishDiceRound() {
     addDiceEffect("poison", `-${poisonDamage}`, "enemy");
     addDiceLog(`${enemy.name}이 독으로 ${poisonDamage} 피해.`);
   }
+  if (enemy.hp > 0 && enemy.burn > 0) {
+    const burnDamage = enemy.burn * 4;
+    enemy.hp -= burnDamage;
+    enemy.burn = Math.max(0, enemy.burn - 1);
+    addDiceEffect("damage", `화상 -${burnDamage}`, "enemy");
+    addDiceLog(`${enemy.name}이 화상으로 ${burnDamage} 피해.`);
+  }
 
   state.dice.resolving = false;
   state.dice.activeRollId = null;
@@ -1084,7 +1190,8 @@ function queueDiceEffectClear() {
 }
 
 function resolveFace(hero, face, slot, enemy) {
-  const amount = face.value + hero.level * 2;
+  const glyph = glyphInfo(hero.glyphs[slot]);
+  const amount = face.value + hero.level * 2 + (glyph?.key === "surge" ? 6 + face.grade * 2 : 0);
 
   if (face.kind === "guard") {
     let shield = amount;
@@ -1105,6 +1212,7 @@ function resolveFace(hero, face, slot, enemy) {
       }
     }
     addDiceLog(`${hero.short}: ${face.label}으로 보호막 ${shield}.`);
+    applyDiceGlyphEffect(hero, face, glyph, amount, { shield });
     return;
   }
 
@@ -1119,6 +1227,7 @@ function resolveFace(hero, face, slot, enemy) {
       addDiceLog(`${hero.short}: ${target.short} 회복 ${amount}.`);
     }
     hero.lastOffense = false;
+    applyDiceGlyphEffect(hero, face, glyph, amount, { healTarget: target });
     return;
   }
 
@@ -1128,6 +1237,7 @@ function resolveFace(hero, face, slot, enemy) {
     addDiceEffect("focus", `집중 +${face.grade + 1}`, "hero", hero.id);
     addDiceLog(`${hero.short}: 집중 ${hero.focus} 축적.`);
     hero.lastOffense = false;
+    applyDiceGlyphEffect(hero, face, glyph, amount);
     return;
   }
 
@@ -1162,9 +1272,80 @@ function resolveFace(hero, face, slot, enemy) {
     addDiceLog(`${hero.short}: 독 ${face.grade + 1} 누적.`);
   }
 
-  damageEnemy(damage, face.kind === "magic" ? "focus" : "damage");
+  const dealt = damageEnemy(damage, face.kind === "magic" ? "focus" : "damage");
+  applyDiceGlyphEffect(hero, face, glyph, amount, { damage: dealt || damage });
   hero.lastOffense = true;
   addDiceLog(`${hero.short}: ${face.label}으로 ${damage} 피해.`);
+}
+
+function applyDiceGlyphEffect(hero, face, glyph, amount, context = {}) {
+  if (!glyph) return;
+  const enemy = state.dice.enemy;
+  if (!enemy) return;
+
+  if (glyph.key === "surge") {
+    addDiceEffect("focus", `과충전 +${6 + face.grade * 2}`, "hero", hero.id);
+    addDiceLog(`${hero.short}: ${glyph.name}으로 면 위력 증가.`);
+    return;
+  }
+
+  if (glyph.key === "flame") {
+    if (["attack", "magic", "poison"].includes(face.kind)) {
+      enemy.burn = (enemy.burn || 0) + 2 + face.grade;
+      addDiceEffect("damage", `화상 +${2 + face.grade}`, "enemy");
+      addDiceLog(`${hero.short}: ${glyph.name}으로 화상 ${2 + face.grade} 누적.`);
+    } else {
+      const fireDamage = Math.ceil(amount * 0.35);
+      damageEnemy(fireDamage, "damage");
+      addDiceLog(`${hero.short}: ${glyph.name}으로 추가 피해 ${fireDamage}.`);
+    }
+    return;
+  }
+
+  if (glyph.key === "frost") {
+    const chill = 7 + face.grade * 2;
+    enemy.chill = (enemy.chill || 0) + chill;
+    addDiceEffect("focus", `빙결 ${chill}`, "enemy");
+    addDiceLog(`${hero.short}: ${glyph.name}으로 다음 공격 -${chill}.`);
+    return;
+  }
+
+  if (glyph.key === "ward") {
+    const shield = 4 + face.grade * 2;
+    state.dice.heroes.forEach((ally) => {
+      if (ally.hp <= 0) return;
+      ally.shield += shield;
+      addDiceEffect("guard", `+${shield}`, "hero", ally.id);
+    });
+    addDiceLog(`${hero.short}: ${glyph.name}으로 전원 보호막 +${shield}.`);
+    return;
+  }
+
+  if (glyph.key === "echo") {
+    const repeat = Math.max(1, Math.ceil((context.damage || amount) * 0.45));
+    if (["attack", "magic", "poison"].includes(face.kind)) {
+      damageEnemy(repeat, "focus");
+      addDiceLog(`${hero.short}: ${glyph.name}로 추가 발동 ${repeat}.`);
+      return;
+    }
+    if (face.kind === "guard") {
+      hero.shield += repeat;
+      addDiceEffect("guard", `메아리 +${repeat}`, "hero", hero.id);
+      addDiceLog(`${hero.short}: ${glyph.name}로 보호막 추가 ${repeat}.`);
+      return;
+    }
+    if (face.kind === "heal" && context.healTarget) {
+      const target = context.healTarget;
+      const maxHp = target.maxHp + (target.level - 1) * 7;
+      target.hp = Math.min(maxHp, target.hp + repeat);
+      addDiceEffect("heal", `메아리 +${repeat}`, "hero", target.id);
+      addDiceLog(`${hero.short}: ${glyph.name}로 회복 추가 ${repeat}.`);
+      return;
+    }
+    hero.focus += 1;
+    addDiceEffect("focus", "메아리 +1", "hero", hero.id);
+    addDiceLog(`${hero.short}: ${glyph.name}로 집중 +1.`);
+  }
 }
 
 function damageEnemy(amount, kind = "damage") {
@@ -1228,6 +1409,13 @@ function enemyAttack(rawDamage = state.dice.enemy?.attack || 0, label = state.di
     addDiceEffect("focus", `분노 +${enemy.rage}`, "enemy");
     enemy.rage = 0;
   }
+  if (enemy.chill > 0) {
+    const reduced = Math.min(enemy.chill, Math.max(0, damage - 1));
+    damage -= reduced;
+    addDiceEffect("focus", `빙결 -${reduced}`, "enemy");
+    addDiceLog(`${enemy.name}: 빙결로 공격력 ${reduced} 감소.`);
+    enemy.chill = 0;
+  }
   const blocked = Math.min(target.shield, damage);
   target.shield -= blocked;
   damage -= blocked;
@@ -1254,22 +1442,22 @@ function winDiceBattle() {
 }
 
 function makeDiceRewards() {
-  const types = Object.keys(FACE_CATALOG);
+  const glyphKeys = Object.keys(DICE_GLYPHS);
   const reward = new Set();
   while (reward.size < 3) {
-    const type = randItem(types);
-    const grade = Math.random() < 0.18 ? 2 : 1;
-    reward.add(keyOf(type, grade));
+    reward.add(randItem(glyphKeys));
   }
   return [...reward];
 }
 
 function claimDiceReward(key) {
-  state.dice.inventory[key] = (state.dice.inventory[key] || 0) + 1;
+  const hero = selectedDiceHero();
+  const oldGlyph = glyphInfo(hero.glyphs[state.dice.selectedSlot]);
+  hero.glyphs[state.dice.selectedSlot] = key;
   state.dice.stage += 1;
   state.dice.reward = null;
   state.dice.enemy = makeDiceEnemy();
-  addDiceLog(`${faceInfo(key).label} 획득. 다음 원정 개방.`);
+  addDiceLog(`${hero.short} ${state.dice.selectedSlot + 1}번 면에 ${glyphInfo(key).name} 부착${oldGlyph ? `, ${oldGlyph.name} 교체` : ""}.`);
   renderDice();
 }
 
@@ -1440,17 +1628,36 @@ function renderLeagueBattle() {
   $("#leagueDrawRound").textContent = `${state.league.drawRound}회`;
 
   const startButton = $("#startLeagueBattle");
-  startButton.disabled = Boolean(state.league.reward);
+  startButton.disabled = Boolean(state.league.reward || state.league.tacticOffer);
   if (state.league.reward) {
     startButton.textContent = "보상 선택";
+  } else if (state.league.tacticOffer) {
+    startButton.textContent = "전술 선택";
   } else if (state.league.battleActive) {
     startButton.textContent = state.league.drawRound === 0 ? "첫 카드 드로우" : "다음 카드";
   } else {
     startButton.textContent = "덱 섞기";
   }
-  $("#nextOpponent").disabled = Boolean(state.league.reward) || state.league.battleActive;
+  $("#nextOpponent").disabled = Boolean(state.league.reward || state.league.tacticOffer) || state.league.battleActive;
 
-  if (state.league.reward) {
+  if (state.league.tacticOffer) {
+    $("#leagueReward").classList.remove("hidden");
+    $("#leagueReward").innerHTML = state.league.tacticOffer
+      .map((key) => {
+        const tactic = LEAGUE_TACTICS[key];
+        return `
+          <button class="reward-card league-tactic-card" data-tactic="${key}" type="button" style="--accent:${tactic.color}">
+            <span class="glyph-badge" style="--glyph-color:${tactic.color}">${tactic.mark}</span>
+            <strong class="face-name">${tactic.name}</strong>
+            <span class="unit-meta">${tactic.desc}</span>
+          </button>
+        `;
+      })
+      .join("");
+    $$(".league-tactic-card").forEach((button) => {
+      button.addEventListener("click", () => claimLeagueTactic(button.dataset.tactic));
+    });
+  } else if (state.league.reward) {
     $("#leagueReward").classList.remove("hidden");
     $("#leagueReward").innerHTML = state.league.reward.ids
       .map((id) => {
@@ -1620,7 +1827,7 @@ function generateOpponent() {
 }
 
 function startLeagueBattle() {
-  if (state.league.reward) return;
+  if (state.league.reward || state.league.tacticOffer) return;
   if (!state.league.battleActive) {
     beginLeagueDeckBattle();
   } else {
@@ -1638,6 +1845,7 @@ function resetLeagueDeckBattle() {
   state.league.drawnPair = null;
   state.league.score = { my: 0, enemy: 0 };
   state.league.drawRound = 0;
+  state.league.tacticOffer = null;
 }
 
 function beginLeagueDeckBattle() {
@@ -1725,6 +1933,8 @@ function drawLeagueCards() {
 
   if (!canFieldLeagueSide("my") || !canFieldLeagueSide("enemy")) {
     finishLeagueDeckBattle();
+  } else {
+    maybeOfferLeagueTactic();
   }
 }
 
@@ -1733,8 +1943,16 @@ function canFieldLeagueSide(side) {
   return Boolean(state.league.drawnPair?.enemy) || state.league.enemyDeck.length > 0;
 }
 
+function maybeOfferLeagueTactic() {
+  if (state.league.reward || state.league.tacticOffer) return;
+  if (state.league.drawRound <= 0 || state.league.drawRound % 2 !== 0) return;
+  state.league.tacticOffer = shuffleItems(Object.keys(LEAGUE_TACTICS)).slice(0, 3);
+  addLeagueLog("전술 선택지 등장. 카드 추가 대신 이번 리그의 흐름을 바꿉니다.");
+}
+
 function finishLeagueDeckBattle() {
   state.league.battleActive = false;
+  state.league.tacticOffer = null;
   const myAlive = canFieldLeagueSide("my");
   const enemyAlive = canFieldLeagueSide("enemy");
   const win = myAlive && !enemyAlive;
@@ -1756,6 +1974,61 @@ function finishLeagueDeckBattle() {
   } else {
     addLeagueLog(`최종 ${resultScore}. 패배 보상 ${gold}골드.`);
   }
+}
+
+function claimLeagueTactic(key) {
+  const tactic = LEAGUE_TACTICS[key];
+  if (!tactic || !state.league.tacticOffer) return;
+
+  if (key === "rally") {
+    const target = state.league.drawnPair?.mine || state.league.myDeck[0];
+    buffLeagueEntry(target, 14, tactic.name);
+  }
+
+  if (key === "mend") {
+    const active = state.league.drawnPair?.mine;
+    if (active) {
+      buffLeagueEntry(active, 20, tactic.name);
+    } else {
+      buffLeagueEntry(state.league.myDeck[0], 10, tactic.name);
+    }
+  }
+
+  if (key === "snare") {
+    const target = state.league.drawnPair?.enemy || state.league.enemyDeck[0];
+    buffLeagueEntry(target, -12, tactic.name);
+  }
+
+  if (key === "reserve") {
+    const revived = state.league.myDiscard.pop();
+    if (revived) {
+      revived.entered = false;
+      revived.used = false;
+      revived.power = Math.max(8, Math.floor(monsterPower(revived.id, revived.level) * 0.35));
+      revived.resultPower = Math.floor(revived.power);
+      state.league.myDeck.unshift(revived);
+      addLeagueLog(`${tactic.name}: ${revived.name}이 힘 ${revived.resultPower}로 덱 위에 복귀.`);
+    } else {
+      buffLeagueEntry(state.league.myDeck[0] || state.league.drawnPair?.mine, 8, tactic.name);
+    }
+  }
+
+  if (key === "formation") {
+    state.league.myDeck.slice(0, 2).forEach((entry) => buffLeagueEntry(entry, 8, tactic.name));
+    if (!state.league.myDeck.length) buffLeagueEntry(state.league.drawnPair?.mine, 8, tactic.name);
+  }
+
+  state.league.tacticOffer = null;
+  renderLeague();
+}
+
+function buffLeagueEntry(entry, amount, label) {
+  if (!entry) return;
+  const before = Math.floor(entry.power);
+  entry.power = Math.max(1, entry.power + amount);
+  entry.resultPower = Math.max(1, Math.floor(entry.power));
+  const delta = entry.resultPower - before;
+  addLeagueLog(`${label}: ${entry.name} ${delta >= 0 ? "+" : ""}${delta}.`);
 }
 
 function makeMonsterRewards() {

@@ -528,6 +528,40 @@ h2 {
   height: 26px;
 }
 
+.face-stack {
+  position: relative;
+  width: fit-content;
+  display: inline-grid;
+  place-items: center;
+}
+
+.glyph-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--glyph-color);
+  color: #fffaf1;
+  font-size: 11px;
+  font-weight: 950;
+  box-shadow: 0 6px 12px rgba(45, 37, 27, 0.18);
+}
+
+.face-stack .glyph-badge,
+.die-cube .glyph-badge {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+}
+
+.reward-card > .glyph-badge {
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+}
+
 .face-name {
   font-size: 13px;
   font-weight: 850;
@@ -750,6 +784,7 @@ h2 {
 }
 
 .die-cube {
+  position: relative;
   width: 58px;
   height: 58px;
   display: grid;
