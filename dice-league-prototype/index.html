@@ -221,34 +221,36 @@
               </div>
             </div>
             <div class="league-deck-board" aria-label="몬스터 리그 덱 배틀">
-              <div id="enemyDeckPile" class="deck-pile enemy"></div>
+              <div class="battle-side-lane enemy">
+                <div id="enemyDeckPile" class="deck-pile enemy"></div>
+                <div class="side-cheer">
+                  <div class="cheer-heading">
+                    <strong>적 응원석</strong>
+                    <span id="enemyCheerHint">0/5</span>
+                  </div>
+                  <div id="enemyCheerBench" class="cheer-bench enemy" aria-label="적 응원석"></div>
+                </div>
+              </div>
               <div id="drawArena" class="draw-arena">
                 <div id="enemyDrawCard" class="draw-card enemy empty"></div>
                 <div class="versus-chip">VS</div>
                 <div id="myDrawCard" class="draw-card mine empty"></div>
               </div>
-              <div id="myDeckPile" class="deck-pile mine"></div>
+              <div class="battle-side-lane mine">
+                <div class="side-cheer">
+                  <div class="cheer-heading">
+                    <strong>내 응원석</strong>
+                    <span id="myCheerHint">0/5</span>
+                  </div>
+                  <div id="cheerBench" class="cheer-bench mine" aria-label="내 응원석"></div>
+                </div>
+                <div id="myDeckPile" class="deck-pile mine"></div>
+              </div>
             </div>
             <div class="league-score-row">
               <span>손실 <strong id="enemyScore">0</strong></span>
               <span>대결 <strong id="leagueDrawRound">0회</strong></span>
               <span>처치 <strong id="myScore">0</strong></span>
-            </div>
-            <div class="cheer-panel">
-              <div class="cheer-side enemy">
-                <div class="cheer-heading">
-                  <strong>적 응원석</strong>
-                  <span id="enemyCheerHint">0/5</span>
-                </div>
-                <div id="enemyCheerBench" class="cheer-bench enemy" aria-label="적 응원석"></div>
-              </div>
-              <div class="cheer-side mine">
-                <div class="cheer-heading">
-                  <strong>내 응원석</strong>
-                  <span id="myCheerHint">0/5</span>
-                </div>
-                <div id="cheerBench" class="cheer-bench mine" aria-label="내 응원석"></div>
-              </div>
             </div>
             <div class="action-row">
               <button id="startLeagueBattle" class="primary-button" type="button">덱 섞기</button>

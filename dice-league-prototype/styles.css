@@ -1151,11 +1151,11 @@ body.league-battle-focus .league-battle {
 
 .league-deck-board {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr) 78px;
+  grid-template-columns: 80px minmax(0, 1fr) 80px;
   grid-template-rows: 1fr;
-  align-items: center;
+  align-items: stretch;
   justify-items: center;
-  gap: 7px;
+  gap: 6px;
   min-height: 382px;
   padding: 8px;
   border: 1px solid rgba(37, 37, 37, 0.1);
@@ -1166,7 +1166,7 @@ body.league-battle-focus .league-battle {
 }
 
 body.league-battle-focus .league-deck-board {
-  min-height: 386px;
+  min-height: 432px;
   padding: 8px;
   border-color: rgba(255, 250, 241, 0.14);
   background:
@@ -1174,16 +1174,24 @@ body.league-battle-focus .league-deck-board {
     #211e1a;
 }
 
-#enemyDeckPile {
-  grid-column: 1;
-  grid-row: 1;
-  align-self: start;
+.battle-side-lane {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
 }
 
-#myDeckPile {
+.battle-side-lane.enemy {
+  grid-column: 1;
+  grid-row: 1;
+  align-content: start;
+}
+
+.battle-side-lane.mine {
   grid-column: 3;
   grid-row: 1;
-  align-self: end;
+  align-content: end;
 }
 
 #drawArena {
@@ -1435,25 +1443,21 @@ body.league-battle-focus .league-score-row strong {
   color: #fffaf1;
 }
 
-.cheer-panel {
+.side-cheer {
+  width: 100%;
   display: grid;
-  gap: 7px;
-}
-
-.cheer-side {
-  display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .cheer-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
 }
 
 .cheer-heading strong {
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1;
 }
 
@@ -1469,15 +1473,15 @@ body.league-battle-focus .cheer-heading span {
 
 .cheer-bench {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: 1fr;
+  gap: 4px;
 }
 
 .cheer-slot {
-  min-height: 54px;
-  padding: 5px;
+  min-height: 34px;
+  padding: 4px;
   display: grid;
-  gap: 3px;
+  gap: 2px;
   align-content: center;
   border: 1px solid rgba(37, 37, 37, 0.12);
   border-radius: 8px;
@@ -1498,8 +1502,8 @@ body.league-battle-focus .cheer-heading span {
 
 .cheer-slot::before {
   content: "";
-  width: 18px;
-  height: 4px;
+  width: 16px;
+  height: 3px;
   border-radius: 999px;
   background: var(--accent, rgba(37, 37, 37, 0.18));
 }
@@ -1510,7 +1514,7 @@ body.league-battle-focus .cheer-heading span {
 
 .cheer-slot strong {
   overflow: hidden;
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1518,7 +1522,7 @@ body.league-battle-focus .cheer-heading span {
 
 .cheer-slot span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 850;
   line-height: 1.15;
 }
@@ -1528,6 +1532,10 @@ body.league-battle-focus .cheer-heading span {
   place-items: center;
   border-style: dashed;
   background: rgba(37, 37, 37, 0.04);
+}
+
+.cheer-slot.empty span {
+  font-size: 0;
 }
 
 body.league-battle-focus .cheer-slot {

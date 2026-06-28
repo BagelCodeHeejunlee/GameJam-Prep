@@ -1681,7 +1681,7 @@ function renderLeagueBattle() {
     ? `${Math.min(state.league.runWins + 1, state.league.maxEncounters)}/${state.league.maxEncounters}`
     : "준비";
   $("#leagueBattleDeckSize").textContent = `${state.league.runCards.length || makeLeagueBaseDeck().length}장`;
-  $("#leagueCheerState").textContent = `내 ${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT} · 적 ${state.league.enemyCheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
+  $("#leagueCheerState").textContent = `내${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT} · 적${state.league.enemyCheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
   $("#myCheerHint").textContent = `${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
   $("#enemyCheerHint").textContent = `${state.league.enemyCheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
   renderCheerBench("#cheerBench", state.league.cheerBench);
