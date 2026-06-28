@@ -401,7 +401,7 @@ const LEAGUE_GEAR = {
 };
 
 const LEAGUE_BASE_DECK_COUNTS = [3, 2, 2, 1, 1, 1];
-const LEAGUE_CHEER_LIMIT = 3;
+const LEAGUE_CHEER_LIMIT = 5;
 const LEAGUE_CHEER_POWER = 8;
 
 const state = {
@@ -479,7 +479,8 @@ const state = {
     myDiscard: [],
     enemyDiscard: [],
     cheerBench: [],
-    battleLostByCheer: false,
+    enemyCheerBench: [],
+    battleLostByCheer: null,
     drawnPair: null,
     score: { my: 0, enemy: 0 },
     drawRound: 0,
@@ -492,7 +493,7 @@ const state = {
     pendingClash: null,
     battleFx: [],
     reward: null,
-    log: ["이긴 몬스터는 남은 힘으로 전장에 계속 남습니다."],
+    log: ["진 카드는 자기 응원석으로 가고, 같은 카드가 다시 나오면 힘 +8씩 받습니다."],
   },
 };
 
@@ -629,6 +630,59 @@ function makeLeagueBaseDeck(entries = state.league.team) {
 function runCardCount(id) {
   const cards = state.league.runCards.length ? state.league.runCards : makeLeagueBaseDeck();
   return cards.filter((cardId) => cardId === id).length;
+}
+
+function scaledLeagueValue(level, base) {
+  return base + Math.floor(level / 3);
+}
+
+function monsterSkillText(id, level = monsterLevel(id), gear = state.league.roster[id]?.gear) {
+  const monster = monsterById[id];
+  if (!monster) return "";
+  switch (monster.effect) {
+    case "wolf":
+      return `처치 후 힘 +${scaledLeagueValue(level, 7)}`;
+    case "slime":
+      return `패배 시 다음 아군 +${scaledLeagueValue(level, 13)}`;
+    case "golem":
+      return `패배 직전 1회 힘 +${Math.floor(monsterPower(id, level, gear) * 0.45)}`;
+    case "bat":
+      return `등장: 상대 -${scaledLeagueValue(level, 8)}, 다음 적 -${scaledLeagueValue(level, 4)}`;
+    case "ogre":
+      return `처치 후 자기 힘 -${Math.max(8, 18 - Math.floor(level / 2))}`;
+    case "goblin":
+      return `시작: 고블린 1장당 +${scaledLeagueValue(level, 4)}`;
+    case "dragon":
+      return `등장: 상대 -${scaledLeagueValue(level, 12)}, 다음 적 -${scaledLeagueValue(level, 6)}`;
+    case "manticore":
+      return `처치 후 다음 적 -${scaledLeagueValue(level, 9)}`;
+    case "skeleton":
+      return `패배 직전 1회 힘 +${scaledLeagueValue(level, 14)}`;
+    case "ghost":
+      return `등장: 상대 -${scaledLeagueValue(level, 10)}, 자신 +${scaledLeagueValue(level, 4)}`;
+    case "mimic":
+      return "등장: 상대 힘 28% 복사";
+    case "shaman":
+      return `시작: 양옆 아군 +${scaledLeagueValue(level, 5)}`;
+    case "bear":
+      return `아군 패배 때마다 힘 +${scaledLeagueValue(level, 8)}`;
+    case "medusa":
+      return "등장: 상대 힘 18% 감소";
+    case "phoenix":
+      return `패배 시 다음 아군 +${scaledLeagueValue(level, 12)}`;
+    case "scorpion":
+      return `패배 시 승자 힘 -${scaledLeagueValue(level, 11)}`;
+    case "harpy":
+      return `등장: 최대 ${scaledLeagueValue(level, 9)} 힘 훔침`;
+    case "treant":
+      return `시작: 뒤 2장 +${scaledLeagueValue(level, 6)}`;
+    case "orc":
+      return `시작: 근접 아군 +${scaledLeagueValue(level, 4)}`;
+    case "kraken":
+      return `등장: 상대 힘 최대 ${48 + level * 3}로 제한`;
+    default:
+      return monster.skill;
+  }
 }
 
 function gearBonus(gear = []) {
@@ -1540,7 +1594,7 @@ function renderLeagueDetail() {
     <div class="monster-avatar" style="--accent:${monster.color}">${monsterArt(monster)}</div>
     <div class="detail-copy">
       <h2>${monster.name}</h2>
-      <p class="unit-meta">${monster.type} · ${monster.skill}</p>
+      <p class="unit-meta">${monster.type} · ${monsterSkillText(selected.id, selected.level, selected.gear)}</p>
       <div class="detail-stats">
         <span class="level-pill">Lv.${selected.level}</span>
         <span class="power-pill">힘 ${monsterPower(selected.id)}</span>
@@ -1627,8 +1681,11 @@ function renderLeagueBattle() {
     ? `${Math.min(state.league.runWins + 1, state.league.maxEncounters)}/${state.league.maxEncounters}`
     : "준비";
   $("#leagueBattleDeckSize").textContent = `${state.league.runCards.length || makeLeagueBaseDeck().length}장`;
-  $("#leagueCheerState").textContent = `${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
-  renderCheerBench();
+  $("#leagueCheerState").textContent = `내 ${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT} · 적 ${state.league.enemyCheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
+  $("#myCheerHint").textContent = `${state.league.cheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
+  $("#enemyCheerHint").textContent = `${state.league.enemyCheerBench.length}/${LEAGUE_CHEER_LIMIT}`;
+  renderCheerBench("#cheerBench", state.league.cheerBench);
+  renderCheerBench("#enemyCheerBench", state.league.enemyCheerBench);
 
   const startButton = $("#startLeagueBattle");
   startButton.disabled = Boolean(state.league.reward || state.league.cardReward || state.league.animating);
@@ -1691,10 +1748,10 @@ function renderLeagueBattle() {
   $("#leagueLog").innerHTML = state.league.log.map((line) => `<li>${line}</li>`).join("");
 }
 
-function renderCheerBench() {
-  const bench = [...state.league.cheerBench];
+function renderCheerBench(selector, cheerBench) {
+  const bench = [...cheerBench];
   while (bench.length < LEAGUE_CHEER_LIMIT) bench.push(null);
-  $("#cheerBench").innerHTML = bench
+  $(selector).innerHTML = bench
     .map((slot) => {
       if (!slot) {
         return `
@@ -1752,7 +1809,7 @@ function drawCardMarkup(entry) {
     <div class="monster-avatar" style="--accent:${monster.color}">${monsterArt(monster)}</div>
     <div class="draw-card-copy">
       <strong>${monster.name}</strong>
-      <span>Lv.${entry.level} · ${monster.skill}</span>
+      <span>Lv.${entry.level} · ${monsterSkillText(entry.id, entry.level, entry.gear)}</span>
       <b class="draw-power" style="--accent:${monster.color}">${power}</b>
       ${cheer}
     </div>
@@ -1772,7 +1829,7 @@ function renderMonsterRoster() {
           <span class="level-pill">Lv.${info.level}</span>
           <span class="power-pill">${monsterPower(monster.id, info.level)}</span>
         </div>
-        <p class="skill">${monster.skill}</p>
+        <p class="skill">${monsterSkillText(monster.id, info.level, info.gear)}</p>
         <span class="unit-meta">조각 ${info.shards} · 장비 +${gearBonus(info.gear)}</span>
         <div class="card-actions">
           <button class="mini-action view-monster" data-monster="${monster.id}" type="button">상세</button>
@@ -1884,7 +1941,8 @@ function resetLeagueDeckBattle() {
   state.league.myDiscard = [];
   state.league.enemyDiscard = [];
   state.league.cheerBench = [];
-  state.league.battleLostByCheer = false;
+  state.league.enemyCheerBench = [];
+  state.league.battleLostByCheer = null;
   state.league.drawnPair = null;
   state.league.score = { my: 0, enemy: 0 };
   state.league.drawRound = 0;
@@ -1968,6 +2026,7 @@ function prepareLeagueClash() {
     mine.entered = true;
   }
   if (!enemy.entered) {
+    applyCheerBonus(enemy);
     applyEntryEffect(enemy, mine, state.league.enemyDeck, state.league.myDeck);
     enemy.entered = true;
   }
@@ -2024,6 +2083,7 @@ function resolvePreparedLeagueClash() {
     mine.resultPower = Math.max(1, Math.floor(mine.power));
     enemy.resultPower = 0;
     state.league.enemyDiscard.push(enemy);
+    sendToCheerBench(enemy);
     state.league.drawnPair = { mine, enemy: null, winner };
   } else if (winner === "enemy") {
     state.league.score.enemy += 1;
@@ -2040,6 +2100,7 @@ function resolvePreparedLeagueClash() {
     state.league.myDiscard.push(mine);
     state.league.enemyDiscard.push(enemy);
     sendToCheerBench(mine);
+    sendToCheerBench(enemy);
     state.league.drawnPair = { mine: null, enemy: null, winner };
   }
 
@@ -2065,34 +2126,50 @@ function canFieldLeagueSide(side) {
 }
 
 function applyCheerBonus(entry) {
-  if (!entry || entry.side !== "my" || entry.cheerApplied) return;
-  const slot = state.league.cheerBench.find((benchSlot) => benchSlot.id === entry.id);
+  if (!entry || entry.cheerApplied) return;
+  const bench = cheerBenchForSide(entry.side);
+  const slot = bench.find((benchSlot) => benchSlot.id === entry.id);
   if (!slot) return;
   const gain = slot.count * LEAGUE_CHEER_POWER;
   entry.power += gain;
   entry.cheerBonus = (entry.cheerBonus || 0) + gain;
   entry.cheerApplied = true;
-  addLeagueLog(`${entry.name}: 응원 x${slot.count} 힘 +${gain}.`);
+  addLeagueLog(`${sideLabel(entry.side)} ${entry.name}: 응원 x${slot.count} 힘 +${gain}.`);
 }
 
 function sendToCheerBench(entry) {
-  if (!entry || entry.side !== "my") return true;
-  const existing = state.league.cheerBench.find((slot) => slot.id === entry.id);
+  if (!entry) return true;
+  if (state.league.battleLostByCheer) return false;
+  const bench = cheerBenchForSide(entry.side);
+  const existing = bench.find((slot) => slot.id === entry.id);
   if (existing) {
     existing.count += 1;
-    addLeagueLog(`${entry.name} 응원석 합류. x${existing.count}`);
+    addLeagueLog(`${sideLabel(entry.side)} ${entry.name} 응원석 합류. x${existing.count}`);
     return true;
   }
-  if (state.league.cheerBench.length >= LEAGUE_CHEER_LIMIT) {
-    state.league.battleLostByCheer = true;
-    state.league.myDeck = [];
-    state.league.drawnPair = { mine: null, enemy: state.league.drawnPair?.enemy || null, winner: "enemy" };
-    addLeagueLog(`응원석 초과. ${entry.name}이 들어갈 칸이 없어 배틀 패배.`);
+  if (bench.length >= LEAGUE_CHEER_LIMIT) {
+    state.league.battleLostByCheer = entry.side;
+    if (entry.side === "my") {
+      state.league.myDeck = [];
+      state.league.drawnPair = { mine: null, enemy: state.league.drawnPair?.enemy || null, winner: "enemy" };
+    } else {
+      state.league.enemyDeck = [];
+      state.league.drawnPair = { mine: state.league.drawnPair?.mine || null, enemy: null, winner: "my" };
+    }
+    addLeagueLog(`${sideLabel(entry.side)} 응원석 초과. ${entry.name}이 들어갈 칸이 없어 배틀 패배.`);
     return false;
   }
-  state.league.cheerBench.push({ id: entry.id, count: 1 });
-  addLeagueLog(`${entry.name} 응원석 합류. 새 칸 사용.`);
+  bench.push({ id: entry.id, count: 1 });
+  addLeagueLog(`${sideLabel(entry.side)} ${entry.name} 응원석 합류. 새 칸 사용.`);
   return true;
+}
+
+function cheerBenchForSide(side) {
+  return side === "enemy" ? state.league.enemyCheerBench : state.league.cheerBench;
+}
+
+function sideLabel(side) {
+  return side === "enemy" ? "적" : "내";
 }
 
 function finishLeagueDeckBattle() {
@@ -2103,7 +2180,7 @@ function finishLeagueDeckBattle() {
   state.league.battleFx = [];
   const myAlive = canFieldLeagueSide("my");
   const enemyAlive = canFieldLeagueSide("enemy");
-  const win = !state.league.battleLostByCheer && myAlive && !enemyAlive;
+  const win = state.league.battleLostByCheer === "enemy" || (!state.league.battleLostByCheer && myAlive && !enemyAlive);
   const tie = !state.league.battleLostByCheer && myAlive === enemyAlive;
   const resultScore = `${state.league.score.my}처치/${state.league.score.enemy}손실`;
 
@@ -2182,6 +2259,7 @@ function buildBattleTeam(entries, side) {
       side,
       index,
       level,
+      gear,
       name: monsterById[id].name,
       effect: monsterById[id].effect,
       power: monsterPower(id, level, gear),
@@ -2284,7 +2362,7 @@ function simulateLeagueBattle() {
 }
 
 function scaleValue(fighter, base) {
-  return base + Math.floor(fighter.level / 3);
+  return scaledLeagueValue(fighter.level, base);
 }
 
 function lowerPower(target, amount, label) {

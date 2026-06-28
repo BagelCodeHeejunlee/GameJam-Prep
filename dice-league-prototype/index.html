@@ -217,7 +217,7 @@
               </div>
               <div>
                 <span>응원석</span>
-                <strong id="leagueCheerState">0/3</strong>
+                <strong id="leagueCheerState">내 0/5</strong>
               </div>
             </div>
             <div class="league-deck-board" aria-label="몬스터 리그 덱 배틀">
@@ -235,11 +235,20 @@
               <span>처치 <strong id="myScore">0</strong></span>
             </div>
             <div class="cheer-panel">
-              <div class="cheer-heading">
-                <strong>응원석</strong>
-                <span>3칸 초과 시 이번 배틀 패배</span>
+              <div class="cheer-side enemy">
+                <div class="cheer-heading">
+                  <strong>적 응원석</strong>
+                  <span id="enemyCheerHint">0/5</span>
+                </div>
+                <div id="enemyCheerBench" class="cheer-bench enemy" aria-label="적 응원석"></div>
               </div>
-              <div id="cheerBench" class="cheer-bench" aria-label="응원석"></div>
+              <div class="cheer-side mine">
+                <div class="cheer-heading">
+                  <strong>내 응원석</strong>
+                  <span id="myCheerHint">0/5</span>
+                </div>
+                <div id="cheerBench" class="cheer-bench mine" aria-label="내 응원석"></div>
+              </div>
             </div>
             <div class="action-row">
               <button id="startLeagueBattle" class="primary-button" type="button">덱 섞기</button>

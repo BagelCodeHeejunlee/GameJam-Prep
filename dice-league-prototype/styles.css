@@ -1437,7 +1437,12 @@ body.league-battle-focus .league-score-row strong {
 
 .cheer-panel {
   display: grid;
-  gap: 6px;
+  gap: 7px;
+}
+
+.cheer-side {
+  display: grid;
+  gap: 5px;
 }
 
 .cheer-heading {
@@ -1464,32 +1469,48 @@ body.league-battle-focus .cheer-heading span {
 
 .cheer-bench {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
 }
 
 .cheer-slot {
-  min-height: 74px;
-  padding: 6px;
+  min-height: 54px;
+  padding: 5px;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 1fr auto;
-  gap: 4px 6px;
-  align-items: center;
+  gap: 3px;
+  align-content: center;
   border: 1px solid rgba(37, 37, 37, 0.12);
   border-radius: 8px;
   background: rgba(255, 250, 241, 0.76);
 }
 
 .cheer-slot .monster-avatar {
-  grid-row: span 2;
-  aspect-ratio: 1;
-  min-width: 0;
+  display: none;
+}
+
+.cheer-bench.enemy .cheer-slot:not(.empty) {
+  background: rgba(216, 95, 69, 0.13);
+}
+
+.cheer-bench.mine .cheer-slot:not(.empty) {
+  background: rgba(32, 136, 124, 0.13);
+}
+
+.cheer-slot::before {
+  content: "";
+  width: 18px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent, rgba(37, 37, 37, 0.18));
+}
+
+.cheer-slot.empty::before {
+  display: none;
 }
 
 .cheer-slot strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1497,8 +1518,9 @@ body.league-battle-focus .cheer-heading span {
 
 .cheer-slot span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 850;
+  line-height: 1.15;
 }
 
 .cheer-slot.empty {
