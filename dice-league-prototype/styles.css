@@ -1368,6 +1368,13 @@ body.league-battle-focus .league-deck-board {
   line-height: 1.2;
 }
 
+.draw-card-copy span b,
+.monster-card .skill b,
+.detail-copy .unit-meta b {
+  color: var(--ink);
+  font-weight: 950;
+}
+
 .draw-power {
   width: 100%;
   min-width: 0;
@@ -1408,6 +1415,22 @@ body.league-battle-focus .league-deck-board {
   box-shadow: 0 9px 18px rgba(45, 37, 27, 0.18);
   animation: league-hit-fx 720ms ease-out both;
   pointer-events: none;
+}
+
+.league-hit-fx.buff {
+  background: var(--green);
+}
+
+.league-hit-fx.debuff {
+  background: var(--blue);
+}
+
+.league-hit-fx.cheer {
+  background: var(--yellow);
+}
+
+.league-hit-fx.damage {
+  background: var(--red);
 }
 
 .league-score-row {
