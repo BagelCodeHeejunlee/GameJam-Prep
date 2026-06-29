@@ -1652,6 +1652,7 @@ async function newRun() {
     cameraScale: 0,
     cameraDrag: null,
     cameraDeadZoneSuppressed: false,
+    cameraFocusActorId: null,
     entityFacingTargets: new Map(),
     offscreenIndicatorElements: new Map(),
     offscreenIndicatorFrame: 0,
@@ -1735,6 +1736,7 @@ function startWave(index) {
   state.cameraScale = 0;
   state.cameraDrag = null;
   state.cameraDeadZoneSuppressed = false;
+  state.cameraFocusActorId = null;
   state.offscreenIndicatorElements = new Map();
   state.offscreenIndicatorFrame = 0;
   state.pendingOffscreenBounds = null;
@@ -2794,6 +2796,7 @@ async function executeCard(actor, cardData) {
     actorId: actor.id,
     cardData,
     targetHits: new Map(),
+    pendingPushes: [],
     didAttack: false,
   };
 
@@ -2815,7 +2818,13 @@ async function executeCard(actor, cardData) {
     }
   }
 
-  await resolveCardEndEffects(actor, cardData, state.activeCardContext);
+  const cardContext = state.activeCardContext;
+  await resolvePendingAttackPushes(actor, cardContext);
+  if (checkEndConditions()) {
+    state.activeCardContext = previousCardContext;
+    return;
+  }
+  await resolveCardEndEffects(actor, cardData, cardContext);
   state.activeCardContext = previousCardContext;
 }
 
@@ -2850,7 +2859,7 @@ async function executeAction(actor, action, cardData) {
     return true;
   }
   if (action.type === "patternAttack") {
-    const didAttack = patternAttack(actor, action);
+    const didAttack = await patternAttack(actor, action);
     if (!didAttack) await moveAfterFailedAttack(actor, action);
     return true;
   }
@@ -3129,37 +3138,28 @@ async function attack(actor, action) {
 
   const chargeBonus = action.ignoreChargeBonus ? 0 : consumeChargeForAttack(actor);
   if (state.activeCardContext?.actorId === actor.id) state.activeCardContext.didAttack = true;
-  await animateActorAttack(actor, targets[0], action);
+  await animateActorAttack(actor, targets, action);
+  const batchVisuals = targets.length > 1;
+  const hitEvents = [];
+  const hitResults = [];
   for (const target of targets) {
     if (!isAlive(actor)) return true;
     if (!isAlive(target)) continue;
     const beforeHp = target.hp;
-    const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus, { targetCount: targets.length });
+    const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus, {
+      targetCount: targets.length,
+      deferVisual: batchVisuals,
+      hitEvents,
+    });
+    hitResults.push({ target, beforeHp, damage });
+  }
+  if (batchVisuals) flushHitEffects(hitEvents);
+  for (const result of hitResults) {
+    const { target, beforeHp, damage } = result;
     resolveKillPassives(actor, target);
     applyOverkillSplash(actor, target, damage - beforeHp, action);
     refundChargeOnKill(actor, target, action);
-    const pushAmount = attackPushAmount(actor, target, action, targets.length);
-    if (pushAmount && isAlive(target)) {
-      const pushedIntoTrap = await pushTarget(actor, target, pushAmount);
-      if (actor.permanent?.pushAreaDamage) {
-        applyEffect(actor, {
-          type: "applyEffect",
-          label: "전장 지배",
-          duration: "nextAttack",
-          modifiers: [{ stat: "damageDealt", amount: actor.permanent.pushAreaDamage }],
-        });
-      }
-      if (pushedIntoTrap && action.trapHitBonus && isAlive(target)) {
-        const bonusBeforeHp = target.hp;
-        const bonusDamage = dealAttackDamage(actor, target, {
-          type: "attack",
-          mult: action.trapHitBonus,
-          range: action.range,
-          melee: action.melee,
-        }, action.trapHitBonus, { targetCount: targets.length });
-        applyOverkillSplash(actor, target, bonusDamage - bonusBeforeHp, action);
-      }
-    }
+    await handleAttackPush(actor, target, action, targets.length);
     if (action.pull && isAlive(target)) await pullTarget(actor, target, action.pull);
   }
   if (action.resetChargeAfterAttack) resetAttackCharge(actor);
@@ -3167,8 +3167,81 @@ async function attack(actor, action) {
   return true;
 }
 
-async function animateActorAttack(actor, target, action) {
-  if (!isAlive(actor) || !target) return;
+async function handleAttackPush(actor, target, action, targetCount) {
+  const pushAmount = attackPushAmount(actor, target, action, targetCount);
+  if (!pushAmount || !isAlive(target)) return null;
+
+  const context = state.activeCardContext;
+  if (context?.actorId === actor.id) {
+    context.pendingPushes = context.pendingPushes ?? [];
+    context.pendingPushes.push({
+      actorId: actor.id,
+      targetId: target.id,
+      action,
+      amount: pushAmount,
+      targetCount,
+      source: { q: actor.q, r: actor.r, side: actor.side, id: actor.id },
+    });
+    return null;
+  }
+
+  return resolveSingleAttackPush(actor, target, action, pushAmount, targetCount);
+}
+
+async function resolvePendingAttackPushes(actor, cardContext) {
+  const pendingPushes = cardContext?.pendingPushes ?? [];
+  if (!pendingPushes.length) return false;
+
+  cardContext.pendingPushes = [];
+  const blockedTargetIds = new Set();
+  for (const pending of pendingPushes) {
+    if (state.finished || state.waitingReward) break;
+    const pushActor = state.entities.find((entity) => entity.id === pending.actorId) ?? actor;
+    const target = state.entities.find((entity) => entity.id === pending.targetId);
+    if (!isAlive(pushActor) || !isAlive(target) || blockedTargetIds.has(target.id)) continue;
+
+    const pushedIntoTrap = await resolveSingleAttackPush(
+      pushActor,
+      target,
+      pending.action,
+      pending.amount,
+      pending.targetCount,
+      pending.source ?? pushActor,
+    );
+    if (pushedIntoTrap === "block") blockedTargetIds.add(target.id);
+  }
+
+  return true;
+}
+
+async function resolveSingleAttackPush(actor, target, action, amount, targetCount, source = actor) {
+  const pushedIntoTrap = await pushTarget(source, target, amount);
+  if (actor.permanent?.pushAreaDamage) {
+    applyEffect(actor, {
+      type: "applyEffect",
+      label: "전장 지배",
+      duration: "nextAttack",
+      modifiers: [{ stat: "damageDealt", amount: actor.permanent.pushAreaDamage }],
+    });
+  }
+  if (pushedIntoTrap && action.trapHitBonus && isAlive(target)) {
+    const bonusBeforeHp = target.hp;
+    const bonusDamage = dealAttackDamage(actor, target, {
+      type: "attack",
+      mult: action.trapHitBonus,
+      range: action.range,
+      melee: action.melee,
+    }, action.trapHitBonus, { targetCount });
+    applyOverkillSplash(actor, target, bonusDamage - bonusBeforeHp, action);
+  }
+  return pushedIntoTrap;
+}
+
+async function animateActorAttack(actor, targetOrTargets, action) {
+  const targets = (Array.isArray(targetOrTargets) ? targetOrTargets : [targetOrTargets])
+    .filter(Boolean);
+  if (!isAlive(actor) || !targets.length) return;
+  const target = targets[0];
   const character = actor.side === "player"
     ? characterDefinitions[actor.characterId] ?? getSelectedCharacter()
     : null;
@@ -3188,7 +3261,8 @@ async function animateActorAttack(actor, target, action) {
   }
 
   const fromPoint = hexToPixel(actor, bounds);
-  const toPoint = hexToPixel(target, bounds);
+  const targetPoints = targets.map((item) => hexToPixel(item, bounds));
+  const toPoint = averagePoint(targetPoints);
   const dx = toPoint.x - fromPoint.x;
   const dy = toPoint.y - fromPoint.y;
   const length = Math.max(1, Math.hypot(dx, dy));
@@ -3205,14 +3279,22 @@ async function animateActorAttack(actor, target, action) {
   entityElement.style.setProperty("--attack-recoil-y", `${-uy * recoil}px`);
   entityElement.classList.add("attacking");
 
-  const projectile = !action.melee && (action.range ?? 1) > 1
-    ? createAttackProjectile(fromPoint, toPoint, duration)
-    : null;
-  if (projectile) elements.board.append(projectile);
+  const projectiles = !action.melee && (action.range ?? 1) > 1
+    ? targetPoints.map((point) => createAttackProjectile(fromPoint, point, duration))
+    : [];
+  projectiles.forEach((projectile) => elements.board.append(projectile));
 
   await sleep(duration);
   entityElement.classList.remove("attacking");
-  projectile?.remove();
+  projectiles.forEach((projectile) => projectile.remove());
+}
+
+function averagePoint(points) {
+  if (!points.length) return { x: 0, y: 0 };
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+  };
 }
 
 function createAttackProjectile(fromPoint, toPoint, duration) {
@@ -3234,7 +3316,7 @@ function createAttackProjectile(fromPoint, toPoint, duration) {
   return span;
 }
 
-function patternAttack(actor, action) {
+async function patternAttack(actor, action) {
   const placement = bestPatternPlacement(
     action.pattern,
     actor,
@@ -3250,16 +3332,29 @@ function patternAttack(actor, action) {
   const chargeBonus = consumeChargeForAttack(actor);
   const targetBonus = (placement.targets.length - 1) * ((action.perTargetBonus ?? 0) + (actor.permanent?.areaPerTargetBonus ?? 0));
   if (state.activeCardContext?.actorId === actor.id) state.activeCardContext.didAttack = true;
-  placement.targets.forEach((target) => {
-    if (!isAlive(actor) || !isAlive(target)) return;
+  await animateActorAttack(actor, placement.targets, action);
+  const batchVisuals = placement.targets.length > 1;
+  const hitEvents = [];
+  const hitResults = [];
+  for (const target of placement.targets) {
+    if (!isAlive(actor)) break;
+    if (!isAlive(target)) continue;
     const beforeHp = target.hp;
     const damage = dealAttackDamage(actor, target, action, action.mult + chargeBonus + targetBonus, {
       targetCount: placement.targets.length,
+      deferVisual: batchVisuals,
+      hitEvents,
     });
+    hitResults.push({ target, beforeHp, damage });
+  }
+  if (batchVisuals) flushHitEffects(hitEvents);
+  for (const result of hitResults) {
+    const { target, beforeHp, damage } = result;
     resolveKillPassives(actor, target);
     applyOverkillSplash(actor, target, damage - beforeHp, action);
     refundChargeOnKill(actor, target, action);
-  });
+    await handleAttackPush(actor, target, action, placement.targets.length);
+  }
   consumeEffects(actor, "attack");
   return true;
 }
@@ -3465,12 +3560,23 @@ function dealAttackDamage(actor, target, action, multiplier, options = {}) {
   const pulseHits = triggerThirdAttackPulse(actor, target, attackHitCount);
   resolveAfterHitEffects(actor, target);
   consumeEffects(target, "hit");
-  renderBoard();
-  renderHud();
-  showHitEffect(target, hitPosition, damage);
-  pulseHits.forEach((hit) => showHitEffect(hit.target, hit.position, hit.damage));
+  const hitEvents = [
+    { target, position: hitPosition, damage },
+    ...pulseHits.map((hit) => ({ target: hit.target, position: hit.position, damage: hit.damage })),
+  ];
+  if (options.deferVisual) {
+    options.hitEvents?.push(...hitEvents);
+  } else {
+    flushHitEffects(hitEvents);
+  }
   log(`${actor.name} -> ${target.name} ${damage} 피해`);
   return damage;
+}
+
+function flushHitEffects(hitEvents = []) {
+  renderBoard();
+  renderHud();
+  hitEvents.forEach((hit) => showHitEffect(hit.target, hit.position, hit.damage));
 }
 
 function applyAutoHitEffects(actor, target, hadAutoMark) {
@@ -5917,8 +6023,8 @@ function renderOffscreenEnemyIndicators(bounds) {
     clearOffscreenEnemyIndicators();
     return;
   }
-  const player = getPlayer();
-  if (!player) {
+  const focusActor = getCameraFocusPlayer();
+  if (!focusActor) {
     clearOffscreenEnemyIndicators();
     return;
   }
@@ -5932,7 +6038,7 @@ function renderOffscreenEnemyIndicators(bounds) {
   const offsetY = Number.isFinite(state.cameraY)
     ? state.cameraY
     : Number.parseFloat(elements.board.style.getPropertyValue("--board-y")) || 0;
-  const playerPoint = screenPointForHex(player, bounds, scale, offsetX, offsetY);
+  const playerPoint = screenPointForHex(focusActor, bounds, scale, offsetX, offsetY);
   const visible = {
     left: 60,
     right: panelWidth - 60,
@@ -5983,7 +6089,7 @@ function renderOffscreenEnemyIndicators(bounds) {
     indicator.style.top = `${position.y}px`;
     if (parts?.arrow) parts.arrow.textContent = directionArrow(dx, dy);
     if (parts?.enemy) parts.enemy.textContent = enemy.label ?? enemy.monsterIndex;
-    if (parts?.distance) parts.distance.textContent = axialDistance(player, enemy);
+    if (parts?.distance) parts.distance.textContent = axialDistance(focusActor, enemy);
     visibleIndicatorIds.add(indicatorId);
   });
 
@@ -6815,29 +6921,9 @@ async function playTurnStart() {
 }
 
 async function playTurnCue(entry, index = 0) {
-  // 적 차례는 따로 알리지 않고 지나간다 — 내 차례만 명확히 인지시킨다.
-  if (entry.actorType !== "player") return;
-  if (!isFirstPlayerEntryInPriorityGroup(entry, index)) return;
   const host = document.querySelector("#turnCue");
-  if (!host) return;
-  const character = characterForActorId(entry.actorId);
-  host.className = "turn-cue player";
-  host.innerHTML = `
-    <div class="turn-cue-panel">
-      <span class="turn-cue-avatar">${portraitContent(character.image, character.shortLabel, "turn-cue-art")}</span>
-      <div class="turn-cue-body">
-        <span class="turn-cue-kicker">MY TURN</span>
-        <strong class="turn-cue-name">${character.name} 차례</strong>
-      </div>
-    </div>
-  `;
-  void host.offsetWidth;
-  document.body.classList.add("turn-cue-active");
-  host.classList.add("show");
-  await sleep(turnDelay(1.7));
-  host.classList.remove("show");
+  host?.classList.remove("show");
   document.body.classList.remove("turn-cue-active");
-  await sleep(turnDelay(0.32));
 }
 
 function entryOwnerLabel(entry) {
@@ -7325,10 +7411,10 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
   let offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
   let offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
 
-  const player = getPlayer();
-  if (state.cameraMode === "focus" && player) {
+  const focusActor = getCameraFocusPlayer();
+  if (state.cameraMode === "focus" && focusActor) {
     scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, CAMERA_FOCUS_TARGET_SCALE));
-    const focusPoint = options.focusPoint ?? hexToPixel(player, bounds);
+    const focusPoint = options.focusPoint ?? hexToPixel(focusActor, bounds);
     const playArea = metrics.playArea;
     const focusCenter = {
       x: panelWidth / 2,
@@ -7336,9 +7422,11 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
     };
     const currentScale = state.cameraScale || scale;
     const panelChanged = state.cameraPanelWidth !== panelWidth || state.cameraPanelHeight !== panelHeight;
+    const focusActorChanged = state.cameraFocusActorId !== focusActor.id;
     const shouldCenterCamera =
       !state.cameraFocusReady ||
       panelChanged ||
+      focusActorChanged ||
       Math.abs(currentScale - scale) > 0.001;
 
     if (shouldCenterCamera) {
@@ -7730,7 +7818,9 @@ function setBoardTransform(value) {
 }
 
 function commitCameraFrame(frame) {
-  state.cameraFocusReady = state.cameraMode === "focus" && Boolean(getPlayer());
+  const focusActor = getCameraFocusPlayer();
+  state.cameraFocusReady = state.cameraMode === "focus" && Boolean(focusActor);
+  state.cameraFocusActorId = focusActor?.id ?? null;
   state.cameraPanelWidth = frame.panelWidth;
   state.cameraPanelHeight = frame.panelHeight;
   state.cameraX = frame.offsetX;
@@ -7799,6 +7889,41 @@ function hexVertices(hex) {
 
 function getPlayer() {
   return state.entities.find((entity) => entity.side === "player" && isAlive(entity));
+}
+
+function getCameraFocusPlayer() {
+  const activeEntry = state?.activeTimelineIndex >= 0
+    ? state.currentTimeline[state.activeTimelineIndex]
+    : null;
+  if (activeEntry?.actorType === "player") {
+    const actor = state.entities.find((entity) => (
+      entity.id === activeEntry.actorId &&
+      entity.side === "player" &&
+      isAlive(entity)
+    ));
+    if (actor) return actor;
+  }
+
+  if (activeEntry?.actorType === "enemyGroup") {
+    const targetId = activeEntry.targetId ?? state.enemyTargetIds?.[activeEntry.actorId];
+    const target = state.entities.find((entity) => (
+      entity.id === targetId &&
+      entity.side === "player" &&
+      isAlive(entity)
+    ));
+    if (target) return target;
+  }
+
+  if (state?.cameraFocusActorId) {
+    const previousFocus = state.entities.find((entity) => (
+      entity.id === state.cameraFocusActorId &&
+      entity.side === "player" &&
+      isAlive(entity)
+    ));
+    if (previousFocus) return previousFocus;
+  }
+
+  return getPlayer();
 }
 
 function alivePlayers() {
