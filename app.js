@@ -5786,7 +5786,124 @@ function updatePriorityItem(item, entry, timelineIndex = -1) {
 
 function renderPlayerHud() {
   if (!elements.playerHud) return;
+  if (AUTO_ROUTINE_MODE) {
+    renderAutoRoutineHud();
+    return;
+  }
   elements.playerHud.innerHTML = "";
+  elements.playerHud.setAttribute("aria-hidden", "true");
+}
+
+function renderAutoRoutineHud() {
+  const players = state.entities.filter((entity) => entity.side === "player");
+  if (!players.length) {
+    elements.playerHud.innerHTML = "";
+    elements.playerHud.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  const activeEntry = state.activeTimelineIndex >= 0
+    ? state.currentTimeline[state.activeTimelineIndex]
+    : null;
+  const activeActorId = activeEntry?.actorType === "player" ? activeEntry.actorId : null;
+
+  elements.playerHud.setAttribute("aria-hidden", "false");
+  elements.playerHud.className = [
+    "player-hud",
+    "auto-routine-hud",
+    players.length === 1 ? "solo" : players.length === 2 ? "duo" : "trio",
+  ].join(" ");
+  elements.playerHud.innerHTML = `
+    <div class="auto-party-board" style="--auto-party-count: ${Math.min(players.length, 3)}">
+      ${players.map((actor) => autoRoutinePanelMarkup(actor, activeActorId)).join("")}
+    </div>
+  `;
+}
+
+function autoRoutinePanelMarkup(actor, activeActorId) {
+  const character = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
+  const routine = autoRoutineCard(actor);
+  const alive = isAlive(actor);
+  const actionChips = routine.actions.map(autoRoutineActionChip).join("");
+  const hp = `${Math.max(0, actor.hp)} / ${actor.maxHp}`;
+  const portrait = portraitContent(character.image, character.shortLabel ?? character.name, "auto-party-portrait-img");
+  return `
+    <article class="auto-party-card ${actor.id === activeActorId ? "active" : ""} ${alive ? "" : "down"}">
+      <div class="auto-party-head">
+        <span class="auto-party-portrait">${portrait}</span>
+        <div class="auto-party-main">
+          <strong>${escapeMarkup(character.name)}</strong>
+          <span>${escapeMarkup(autoRoutineRoleLine(actor))}</span>
+        </div>
+      </div>
+      <div class="auto-party-hp" aria-label="체력 ${hp}">
+        <span><i style="width: ${hpPercent(actor)}%"></i></span>
+        <b>${hp}</b>
+      </div>
+      <div class="auto-action-list" aria-label="자동 행동">
+        ${actionChips}
+      </div>
+    </article>
+  `;
+}
+
+function autoRoutineRoleLine(actor) {
+  if (actor.characterId === "archer") {
+    const shots = actor.permanent?.autoShots ?? 2;
+    return `공격력 ${actor.baseAtk} · ${shots}연타`;
+  }
+  if (actor.characterId === "warrior") {
+    const targets = actor.permanent?.autoCleaveTargets ?? 1;
+    return `공격력 ${actor.baseAtk} · ${targets > 1 ? `${targets}대상` : "근접"}`;
+  }
+  if (actor.characterId === "mage") {
+    const targets = actor.permanent?.autoChainTargets ?? 1;
+    return `공격력 ${actor.baseAtk} · ${targets > 1 ? `${targets}연쇄` : `사거리 ${actor.baseRange}`}`;
+  }
+  return `공격력 ${actor.baseAtk} · 이동 ${actor.baseMove}`;
+}
+
+function autoRoutineActionChip(action) {
+  const summary = autoRoutineActionSummary(action);
+  return `
+    <span class="auto-action-chip ${summary.kind}" title="${escapeMarkup(summary.title)}">
+      <span class="action-icon ${summary.icon}">${actionIcon(summary.icon)}</span>
+      <b>${escapeMarkup(summary.label)}</b>
+    </span>
+  `;
+}
+
+function autoRoutineActionSummary(action) {
+  if (action.type === "move") {
+    return { kind: "move", icon: "move", label: `이동 ${action.amount ?? 0}`, title: `가장 가까운 적에게 ${action.amount ?? 0}칸 접근` };
+  }
+  if (action.type === "attack") {
+    const targets = action.targets && action.targets > 1 ? ` x${action.targets}` : "";
+    const label = action.melee || action.range <= 1 ? `근접 ${action.mult ?? 1}${targets}` : `공격 ${action.mult ?? 1}${targets}`;
+    return { kind: "attack", icon: action.melee || action.range <= 1 ? "melee" : "ranged", label, title: `가장 가까운 적 공격${targets}` };
+  }
+  if (action.type === "patternAttack") {
+    return { kind: "attack", icon: "area", label: "범위", title: "주변 다중 타격" };
+  }
+  if (action.type === "placeTrap") {
+    return { kind: "special", icon: trapIconKind(action), label: "함정", title: trapLabel(action) };
+  }
+  if (action.type === "placeRune") {
+    return { kind: "special", icon: "rune", label: "룬", title: "룬 설치" };
+  }
+  if (action.type === "placeMeteor") {
+    return { kind: "special", icon: "meteor", label: "운석", title: "운석 예고" };
+  }
+  return { kind: "special", icon: "effect", label: action.type, title: action.type };
+}
+
+function escapeMarkup(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function renderTurnPlanner() {
