@@ -1389,8 +1389,8 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-mage-damage", "mage", "공용", "안정된 마력", "마법사 기본 공격력이 2 증가한다.", () => {
     autoHero("mage").baseAtk += 2;
   }),
-  autoUpgrade("auto-mage-retreat", "mage", "공용", "마력 거리두기", "마법사의 자동 후퇴 거리가 1 증가한다.", () => {
-    autoPermanent("mage").autoRetreatBonus = (autoPermanent("mage").autoRetreatBonus ?? 0) + 1;
+  autoUpgrade("auto-mage-retreat", "mage", "공용", "마력 위치 조정", "마법사의 자동 이동 거리가 1 증가한다.", () => {
+    autoPermanent("mage").autoMoveBonus = (autoPermanent("mage").autoMoveBonus ?? 0) + 1;
   }),
   autoUpgrade("auto-mage-chain", "mage", "연쇄", "연쇄 마력탄", "마법사가 최대 2명의 적을 공격한다.", () => {
     autoPermanent("mage").autoChainTargets = Math.max(autoPermanent("mage").autoChainTargets ?? 1, 2);
@@ -1795,7 +1795,7 @@ function createPlayerEntity(character, position, previousPlayer = null) {
     maxHp: previousPlayer?.maxHp ?? character.maxHp,
     baseAtk: previousPlayer?.baseAtk ?? character.baseAtk,
     baseRange: character.baseRange,
-    baseMove: character.baseMove,
+    baseMove: AUTO_ROUTINE_MODE && character.id === "mage" ? 1 : character.baseMove,
     charge: 0,
     permanent: { ...(previousPlayer?.permanent ?? {}) },
     temporary: {},
@@ -2262,7 +2262,7 @@ function autoMageRoutineCard(actor) {
   const permanent = actor.permanent ?? {};
   const range = actor.baseRange + (permanent.autoRangeBonus ?? 0);
   const actions = [
-    { type: "flee", amount: 1 + (permanent.autoRetreatBonus ?? 0) },
+    { type: "move", amount: 1 + (permanent.autoMoveBonus ?? 0), desiredRange: range },
   ];
   if (permanent.autoRuneEvery && state.turn % permanent.autoRuneEvery === 2) {
     actions.push({
