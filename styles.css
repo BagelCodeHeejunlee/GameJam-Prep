@@ -3336,6 +3336,13 @@ body.turn-cue-active .turn-scrim {
   gap: 14px 8px;
 }
 
+.reward-cards.reward-phase-auto {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 420px;
+  margin: 0 auto;
+  gap: 10px;
+}
+
 @media (min-width: 600px) {
   .reward-cards.reward-phase-passive {
     grid-template-columns: repeat(3, max-content);
@@ -4218,6 +4225,64 @@ body.turn-cue-active .turn-scrim {
 
 .reward-pick:active .reward-mount {
   transform: translateY(-4px) scale(1);
+}
+
+.auto-upgrade-pick {
+  width: 100%;
+  min-height: 112px;
+  align-items: stretch;
+  gap: 7px;
+  padding: 14px 15px;
+  border: 1px solid rgba(255, 244, 211, 0.48);
+  border-left: 5px solid #ffd36c;
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 50%),
+    rgba(20, 42, 54, 0.88);
+  color: #fff8e2;
+  text-align: left;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+}
+
+.auto-upgrade-pick strong {
+  color: #fff5cf;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.auto-upgrade-pick span {
+  color: #d9e5eb;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.auto-upgrade-owner {
+  color: #ffd36c !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+.auto-owner-archer {
+  border-left-color: #88d267;
+}
+
+.auto-owner-warrior {
+  border-left-color: #f09a47;
+}
+
+.auto-owner-mage {
+  border-left-color: #8aa6ff;
+}
+
+.auto-owner-party {
+  border-left-color: #ffd36c;
+}
+
+.auto-upgrade-pick:hover,
+.auto-upgrade-pick:focus-visible {
+  transform: translateY(-3px);
+  filter: brightness(1.07);
 }
 
 /* ── Acquisition: card flies to the deck ───────────────────── */

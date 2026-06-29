@@ -15,6 +15,7 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
+const AUTO_ROUTINE_MODE = true;
 const STAT_PERCENT_PASSIVE_CAP_BY_RARITY = {
   "기본": 0.1,
   "노말": 0.1,
@@ -1303,6 +1304,151 @@ const monsterDecks = {
 
 const waves = buildWaves();
 const testPlayerPartyIds = ["archer", "warrior", "mage"];
+const autoUpgradeCatalog = [
+  autoUpgrade("auto-archer-damage", "archer", "공용", "안정 사격", "궁수 기본 공격력이 2 증가한다.", () => {
+    autoHero("archer").baseAtk += 2;
+  }),
+  autoUpgrade("auto-archer-range", "archer", "공용", "사거리 확보", "궁수 자동 사격 사거리가 1 증가한다.", () => {
+    autoPermanent("archer").autoRangeBonus = (autoPermanent("archer").autoRangeBonus ?? 0) + 1;
+  }),
+  autoUpgrade("auto-archer-mark", "archer", "표식", "약점 표식", "궁수 공격이 적에게 표식을 남긴다. 표식 대상은 추가 피해 시너지의 기준이 된다.", () => {
+    autoPermanent("archer").autoMarkOnHit = true;
+  }),
+  autoUpgrade("auto-archer-mark-hunt", "archer", "표식", "표식 사냥", "궁수가 표식 대상을 공격할 때 주는 피해가 30% 증가한다.", () => {
+    autoPermanent("archer").autoMarkedDamage = (autoPermanent("archer").autoMarkedDamage ?? 0) + 0.3;
+  }, { requires: ["auto-archer-mark"] }),
+  autoUpgrade("auto-archer-mark-transfer", "archer", "표식", "표식 전이", "표식 적이 죽으면 가장 체력이 낮은 다른 적에게 표식이 옮겨진다.", () => {
+    autoPermanent("archer").autoMarkTransfer = true;
+  }, { requires: ["auto-archer-mark-hunt"] }),
+  autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
+    autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
+  }),
+  autoUpgrade("auto-archer-double", "archer", "연타", "연속 사격", "궁수가 매 턴 2회 사격한다.", () => {
+    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 1, 2);
+  }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage", "auto-archer-mark"] }),
+  autoUpgrade("auto-archer-triple", "archer", "연타", "삼연사", "궁수가 매 턴 3회 사격한다.", () => {
+    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 1, 3);
+  }, { requires: ["auto-archer-double"] }),
+  autoUpgrade("auto-archer-trap", "archer", "함정", "공격 함정", "궁수가 3턴마다 적 진입 경로에 공격 함정을 설치한다.", () => {
+    autoPermanent("archer").autoTrapEvery = 3;
+    autoPermanent("archer").autoTrapCount = Math.max(autoPermanent("archer").autoTrapCount ?? 1, 1);
+  }),
+  autoUpgrade("auto-archer-trap-polish", "archer", "함정", "함정 손질", "함정 위력이 증가하고, 함정 발동 후 다음 사격 피해가 오른다.", () => {
+    autoPermanent("archer").autoTrapPower = (autoPermanent("archer").autoTrapPower ?? 2) + 1;
+    autoPermanent("archer").trapNextAttackDamage = (autoPermanent("archer").trapNextAttackDamage ?? 0) + 0.35;
+  }, { requires: ["auto-archer-trap"] }),
+  autoUpgrade("auto-archer-spike-path", "archer", "함정", "가시 길목", "함정 설치 수가 1 증가한다.", () => {
+    autoPermanent("archer").autoTrapCount = (autoPermanent("archer").autoTrapCount ?? 1) + 1;
+  }, { requires: ["auto-archer-trap"] }),
+  autoUpgrade("auto-archer-chain-trap", "archer", "함정", "연쇄 함정", "함정이 발동하면 주변 적에게도 피해를 준다.", () => {
+    autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 2);
+  }, { requires: ["auto-archer-trap-polish"] }),
+
+  autoUpgrade("auto-warrior-damage", "warrior", "공용", "강한 베기", "전사 기본 공격력이 2 증가한다.", () => {
+    autoHero("warrior").baseAtk += 2;
+  }),
+  autoUpgrade("auto-warrior-frontline", "warrior", "공용", "전열 유지", "전사가 매 턴 받는 피해 감소 효과를 얻고, 낮은 체력 아군 근처의 적을 더 우선한다.", () => {
+    autoPermanent("warrior").autoProtect = true;
+    applyEffect(autoHero("warrior"), {
+      type: "applyEffect",
+      label: "전열 유지",
+      duration: "stage",
+      modifiers: [{ stat: "damageTaken", amount: -0.15 }],
+    });
+  }),
+  autoUpgrade("auto-warrior-push", "warrior", "돌진", "방패 밀치기", "전사 공격이 적을 1칸 밀친다.", () => {
+    autoPermanent("warrior").autoPush = (autoPermanent("warrior").autoPush ?? 0) + 1;
+  }),
+  autoUpgrade("auto-warrior-breakthrough", "warrior", "돌진", "돌파", "전사의 자동 접근 이동력이 1 증가하고 근접 피해가 15% 증가한다.", () => {
+    autoPermanent("warrior").autoMoveBonus = (autoPermanent("warrior").autoMoveBonus ?? 0) + 1;
+    autoPermanent("warrior").moveAttackDamage = (autoPermanent("warrior").moveAttackDamage ?? 0) + 0.15;
+  }),
+  autoUpgrade("auto-warrior-comet", "warrior", "돌진", "전장의 혜성", "전사가 3칸 이상 이동 후 공격하면 밀침이 1 증가하고 추가 피해를 준다.", () => {
+    autoPermanent("warrior").autoComet = true;
+    autoPermanent("warrior").autoPush = (autoPermanent("warrior").autoPush ?? 0) + 1;
+  }, { requiresAny: ["auto-warrior-push", "auto-warrior-breakthrough"] }),
+  autoUpgrade("auto-warrior-cleave", "warrior", "범위 공격", "넓은 휩쓸기", "전사가 근접한 적을 최대 2명까지 공격한다.", () => {
+    autoPermanent("warrior").autoCleaveTargets = Math.max(autoPermanent("warrior").autoCleaveTargets ?? 1, 2);
+  }),
+  autoUpgrade("auto-warrior-collapse", "warrior", "범위 공격", "전열 붕괴", "전사가 적을 밀칠 때 다음 공격 피해가 증가한다.", () => {
+    autoPermanent("warrior").pushAreaDamage = (autoPermanent("warrior").pushAreaDamage ?? 0) + 0.25;
+  }, { requires: ["auto-warrior-push"] }),
+  autoUpgrade("auto-warrior-control", "warrior", "범위 공격", "전장 장악", "전사가 근접한 적을 최대 3명까지 공격한다.", () => {
+    autoPermanent("warrior").autoCleaveTargets = Math.max(autoPermanent("warrior").autoCleaveTargets ?? 1, 3);
+  }, { requires: ["auto-warrior-cleave"] }),
+  autoUpgrade("auto-warrior-blood", "warrior", "광전", "피의 박자", "전사 체력이 낮을수록 피해가 증가한다.", () => {
+    autoPermanent("warrior").berserkLostHpDamage = (autoPermanent("warrior").berserkLostHpDamage ?? 0) + 0.65;
+  }),
+  autoUpgrade("auto-warrior-berserk", "warrior", "광전", "광전 태세", "전사 체력이 절반 이하이면 자동 공격을 한 번 더 한다.", () => {
+    autoPermanent("warrior").autoBerserkExtra = true;
+  }, { requires: ["auto-warrior-blood"] }),
+  autoUpgrade("auto-warrior-storm", "warrior", "광전", "피의 폭풍", "전사가 4턴마다 주변 다중 타격을 한다.", () => {
+    autoPermanent("warrior").autoBloodStormEvery = 4;
+  }, { requiresAny: ["auto-warrior-berserk", "auto-warrior-cleave"] }),
+
+  autoUpgrade("auto-mage-damage", "mage", "공용", "안정된 마력", "마법사 기본 공격력이 2 증가한다.", () => {
+    autoHero("mage").baseAtk += 2;
+  }),
+  autoUpgrade("auto-mage-retreat", "mage", "공용", "마력 거리두기", "마법사의 자동 후퇴 거리가 1 증가한다.", () => {
+    autoPermanent("mage").autoRetreatBonus = (autoPermanent("mage").autoRetreatBonus ?? 0) + 1;
+  }),
+  autoUpgrade("auto-mage-chain", "mage", "연쇄", "연쇄 마력탄", "마법사가 최대 2명의 적을 공격한다.", () => {
+    autoPermanent("mage").autoChainTargets = Math.max(autoPermanent("mage").autoChainTargets ?? 1, 2);
+  }),
+  autoUpgrade("auto-mage-three-chain", "mage", "연쇄", "세 갈래 번개", "마법사가 최대 3명의 적을 공격한다.", () => {
+    autoPermanent("mage").autoChainTargets = Math.max(autoPermanent("mage").autoChainTargets ?? 1, 3);
+  }, { requires: ["auto-mage-chain"] }),
+  autoUpgrade("auto-mage-circuit", "mage", "연쇄", "무한 회로", "다중 대상 마법 피해가 증가한다.", () => {
+    autoPermanent("mage").multiTargetDamage = (autoPermanent("mage").multiTargetDamage ?? 0) + 0.25;
+  }, { requires: ["auto-mage-three-chain"] }),
+  autoUpgrade("auto-mage-rune", "mage", "룬", "폭발 룬", "마법사가 3턴마다 룬을 설치한다.", () => {
+    autoPermanent("mage").autoRuneEvery = 3;
+    autoPermanent("mage").autoRuneCount = Math.max(autoPermanent("mage").autoRuneCount ?? 1, 1);
+  }),
+  autoUpgrade("auto-mage-rune-tune", "mage", "룬", "룬 조율", "룬 위력이 증가하고 룬 보유 중 원거리 피해가 증가한다.", () => {
+    autoPermanent("mage").autoRunePower = (autoPermanent("mage").autoRunePower ?? 1) + 1;
+    autoPermanent("mage").runeDamage = (autoPermanent("mage").runeDamage ?? 0) + 0.1;
+  }, { requires: ["auto-mage-rune"] }),
+  autoUpgrade("auto-mage-rune-link", "mage", "룬", "룬 연동", "룬이 발동하면 주변 적에게도 피해를 준다.", () => {
+    autoPermanent("mage").runeChainDamage = Math.max(autoPermanent("mage").runeChainDamage ?? 0, 1);
+  }, { requires: ["auto-mage-rune-tune"] }),
+  autoUpgrade("auto-mage-meteor", "mage", "운석", "운석 예고", "마법사가 4턴마다 운석을 예고한다.", () => {
+    autoPermanent("mage").autoMeteorEvery = 4;
+  }),
+  autoUpgrade("auto-mage-shard", "mage", "운석", "파편 회수", "운석이 2명 이상 맞히면 다음 운석 피해가 증가한다.", () => {
+    autoPermanent("mage").meteorMultiDamage = (autoPermanent("mage").meteorMultiDamage ?? 0) + 0.25;
+  }, { requires: ["auto-mage-meteor"] }),
+  autoUpgrade("auto-mage-sky", "mage", "운석", "하늘 붕괴", "운석 피해와 범위가 증가한다.", () => {
+    autoPermanent("mage").autoMeteorMultBonus = (autoPermanent("mage").autoMeteorMultBonus ?? 0) + 1;
+    autoPermanent("mage").autoMeteorRadius = Math.max(autoPermanent("mage").autoMeteorRadius ?? 1, 2);
+  }, { requires: ["auto-mage-shard"] }),
+
+  autoUpgrade("auto-party-mark-break", "party", "궁수+전사", "표식 돌파", "전사가 표식 적을 공격하면 추가 피해와 밀침을 얻는다.", () => {
+    state.autoSynergy.markBreak = true;
+  }, { requires: ["auto-archer-mark", "auto-warrior-push"] }),
+  autoUpgrade("auto-party-mark-conduct", "party", "궁수+마법사", "표식 전도", "마법사가 표식 적에게 주는 피해가 증가하고 표식이 오래 유지된다.", () => {
+    state.autoSynergy.markConduct = true;
+  }, { requires: ["auto-archer-mark", "auto-mage-chain"] }),
+  autoUpgrade("auto-party-burning-trap", "party", "궁수+마법사", "불타는 함정", "함정과 룬이 더 강하게 발동한다.", () => {
+    state.autoSynergy.burningTrap = true;
+    autoPermanent("archer").autoTrapPower = (autoPermanent("archer").autoTrapPower ?? 2) + 1;
+    autoPermanent("mage").autoRunePower = (autoPermanent("mage").autoRunePower ?? 1) + 1;
+  }, { requiresAny: ["auto-archer-trap", "auto-mage-rune"] }),
+  autoUpgrade("auto-party-collision", "party", "전사+마법사", "충돌 폭발", "전사가 적을 밀칠 때 다음 마법 피해가 증가한다.", () => {
+    state.autoSynergy.collisionBurst = true;
+    autoPermanent("warrior").pushAreaDamage = (autoPermanent("warrior").pushAreaDamage ?? 0) + 0.2;
+  }, { requires: ["auto-warrior-push"] }),
+  autoUpgrade("auto-party-rune-dash", "party", "전사+마법사", "룬 돌진", "전사가 밀친 적을 따라 룬 전투가 강해진다.", () => {
+    state.autoSynergy.runeDash = true;
+    autoPermanent("mage").runeDamage = (autoPermanent("mage").runeDamage ?? 0) + 0.15;
+  }, { requires: ["auto-warrior-push", "auto-mage-rune"] }),
+  autoUpgrade("auto-party-encircle", "party", "3인", "포위 완성", "표식, 밀침, 마법 피해가 모두 연결되면 파티 전체 피해가 증가한다.", () => {
+    state.autoSynergy.encircle = true;
+    playerPartyCharacters().forEach((character) => {
+      autoPermanent(character.id).autoPartyDamage = (autoPermanent(character.id).autoPartyDamage ?? 0) + 0.15;
+    });
+  }, { requiresAny: ["auto-party-mark-break", "auto-party-mark-conduct", "auto-party-rune-dash"] }),
+];
 
 let state;
 
@@ -1313,6 +1459,21 @@ function getSelectedCharacter() {
 function characterForActorId(actorId) {
   const entity = state?.entities?.find((item) => item.id === actorId);
   return characterDefinitions[entity?.characterId] ?? characterDefinitions[actorId] ?? getSelectedCharacter();
+}
+
+function autoUpgrade(id, owner, route, name, desc, apply, options = {}) {
+  return { id, owner, route, name, desc, apply, ...options };
+}
+
+function autoHero(id) {
+  return state.entities.find((entity) => entity.side === "player" && entity.characterId === id);
+}
+
+function autoPermanent(id) {
+  const actor = autoHero(id);
+  if (!actor) return {};
+  actor.permanent = actor.permanent ?? {};
+  return actor.permanent;
 }
 
 function card(id, name, route, rarity, priority, actions, copies = 1) {
@@ -1379,6 +1540,10 @@ async function newRun() {
     preStartReward: false,
     rewardPhase: "passive",
     passiveCards: [],
+    autoMode: AUTO_ROUTINE_MODE,
+    autoUpgrades: [],
+    autoPickedUpgradeIds: new Set(),
+    autoSynergy: {},
     rewardPickCount: 0,
     rewardTags: new Set(),
     rewardRouteCounts: {},
@@ -1397,6 +1562,13 @@ async function newRun() {
 
   startWave(0);
   log(`${character.name} 새 런을 시작했다.`);
+  if (AUTO_ROUTINE_MODE) {
+    log("자동 루틴 전투: 전투 중 선택 없이 영웅들이 고정 행동을 수행합니다.");
+    render();
+    preloadRewardAssets(character);
+    scheduleTurn();
+    return;
+  }
   state.waitingReward = true;
   state.preStartReward = true;
   state.rewardPhase = "passive";
@@ -1837,6 +2009,10 @@ function scheduleTurn() {
 }
 
 async function runTurn() {
+  if (AUTO_ROUTINE_MODE) {
+    await runAutoRoutineTurn();
+    return;
+  }
   if (state.paused || state.busy || state.waitingReward || state.finished) return;
   const turnState = state;
   state.busy = true;
@@ -1933,6 +2109,218 @@ async function runTurn() {
   state.busy = false;
   render();
   scheduleTurn();
+}
+
+async function runAutoRoutineTurn() {
+  if (state.paused || state.busy || state.waitingReward || state.finished) return;
+  const turnState = state;
+  state.busy = true;
+  state.turn += 1;
+  state.activeTimelineIndex = -1;
+  state.comboHits = {};
+  processMeteors();
+  if (checkEndConditions()) {
+    state.busy = false;
+    return;
+  }
+
+  await playTurnStart();
+  if (state !== turnState || state.finished || state.waitingReward) {
+    state.busy = false;
+    return;
+  }
+
+  const playerEntries = alivePlayers().map((actor, index) => ({
+    actorType: "player",
+    actorId: actor.id,
+    card: autoRoutineCard(actor),
+    playIndex: index,
+  }));
+  const enemyEntries = autoEnemyPlanEntries();
+  state.planningChoices = [];
+  state.plannedCardKeys = [];
+  state.enemyPlanEntries = enemyEntries;
+  state.turnPlanning = false;
+  state.currentTimeline = playerEntries.concat(enemyEntries);
+  assignPlanOrders(state.currentTimeline);
+  state.priorityRevealMode = "";
+  state.activeTimelineIndex = -1;
+  state.completedTimelineCount = 0;
+  state.completedTimelineIndexes = new Set();
+  state.suppressPlayerCard = false;
+  state.focusTargetId = currentFocusTargetId();
+  log(`턴 ${state.turn}: 자동 루틴`);
+  render();
+  await sleep(turnDelay(0.45));
+
+  for (let index = 0; index < state.currentTimeline.length; index += 1) {
+    if (state.finished || state.waitingReward) break;
+    const entry = state.currentTimeline[index];
+    state.activeTimelineIndex = index;
+    document.body.classList.toggle("player-acting", entry.actorType === "player");
+    releaseManualCameraPanForPlayerTurn(entry);
+    renderPriorityStrip();
+    renderEnemyActionHud();
+    renderPlayerHud();
+    renderBoard();
+    renderDrawnCards();
+    renderTimeline(index);
+    await playTurnCue(entry, index);
+    await executeTimelineEntry(entry);
+    expireTurnEndEffects(entry);
+    state.completedTimelineIndexes.add(index);
+    state.completedTimelineCount = Math.max(state.completedTimelineCount, index + 1);
+    state.activeTimelineIndex = -1;
+    document.body.classList.remove("player-acting");
+    renderPriorityStrip();
+    renderEnemyActionHud();
+    renderPlayerHud();
+    renderBoard();
+    renderDrawnCards();
+    renderTimeline();
+    await sleep(turnDelay());
+    if (checkEndConditions()) break;
+  }
+
+  state.focusTargetId = currentFocusTargetId();
+  state.busy = false;
+  render();
+  scheduleTurn();
+}
+
+function autoRoutineCard(actor) {
+  if (actor.characterId === "archer") return autoArcherRoutineCard(actor);
+  if (actor.characterId === "warrior") return autoWarriorRoutineCard(actor);
+  if (actor.characterId === "mage") return autoMageRoutineCard(actor);
+  return {
+    ...card(`auto-${actor.id}-${state.turn}`, "자동 행동", "자동", "기본", 50, [
+      { type: "move", amount: actor.baseMove, desiredRange: actor.baseRange },
+      { type: "attack", mult: 1, range: actor.baseRange, melee: actor.baseRange <= 1 },
+    ]),
+    instanceId: `auto-${actor.id}-${state.turn}`,
+  };
+}
+
+function autoArcherRoutineCard(actor) {
+  const permanent = actor.permanent ?? {};
+  const range = actor.baseRange + (permanent.autoRangeBonus ?? 0);
+  const actions = [
+    { type: "move", amount: 2 + (permanent.autoMoveBonus ?? 0), desiredRange: Math.max(2, range) },
+  ];
+  if (permanent.autoTrapEvery && state.turn % permanent.autoTrapEvery === 1) {
+    actions.push({
+      type: "placeTrap",
+      range,
+      trap: "attack",
+      count: permanent.autoTrapCount ?? 1,
+      power: permanent.autoTrapPower ?? 2,
+    });
+  }
+  const shots = permanent.autoShots ?? 1;
+  for (let index = 0; index < shots; index += 1) {
+    actions.push({
+      type: "attack",
+      mult: 1,
+      range,
+      preferPreviousTarget: index > 0,
+      push: permanent.autoPush ?? 0,
+    });
+  }
+  return {
+    ...card(`auto-archer-${state.turn}`, shots >= 3 ? "자동 삼연사" : shots >= 2 ? "자동 연속 사격" : "자동 사격", "자동 루틴", "기본", 40, actions),
+    instanceId: `auto-archer-${state.turn}`,
+  };
+}
+
+function autoWarriorRoutineCard(actor) {
+  const permanent = actor.permanent ?? {};
+  const actions = [
+    { type: "move", amount: 3 + (permanent.autoMoveBonus ?? 0), desiredRange: 1 },
+  ];
+  const attack = {
+    type: "attack",
+    mult: 1 + (permanent.autoComet ? 0.35 : 0),
+    range: 1,
+    melee: true,
+    push: permanent.autoPush ?? 0,
+    targets: permanent.autoCleaveTargets ?? 1,
+  };
+  actions.push(attack);
+  if (permanent.autoBerserkExtra && actor.hp <= actor.maxHp / 2) {
+    actions.push({ ...attack, preferPreviousTarget: true });
+  }
+  if (permanent.autoBloodStormEvery && state.turn % permanent.autoBloodStormEvery === 0) {
+    actions.push({ type: "patternAttack", mult: 1, range: 1, pattern: "adjacent-triple", melee: true });
+  }
+  return {
+    ...card(`auto-warrior-${state.turn}`, "자동 돌진 베기", "자동 루틴", "기본", 50, actions),
+    instanceId: `auto-warrior-${state.turn}`,
+  };
+}
+
+function autoMageRoutineCard(actor) {
+  const permanent = actor.permanent ?? {};
+  const range = actor.baseRange + (permanent.autoRangeBonus ?? 0);
+  const actions = [
+    { type: "flee", amount: 1 + (permanent.autoRetreatBonus ?? 0) },
+  ];
+  if (permanent.autoRuneEvery && state.turn % permanent.autoRuneEvery === 2) {
+    actions.push({
+      type: "placeRune",
+      range,
+      count: permanent.autoRuneCount ?? 1,
+      power: permanent.autoRunePower ?? 1,
+    });
+  }
+  if (permanent.autoMeteorEvery && state.turn % permanent.autoMeteorEvery === 0) {
+    actions.push({
+      type: "placeMeteor",
+      range: range + 1,
+      mult: 2 + (permanent.autoMeteorMultBonus ?? 0),
+      radius: permanent.autoMeteorRadius ?? 1,
+      delay: 1,
+    });
+  }
+  actions.push({
+    type: "attack",
+    mult: 1,
+    range,
+    targets: permanent.autoChainTargets ?? 1,
+  });
+  return {
+    ...card(`auto-mage-${state.turn}`, "자동 마력탄", "자동 루틴", "기본", 60, actions),
+    instanceId: `auto-mage-${state.turn}`,
+  };
+}
+
+function autoEnemyPlanEntries() {
+  const entries = aliveEnemyKinds().map((kind) => {
+    const cardData = autoEnemyRoutineCard(kind);
+    return {
+      actorType: "enemyGroup",
+      actorId: kind,
+      card: cardData,
+      targetId: chooseEnemyGroupTarget(kind, cardData)?.id ?? null,
+    };
+  });
+  state.enemyTargetIds = Object.fromEntries(entries.map((entry) => [entry.actorId, entry.targetId]));
+  return entries;
+}
+
+function autoEnemyRoutineCard(kind) {
+  const sample = aliveEnemies().find((enemy) => enemy.kind === kind);
+  const definition = monsterDefinitions[kind] ?? monsterDefinitions.brute;
+  const move = sample?.baseMove ?? definition.baseMove ?? 1;
+  const range = sample?.baseRange ?? definition.baseRange ?? 1;
+  const melee = range <= 1;
+  const actions = [
+    { type: "move", amount: move, desiredRange: range },
+    { type: "attack", mult: 1, range, melee },
+  ];
+  return {
+    ...card(`auto-enemy-${kind}-${state.turn}`, `${definition.name} 자동 행동`, "자동 루틴", "기본", 70, actions),
+    instanceId: `auto-enemy-${kind}-${state.turn}`,
+  };
 }
 
 function playerTurnDrawCount() {
@@ -2729,8 +3117,34 @@ function selectTargets(actor, action) {
 
 function preferredTargetIdForActor(actor) {
   if (!actor) return null;
+  if (AUTO_ROUTINE_MODE && actor.side === "player") {
+    const autoTargetId = autoPreferredTargetId(actor);
+    if (autoTargetId) return autoTargetId;
+  }
   if (actor.side === "player") return state.focusTargetId ?? null;
   return state.enemyTargetIds?.[actor.kind] ?? null;
+}
+
+function autoPreferredTargetId(actor) {
+  if (actor.characterId === "warrior" && actor.permanent?.autoProtect) {
+    const weakHero = alivePlayers()
+      .sort((a, b) => a.hp / Math.max(1, a.maxHp) - b.hp / Math.max(1, b.maxHp))[0];
+    if (weakHero) {
+      const pressureTarget = aliveEnemies()
+        .filter((enemy) => axialDistance(enemy, weakHero) <= 1)
+        .sort((a, b) => a.hp - b.hp || axialDistance(actor, a) - axialDistance(actor, b))[0];
+      if (pressureTarget) return pressureTarget.id;
+    }
+  }
+
+  if (actor.characterId === "archer") {
+    const marked = aliveEnemies()
+      .filter((enemy) => enemy.temporary?.autoMarked)
+      .sort((a, b) => a.hp - b.hp || axialDistance(actor, a) - axialDistance(actor, b))[0];
+    if (marked) return marked.id;
+  }
+
+  return null;
 }
 
 function targetPriorityDistance(actor, target, action) {
@@ -2848,8 +3262,10 @@ function dealAttackDamage(actor, target, action, multiplier, options = {}) {
   const adjacentPenalty = adjacentDamagePenalty(context);
   const damage = Math.max(1, Math.round(actor.baseAtk * finalMultiplier * adjacentPenalty));
   const hitPosition = { q: target.q, r: target.r };
+  const hadAutoMark = Boolean(target.temporary?.autoMarked);
   applyDamage(target, damage);
   noteTargetHit(actor, target);
+  applyAutoHitEffects(actor, target, hadAutoMark);
   resolveAfterHitEffects(actor, target);
   consumeEffects(target, "hit");
   renderBoard();
@@ -2857,6 +3273,31 @@ function dealAttackDamage(actor, target, action, multiplier, options = {}) {
   showHitEffect(target, hitPosition, damage);
   log(`${actor.name} -> ${target.name} ${damage} 피해`);
   return damage;
+}
+
+function applyAutoHitEffects(actor, target, hadAutoMark) {
+  if (!AUTO_ROUTINE_MODE || !actor || !target) return;
+  if (actor.side === "player" && actor.characterId === "archer" && actor.permanent?.autoMarkOnHit && isAlive(target)) {
+    target.temporary = target.temporary ?? {};
+    if (!target.temporary.autoMarked) log(`${target.name} 표식`);
+    target.temporary.autoMarked = {
+      ownerId: actor.id,
+      source: "archer",
+    };
+  }
+  if (!isAlive(target) && hadAutoMark && autoHero("archer")?.permanent?.autoMarkTransfer) {
+    transferAutoMark(target);
+  }
+}
+
+function transferAutoMark(defeatedTarget) {
+  const nextTarget = aliveEnemies()
+    .filter((enemy) => enemy.id !== defeatedTarget.id)
+    .sort((a, b) => a.hp - b.hp || (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0))[0];
+  if (!nextTarget) return;
+  nextTarget.temporary = nextTarget.temporary ?? {};
+  nextTarget.temporary.autoMarked = { ownerId: "archer", source: "transfer" };
+  log(`표식 전이: ${nextTarget.name}`);
 }
 
 function resolveAfterHitEffects(attacker, target) {
@@ -2897,10 +3338,17 @@ function noteTargetHit(actor, target) {
 function outgoingDamageMultiplier(context) {
   const { actor, target, action, repeatHits } = context;
   let bonus = actorDamageMultiplier(actor) - 1;
+  bonus += actor.permanent?.autoPartyDamage ?? 0;
+  if (context.isMelee) bonus += actor.permanent?.moveAttackDamage ?? 0;
   if (actor.permanent?.comboDamage && repeatHits > 0) bonus += repeatHits * actor.permanent.comboDamage;
   if (actor.permanent?.thirdHitDamage && repeatHits >= 2) bonus += actor.permanent.thirdHitDamage;
   if (actor.permanent?.multiTargetDamage && context.targetCount >= 2) bonus += actor.permanent.multiTargetDamage;
   if (actor.permanent?.runeDamage && ownedRunes(actor).length) bonus += actor.permanent.runeDamage;
+  if (target?.temporary?.autoMarked) {
+    if (actor.characterId === "archer") bonus += actor.permanent?.autoMarkedDamage ?? 0;
+    if (actor.characterId === "warrior" && state.autoSynergy?.markBreak) bonus += 0.25;
+    if (actor.characterId === "mage" && state.autoSynergy?.markConduct) bonus += 0.25;
+  }
   if (action.perRepeatTargetDamage && repeatHits > 0) bonus += repeatHits * action.perRepeatTargetDamage;
   if (action.sameTargetBonus && repeatHits > 0) bonus += action.sameTargetBonus;
   if (action.thirdHitBonus && repeatHits >= 2) bonus += action.thirdHitBonus;
@@ -2923,7 +3371,10 @@ function adjacentDamagePenalty(context) {
 
 function attackPushAmount(actor, target, action, targetCount) {
   const context = damageContext(actor, target, action, { targetCount });
-  return Math.max(0, (action.push ?? 0) + effectModifierTotal(actor, "push", context));
+  const markPush = AUTO_ROUTINE_MODE && actor.characterId === "warrior" && target?.temporary?.autoMarked && state.autoSynergy?.markBreak
+    ? 1
+    : 0;
+  return Math.max(0, (action.push ?? 0) + markPush + effectModifierTotal(actor, "push", context));
 }
 
 function refundChargeOnKill(actor, target, action) {
@@ -4324,6 +4775,13 @@ async function clearWave() {
     return;
   }
   state.waitingReward = true;
+  if (AUTO_ROUTINE_MODE) {
+    recoverAutoParty();
+    state.rewardPhase = "auto";
+    render();
+    showRewards();
+    return;
+  }
   state.rewardPhase = "passive";
   resetPlayerDecksForWave(playerPartyCharacters());
   await preloadRewardAssets(getSelectedCharacter());
@@ -4342,6 +4800,10 @@ function finishRun(win) {
 }
 
 function showRewards() {
+  if (AUTO_ROUTINE_MODE || state.rewardPhase === "auto") {
+    showAutoUpgradeRewards();
+    return;
+  }
   const rewardPhase = state.rewardPhase ?? "passive";
   const rewards = rewardPhase === "passive" ? drawPassiveRewards() : drawCardRewards();
   state.rewardLocked = false;
@@ -4377,6 +4839,84 @@ function showRewards() {
     elements.rewardCards.append(pick);
   });
   elements.rewardOverlay.classList.remove("hidden");
+}
+
+function recoverAutoParty() {
+  state.entities
+    .filter((entity) => entity.side === "player")
+    .forEach((actor) => {
+      if (actor.hp <= 0) actor.hp = Math.max(1, Math.ceil(actor.maxHp * 0.45));
+      else actor.hp = Math.min(actor.maxHp, actor.hp + Math.ceil(actor.maxHp * 0.28));
+    });
+}
+
+function showAutoUpgradeRewards() {
+  const rewards = drawAutoUpgradeRewards();
+  state.rewardLocked = false;
+  elements.rewardInstr.innerHTML = `자동 루틴 강화 <b>1개</b>를 선택하세요`;
+  elements.rewardCards.innerHTML = "";
+  elements.rewardCards.className = "reward-cards reward-phase-auto";
+  rewards.forEach((reward) => {
+    const pick = document.createElement("button");
+    pick.className = `reward-pick auto-upgrade-pick auto-owner-${reward.owner}`;
+    pick.type = "button";
+    pick.innerHTML = `
+      <span class="auto-upgrade-owner">${autoRewardOwnerLabel(reward.owner)} · ${reward.route}</span>
+      <strong>${reward.name}</strong>
+      <span>${reward.desc}</span>
+    `;
+    pick.addEventListener("click", () => pickAutoUpgrade(reward));
+    elements.rewardCards.append(pick);
+  });
+  elements.rewardOverlay.classList.remove("hidden");
+}
+
+function drawAutoUpgradeRewards() {
+  const pool = autoUpgradeCatalog.filter((upgrade) => isAutoUpgradeAvailable(upgrade));
+  const byOwner = ["archer", "warrior", "mage", "party"].flatMap((owner) => {
+    const ownerPool = pool.filter((upgrade) => upgrade.owner === owner);
+    return shuffle(ownerPool).slice(0, 1);
+  });
+  const selected = [...byOwner];
+  const selectedIds = new Set(selected.map((upgrade) => upgrade.id));
+  shuffle(pool)
+    .filter((upgrade) => !selectedIds.has(upgrade.id))
+    .forEach((upgrade) => {
+      if (selected.length < 3) selected.push(upgrade);
+    });
+  return selected.slice(0, 3);
+}
+
+function isAutoUpgradeAvailable(upgrade) {
+  const picked = state.autoPickedUpgradeIds ?? new Set();
+  if (picked.has(upgrade.id)) return false;
+  if (upgrade.requires?.some((id) => !picked.has(id))) return false;
+  if (upgrade.requiresAny?.length && !upgrade.requiresAny.some((id) => picked.has(id))) return false;
+  return true;
+}
+
+function pickAutoUpgrade(reward) {
+  if (state.rewardLocked) return;
+  state.rewardLocked = true;
+  elements.rewardOverlay.classList.add("hidden");
+  state.autoPickedUpgradeIds = state.autoPickedUpgradeIds ?? new Set();
+  state.autoUpgrades = state.autoUpgrades ?? [];
+  state.autoPickedUpgradeIds.add(reward.id);
+  state.autoUpgrades.push(reward);
+  reward.apply();
+  log(`루틴 강화: ${reward.name}`);
+  state.rewardLocked = false;
+  state.waitingReward = false;
+  state.rewardPhase = "auto";
+  state.waveIndex += 1;
+  startWave(state.waveIndex);
+  render();
+  scheduleTurn();
+}
+
+function autoRewardOwnerLabel(owner) {
+  if (owner === "party") return "파티";
+  return characterDefinitions[owner]?.name ?? owner;
 }
 
 function drawPassiveRewards() {
