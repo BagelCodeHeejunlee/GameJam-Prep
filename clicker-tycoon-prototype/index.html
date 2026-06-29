@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>심해 상점 타이쿤 프로토타입</title>
+    <meta name="theme-color" content="#12383c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="심해 상점" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="phone-shell">
+      <header class="top-hud">
+        <div class="brand-block">
+          <span class="eyebrow">DEEP SHOP</span>
+          <h1>심해 상점 타이쿤</h1>
+        </div>
+        <div class="hud-grid" aria-label="게임 자원">
+          <div class="hud-chip">
+            <span>DAY</span>
+            <strong id="dayLabel">1</strong>
+          </div>
+          <div class="hud-chip">
+            <span>COIN</span>
+            <strong id="cashLabel">80</strong>
+          </div>
+          <div class="hud-chip">
+            <span>REP</span>
+            <strong id="repLabel">1</strong>
+          </div>
+        </div>
+      </header>
+
+      <section id="guidePanel" class="guide-panel" aria-live="polite">
+        <div class="guide-portrait" aria-hidden="true">
+          <span></span>
+        </div>
+        <div>
+          <strong id="guideTitle">첫 탐험</strong>
+          <p id="guideText">빛나는 조개 타일을 탭해서 첫 재료를 캐세요. 이 게임은 조작보다 무엇을 먼저 공급할지 고르는 게임입니다.</p>
+        </div>
+        <button id="skipGuideButton" class="icon-button" type="button" aria-label="튜토리얼 숨기기">x</button>
+      </section>
+
+      <nav class="phase-tabs" aria-label="화면 전환">
+        <button id="exploreTab" class="active" type="button">탐험</button>
+        <button id="shopTab" type="button">가게</button>
+      </nav>
+
+      <section id="explorePanel" class="phase-panel active" aria-label="탐험 화면">
+        <section class="mission-card">
+          <div>
+            <span class="eyebrow">TODAY</span>
+            <strong id="goalLabel">조개 구이대 재고 채우기</strong>
+          </div>
+          <button id="newDayButton" type="button">다음 날</button>
+        </section>
+
+        <section class="explore-stats" aria-label="탐험 상태">
+          <div>
+            <span>산소</span>
+            <strong id="oxygenLabel">42</strong>
+          </div>
+          <div>
+            <span>가방</span>
+            <strong id="bagLabel">0/14</strong>
+          </div>
+          <div>
+            <span>위험</span>
+            <strong id="dangerLabel">0%</strong>
+          </div>
+        </section>
+
+        <section id="mineBoard" class="mine-board" aria-label="채굴 보드"></section>
+
+        <section class="toolbelt" aria-label="탐험 도구">
+          <button id="scannerButton" class="tool-button" type="button">
+            <span class="tool-icon scan-icon"></span>
+            <strong>스캔</strong>
+            <em id="scannerCount">2</em>
+          </button>
+          <button id="bombButton" class="tool-button" type="button">
+            <span class="tool-icon bomb-icon"></span>
+            <strong>폭탄</strong>
+            <em id="bombCount">1</em>
+          </button>
+          <button id="returnButton" class="tool-button primary" type="button">
+            <span class="tool-icon return-icon"></span>
+            <strong>귀환</strong>
+            <em>가게</em>
+          </button>
+        </section>
+      </section>
+
+      <section id="shopPanel" class="phase-panel" aria-label="가게 화면">
+        <section class="shop-summary">
+          <div>
+            <span>분당 매출</span>
+            <strong id="incomeLabel">0</strong>
+          </div>
+          <div>
+            <span>대기 손님</span>
+            <strong id="queueLabel">0</strong>
+          </div>
+          <div>
+            <span>직원</span>
+            <strong id="staffLabel">0</strong>
+          </div>
+        </section>
+
+        <section id="shopMap" class="shop-map" aria-label="상점 운영 맵"></section>
+
+        <section class="warehouse-panel" aria-label="창고">
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">WAREHOUSE</span>
+              <strong>탐험 재료</strong>
+            </div>
+            <button id="collectAllButton" type="button">전부 수거</button>
+          </div>
+          <div id="warehouseList" class="warehouse-list"></div>
+        </section>
+
+        <section id="stationList" class="station-list" aria-label="판매 스테이션"></section>
+      </section>
+
+      <section class="event-log" aria-label="게임 로그">
+        <div class="section-head">
+          <strong>상점 로그</strong>
+          <button id="restartButton" type="button">초기화</button>
+        </div>
+        <div id="logList" class="log-list"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
