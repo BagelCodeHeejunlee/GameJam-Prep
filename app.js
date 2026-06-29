@@ -1312,13 +1312,13 @@ const monsterDecks = {
 const waves = buildWaves();
 const testPlayerPartyIds = ["archer", "warrior", "mage"];
 const autoUpgradeCatalog = [
-  autoUpgrade("auto-archer-damage", "archer", "공용", "안정 사격", "궁수 기본 공격력이 2 증가한다.", () => {
-    autoHero("archer").baseAtk += 2;
+  autoUpgrade("auto-archer-damage", "archer", "공용", "안정 사격", "궁수 기본 공격력이 25% 증가한다.", () => {
+    increaseAutoHeroBaseAtkPercent("archer", 0.25);
   }),
   autoUpgrade("auto-archer-range", "archer", "공용", "사거리 확보", "궁수 자동 사격 사거리가 1 증가한다.", () => {
     autoPermanent("archer").autoRangeBonus = (autoPermanent("archer").autoRangeBonus ?? 0) + 1;
   }),
-  autoUpgrade("auto-archer-mark", "archer", "표식", "약점 표식", "궁수 공격이 적에게 표식을 남긴다. 표식 대상은 추가 피해 시너지의 기준이 된다.", () => {
+  autoUpgrade("auto-archer-mark", "archer", "표식", "약점 표식", "궁수 공격이 적에게 표식을 남긴다. 표식 대상은 모든 아군에게 받는 피해가 증가한다.", () => {
     autoPermanent("archer").autoMarkOnHit = true;
   }),
   autoUpgrade("auto-archer-mark-hunt", "archer", "표식", "표식 사냥", "궁수가 표식 대상을 공격할 때 주는 피해가 30% 증가한다.", () => {
@@ -1351,8 +1351,8 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 2);
   }, { requires: ["auto-archer-trap-polish"] }),
 
-  autoUpgrade("auto-warrior-damage", "warrior", "공용", "강한 베기", "전사 기본 공격력이 2 증가한다.", () => {
-    autoHero("warrior").baseAtk += 2;
+  autoUpgrade("auto-warrior-damage", "warrior", "공용", "강한 베기", "전사 기본 공격력이 25% 증가한다.", () => {
+    increaseAutoHeroBaseAtkPercent("warrior", 0.25);
   }),
   autoUpgrade("auto-warrior-frontline", "warrior", "공용", "전열 유지", "전사가 매 턴 받는 피해 감소 효과를 얻고, 낮은 체력 아군 근처의 적을 더 우선한다.", () => {
     autoPermanent("warrior").autoProtect = true;
@@ -1393,8 +1393,8 @@ const autoUpgradeCatalog = [
     autoPermanent("warrior").autoBloodStormEvery = 4;
   }, { requiresAny: ["auto-warrior-berserk", "auto-warrior-cleave"] }),
 
-  autoUpgrade("auto-mage-damage", "mage", "공용", "안정된 마력", "마법사 기본 공격력이 2 증가한다.", () => {
-    autoHero("mage").baseAtk += 2;
+  autoUpgrade("auto-mage-damage", "mage", "공용", "안정된 마력", "마법사 기본 공격력이 25% 증가한다.", () => {
+    increaseAutoHeroBaseAtkPercent("mage", 0.25);
   }),
   autoUpgrade("auto-mage-retreat", "mage", "공용", "마력 위치 조정", "마법사의 자동 이동 거리가 1 증가한다.", () => {
     autoPermanent("mage").autoMoveBonus = (autoPermanent("mage").autoMoveBonus ?? 0) + 1;
@@ -1481,6 +1481,12 @@ function autoPermanent(id) {
   if (!actor) return {};
   actor.permanent = actor.permanent ?? {};
   return actor.permanent;
+}
+
+function increaseAutoHeroBaseAtkPercent(id, percent) {
+  const actor = autoHero(id);
+  if (!actor) return;
+  actor.baseAtk += Math.max(1, Math.round(actor.baseAtk * percent));
 }
 
 function card(id, name, route, rarity, priority, actions, copies = 1) {
@@ -3397,6 +3403,7 @@ function outgoingDamageMultiplier(context) {
   if (actor.permanent?.multiTargetDamage && context.targetCount >= 2) bonus += actor.permanent.multiTargetDamage;
   if (actor.permanent?.runeDamage && ownedRunes(actor).length) bonus += actor.permanent.runeDamage;
   if (target?.temporary?.autoMarked) {
+    if (actor.side === "player") bonus += 0.12;
     if (actor.characterId === "archer") bonus += actor.permanent?.autoMarkedDamage ?? 0;
     if (actor.characterId === "warrior" && state.autoSynergy?.markBreak) bonus += 0.25;
     if (actor.characterId === "mage" && state.autoSynergy?.markConduct) bonus += 0.25;
@@ -4937,11 +4944,15 @@ function showAutoUpgradeRewards() {
   elements.rewardCards.innerHTML = "";
   elements.rewardCards.className = "reward-cards reward-phase-auto";
   rewards.forEach((reward) => {
+    const rarity = autoUpgradeRarity(reward);
     const pick = document.createElement("button");
-    pick.className = `reward-pick auto-upgrade-pick auto-owner-${reward.owner}`;
+    pick.className = `reward-pick auto-upgrade-pick auto-owner-${reward.owner} ${rarityClass(rarity)}`;
     pick.type = "button";
     pick.innerHTML = `
-      <span class="auto-upgrade-owner">${autoRewardOwnerLabel(reward.owner)} · ${reward.route}</span>
+      <span class="auto-upgrade-meta">
+        <span class="auto-upgrade-owner">${autoRewardOwnerLabel(reward.owner)} · ${reward.route}</span>
+        <b class="auto-upgrade-rarity">${rarity}</b>
+      </span>
       <strong>${reward.name}</strong>
       <span>${reward.desc}</span>
     `;
@@ -4953,18 +4964,7 @@ function showAutoUpgradeRewards() {
 
 function drawAutoUpgradeRewards() {
   const pool = autoUpgradeCatalog.filter((upgrade) => isAutoUpgradeAvailable(upgrade));
-  const byOwner = ["archer", "warrior", "mage", "party"].flatMap((owner) => {
-    const ownerPool = pool.filter((upgrade) => upgrade.owner === owner);
-    return shuffle(ownerPool).slice(0, 1);
-  });
-  const selected = [...byOwner];
-  const selectedIds = new Set(selected.map((upgrade) => upgrade.id));
-  shuffle(pool)
-    .filter((upgrade) => !selectedIds.has(upgrade.id))
-    .forEach((upgrade) => {
-      if (selected.length < 3) selected.push(upgrade);
-    });
-  return selected.slice(0, 3);
+  return shuffle(pool).slice(0, 3);
 }
 
 function isAutoUpgradeAvailable(upgrade) {
@@ -4997,6 +4997,26 @@ function pickAutoUpgrade(reward) {
 function autoRewardOwnerLabel(owner) {
   if (owner === "party") return "파티";
   return characterDefinitions[owner]?.name ?? owner;
+}
+
+function autoUpgradeRarity(upgrade) {
+  const depth = autoUpgradeDepth(upgrade);
+  if (depth >= 3) return "전설";
+  if (depth >= 2) return "에픽";
+  if (depth >= 1) return "레어";
+  return "노말";
+}
+
+function autoUpgradeDepth(upgrade, seen = new Set()) {
+  if (!upgrade || seen.has(upgrade.id)) return 0;
+  const requirements = [...(upgrade.requires ?? []), ...(upgrade.requiresAny ?? [])];
+  if (!requirements.length) return 0;
+  seen.add(upgrade.id);
+  const depths = requirements.map((id) => {
+    const prerequisite = autoUpgradeCatalog.find((item) => item.id === id);
+    return autoUpgradeDepth(prerequisite, new Set(seen));
+  });
+  return 1 + Math.max(0, ...depths);
 }
 
 function drawPassiveRewards() {
@@ -5399,6 +5419,7 @@ function renderBoard() {
           entity.kind === activeEntry.actorId));
     const focused = entity.side === "enemy" && state.focusTargetId === entity.id;
     const enemyTargeted = Object.values(state.enemyTargetIds ?? {}).includes(entity.id);
+    const marked = entity.side === "enemy" && Boolean(entity.temporary?.autoMarked);
     const planningSelectable = state.turnPlanning && entity.side === "enemy";
     const character = entity.side === "player"
       ? characterDefinitions[entity.characterId] ?? getSelectedCharacter()
@@ -5412,7 +5433,7 @@ function renderBoard() {
       div.dataset.entityId = entity.id;
       elements.board.append(div);
     }
-    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${focused ? "focused" : ""} ${enemyTargeted ? "enemy-targeted" : ""} ${planningSelectable ? "selectable" : ""} ${image ? "has-art" : ""} ${hasToken ? "has-token" : ""}`;
+    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${focused ? "focused" : ""} ${enemyTargeted ? "enemy-targeted" : ""} ${marked ? "marked" : ""} ${planningSelectable ? "selectable" : ""} ${image ? "has-art" : ""} ${hasToken ? "has-token" : ""}`;
     if (div.className !== className) div.className = className;
     div.dataset.entityId = entity.id;
     if (div.dataset.image !== (image ?? "") || div.dataset.label !== label) {
@@ -5420,6 +5441,7 @@ function renderBoard() {
       div.dataset.label = label;
       div.innerHTML = `
         ${image ? spriteImg(image, "entity-art") : `<span class="entity-label">${label}</span>`}
+        <span class="mark-badge" aria-hidden="true">표</span>
         <span class="hp-readout"></span>
         <span class="hp-bar" aria-hidden="true"><i></i></span>
       `;
