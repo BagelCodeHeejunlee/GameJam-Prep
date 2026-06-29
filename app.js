@@ -1417,8 +1417,9 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 4);
     autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 4);
   }, { metaLevel: 1 }),
-  autoUpgrade("auto-archer-charge-compress", "archer", "차지", "압축 장전", "저격 발사에 필요한 차지가 3으로 감소한다.", () => {
+  autoUpgrade("auto-archer-charge-compress", "archer", "차지", "압축 장전", "저격 발사에 필요한 차지가 3으로 감소하고 저격 피해가 증가한다.", () => {
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 3);
+    autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 5);
   }, { requires: ["auto-archer-charge"] }),
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
@@ -1426,8 +1427,12 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-double", "archer", "연타", "세 번째 화살", "궁수가 매 턴 3회 사격한다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 3);
   }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage"] }),
-  autoUpgrade("auto-archer-triple", "archer", "연타", "끝없는 연사", "궁수가 매 턴 4회 사격한다.", () => {
+  autoUpgrade("auto-archer-triple", "archer", "연타", "끝없는 연사", "궁수가 매 턴 4회 사격하고, 연속 사격이 대상 주변에 작은 파동을 만든다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 4);
+    autoPermanent("archer").thirdAttackPulseEvery = Math.min(autoPermanent("archer").thirdAttackPulseEvery ?? 3, 3);
+    autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 2);
+    autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.08);
+    autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 1);
   }, { requires: ["auto-archer-double"] }),
   autoUpgrade("auto-archer-trap", "archer", "함정", "공격 함정", "궁수가 3턴마다 적 진입 경로에 공격 함정을 설치한다.", () => {
     autoPermanent("archer").autoTrapEvery = 3;
@@ -1440,8 +1445,10 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-spike-path", "archer", "함정", "가시 길목", "함정 설치 수가 1 증가한다.", () => {
     autoPermanent("archer").autoTrapCount = (autoPermanent("archer").autoTrapCount ?? 1) + 1;
   }, { requires: ["auto-archer-trap"] }),
-  autoUpgrade("auto-archer-chain-trap", "archer", "함정", "연쇄 함정", "함정이 발동하면 주변 적에게도 피해를 준다.", () => {
-    autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 2);
+  autoUpgrade("auto-archer-chain-trap", "archer", "함정", "연쇄 함정", "함정이 발동하면 주변 적에게도 피해를 주고 궁수가 즉시 매복 사격한다.", () => {
+    autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 2.5);
+    autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 1);
+    autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 5);
   }, { requires: ["auto-archer-trap-polish"] }),
 
   autoUpgrade("auto-warrior-damage", "warrior", "공용", "강한 베기", "전사 기본 공격력이 25% 증가한다.", () => {
@@ -1463,9 +1470,10 @@ const autoUpgradeCatalog = [
     autoPermanent("warrior").autoMoveBonus = (autoPermanent("warrior").autoMoveBonus ?? 0) + 1;
     autoPermanent("warrior").moveAttackDamage = (autoPermanent("warrior").moveAttackDamage ?? 0) + 0.15;
   }),
-  autoUpgrade("auto-warrior-comet", "warrior", "돌진", "전장의 혜성", "전사가 3칸 이상 이동 후 공격하면 밀침이 1 증가하고 추가 피해를 준다.", () => {
+  autoUpgrade("auto-warrior-comet", "warrior", "돌진", "전장의 혜성", "전사의 돌진 피해가 크게 증가하고 적을 더 강하게 밀어낸다.", () => {
     autoPermanent("warrior").autoComet = true;
     autoPermanent("warrior").autoPush = (autoPermanent("warrior").autoPush ?? 0) + 1;
+    autoPermanent("warrior").moveAttackDamage = (autoPermanent("warrior").moveAttackDamage ?? 0) + 0.25;
   }, { requiresAny: ["auto-warrior-push", "auto-warrior-breakthrough"] }),
   autoUpgrade("auto-warrior-cleave", "warrior", "범위 공격", "넓은 휩쓸기", "전사가 근접한 적을 최대 2명까지 공격한다.", () => {
     autoPermanent("warrior").autoCleaveTargets = Math.max(autoPermanent("warrior").autoCleaveTargets ?? 1, 2);
@@ -1473,8 +1481,10 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-warrior-collapse", "warrior", "범위 공격", "전열 붕괴", "전사가 적을 밀칠 때 다음 공격 피해가 증가한다.", () => {
     autoPermanent("warrior").pushAreaDamage = (autoPermanent("warrior").pushAreaDamage ?? 0) + 0.25;
   }, { requires: ["auto-warrior-push"] }),
-  autoUpgrade("auto-warrior-control", "warrior", "범위 공격", "전장 장악", "전사가 근접한 적을 최대 3명까지 공격한다.", () => {
+  autoUpgrade("auto-warrior-control", "warrior", "범위 공격", "전장 장악", "전사가 근접한 적을 최대 3명까지 공격하고 휩쓸기에도 밀침을 더한다.", () => {
     autoPermanent("warrior").autoCleaveTargets = Math.max(autoPermanent("warrior").autoCleaveTargets ?? 1, 3);
+    autoPermanent("warrior").autoPush = Math.max(autoPermanent("warrior").autoPush ?? 0, 1);
+    autoPermanent("warrior").pushAreaDamage = (autoPermanent("warrior").pushAreaDamage ?? 0) + 0.35;
   }, { requires: ["auto-warrior-cleave"] }),
   autoUpgrade("auto-warrior-blood", "warrior", "광전", "피의 박자", "전사 체력이 낮을수록 피해가 증가한다.", () => {
     autoPermanent("warrior").berserkLostHpDamage = (autoPermanent("warrior").berserkLostHpDamage ?? 0) + 0.65;
@@ -1482,8 +1492,11 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-warrior-berserk", "warrior", "광전", "광전 태세", "전사 체력이 절반 이하이면 자동 공격을 한 번 더 한다.", () => {
     autoPermanent("warrior").autoBerserkExtra = true;
   }, { requires: ["auto-warrior-blood"] }),
-  autoUpgrade("auto-warrior-storm", "warrior", "광전", "피의 폭풍", "전사가 4턴마다 주변 다중 타격을 한다.", () => {
-    autoPermanent("warrior").autoBloodStormEvery = 4;
+  autoUpgrade("auto-warrior-storm", "warrior", "광전", "피의 폭풍", "전사가 3턴마다 주변 다중 타격을 하고, 체력이 낮을수록 추가 피해를 얻는다.", () => {
+    autoPermanent("warrior").autoBloodStormEvery = 3;
+    autoPermanent("warrior").autoBloodStormMult = Math.max(autoPermanent("warrior").autoBloodStormMult ?? 1, 1.2);
+    autoPermanent("warrior").lowHpDamage = (autoPermanent("warrior").lowHpDamage ?? 0) + 0.35;
+    autoPermanent("warrior").lowHpDamageThreshold = Math.max(autoPermanent("warrior").lowHpDamageThreshold ?? 0, 0.5);
   }, { requiresAny: ["auto-warrior-berserk", "auto-warrior-cleave"] }),
 
   autoUpgrade("auto-mage-damage", "mage", "공용", "안정된 마력", "마법사 기본 공격력이 25% 증가한다.", () => {
@@ -1498,8 +1511,9 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-mage-three-chain", "mage", "연쇄", "세 갈래 번개", "마법사가 최대 3명의 적을 공격한다.", () => {
     autoPermanent("mage").autoChainTargets = Math.max(autoPermanent("mage").autoChainTargets ?? 1, 3);
   }, { requires: ["auto-mage-chain"] }),
-  autoUpgrade("auto-mage-circuit", "mage", "연쇄", "무한 회로", "다중 대상 마법 피해가 증가한다.", () => {
-    autoPermanent("mage").multiTargetDamage = (autoPermanent("mage").multiTargetDamage ?? 0) + 0.25;
+  autoUpgrade("auto-mage-circuit", "mage", "연쇄", "무한 회로", "마법사가 최대 4명의 적을 공격하고 다중 대상 마법 피해가 크게 증가한다.", () => {
+    autoPermanent("mage").autoChainTargets = Math.max(autoPermanent("mage").autoChainTargets ?? 1, 4);
+    autoPermanent("mage").multiTargetDamage = (autoPermanent("mage").multiTargetDamage ?? 0) + 0.35;
   }, { requires: ["auto-mage-three-chain"] }),
   autoUpgrade("auto-mage-rune", "mage", "룬", "폭발 룬", "마법사가 3턴마다 룬을 설치한다.", () => {
     autoPermanent("mage").autoRuneEvery = 3;
@@ -1509,8 +1523,9 @@ const autoUpgradeCatalog = [
     autoPermanent("mage").autoRunePower = (autoPermanent("mage").autoRunePower ?? 1) + 1;
     autoPermanent("mage").runeDamage = (autoPermanent("mage").runeDamage ?? 0) + 0.1;
   }, { requires: ["auto-mage-rune"] }),
-  autoUpgrade("auto-mage-rune-link", "mage", "룬", "룬 연동", "룬이 발동하면 주변 적에게도 피해를 준다.", () => {
-    autoPermanent("mage").runeChainDamage = Math.max(autoPermanent("mage").runeChainDamage ?? 0, 1);
+  autoUpgrade("auto-mage-rune-link", "mage", "룬", "룬 연동", "마법사가 룬을 하나 더 설치하고, 룬이 발동하면 주변 적에게도 강한 피해를 준다.", () => {
+    autoPermanent("mage").autoRuneCount = Math.max(autoPermanent("mage").autoRuneCount ?? 1, 2);
+    autoPermanent("mage").runeChainDamage = Math.max(autoPermanent("mage").runeChainDamage ?? 0, 1.5);
   }, { requires: ["auto-mage-rune-tune"] }),
   autoUpgrade("auto-mage-meteor", "mage", "운석", "운석 예고", "마법사가 4턴마다 운석을 예고한다.", () => {
     autoPermanent("mage").autoMeteorEvery = 4;
@@ -1518,9 +1533,11 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-mage-shard", "mage", "운석", "파편 회수", "운석이 2명 이상 맞히면 다음 운석 피해가 증가한다.", () => {
     autoPermanent("mage").meteorMultiDamage = (autoPermanent("mage").meteorMultiDamage ?? 0) + 0.25;
   }, { requires: ["auto-mage-meteor"] }),
-  autoUpgrade("auto-mage-sky", "mage", "운석", "하늘 붕괴", "운석 피해와 범위가 증가한다.", () => {
+  autoUpgrade("auto-mage-sky", "mage", "운석", "하늘 붕괴", "운석 주기가 짧아지고 피해, 범위, 처치 후 확산 피해가 증가한다.", () => {
+    autoPermanent("mage").autoMeteorEvery = Math.min(autoPermanent("mage").autoMeteorEvery ?? 4, 3);
     autoPermanent("mage").autoMeteorMultBonus = (autoPermanent("mage").autoMeteorMultBonus ?? 0) + 1;
     autoPermanent("mage").autoMeteorRadius = Math.max(autoPermanent("mage").autoMeteorRadius ?? 1, 2);
+    autoPermanent("mage").meteorKillSplash = Math.max(autoPermanent("mage").meteorKillSplash ?? 0, 1.2);
   }, { requires: ["auto-mage-shard"] }),
 
   autoUpgrade("auto-party-mark-break", "party", "궁수+전사", "표식 돌파", "전사가 표식 적을 공격하면 추가 피해와 밀침을 얻는다.", () => {
@@ -2415,7 +2432,7 @@ function autoWarriorRoutineCard(actor) {
     actions.push({ ...attack, preferPreviousTarget: true });
   }
   if (permanent.autoBloodStormEvery && state.turn % permanent.autoBloodStormEvery === 0) {
-    actions.push({ type: "patternAttack", mult: 1, range: 1, pattern: "adjacent-triple", melee: true });
+    actions.push({ type: "patternAttack", mult: permanent.autoBloodStormMult ?? 1, range: 1, pattern: "adjacent-triple", melee: true });
   }
   return {
     ...card(`auto-warrior-${state.turn}`, "자동 돌진 베기", "자동 루틴", "기본", 50, actions),
