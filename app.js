@@ -20,6 +20,8 @@ const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
 const AUTO_ROUTINE_MODE = true;
 const ENABLE_PARTY_SYNERGY_UPGRADES = false;
+const AUTO_REWARD_CHOICES = 3;
+const AUTO_TRAINING_FALLBACK_BONUS = 0.1;
 const AUTO_ENEMY_BALANCE_TIERS = [
   { maxWave: 2, hpMultiplier: 3.2, minHp: 18, attackMultiplier: 1, attackBonus: 0 },
   { maxWave: 5, hpMultiplier: 2.4, minHp: 24, eliteHpMultiplier: 1.15, bossHpMultiplier: 1.35, attackMultiplier: 1.1, attackBonus: 0 },
@@ -5032,8 +5034,39 @@ function showAutoUpgradeRewards() {
 }
 
 function drawAutoUpgradeRewards() {
+  const choiceCount = AUTO_REWARD_CHOICES;
   const pool = autoUpgradeCatalog.filter((upgrade) => isAutoUpgradeAvailable(upgrade));
-  return shuffle(pool).slice(0, 3);
+  const selected = shuffle(pool).slice(0, choiceCount);
+  if (selected.length >= choiceCount) return selected;
+  return [
+    ...selected,
+    ...drawAutoTrainingFallbackRewards(choiceCount - selected.length, selected),
+  ].slice(0, choiceCount);
+}
+
+function drawAutoTrainingFallbackRewards(count, selected = []) {
+  if (count <= 0) return [];
+  const selectedOwnerCounts = selected.reduce((counts, reward) => {
+    counts.set(reward.owner, (counts.get(reward.owner) ?? 0) + 1);
+    return counts;
+  }, new Map());
+  return shuffle(playerPartyCharacters())
+    .sort((a, b) => (selectedOwnerCounts.get(a.id) ?? 0) - (selectedOwnerCounts.get(b.id) ?? 0))
+    .slice(0, count)
+    .map(createAutoTrainingFallbackReward);
+}
+
+function createAutoTrainingFallbackReward(character) {
+  const percent = Math.round(AUTO_TRAINING_FALLBACK_BONUS * 100);
+  return {
+    id: `auto-training-${character.id}`,
+    owner: character.id,
+    route: "훈련",
+    name: `${character.name} 집중 훈련`,
+    desc: `${character.name} 기본 공격력이 ${percent}% 증가한다.`,
+    repeatable: true,
+    apply: () => increaseAutoHeroBaseAtkPercent(character.id, AUTO_TRAINING_FALLBACK_BONUS),
+  };
 }
 
 function isAutoUpgradeAvailable(upgrade) {
@@ -5056,7 +5089,7 @@ function pickAutoUpgrade(reward) {
   elements.rewardOverlay.classList.add("hidden");
   state.autoPickedUpgradeIds = state.autoPickedUpgradeIds ?? new Set();
   state.autoUpgrades = state.autoUpgrades ?? [];
-  state.autoPickedUpgradeIds.add(reward.id);
+  if (!reward.repeatable) state.autoPickedUpgradeIds.add(reward.id);
   state.autoUpgrades.push(reward);
   reward.apply();
   log(`루틴 강화: ${reward.name}`);
