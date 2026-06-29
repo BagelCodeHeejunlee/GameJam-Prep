@@ -643,9 +643,116 @@ h1 {
 }
 
 .warehouse-panel,
+.skill-panel,
 .event-log {
   padding: 9px;
   border-radius: 8px;
+}
+
+.skill-panel {
+  border: 1px solid rgba(91, 72, 38, 0.22);
+  background: linear-gradient(180deg, #fffaf0, #f6efd8);
+  box-shadow: 0 7px 20px rgba(31, 55, 50, 0.09);
+}
+
+.skill-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.skill-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 54px;
+  gap: 8px;
+  align-items: center;
+  padding: 7px;
+  border-radius: 8px;
+  background: #f5edda;
+  border: 1px solid rgba(91, 72, 38, 0.13);
+}
+
+.skill-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #4ea6a2, #1d6668);
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.12);
+}
+
+.skill-icon.oxygen {
+  border-radius: 50% 50% 8px 8px;
+  background:
+    radial-gradient(circle at 50% 25%, #fffaf0 0 5px, transparent 6px),
+    linear-gradient(180deg, #62bfd0, #1d7c7d);
+}
+
+.skill-icon.bag {
+  border-radius: 11px 11px 8px 8px;
+  background:
+    linear-gradient(90deg, transparent 0 28%, rgba(255, 250, 240, 0.85) 29% 39%, transparent 40% 60%, rgba(255, 250, 240, 0.85) 61% 71%, transparent 72%),
+    linear-gradient(180deg, #df9b4d, #92562f);
+}
+
+.skill-icon.drill {
+  background:
+    linear-gradient(135deg, transparent 0 34%, #fffaf0 35% 46%, transparent 47%),
+    linear-gradient(180deg, #8c9da1, #3f5a5f);
+}
+
+.skill-icon.scanner {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 0 35%, #fffaf0 36% 47%, transparent 48%),
+    conic-gradient(from 20deg, #62bfd0, #7160a8, #62bfd0);
+}
+
+.skill-icon.safety {
+  background:
+    linear-gradient(135deg, transparent 0 42%, #fffaf0 43% 58%, transparent 59%),
+    linear-gradient(180deg, #e4a72e, #5e945b);
+}
+
+.skill-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.skill-title h3 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.skill-title span {
+  flex: 0 0 auto;
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.skill-card p {
+  margin: 3px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.skill-card em {
+  color: #6f351f;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.skill-card button {
+  min-height: 34px;
+  background: var(--deep);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .warehouse-list {
@@ -738,6 +845,7 @@ h1 {
 
 .station-actions button:disabled,
 .hire-button:disabled,
+.skill-card button:disabled,
 .tool-button:disabled,
 .mission-card button:disabled,
 .section-head button:disabled {

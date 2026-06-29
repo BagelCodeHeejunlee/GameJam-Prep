@@ -30,6 +30,7 @@
     staffLabel: $("#staffLabel"),
     shopMap: $("#shopMap"),
     warehouseList: $("#warehouseList"),
+    skillList: $("#skillList"),
     stationList: $("#stationList"),
     collectAllButton: $("#collectAllButton"),
     restartButton: $("#restartButton"),
@@ -101,6 +102,44 @@
     },
   };
 
+  const skillDefs = {
+    oxygen: {
+      name: "압축 산소통",
+      desc: "다음 탐험부터 산소 최대치가 늘어 더 깊이 파고들 수 있습니다.",
+      baseCost: 70,
+      maxLevel: 5,
+      effectLabel: (level) => `산소 +${level * 6}`,
+    },
+    bag: {
+      name: "확장 가방",
+      desc: "귀환 전까지 더 많은 재료를 들고 올 수 있습니다.",
+      baseCost: 85,
+      maxLevel: 5,
+      effectLabel: (level) => `가방 +${level * 3}`,
+    },
+    drill: {
+      name: "강화 드릴",
+      desc: "탭 한 번의 채굴력이 올라 단단한 광맥을 빠르게 캡니다.",
+      baseCost: 110,
+      maxLevel: 3,
+      effectLabel: (level) => `채굴력 ${1 + level}`,
+    },
+    scanner: {
+      name: "탐사용 스캐너",
+      desc: "탐험 시작 시 스캔 횟수가 늘고 더 많은 희귀 타일을 드러냅니다.",
+      baseCost: 80,
+      maxLevel: 4,
+      effectLabel: (level) => `스캔 +${level}`,
+    },
+    safety: {
+      name: "안전 로프",
+      desc: "위험 타일을 캘 때 오르는 위험도를 줄입니다.",
+      baseCost: 95,
+      maxLevel: 4,
+      effectLabel: (level) => `위험 -${level * 3}`,
+    },
+  };
+
   const guideSteps = [
     {
       id: "mine",
@@ -138,6 +177,13 @@
       done: (state) => Object.values(state.stations).some((station) => station.priceLevel > 1 || station.speedLevel > 1 || station.capacityLevel > 1),
     },
     {
+      id: "exploreSkill",
+      title: "탐험 스킬 강화",
+      text: "장사로 번 돈을 탐험 스킬에도 투자하세요. 산소통을 올리면 다음 탐험 시간이 길어집니다.",
+      target: '[data-skill="oxygen"]',
+      done: (state) => Object.values(state.skills).some((level) => level > 0),
+    },
+    {
       id: "hire",
       title: "직원 자동화",
       text: "보충 직원을 고용하세요. 직접 하던 재고 보충이 자동화되면서 타이쿤 성장감이 시작됩니다.",
@@ -162,7 +208,7 @@
     return {
       day: 1,
       phase: "explore",
-      cash: 130,
+      cash: 200,
       rep: 1,
       goal: "조개 구이대 재고 채우기",
       oxygen: 42,
@@ -174,6 +220,7 @@
       tools: { scanner: 2, bomb: 1 },
       mine: makeMine(),
       stations: makeStations(),
+      skills: makeSkills(),
       staff: { restocker: false },
       tutorialIndex: 0,
       tutorialHidden: false,
@@ -204,6 +251,10 @@
         },
       ]),
     );
+  }
+
+  function makeSkills() {
+    return Object.fromEntries(Object.keys(skillDefs).map((id) => [id, 0]));
   }
 
   function makeMine() {
@@ -247,6 +298,7 @@
     renderMine();
     renderWarehouse();
     renderShopMap();
+    renderSkills();
     renderStations();
     renderLogs();
     updateTutorial();
@@ -262,7 +314,7 @@
     elements.repLabel.textContent = state.rep;
     elements.goalLabel.textContent = state.goal;
     elements.oxygenLabel.textContent = state.oxygen;
-    elements.bagLabel.textContent = `${state.bagUsed}/${state.bagMax}`;
+    elements.bagLabel.textContent = `${state.bagUsed}/${bagCapacity()}`;
     elements.dangerLabel.textContent = `${state.danger}%`;
     elements.scannerCount.textContent = state.tools.scanner;
     elements.bombCount.textContent = state.tools.bomb;
@@ -305,6 +357,33 @@
         <strong>${resource.name} ${state.warehouse[id]}</strong>
       </div>
     `).join("");
+  }
+
+  function renderSkills() {
+    elements.skillList.innerHTML = Object.entries(skillDefs).map(([id, skill]) => {
+      const level = state.skills[id];
+      const maxed = level >= skill.maxLevel;
+      const cost = skillCost(id);
+      const disabled = maxed || state.cash < cost;
+      const effectText = level === 0 ? `구매 시: ${skill.effectLabel(1)}` : `적용 중: ${skill.effectLabel(level)}`;
+
+      return `
+        <article class="skill-card">
+          <div class="skill-icon ${id}" aria-hidden="true"></div>
+          <div>
+            <div class="skill-title">
+              <h3>${skill.name}</h3>
+              <span>Lv.${level}/${skill.maxLevel}</span>
+            </div>
+            <p>${skill.desc}</p>
+            <em>${effectText}</em>
+          </div>
+          <button type="button" data-action="upgrade-skill" data-skill="${id}" ${disabled ? "disabled" : ""}>
+            ${maxed ? "최대" : `${cost}`}
+          </button>
+        </article>
+      `;
+    }).join("");
   }
 
   function renderShopMap() {
@@ -397,7 +476,7 @@
     elements.logList.innerHTML = state.logs.slice(0, 4).map((text) => `<div class="log-item">${text}</div>`).join("");
   }
 
-  function mineTile(tileId, power = 1) {
+  function mineTile(tileId, power = miningPower()) {
     const tile = state.mine[tileId];
     if (!tile || tile.mined || !tile.revealed || state.oxygen <= 0) return;
 
@@ -406,7 +485,7 @@
     state.oxygen = Math.max(0, state.oxygen - 1);
 
     if (type.danger) {
-      state.danger = Math.min(100, state.danger + type.danger);
+      state.danger = Math.min(100, state.danger + Math.max(4, type.danger - state.skills.safety * 3));
     }
 
     if (tile.hp === 0) {
@@ -416,7 +495,7 @@
       revealNeighbors(tile.id);
     }
 
-    if (state.oxygen === 0 || state.danger >= 100 || state.bagUsed >= state.bagMax) {
+    if (state.oxygen === 0 || state.danger >= 100 || state.bagUsed >= bagCapacity()) {
       log("탐험 한계에 도달했습니다. 귀환해서 재고를 정리하세요.");
     }
 
@@ -430,7 +509,7 @@
       return;
     }
 
-    const capacityLeft = state.bagMax - state.bagUsed;
+    const capacityLeft = bagCapacity() - state.bagUsed;
     if (capacityLeft < type.weight) {
       log("가방이 가득 차서 재료를 더 담을 수 없습니다.");
       return;
@@ -460,7 +539,7 @@
     if (state.tools.scanner <= 0) return;
     state.tools.scanner -= 1;
     const hiddenRare = state.mine.filter((tile) => !tile.revealed && ["pearl", "relic", "danger"].includes(tile.type));
-    hiddenRare.slice(0, 4).forEach((tile) => {
+    hiddenRare.slice(0, 4 + state.skills.scanner).forEach((tile) => {
       tile.revealed = true;
       tile.scanned = true;
     });
@@ -495,10 +574,10 @@
     if (state.phase !== "shop") return;
     settleShop();
     state.day += 1;
-    state.oxygen = 42 + Math.min(10, state.day * 2);
+    state.oxygen = oxygenMax();
     state.danger = 0;
     state.mine = makeMine();
-    state.tools.scanner = 2;
+    state.tools.scanner = 2 + state.skills.scanner;
     state.tools.bomb = 1;
     state.goal = state.day >= 3 ? "기념품 선반 해금하기" : "조개 구이대 재고 채우기";
     log(`${state.day}일차가 시작됐습니다. 새 탐험지가 열렸습니다.`);
@@ -647,6 +726,25 @@
     render();
   }
 
+  function upgradeSkill(id) {
+    const skill = skillDefs[id];
+    if (!skill) return;
+    const level = state.skills[id];
+    if (level >= skill.maxLevel) return;
+    const cost = skillCost(id);
+    if (state.cash < cost) return;
+
+    state.cash -= cost;
+    state.skills[id] += 1;
+
+    if (id === "oxygen" && state.phase === "explore") {
+      state.oxygen += 6;
+    }
+
+    log(`${skill.name} Lv.${state.skills[id]} 강화. 다음 탐험부터 ${skill.effectLabel(state.skills[id])} 효과가 적용됩니다.`);
+    render();
+  }
+
   function stationCapacity(id) {
     const station = state.stations[id];
     return stationDefs[id].baseCapacity + (station.capacityLevel - 1) * 3;
@@ -674,6 +772,24 @@
     return station.unlocked && station.stock < stationCapacity(id) && state.warehouse[def.resource] > 0;
   }
 
+  function oxygenMax() {
+    return 42 + Math.min(10, state.day * 2) + state.skills.oxygen * 6;
+  }
+
+  function bagCapacity() {
+    return 14 + state.skills.bag * 3;
+  }
+
+  function miningPower() {
+    return 1 + state.skills.drill;
+  }
+
+  function skillCost(id) {
+    const skill = skillDefs[id];
+    const level = state.skills[id];
+    return Math.round(skill.baseCost * Math.pow(1.65, level));
+  }
+
   function updateTutorial() {
     document.querySelectorAll(".tutorial-focus").forEach((node) => node.classList.remove("tutorial-focus"));
 
@@ -699,7 +815,7 @@
   }
 
   function getDisplayGuideStep(step) {
-    const shopOnlySteps = ["stock", "collect", "upgrade", "hire"];
+    const shopOnlySteps = ["stock", "collect", "upgrade", "exploreSkill", "hire"];
     if (state.phase === "explore" && shopOnlySteps.includes(step.id)) {
       return {
         title: "다음 장사 준비",
@@ -770,6 +886,12 @@
       if (action === "unlock") unlockStation(station);
       if (action === "upgrade-price") upgradeStation(station, "price");
       if (action === "upgrade-speed") upgradeStation(station, "speed");
+    });
+
+    elements.skillList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-action='upgrade-skill']");
+      if (!button) return;
+      upgradeSkill(button.dataset.skill);
     });
   }
 
