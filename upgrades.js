@@ -6,6 +6,7 @@ const AUTO_UPGRADE_RULES_STORAGE_KEY = "gamejam-prep-auto-upgrade-rules-v1";
 const META_PROGRESS_STORAGE_KEY = "gamejam-prep-meta-growth-v1";
 const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
+const AUTO_UNLOCK_ALL_UPGRADE_LEVELS = true;
 const ROUTE_ORDER = {
   archer: ["공용", "연타", "함정", "차지"],
   warrior: ["공용", "돌진", "범위 공격", "광전"],
@@ -358,14 +359,17 @@ function isTreeRootUpgrade(upgrade) {
 }
 
 function isUnlockedForCurrentLevel(upgrade) {
+  if (AUTO_UNLOCK_ALL_UPGRADE_LEVELS) return true;
   return characterMetaLevel(upgrade.owner) >= autoUpgradeMetaRequirement(upgrade);
 }
 
 function hasCustomRequirement(upgrade) {
+  if (AUTO_UNLOCK_ALL_UPGRADE_LEVELS) return false;
   return Object.hasOwn(state.rules.levelRequirements, upgrade.id);
 }
 
 function autoUpgradeMetaRequirement(upgrade) {
+  if (AUTO_UNLOCK_ALL_UPGRADE_LEVELS) return META_LEVEL_MIN;
   const customLevel = sanitizeMetaRequirement(state.rules.levelRequirements[upgrade.id]);
   return customLevel ?? defaultAutoUpgradeMetaRequirement(upgrade);
 }

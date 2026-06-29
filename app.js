@@ -21,6 +21,7 @@ const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
 const AUTO_ROUTINE_MODE = true;
 const ENABLE_PARTY_SYNERGY_UPGRADES = false;
+const AUTO_UNLOCK_ALL_UPGRADE_LEVELS = true;
 const AUTO_REWARD_CHOICES = 3;
 const AUTO_TRAINING_FALLBACK_BONUS = 0.1;
 const AUTO_ENEMY_BALANCE_TIERS = [
@@ -5279,6 +5280,7 @@ function autoUpgradeRarity(upgrade) {
 }
 
 function autoUpgradeMetaRequirement(upgrade) {
+  if (AUTO_UNLOCK_ALL_UPGRADE_LEVELS && !isPartySynergyUpgrade(upgrade)) return META_LEVEL_MIN;
   const customRequirement = autoUpgradeLevelRequirementOverride(upgrade);
   if (customRequirement) return customRequirement;
   if (upgrade.metaLevel) return clampMetaLevel(upgrade.metaLevel);
@@ -5309,6 +5311,7 @@ function partyMetaLevel() {
 
 function isAutoUpgradeMetaUnlocked(upgrade) {
   if (!ENABLE_PARTY_SYNERGY_UPGRADES && isPartySynergyUpgrade(upgrade)) return false;
+  if (AUTO_UNLOCK_ALL_UPGRADE_LEVELS && !isPartySynergyUpgrade(upgrade)) return true;
   return autoUpgradeOwnerMetaLevel(upgrade) >= autoUpgradeMetaRequirement(upgrade);
 }
 
@@ -5338,17 +5341,20 @@ function renderMetaGrowth() {
   const characterCards = playerPartyCharacters()
     .map((character) => metaCharacterCardMarkup(character))
     .join("");
+  const growthCopy = AUTO_UNLOCK_ALL_UPGRADE_LEVELS
+    ? "현재 테스트에서는 모든 캐릭터 선택지가 열려 있고, 트리 선행 순서만 적용됩니다."
+    : "각 캐릭터 레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.";
   const growthSummary = ENABLE_PARTY_SYNERGY_UPGRADES
     ? `
       <div class="meta-growth-party">
         <span>파티 평균 Lv.${partyMetaLevel()}</span>
-        <strong>레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.</strong>
+        <strong>${growthCopy}</strong>
       </div>
     `
     : `
       <div class="meta-growth-party">
         <span>캐릭터 성장</span>
-        <strong>각 캐릭터 레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.</strong>
+        <strong>${growthCopy}</strong>
       </div>
     `;
   elements.metaGrowthContent.innerHTML = `
