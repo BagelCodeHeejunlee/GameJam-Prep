@@ -16,6 +16,7 @@ const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
 const META_PROGRESS_STORAGE_KEY = "gamejam-prep-meta-growth-v1";
+const AUTO_UPGRADE_RULES_STORAGE_KEY = "gamejam-prep-auto-upgrade-rules-v1";
 const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
 const AUTO_ROUTINE_MODE = true;
@@ -114,6 +115,7 @@ let selectedCharacterId = "archer";
 let speedMultiplier = 1;
 let plannerDrag = null;
 let metaProgress = loadMetaProgress();
+let autoUpgradeRules = loadAutoUpgradeRules();
 
 const baseArcherCards = [
   card("advance-shot", "전진 사격", "기본", "기본", 54, [
@@ -1216,6 +1218,25 @@ function loadMetaProgress() {
   }
 }
 
+function defaultAutoUpgradeRules() {
+  return { levelRequirements: {} };
+}
+
+function loadAutoUpgradeRules() {
+  const fallback = defaultAutoUpgradeRules();
+  try {
+    const saved = JSON.parse(localStorage.getItem(AUTO_UPGRADE_RULES_STORAGE_KEY) ?? "null");
+    const levelRequirements = Object.entries(saved?.levelRequirements ?? {}).reduce((result, [id, value]) => {
+      const level = sanitizeMetaRequirement(value);
+      if (level) result[id] = level;
+      return result;
+    }, {});
+    return { ...fallback, levelRequirements };
+  } catch {
+    return fallback;
+  }
+}
+
 function saveMetaProgress() {
   try {
     localStorage.setItem(META_PROGRESS_STORAGE_KEY, JSON.stringify(metaProgress));
@@ -1227,6 +1248,13 @@ function saveMetaProgress() {
 function clampMetaLevel(value) {
   const level = Number.isFinite(Number(value)) ? Number(value) : META_LEVEL_MIN;
   return Math.max(META_LEVEL_MIN, Math.min(META_LEVEL_MAX, Math.round(level)));
+}
+
+function sanitizeMetaRequirement(value) {
+  if (String(value ?? "").trim() === "") return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return clampMetaLevel(numeric);
 }
 
 function characterMetaLevel(id) {
@@ -5130,6 +5158,8 @@ function autoUpgradeRarity(upgrade) {
 }
 
 function autoUpgradeMetaRequirement(upgrade) {
+  const customRequirement = autoUpgradeLevelRequirementOverride(upgrade);
+  if (customRequirement) return customRequirement;
   const depth = autoUpgradeDepth(upgrade);
   if (upgrade.owner === "party") return Math.min(META_LEVEL_MAX, 4 + depth * 2);
   if (upgrade.route === "공용") return Math.min(META_LEVEL_MAX, 1 + depth);
@@ -5137,6 +5167,11 @@ function autoUpgradeMetaRequirement(upgrade) {
   if (depth === 1) return 4;
   if (depth === 2) return 6;
   return META_LEVEL_MAX;
+}
+
+function autoUpgradeLevelRequirementOverride(upgrade) {
+  if (!upgrade?.id) return null;
+  return sanitizeMetaRequirement(autoUpgradeRules?.levelRequirements?.[upgrade.id]);
 }
 
 function autoUpgradeOwnerMetaLevel(upgrade) {

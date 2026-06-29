@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>선택지 제한 관리 - GameJam Prep</title>
+    <meta name="theme-color" content="#234a38" />
+    <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="assets/card-normal-v2.png" />
+    <link rel="stylesheet" href="upgrades.css?v=20260629-upgrade-rules" />
+  </head>
+  <body>
+    <main class="upgrade-shell">
+      <aside class="upgrade-sidebar" aria-label="캐릭터 선택">
+        <nav class="tool-nav" aria-label="도구 이동">
+          <a href="index.html">전투</a>
+          <a href="cards.html">카드툴</a>
+        </nav>
+        <div class="brand-block">
+          <span>GameJam Prep</span>
+          <h1>선택지 제한</h1>
+        </div>
+        <div id="characterList" class="character-list"></div>
+        <section id="sideSummary" class="side-summary" aria-label="선택지 요약"></section>
+      </aside>
+
+      <section class="upgrade-main">
+        <header id="upgradeHeader" class="upgrade-header"></header>
+        <section class="bulk-panel" aria-label="일괄 설정">
+          <button id="setRootLevelOneButton" type="button">트리 첫 선택지 Lv.1</button>
+          <button id="resetCharacterButton" type="button">이 캐릭터 기본값</button>
+          <button id="resetAllButton" type="button">전체 기본값</button>
+        </section>
+        <section id="routeSections" class="route-sections" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+    <script src="upgrades.js?v=20260629-upgrade-rules"></script>
+  </body>
+</html>
