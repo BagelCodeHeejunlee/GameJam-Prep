@@ -1399,21 +1399,24 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-range", "archer", "공용", "사거리 확보", "궁수 자동 사격 사거리가 1 증가한다.", () => {
     autoPermanent("archer").autoRangeBonus = (autoPermanent("archer").autoRangeBonus ?? 0) + 1;
   }),
-  autoUpgrade("auto-archer-mark", "archer", "표식", "약점 표식", "궁수 공격이 적에게 표식을 남긴다. 표식 대상은 모든 아군에게 받는 피해가 증가한다.", () => {
-    autoPermanent("archer").autoMarkOnHit = true;
-  }),
-  autoUpgrade("auto-archer-mark-hunt", "archer", "표식", "표식 사냥", "궁수가 표식 대상을 공격할 때 주는 피해가 30% 증가한다.", () => {
-    autoPermanent("archer").autoMarkedDamage = (autoPermanent("archer").autoMarkedDamage ?? 0) + 0.3;
-  }, { requires: ["auto-archer-mark"] }),
-  autoUpgrade("auto-archer-mark-transfer", "archer", "표식", "표식 전이", "표식 적이 죽으면 가장 체력이 낮은 다른 적에게 표식이 옮겨진다.", () => {
-    autoPermanent("archer").autoMarkTransfer = true;
-  }, { requires: ["auto-archer-mark-hunt"] }),
+  autoUpgrade("auto-archer-charge", "archer", "차지", "저격 태세", "궁수의 자동 공격이 차지로 바뀐다. 차지 4가 되면 사거리 제한 없는 공격 4를 한다.", () => {
+    autoPermanent("archer").autoSnipeChargeMode = true;
+    autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 4);
+    autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 4);
+  }, { metaLevel: 1 }),
+  autoUpgrade("auto-archer-charge-compress", "archer", "차지", "압축 장전", "저격 발사에 필요한 차지가 3으로 감소한다.", () => {
+    autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 3);
+  }, { requires: ["auto-archer-charge"] }),
+  autoUpgrade("auto-archer-piercing-snipe", "archer", "차지", "관통 저격", "저격 피해가 증가하고 처치 잔여 피해가 다른 적에게 전이된다.", () => {
+    autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 5);
+    autoPermanent("archer").autoSnipeOverkillRange = Math.max(autoPermanent("archer").autoSnipeOverkillRange ?? 0, 4);
+  }, { requires: ["auto-archer-charge-compress"] }),
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
   }),
   autoUpgrade("auto-archer-double", "archer", "연타", "세 번째 화살", "궁수가 매 턴 3회 사격한다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 3);
-  }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage", "auto-archer-mark"] }),
+  }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage"] }),
   autoUpgrade("auto-archer-triple", "archer", "연타", "끝없는 연사", "궁수가 매 턴 4회 사격한다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 4);
   }, { requires: ["auto-archer-double"] }),
@@ -2343,6 +2346,33 @@ function autoArcherRoutineCard(actor) {
       power: permanent.autoTrapPower ?? 2,
     });
   }
+  if (permanent.autoSnipeChargeMode) {
+    const threshold = permanent.autoSnipeThreshold ?? 4;
+    const currentCharge = actor.charge ?? 0;
+    const chargeGain = permanent.autoSnipeChargeGain ?? 1;
+    const missingCharge = Math.max(0, threshold - currentCharge);
+    if (missingCharge > 0) {
+      actions.push({
+        type: "charge",
+        amount: Math.min(chargeGain, missingCharge),
+        lockMove: false,
+      });
+    }
+    if (currentCharge + chargeGain >= threshold) {
+      actions.push({
+        type: "attack",
+        mult: permanent.autoSnipeDamage ?? 4,
+        range: Infinity,
+        ignoreChargeBonus: true,
+        resetChargeAfterAttack: true,
+        overkillSplashRange: permanent.autoSnipeOverkillRange ?? 0,
+      });
+    }
+    return {
+      ...card(`auto-archer-${state.turn}`, currentCharge + chargeGain >= threshold ? "자동 저격" : "자동 차지", "자동 루틴", "기본", 40, actions),
+      instanceId: `auto-archer-${state.turn}`,
+    };
+  }
   const shots = permanent.autoShots ?? 2;
   for (let index = 0; index < shots; index += 1) {
     actions.push({
@@ -2803,7 +2833,7 @@ async function executeAction(actor, action, cardData) {
     if (actor.permanent?.chargeRetreat) {
       await moveActor(actor, { type: "flee", amount: actor.permanent.chargeRetreat, flee: true, ignoreCannotMove: true }, cardData);
     }
-    actor.temporary.cannotMove = true;
+    if (action.lockMove !== false) actor.temporary.cannotMove = true;
     log(`${actor.name} 차지 ${actor.charge}`);
     return Boolean(actor.permanent?.chargeRetreat);
   }
@@ -3071,7 +3101,7 @@ async function attack(actor, action) {
     return false;
   }
 
-  const chargeBonus = consumeChargeForAttack(actor);
+  const chargeBonus = action.ignoreChargeBonus ? 0 : consumeChargeForAttack(actor);
   if (state.activeCardContext?.actorId === actor.id) state.activeCardContext.didAttack = true;
   await animateActorAttack(actor, targets[0], action);
   for (const target of targets) {
@@ -3106,6 +3136,7 @@ async function attack(actor, action) {
     }
     if (action.pull && isAlive(target)) await pullTarget(actor, target, action.pull);
   }
+  if (action.resetChargeAfterAttack) resetAttackCharge(actor);
   consumeEffects(actor, "attack");
   return true;
 }
@@ -4749,10 +4780,16 @@ function consumeChargeForAttack(actor) {
   const multiplier = actor.permanent?.chargeStackMultiplier ?? 1;
   const bonus = charge * multiplier;
   log(`${actor.name} 차지 ${charge} 소비`);
+  resetAttackCharge(actor);
+  return bonus;
+}
+
+function resetAttackCharge(actor) {
+  if (!actor) return;
   actor.charge = 0;
+  actor.temporary = actor.temporary ?? {};
   actor.temporary.cannotMove = false;
   renderHud();
-  return bonus;
 }
 
 function applyOverkillSplash(actor, defeatedTarget, overkillDamage, action = {}) {
@@ -5101,6 +5138,7 @@ function isAutoUpgradeAvailable(upgrade) {
   const picked = state.autoPickedUpgradeIds ?? new Set();
   if (!ENABLE_PARTY_SYNERGY_UPGRADES && isPartySynergyUpgrade(upgrade)) return false;
   if (picked.has(upgrade.id)) return false;
+  if (isAutoUpgradeRouteConflict(upgrade, picked)) return false;
   if (!isAutoUpgradeMetaUnlocked(upgrade)) return false;
   if (upgrade.requires?.some((id) => !picked.has(id))) return false;
   if (upgrade.requiresAny?.length && !upgrade.requiresAny.some((id) => picked.has(id))) return false;
@@ -5109,6 +5147,16 @@ function isAutoUpgradeAvailable(upgrade) {
 
 function isPartySynergyUpgrade(upgrade) {
   return upgrade?.owner === "party";
+}
+
+function isAutoUpgradeRouteConflict(upgrade, picked) {
+  if (upgrade?.owner !== "archer") return false;
+  const pickedRoutes = new Set(autoUpgradeCatalog
+    .filter((item) => picked.has(item.id))
+    .map((item) => item.route));
+  if (upgrade.route === "차지" && pickedRoutes.has("연타")) return true;
+  if (upgrade.route === "연타" && pickedRoutes.has("차지")) return true;
+  return false;
 }
 
 function pickAutoUpgrade(reward) {
@@ -5160,6 +5208,7 @@ function autoUpgradeRarity(upgrade) {
 function autoUpgradeMetaRequirement(upgrade) {
   const customRequirement = autoUpgradeLevelRequirementOverride(upgrade);
   if (customRequirement) return customRequirement;
+  if (upgrade.metaLevel) return clampMetaLevel(upgrade.metaLevel);
   const depth = autoUpgradeDepth(upgrade);
   if (upgrade.owner === "party") return Math.min(META_LEVEL_MAX, 4 + depth * 2);
   if (upgrade.route === "공용") return Math.min(META_LEVEL_MAX, 1 + depth);
@@ -6245,6 +6294,10 @@ function updateAutoRoutineHud(players, activeActorId) {
 
 function autoRoutineRoleLine(actor) {
   if (actor.characterId === "archer") {
+    if (actor.permanent?.autoSnipeChargeMode) {
+      const threshold = actor.permanent.autoSnipeThreshold ?? 4;
+      return `공격력 ${actor.baseAtk} · 저격 차지 ${actor.charge ?? 0}/${threshold}`;
+    }
     const shots = actor.permanent?.autoShots ?? 2;
     return `공격력 ${actor.baseAtk} · ${shots}연타`;
   }
@@ -6275,8 +6328,13 @@ function autoRoutineActionSummary(action) {
   }
   if (action.type === "attack") {
     const targets = action.targets && action.targets > 1 ? ` x${action.targets}` : "";
-    const label = action.melee || action.range <= 1 ? `근접 ${action.mult ?? 1}${targets}` : `공격 ${action.mult ?? 1}${targets}`;
-    return { kind: "attack", icon: action.melee || action.range <= 1 ? "melee" : "ranged", label, title: `가장 가까운 적 공격${targets}` };
+    const ranged = !(action.melee || action.range <= 1);
+    const label = action.melee || action.range <= 1 ? `근접 ${action.mult ?? 1}${targets}` : `${action.range === Infinity ? "저격" : "공격"} ${action.mult ?? 1}${targets}`;
+    const rangeText = action.range === Infinity ? "사거리 무제한" : "가장 가까운 적";
+    return { kind: "attack", icon: ranged ? "ranged" : "melee", label, title: `${rangeText} 공격${targets}` };
+  }
+  if (action.type === "charge") {
+    return { kind: "special", icon: "charge", label: `차지 ${action.amount ?? 1}`, title: `저격 차지 ${action.amount ?? 1} 획득` };
   }
   if (action.type === "patternAttack") {
     return { kind: "attack", icon: "area", label: "범위", title: "주변 다중 타격" };
@@ -6869,7 +6927,12 @@ function actionGroup(kind, parts) {
 
 function actionStat(kind, label, value) {
   const icon = actionIcon(kind);
-  return `<span class="action-stat" title="${label}"><span class="action-icon ${kind.replaceAll(" ", "-")}">${icon}</span><b>${value}</b></span>`;
+  return `<span class="action-stat" title="${label}"><span class="action-icon ${kind.replaceAll(" ", "-")}">${icon}</span><b>${formatActionValue(value)}</b></span>`;
+}
+
+function formatActionValue(value) {
+  if (value === Infinity) return "∞";
+  return value;
 }
 
 function actionIcon(kind) {

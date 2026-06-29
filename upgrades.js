@@ -7,7 +7,7 @@ const META_PROGRESS_STORAGE_KEY = "gamejam-prep-meta-growth-v1";
 const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
 const ROUTE_ORDER = {
-  archer: ["공용", "표식", "연타", "함정"],
+  archer: ["공용", "연타", "함정", "차지"],
   warrior: ["공용", "돌진", "범위 공격", "광전"],
   mage: ["공용", "연쇄", "룬", "운석"],
 };
@@ -371,6 +371,7 @@ function autoUpgradeMetaRequirement(upgrade) {
 }
 
 function defaultAutoUpgradeMetaRequirement(upgrade) {
+  if (upgrade.metaLevel) return clampMetaLevel(upgrade.metaLevel);
   const depth = autoUpgradeDepth(upgrade);
   if (upgrade.owner === "party") return Math.min(META_LEVEL_MAX, 4 + depth * 2);
   if (upgrade.route === "공용") return Math.min(META_LEVEL_MAX, 1 + depth);
