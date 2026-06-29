@@ -3467,6 +3467,10 @@ async function patternAttack(actor, action) {
 }
 
 function selectTargets(actor, action) {
+  return selectTargetsFromTile(actor, actor, action);
+}
+
+function selectTargetsFromTile(actor, tile, action) {
   const range = effectiveActionRange(actor, action);
   const previousTargetIds = state.activeCardContext?.actorId === actor.id
     ? state.activeCardContext.targetHits
@@ -3474,11 +3478,11 @@ function selectTargets(actor, action) {
   const preferredTargetId = preferredTargetIdForActor(actor);
   const singleTarget = isSingleTargetAction(action);
   const candidates = aliveOpponents(actor)
-    .filter((target) => canTarget(actor, target, range))
+    .filter((target) => canTargetFromTile(tile, actor.side, target, range))
     .sort((a, b) => {
       if (singleTarget) {
-        const distanceA = targetPriorityDistance(actor, a, action);
-        const distanceB = targetPriorityDistance(actor, b, action);
+        const distanceA = targetPriorityDistanceFromTile(actor, tile, a, action);
+        const distanceB = targetPriorityDistanceFromTile(actor, tile, b, action);
         if (distanceA !== distanceB) return distanceA - distanceB;
         if (a.hp !== b.hp) return a.hp - b.hp;
       }
@@ -3496,12 +3500,12 @@ function selectTargets(actor, action) {
       if (a.hp !== b.hp) return a.hp - b.hp;
       if (isRangedAttackAction(action)) {
         const targetCount = action.targets ?? 1;
-        const aPenaltyFree = isPenaltyFreeTargetFromTile(actor, actor, a, action, targetCount);
-        const bPenaltyFree = isPenaltyFreeTargetFromTile(actor, actor, b, action, targetCount);
+        const aPenaltyFree = isPenaltyFreeTargetFromTile(actor, tile, a, action, targetCount);
+        const bPenaltyFree = isPenaltyFreeTargetFromTile(actor, tile, b, action, targetCount);
         if (aPenaltyFree !== bPenaltyFree) return aPenaltyFree ? -1 : 1;
       }
-      const distanceA = targetPriorityDistance(actor, a, action);
-      const distanceB = targetPriorityDistance(actor, b, action);
+      const distanceA = targetPriorityDistanceFromTile(actor, tile, a, action);
+      const distanceB = targetPriorityDistanceFromTile(actor, tile, b, action);
       if (distanceA !== distanceB) return distanceA - distanceB;
       return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
     });
@@ -3825,6 +3829,30 @@ function attackPushAmount(actor, target, action, targetCount) {
     : 0;
   const chancePush = rollAttackPush(actor);
   return Math.max(0, (action.push ?? 0) + markPush + chancePush + effectModifierTotal(actor, "push", context));
+}
+
+function plannedAttackPushAmount(actor, sourceTile, target, action, targetCount) {
+  if (!isAlive(target)) return 0;
+  const context = damageContextFromTile(actor, sourceTile, target, action, { targetCount });
+  const markPush = AUTO_ROUTINE_MODE && actor.characterId === "warrior" && target?.temporary?.autoMarked && state.autoSynergy?.markBreak
+    ? 1
+    : 0;
+  return Math.max(0, (action.push ?? 0) + markPush + effectModifierTotal(actor, "push", context));
+}
+
+function damageContextFromTile(actor, sourceTile, target, action, options = {}) {
+  const distance = axialDistance(sourceTile, target);
+  const repeatHits = state.activeCardContext?.targetHits?.get(target.id) ?? 0;
+  return {
+    actor,
+    target,
+    action,
+    distance,
+    repeatHits,
+    targetCount: options.targetCount ?? action.targets ?? 1,
+    isMelee: Boolean(action.melee || action.range <= 1),
+    isRanged: !action.melee && (action.range ?? 1) > 1,
+  };
 }
 
 function rollAttackPush(actor) {
@@ -4350,6 +4378,8 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
         hitCount: targetInfo.hitCount,
         focusHitCount: targetInfo.focusHitCount,
         nonPenaltyHitCount: targetInfo.nonPenaltyHitCount,
+        trapSetupHitCount: targetInfo.trapSetupHitCount,
+        trapSetupBestStep: targetInfo.trapSetupBestStep,
         lowestHp: targetInfo.lowestHp,
         lowestNonPenaltyHp: targetInfo.lowestNonPenaltyHp,
         lowestIndex: targetInfo.lowestIndex,
@@ -4399,6 +4429,8 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
   const targetLimit = attackAction?.targets ?? 1;
   if (targetLimit <= 1) {
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+    const trapScore = compareTrapSetupScores(a, b);
+    if (trapScore) return trapScore;
     if (a.nearestTargetDistance !== b.nearestTargetDistance) {
       return a.nearestTargetDistance - b.nearestTargetDistance;
     }
@@ -4410,6 +4442,8 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
     return (b.focusHitCount ?? 0) - (a.focusHitCount ?? 0);
   }
   if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+  const trapScore = compareTrapSetupScores(a, b);
+  if (trapScore) return trapScore;
 
   const ranged = isRangedAttackAction(attackAction);
   if (ranged && targetLimit > 1 && a.nonPenaltyHitCount !== b.nonPenaltyHitCount) {
@@ -4426,6 +4460,18 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
   }
 
   if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
+  return 0;
+}
+
+function compareTrapSetupScores(a, b) {
+  const aTrapHits = a.trapSetupHitCount ?? 0;
+  const bTrapHits = b.trapSetupHitCount ?? 0;
+  if (aTrapHits !== bTrapHits) return bTrapHits - aTrapHits;
+  if (aTrapHits > 0) {
+    const aStep = a.trapSetupBestStep ?? Infinity;
+    const bStep = b.trapSetupBestStep ?? Infinity;
+    if (aStep !== bStep) return aStep - bStep;
+  }
   return 0;
 }
 
@@ -4522,6 +4568,8 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       hitCount: 0,
       focusHitCount: 0,
       nonPenaltyHitCount: 0,
+      trapSetupHitCount: 0,
+      trapSetupBestStep: Infinity,
       lowestHp: Infinity,
       lowestNonPenaltyHp: Infinity,
       lowestIndex: 9999,
@@ -4535,10 +4583,13 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     const nonPenaltyTargets = placement.targets.filter((target) =>
       isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, placement.targets.length),
     );
+    const trapSetup = forceMoveTrapSetupScore(actor, tile, attackAction, placement.targets);
     return {
       hitCount: placement.targets.length,
       focusHitCount: placement.focusHitCount ?? 0,
       nonPenaltyHitCount: nonPenaltyTargets.length,
+      trapSetupHitCount: trapSetup.hitCount,
+      trapSetupBestStep: trapSetup.bestStep,
       lowestHp: placement.lowestHp,
       lowestNonPenaltyHp: Math.min(...nonPenaltyTargets.map((target) => target.hp), Infinity),
       lowestIndex: placement.lowestIndex,
@@ -4546,10 +4597,9 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       nearestTargetHp: placement.lowestHp,
     };
   }
-  const targets = aliveOpponents(actor).filter((target) =>
-    canTargetFromTile(tile, actor.side, target, effectiveActionRange(actor, attackAction)),
-  );
+  const targets = selectTargetsFromTile(actor, tile, attackAction);
   const targetLimit = attackAction.targets ?? 1;
+  const trapSetup = forceMoveTrapSetupScore(actor, tile, attackAction, targets);
   const nearestTarget = targets
     .map((target) => ({
       target,
@@ -4570,12 +4620,80 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     hitCount: Math.min(targets.length, targetLimit),
     focusHitCount,
     nonPenaltyHitCount: Math.min(nonPenaltyTargets.length, targetLimit),
+    trapSetupHitCount: trapSetup.hitCount,
+    trapSetupBestStep: trapSetup.bestStep,
     lowestHp: Math.min(...targets.map((target) => target.hp), Infinity),
     lowestNonPenaltyHp: Math.min(...nonPenaltyTargets.map((target) => target.hp), Infinity),
     lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0), 9999),
     nearestTargetDistance: nearestTarget?.distance ?? Infinity,
     nearestTargetHp: nearestTarget?.target.hp ?? Infinity,
   };
+}
+
+function forceMoveTrapSetupScore(actor, sourceTile, attackAction, targets) {
+  if (!targets.length) return { hitCount: 0, bestStep: Infinity };
+
+  const targetCount = Math.max(1, targets.length);
+  let hitCount = 0;
+  let bestStep = Infinity;
+  for (const target of targets) {
+    const pushAmount = plannedAttackPushAmount(actor, sourceTile, target, attackAction, targetCount);
+    const pullAmount = attackAction.pull ?? 0;
+    if (!pushAmount && !pullAmount) continue;
+    const pushResult = simulateForceMoveTrapHit(actor, sourceTile, target, pushAmount, "push");
+    const pullResult = simulateForceMoveTrapHit(actor, sourceTile, target, pullAmount, "pull");
+    const result = betterTrapSetupResult(pushResult, pullResult);
+    if (!result.hit) continue;
+    hitCount += 1;
+    bestStep = Math.min(bestStep, result.step);
+  }
+  return { hitCount, bestStep };
+}
+
+function betterTrapSetupResult(left, right) {
+  if (left.hit && right.hit) return left.step <= right.step ? left : right;
+  return left.hit ? left : right;
+}
+
+function simulateForceMoveTrapHit(actor, sourceTile, target, amount, mode) {
+  if (!amount || amount <= 0 || !isAlive(target)) return { hit: false, step: Infinity };
+  let current = { q: target.q, r: target.r };
+  for (let step = 1; step <= amount; step += 1) {
+    const next = nextForcedMoveTileForPlanning(actor, sourceTile, target, current, mode);
+    if (!next) break;
+    current = next;
+    if (movementTrapAt(current)) return { hit: true, step };
+  }
+  return { hit: false, step: Infinity };
+}
+
+function nextForcedMoveTileForPlanning(actor, sourceTile, target, current, mode) {
+  const currentDistance = axialDistance(sourceTile, current);
+  const candidates = directions
+    .map((dir) => ({ q: current.q + dir.q, r: current.r + dir.r }))
+    .filter((tile) => isTile(tile) && canForcedMoveEndAtForPlanning(actor, sourceTile, target, tile))
+    .map((tile) => ({ tile, distance: axialDistance(sourceTile, tile), trap: trapAt(tile) }))
+    .filter((item) => (mode === "push" ? item.distance > currentDistance : item.distance < currentDistance));
+
+  if (!candidates.length) return null;
+
+  candidates.sort((a, b) => {
+    if (Boolean(a.trap) !== Boolean(b.trap)) return a.trap ? -1 : 1;
+    if (a.distance !== b.distance) return mode === "push" ? b.distance - a.distance : a.distance - b.distance;
+    if (a.tile.q !== b.tile.q) return a.tile.q - b.tile.q;
+    return a.tile.r - b.tile.r;
+  });
+
+  return candidates[0].tile;
+}
+
+function canForcedMoveEndAtForPlanning(actor, sourceTile, target, tile) {
+  if (isWall(tile)) return false;
+  return !state.entities.some((entity) => {
+    if (!isAlive(entity) || entity.id === target.id) return false;
+    if (entity.id === actor.id) return sameHex(sourceTile, tile);
+    return sameHex(entity, tile);
+  });
 }
 
 function isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, targetCount = attackAction?.targets ?? 1) {
