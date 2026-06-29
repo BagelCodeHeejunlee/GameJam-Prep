@@ -375,11 +375,6 @@ h2 {
   box-shadow: 0 6px 0 rgba(167, 66, 40, 0.28);
 }
 
-.entity.enemy.selectable {
-  cursor: pointer;
-}
-
-.entity.focused::before,
 .entity.enemy-targeted::after {
   content: "";
   position: absolute;
@@ -387,13 +382,6 @@ h2 {
   z-index: 1;
   border-radius: 50%;
   pointer-events: none;
-}
-
-.entity.focused::before {
-  border: 3px solid rgba(255, 224, 85, 0.98);
-  box-shadow:
-    0 0 0 4px rgba(255, 224, 85, 0.18),
-    0 0 22px rgba(255, 197, 49, 0.76);
 }
 
 .entity.enemy-targeted::after {

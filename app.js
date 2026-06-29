@@ -1696,7 +1696,6 @@ async function newRun() {
     plannedCardKeys: [],
     enemyPlanEntries: [],
     enemyTargetIds: {},
-    focusTargetId: null,
     planResolver: null,
     log: [],
     speedMultiplier,
@@ -1821,7 +1820,6 @@ function startWave(index) {
   state.plannedCardKeys = [];
   state.enemyPlanEntries = [];
   state.enemyTargetIds = {};
-  state.focusTargetId = firstAliveEnemyId();
   state.planResolver = null;
 }
 
@@ -2219,7 +2217,6 @@ async function runTurn() {
   state.planningChoices = playerChoices;
   state.enemyPlanEntries = enemyEntries;
   state.plannedCardKeys = defaultPlannedCardKeys(playerChoices);
-  state.focusTargetId = currentFocusTargetId();
   state.turnPlanning = true;
   state.currentTimeline = plannedPlayerEntriesFromState().concat(enemyEntries);
   assignPlanOrders(state.currentTimeline);
@@ -2286,7 +2283,6 @@ async function runTurn() {
     skippedPlayerEntries.forEach((entry) => discardSkippedPlayerCard(entry.card, entry.actorId));
     enemyEntries.forEach((entry) => discardEnemyCard(entry.card, entry.actorId));
   }
-  state.focusTargetId = currentFocusTargetId();
   state.busy = false;
   render();
   scheduleTurn();
@@ -2329,7 +2325,6 @@ async function runAutoRoutineTurn() {
   state.completedTimelineCount = 0;
   state.completedTimelineIndexes = new Set();
   state.suppressPlayerCard = false;
-  state.focusTargetId = currentFocusTargetId();
   log(`턴 ${state.turn}: 자동 루틴`);
   render();
   await sleep(turnDelay(0.45));
@@ -2364,7 +2359,6 @@ async function runAutoRoutineTurn() {
     if (checkEndConditions()) break;
   }
 
-  state.focusTargetId = currentFocusTargetId();
   state.busy = false;
   render();
   scheduleTurn();
@@ -2695,28 +2689,6 @@ function chooseEnemyGroupTarget(kind, cardData) {
     if (distanceA !== distanceB) return distanceA - distanceB;
     return a.id.localeCompare(b.id);
   })[0] ?? null;
-}
-
-function currentFocusTargetId() {
-  const current = state.focusTargetId
-    ? state.entities.find((entity) => entity.id === state.focusTargetId && isAlive(entity) && entity.side === "enemy")
-    : null;
-  return current?.id ?? firstAliveEnemyId();
-}
-
-function firstAliveEnemyId() {
-  return aliveEnemies().sort((a, b) => {
-    if (a.hp !== b.hp) return a.hp - b.hp;
-    return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
-  })[0]?.id ?? null;
-}
-
-function setFocusTarget(targetId) {
-  if (!state?.turnPlanning || !targetId) return;
-  const enemy = state.entities.find((entity) => entity.id === targetId && entity.side === "enemy" && isAlive(entity));
-  if (!enemy) return;
-  state.focusTargetId = enemy.id;
-  render();
 }
 
 function applySharedPlayerPriority(entries) {
@@ -3419,7 +3391,6 @@ async function patternAttack(actor, action) {
     actor,
     effectiveActionRange(actor, action),
     actor.side,
-    preferredTargetIdForActor(actor),
   );
   if (!placement.tiles.length) {
     log(`${actor.name} 공격 실패`);
@@ -3475,7 +3446,7 @@ function selectTargetsFromTile(actor, tile, action) {
   const previousTargetIds = state.activeCardContext?.actorId === actor.id
     ? state.activeCardContext.targetHits
     : null;
-  const preferredTargetId = preferredTargetIdForActor(actor);
+  const plannedTargetId = plannedTargetIdForActor(actor);
   const singleTarget = isSingleTargetAction(action);
   const candidates = aliveOpponents(actor)
     .filter((target) => canTargetFromTile(tile, actor.side, target, range))
@@ -3486,10 +3457,10 @@ function selectTargetsFromTile(actor, tile, action) {
         if (distanceA !== distanceB) return distanceA - distanceB;
         if (a.hp !== b.hp) return a.hp - b.hp;
       }
-      if (preferredTargetId) {
-        const aPreferred = a.id === preferredTargetId;
-        const bPreferred = b.id === preferredTargetId;
-        if (aPreferred !== bPreferred) return aPreferred ? -1 : 1;
+      if (plannedTargetId) {
+        const aPlanned = a.id === plannedTargetId;
+        const bPlanned = b.id === plannedTargetId;
+        if (aPlanned !== bPlanned) return aPlanned ? -1 : 1;
       }
       if (action.preferPreviousTarget && previousTargetIds) {
         const aPrevious = previousTargetIds.has(a.id);
@@ -3513,13 +3484,12 @@ function selectTargetsFromTile(actor, tile, action) {
   return candidates.slice(0, action.targets ?? 1);
 }
 
-function preferredTargetIdForActor(actor) {
+function plannedTargetIdForActor(actor) {
   if (!actor) return null;
   if (AUTO_ROUTINE_MODE && actor.side === "player") {
     const autoTargetId = autoPreferredTargetId(actor);
     if (autoTargetId) return autoTargetId;
   }
-  if (actor.side === "player") return state.focusTargetId ?? null;
   return state.enemyTargetIds?.[actor.kind] ?? null;
 }
 
@@ -4376,7 +4346,6 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
       return {
         tile,
         hitCount: targetInfo.hitCount,
-        focusHitCount: targetInfo.focusHitCount,
         nonPenaltyHitCount: targetInfo.nonPenaltyHitCount,
         trapSetupHitCount: targetInfo.trapSetupHitCount,
         trapSetupBestStep: targetInfo.trapSetupBestStep,
@@ -4438,9 +4407,6 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
     return 0;
   }
 
-  if ((a.focusHitCount ?? 0) !== (b.focusHitCount ?? 0)) {
-    return (b.focusHitCount ?? 0) - (a.focusHitCount ?? 0);
-  }
   if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
   const trapScore = compareTrapSetupScores(a, b);
   if (trapScore) return trapScore;
@@ -4476,13 +4442,13 @@ function compareTrapSetupScores(a, b) {
 }
 
 function nearestOpponentMoveDistance(actor, tile, opponents, attackAction, approachFields = null) {
-  const preferredTargetId = isSingleTargetAction(attackAction) ? null : preferredTargetIdForActor(actor);
-  const preferredTarget = preferredTargetId
-    ? opponents.find((enemy) => enemy.id === preferredTargetId)
+  const plannedTargetId = isSingleTargetAction(attackAction) ? null : plannedTargetIdForActor(actor);
+  const plannedTarget = plannedTargetId
+    ? opponents.find((enemy) => enemy.id === plannedTargetId)
     : null;
-  if (preferredTarget) {
-    if (!isMeleeAttackAction(attackAction)) return axialDistance(tile, preferredTarget);
-    return approachDistanceToTarget(actor, tile, preferredTarget, approachFields?.get(preferredTarget.id));
+  if (plannedTarget) {
+    if (!isMeleeAttackAction(attackAction)) return axialDistance(tile, plannedTarget);
+    return approachDistanceToTarget(actor, tile, plannedTarget, approachFields?.get(plannedTarget.id));
   }
   if (!isMeleeAttackAction(attackAction)) {
     return Math.min(...opponents.map((enemy) => axialDistance(tile, enemy)));
@@ -4566,7 +4532,6 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
   if (!attackAction || (attackAction.type !== "attack" && attackAction.type !== "patternAttack")) {
     return {
       hitCount: 0,
-      focusHitCount: 0,
       nonPenaltyHitCount: 0,
       trapSetupHitCount: 0,
       trapSetupBestStep: Infinity,
@@ -4577,16 +4542,14 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       nearestTargetHp: Infinity,
     };
   }
-  const preferredTargetId = preferredTargetIdForActor(actor);
   if (attackAction.type === "patternAttack") {
-    const placement = bestPatternPlacement(attackAction.pattern, tile, effectiveActionRange(actor, attackAction), actor.side, preferredTargetId);
+    const placement = bestPatternPlacement(attackAction.pattern, tile, effectiveActionRange(actor, attackAction), actor.side);
     const nonPenaltyTargets = placement.targets.filter((target) =>
       isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, placement.targets.length),
     );
     const trapSetup = forceMoveTrapSetupScore(actor, tile, attackAction, placement.targets);
     return {
       hitCount: placement.targets.length,
-      focusHitCount: placement.focusHitCount ?? 0,
       nonPenaltyHitCount: nonPenaltyTargets.length,
       trapSetupHitCount: trapSetup.hitCount,
       trapSetupBestStep: trapSetup.bestStep,
@@ -4613,12 +4576,8 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
   const nonPenaltyTargets = targets.filter((target) =>
     isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, Math.min(targets.length, targetLimit)),
   );
-  const focusHitCount = preferredTargetId && targets.some((target) => target.id === preferredTargetId)
-    ? 1
-    : 0;
   return {
     hitCount: Math.min(targets.length, targetLimit),
-    focusHitCount,
     nonPenaltyHitCount: Math.min(nonPenaltyTargets.length, targetLimit),
     trapSetupHitCount: trapSetup.hitCount,
     trapSetupBestStep: trapSetup.bestStep,
@@ -5333,17 +5292,17 @@ function applyOverkillSplash(actor, defeatedTarget, overkillDamage, action = {})
   log(`${actor.name} 잔여 관통 -> ${target.name} ${overkillDamage} 피해`);
 }
 
-function bestPatternPlacement(pattern, origin, range, side = origin.side, preferredTargetId = null) {
-  if (pattern === "adjacent-pair") return bestAdjacentGroupPlacement(origin, range, side, 2, preferredTargetId);
-  if (pattern === "adjacent-triple") return bestAdjacentGroupPlacement(origin, range, side, 3, preferredTargetId);
-  return { tiles: [], targets: [], focusHitCount: 0, lowestHp: Infinity, lowestIndex: 9999 };
+function bestPatternPlacement(pattern, origin, range, side = origin.side) {
+  if (pattern === "adjacent-pair") return bestAdjacentGroupPlacement(origin, range, side, 2);
+  if (pattern === "adjacent-triple") return bestAdjacentGroupPlacement(origin, range, side, 3);
+  return { tiles: [], targets: [], lowestHp: Infinity, lowestIndex: 9999 };
 }
 
 function bestAdjacentPair(actorOrTile, range, side = actorOrTile.side) {
   return bestAdjacentGroupPlacement(actorOrTile, range, side, 2).tiles;
 }
 
-function bestAdjacentGroupPlacement(actorOrTile, range, side = actorOrTile.side, size = 2, preferredTargetId = null) {
+function bestAdjacentGroupPlacement(actorOrTile, range, side = actorOrTile.side, size = 2) {
   const origin = actorOrTile;
   const candidates = [];
   const seen = new Set();
@@ -5369,7 +5328,6 @@ function bestAdjacentGroupPlacement(actorOrTile, range, side = actorOrTile.side,
         candidates.push({
           tiles: group,
           targets,
-          focusHitCount: preferredTargetId && targets.some((target) => target.id === preferredTargetId) ? 1 : 0,
           hitCount: targets.length,
           distance: Math.min(...anchorDistances),
           lowestHp: Math.min(...targets.map((target) => target.hp)),
@@ -5379,15 +5337,12 @@ function bestAdjacentGroupPlacement(actorOrTile, range, side = actorOrTile.side,
     }
   }
   candidates.sort((a, b) => {
-    if ((a.focusHitCount ?? 0) !== (b.focusHitCount ?? 0)) {
-      return (b.focusHitCount ?? 0) - (a.focusHitCount ?? 0);
-    }
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     if (a.lowestHp !== b.lowestHp) return a.lowestHp - b.lowestHp;
     if (a.distance !== b.distance) return a.distance - b.distance;
     return a.lowestIndex - b.lowestIndex;
   });
-  return candidates[0] ?? { tiles: [], targets: [], focusHitCount: 0, lowestHp: Infinity, lowestIndex: 9999 };
+  return candidates[0] ?? { tiles: [], targets: [], lowestHp: Infinity, lowestIndex: 9999 };
 }
 
 function canTarget(actor, target, range) {
@@ -6282,10 +6237,8 @@ function renderBoard() {
         (activeEntry.actorType !== "player" &&
           entity.side !== "player" &&
           entity.kind === activeEntry.actorId));
-    const focused = entity.side === "enemy" && state.focusTargetId === entity.id;
     const enemyTargeted = Object.values(state.enemyTargetIds ?? {}).includes(entity.id);
     const marked = entity.side === "enemy" && Boolean(entity.temporary?.autoMarked);
-    const planningSelectable = state.turnPlanning && entity.side === "enemy";
     const character = entity.side === "player"
       ? characterDefinitions[entity.characterId] ?? getSelectedCharacter()
       : null;
@@ -6298,7 +6251,7 @@ function renderBoard() {
       div.dataset.entityId = entity.id;
       elements.board.append(div);
     }
-    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${focused ? "focused" : ""} ${enemyTargeted ? "enemy-targeted" : ""} ${marked ? "marked" : ""} ${planningSelectable ? "selectable" : ""} ${image ? "has-art" : ""} ${hasToken ? "has-token" : ""}`;
+    const className = `entity ${entity.side} ${entity.boss ? "boss" : ""} ${acting ? "acting" : ""} ${enemyTargeted ? "enemy-targeted" : ""} ${marked ? "marked" : ""} ${image ? "has-art" : ""} ${hasToken ? "has-token" : ""}`;
     if (div.className !== className) div.className = className;
     div.dataset.entityId = entity.id;
     if (div.dataset.image !== (image ?? "") || div.dataset.label !== label) {
@@ -8634,11 +8587,6 @@ elements.boardPanel.addEventListener("pointerdown", beginBoardCameraDrag);
 elements.boardPanel.addEventListener("pointermove", moveBoardCameraDrag);
 elements.boardPanel.addEventListener("pointerup", endBoardCameraDrag);
 elements.boardPanel.addEventListener("pointercancel", endBoardCameraDrag);
-elements.board.addEventListener("click", (event) => {
-  const entityElement = event.target.closest(".entity.enemy");
-  if (!entityElement?.dataset.entityId) return;
-  setFocusTarget(entityElement.dataset.entityId);
-});
 elements.turnPlanner?.addEventListener("click", (event) => {
   const confirmButton = event.target.closest(".planner-confirm");
   if (confirmButton) {
