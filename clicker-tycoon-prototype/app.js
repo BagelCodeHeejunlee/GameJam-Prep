@@ -15,6 +15,7 @@
     shopPanel: $("#shopPanel"),
     goalLabel: $("#goalLabel"),
     newDayButton: $("#newDayButton"),
+    endShopButton: $("#endShopButton"),
     oxygenLabel: $("#oxygenLabel"),
     bagLabel: $("#bagLabel"),
     dangerLabel: $("#dangerLabel"),
@@ -233,6 +234,10 @@
     elements.shopPanel.classList.toggle("active", phase === "shop");
     elements.exploreTab.classList.toggle("active", phase === "explore");
     elements.shopTab.classList.toggle("active", phase === "shop");
+    elements.exploreTab.disabled = phase !== "explore";
+    elements.shopTab.disabled = phase !== "shop";
+    elements.exploreTab.textContent = phase === "explore" ? "1 탐험 진행" : "1 탐험 완료";
+    elements.shopTab.textContent = phase === "shop" ? "2 장사 진행" : "2 장사 대기";
     updateTutorial();
     render();
   }
@@ -265,6 +270,7 @@
     elements.queueLabel.textContent = totalQueue;
     elements.staffLabel.textContent = staffCount;
     elements.newDayButton.disabled = state.phase !== "shop";
+    elements.newDayButton.textContent = state.phase === "explore" ? "탐험 중" : "다음 날";
   }
 
   function renderMine() {
@@ -480,11 +486,14 @@
     });
     state.bagUsed = 0;
     state.goal = "스테이션 재고와 계산대 병목 관리";
+    state.incomeSamples = [];
     log("탐험 재료를 창고로 옮겼습니다. 이제 가게를 운영하세요.");
     setPhase("shop");
   }
 
   function startNewDay() {
+    if (state.phase !== "shop") return;
+    settleShop();
     state.day += 1;
     state.oxygen = 42 + Math.min(10, state.day * 2);
     state.danger = 0;
@@ -496,7 +505,30 @@
     setPhase("explore");
   }
 
+  function settleShop() {
+    let settledCash = 0;
+    Object.keys(stationDefs).forEach((id) => {
+      const station = state.stations[id];
+      settledCash += station.cashPile;
+      station.cashPile = 0;
+      station.queue = 0;
+      station.progress = 0;
+    });
+
+    if (settledCash > 0) {
+      state.cash += settledCash;
+      state.stats.collected += settledCash;
+      state.stats.totalEarned += settledCash;
+      log(`영업 종료 정산으로 ${formatNumber(settledCash)} 코인을 수거했습니다.`);
+    } else {
+      log("영업을 종료했습니다. 다음 탐험을 시작합니다.");
+    }
+
+    state.incomeSamples = [];
+  }
+
   function runShopTick() {
+    if (state.phase !== "shop") return;
     const earnedThisTick = [];
     Object.keys(stationDefs).forEach((id) => {
       const station = state.stations[id];
@@ -528,6 +560,7 @@
   }
 
   function addCustomer() {
+    if (state.phase !== "shop") return;
     const unlocked = Object.keys(stationDefs).filter((id) => state.stations[id].unlocked);
     if (!unlocked.length) return;
     const sorted = unlocked.sort((a, b) => state.stations[a].queue - state.stations[b].queue);
@@ -537,6 +570,7 @@
   }
 
   function runRestocker() {
+    if (state.phase !== "shop") return;
     if (!state.staff.restocker) return;
     const candidates = Object.keys(stationDefs)
       .filter((id) => state.stations[id].unlocked && canRestock(id))
@@ -653,14 +687,27 @@
     }
 
     const step = guideSteps[state.tutorialIndex] || guideSteps[guideSteps.length - 1];
+    const displayStep = getDisplayGuideStep(step);
     elements.guidePanel.classList.remove("hidden");
-    elements.guideTitle.textContent = step.title;
-    elements.guideText.textContent = step.text;
+    elements.guideTitle.textContent = displayStep.title;
+    elements.guideText.textContent = displayStep.text;
 
-    if (step.target) {
-      const target = document.querySelector(step.target);
+    if (displayStep.target) {
+      const target = document.querySelector(displayStep.target);
       if (target) target.classList.add("tutorial-focus");
     }
+  }
+
+  function getDisplayGuideStep(step) {
+    const shopOnlySteps = ["stock", "collect", "upgrade", "hire"];
+    if (state.phase === "explore" && shopOnlySteps.includes(step.id)) {
+      return {
+        title: "다음 장사 준비",
+        text: "지금은 탐험 시간입니다. 재료를 더 캐고 귀환하면 장사에서 보충, 수거, 업그레이드를 이어갑니다.",
+        target: "#returnButton",
+      };
+    }
+    return step;
   }
 
   function log(message) {
@@ -684,8 +731,13 @@
     elements.bombButton.addEventListener("click", useBomb);
     elements.returnButton.addEventListener("click", returnToShop);
     elements.newDayButton.addEventListener("click", startNewDay);
-    elements.exploreTab.addEventListener("click", () => setPhase("explore"));
-    elements.shopTab.addEventListener("click", () => setPhase("shop"));
+    elements.endShopButton.addEventListener("click", startNewDay);
+    elements.exploreTab.addEventListener("click", () => {
+      if (state.phase === "explore") setPhase("explore");
+    });
+    elements.shopTab.addEventListener("click", () => {
+      if (state.phase === "shop") setPhase("shop");
+    });
     elements.collectAllButton.addEventListener("click", collectAllCash);
     elements.skipGuideButton.addEventListener("click", () => {
       state.tutorialHidden = true;
@@ -736,7 +788,7 @@
   function init() {
     state = createInitialState();
     log("새 상점이 열렸습니다. 먼저 탐험에서 재료를 캐세요.");
-    render();
+    setPhase("explore");
     startLoops();
   }
 

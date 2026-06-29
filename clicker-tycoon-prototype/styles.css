@@ -239,6 +239,11 @@ h1 {
   box-shadow: 0 8px 14px rgba(18, 56, 60, 0.18);
 }
 
+.phase-tabs button:disabled:not(.active) {
+  opacity: 0.52;
+  color: #6b7a75;
+}
+
 .phase-panel {
   display: none;
   min-height: 0;
@@ -272,6 +277,10 @@ h1 {
   color: #fff;
   font-size: 12px;
   font-weight: 900;
+}
+
+.shop-mission {
+  grid-template-columns: minmax(0, 1fr) 92px;
 }
 
 .explore-stats,

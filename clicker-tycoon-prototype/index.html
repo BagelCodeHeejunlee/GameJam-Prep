@@ -45,9 +45,9 @@
         <button id="skipGuideButton" class="icon-button" type="button" aria-label="튜토리얼 숨기기">x</button>
       </section>
 
-      <nav class="phase-tabs" aria-label="화면 전환">
-        <button id="exploreTab" class="active" type="button">탐험</button>
-        <button id="shopTab" type="button">가게</button>
+      <nav class="phase-tabs" aria-label="하루 단계">
+        <button id="exploreTab" class="active" type="button">1 탐험</button>
+        <button id="shopTab" type="button" disabled>2 장사</button>
       </nav>
 
       <section id="explorePanel" class="phase-panel active" aria-label="탐험 화면">
@@ -109,6 +109,14 @@
             <span>직원</span>
             <strong id="staffLabel">0</strong>
           </div>
+        </section>
+
+        <section class="mission-card shop-mission">
+          <div>
+            <span class="eyebrow">SHOP TIME</span>
+            <strong>영업이 끝나면 다음 탐험으로 넘어갑니다</strong>
+          </div>
+          <button id="endShopButton" type="button">영업 종료</button>
         </section>
 
         <section id="shopMap" class="shop-map" aria-label="상점 운영 맵"></section>
