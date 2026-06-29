@@ -1420,10 +1420,6 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-charge-compress", "archer", "차지", "압축 장전", "저격 발사에 필요한 차지가 3으로 감소한다.", () => {
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 3);
   }, { requires: ["auto-archer-charge"] }),
-  autoUpgrade("auto-archer-piercing-snipe", "archer", "차지", "관통 저격", "저격 피해가 증가하고 처치 잔여 피해가 다른 적에게 전이된다.", () => {
-    autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 5);
-    autoPermanent("archer").autoSnipeOverkillRange = Math.max(autoPermanent("archer").autoSnipeOverkillRange ?? 0, 4);
-  }, { requires: ["auto-archer-charge-compress"] }),
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
   }),
@@ -2378,7 +2374,6 @@ function autoArcherRoutineCard(actor) {
         range: Infinity,
         ignoreChargeBonus: true,
         resetChargeAfterAttack: true,
-        overkillSplashRange: permanent.autoSnipeOverkillRange ?? 0,
       });
     }
     return {
