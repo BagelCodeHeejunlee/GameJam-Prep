@@ -5798,6 +5798,7 @@ function renderAutoRoutineHud() {
   const players = state.entities.filter((entity) => entity.side === "player");
   if (!players.length) {
     elements.playerHud.innerHTML = "";
+    delete elements.playerHud.dataset.autoSignature;
     elements.playerHud.setAttribute("aria-hidden", "true");
     return;
   }
@@ -5813,22 +5814,29 @@ function renderAutoRoutineHud() {
     "auto-routine-hud",
     players.length === 1 ? "solo" : players.length === 2 ? "duo" : "trio",
   ].join(" ");
-  elements.playerHud.innerHTML = `
-    <div class="auto-party-board" style="--auto-party-count: ${Math.min(players.length, 3)}">
-      ${players.map((actor) => autoRoutinePanelMarkup(actor, activeActorId)).join("")}
-    </div>
-  `;
+  elements.playerHud.style.setProperty("--auto-party-count", Math.min(players.length, 3));
+
+  const signature = autoRoutineHudSignature(players);
+  if (elements.playerHud.dataset.autoSignature !== signature) {
+    elements.playerHud.innerHTML = `
+      <div class="auto-party-board">
+        ${players.map(autoRoutinePanelMarkup).join("")}
+      </div>
+    `;
+    elements.playerHud.dataset.autoSignature = signature;
+  }
+
+  updateAutoRoutineHud(players, activeActorId);
 }
 
-function autoRoutinePanelMarkup(actor, activeActorId) {
+function autoRoutinePanelMarkup(actor) {
   const character = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
   const routine = autoRoutineCard(actor);
-  const alive = isAlive(actor);
   const actionChips = routine.actions.map(autoRoutineActionChip).join("");
   const hp = `${Math.max(0, actor.hp)} / ${actor.maxHp}`;
   const portrait = portraitContent(character.image, character.shortLabel ?? character.name, "auto-party-portrait-img");
   return `
-    <article class="auto-party-card ${actor.id === activeActorId ? "active" : ""} ${alive ? "" : "down"}">
+    <article class="auto-party-card" data-actor-id="${escapeMarkup(actor.id)}">
       <div class="auto-party-head">
         <span class="auto-party-portrait">${portrait}</span>
         <div class="auto-party-main">
@@ -5845,6 +5853,45 @@ function autoRoutinePanelMarkup(actor, activeActorId) {
       </div>
     </article>
   `;
+}
+
+function autoRoutineHudSignature(players) {
+  return players.map((actor) => {
+    const character = characterDefinitions[actor.characterId] ?? getSelectedCharacter();
+    const routine = autoRoutineCard(actor);
+    const actions = routine.actions.map((action) => {
+      const summary = autoRoutineActionSummary(action);
+      return `${summary.kind}:${summary.icon}:${summary.label}:${summary.title}`;
+    }).join(",");
+    return [
+      actor.id,
+      actor.characterId,
+      character.name,
+      character.image,
+      actor.maxHp,
+      autoRoutineRoleLine(actor),
+      actions,
+    ].join("|");
+  }).join("||");
+}
+
+function updateAutoRoutineHud(players, activeActorId) {
+  const playerById = new Map(players.map((actor) => [String(actor.id), actor]));
+  elements.playerHud.querySelectorAll(".auto-party-card").forEach((card) => {
+    const actor = playerById.get(card.dataset.actorId);
+    if (!actor) return;
+
+    card.classList.toggle("active", actor.id === activeActorId);
+    card.classList.toggle("down", !isAlive(actor));
+
+    const hp = `${Math.max(0, actor.hp)} / ${actor.maxHp}`;
+    const hpWrap = card.querySelector(".auto-party-hp");
+    const hpFill = card.querySelector(".auto-party-hp i");
+    const hpText = card.querySelector(".auto-party-hp b");
+    if (hpWrap) hpWrap.setAttribute("aria-label", `체력 ${hp}`);
+    if (hpFill) hpFill.style.width = `${hpPercent(actor)}%`;
+    if (hpText && hpText.textContent !== hp) hpText.textContent = hp;
+  });
 }
 
 function autoRoutineRoleLine(actor) {
