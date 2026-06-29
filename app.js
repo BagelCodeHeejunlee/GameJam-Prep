@@ -1413,6 +1413,12 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.1);
     autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 1);
   }, { metaLevel: 1 }),
+  autoUpgrade("auto-archer-crack-shot", "archer", "공용", "균열 사격", "세 번째 파동 피해가 현재 체력의 15%로 증가하고 탐색 범위가 2칸으로 넓어진다.", () => {
+    autoPermanent("archer").thirdAttackPulseEvery = Math.min(autoPermanent("archer").thirdAttackPulseEvery ?? 3, 3);
+    autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 3);
+    autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.15);
+    autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 2);
+  }, { requires: ["auto-archer-third-pulse"] }),
   autoUpgrade("auto-archer-charge", "archer", "차지", "저격 태세", "궁수의 자동 공격이 차지로 바뀐다. 차지 4가 되면 사거리 제한 없는 공격 4를 한다.", () => {
     autoPermanent("archer").autoSnipeChargeMode = true;
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 4);
@@ -1422,6 +1428,9 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 3);
     autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 5);
   }, { requires: ["auto-archer-charge"] }),
+  autoUpgrade("auto-archer-full-draw", "archer", "차지", "완전 장전", "저격으로 적을 처치하면 저격 후 차지 1을 남긴다.", () => {
+    autoPermanent("archer").autoSnipeKillChargeRefund = Math.max(autoPermanent("archer").autoSnipeKillChargeRefund ?? 0, 1);
+  }, { requires: ["auto-archer-charge-compress"] }),
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
   }),
@@ -1445,6 +1454,17 @@ const autoUpgradeCatalog = [
   }, { requires: ["auto-archer-trap"] }),
   autoUpgrade("auto-archer-spike-path", "archer", "함정", "가시 길목", "함정 설치 수가 1 증가한다.", () => {
     autoPermanent("archer").autoTrapCount = (autoPermanent("archer").autoTrapCount ?? 1) + 1;
+  }, { requires: ["auto-archer-trap"] }),
+  autoUpgrade("auto-archer-trap-herding", "archer", "함정", "덫몰이", "함정이 있으면 궁수가 매 턴 가까운 적을 함정 쪽으로 1칸 유도한다.", () => {
+    autoPermanent("archer").autoTrapLure = true;
+    autoPermanent("archer").autoTrapLureAmount = Math.max(autoPermanent("archer").autoTrapLureAmount ?? 0, 1);
+  }, { requires: ["auto-archer-trap"] }),
+  autoUpgrade("auto-archer-ankle-shot", "archer", "함정", "발목 노리기", "함정에 걸린 적은 다음 이동을 할 수 없다.", () => {
+    autoPermanent("archer").trapSnare = true;
+  }, { requires: ["auto-archer-trap"] }),
+  autoUpgrade("auto-archer-ambush-shot", "archer", "함정", "매복 사격", "함정이 발동하면 궁수가 발동시킨 적을 즉시 공격한다.", () => {
+    autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 1);
+    autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 5);
   }, { requires: ["auto-archer-trap"] }),
   autoUpgrade("auto-archer-chain-trap", "archer", "함정", "연쇄 함정", "함정이 발동하면 주변 적에게도 피해를 주고 궁수가 즉시 매복 사격한다.", () => {
     autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 2.5);
@@ -2375,6 +2395,13 @@ function autoArcherRoutineCard(actor) {
       power: permanent.autoTrapPower ?? 2,
     });
   }
+  if (permanent.autoTrapLure && ownedMovementTraps(actor).length) {
+    actions.push({
+      type: "pushTowardTrap",
+      amount: permanent.autoTrapLureAmount ?? 1,
+      range,
+    });
+  }
   if (permanent.autoSnipeChargeMode) {
     const threshold = permanent.autoSnipeThreshold ?? 4;
     const currentCharge = actor.charge ?? 0;
@@ -2394,6 +2421,7 @@ function autoArcherRoutineCard(actor) {
         range: Infinity,
         ignoreChargeBonus: true,
         resetChargeAfterAttack: true,
+        chargeRefundAfterReset: permanent.autoSnipeKillChargeRefund ?? 0,
       });
     }
     return {
@@ -3142,6 +3170,7 @@ async function attack(actor, action) {
   const batchVisuals = targets.length > 1;
   const hitEvents = [];
   const hitResults = [];
+  let chargeRefundAfterReset = 0;
   for (const target of targets) {
     if (!isAlive(actor)) return true;
     if (!isAlive(target)) continue;
@@ -3158,11 +3187,15 @@ async function attack(actor, action) {
     const { target, beforeHp, damage } = result;
     resolveKillPassives(actor, target);
     applyOverkillSplash(actor, target, damage - beforeHp, action);
+    if (action.chargeRefundAfterReset && !isAlive(target)) {
+      chargeRefundAfterReset = Math.max(chargeRefundAfterReset, action.chargeRefundAfterReset);
+    }
     refundChargeOnKill(actor, target, action);
     await handleAttackPush(actor, target, action, targets.length);
     if (action.pull && isAlive(target)) await pullTarget(actor, target, action.pull);
   }
   if (action.resetChargeAfterAttack) resetAttackCharge(actor);
+  if (chargeRefundAfterReset) addCharge(actor, chargeRefundAfterReset, "완전 장전", { lockMove: false });
   consumeEffects(actor, "attack");
   return true;
 }
@@ -3730,9 +3763,15 @@ function rollAttackPush(actor) {
 
 function refundChargeOnKill(actor, target, action) {
   if (!action.killChargeRefund || isAlive(target)) return;
-  actor.charge = (actor.charge ?? 0) + action.killChargeRefund;
-  actor.temporary.cannotMove = true;
-  log(`${actor.name} 처치 집중: 차지 ${actor.charge}`);
+  addCharge(actor, action.killChargeRefund, "처치 집중", { lockMove: true });
+}
+
+function addCharge(actor, amount, label, options = {}) {
+  if (!actor || !amount) return;
+  actor.charge = (actor.charge ?? 0) + amount;
+  actor.temporary = actor.temporary ?? {};
+  if (options.lockMove) actor.temporary.cannotMove = true;
+  log(`${actor.name} ${label}: 차지 ${actor.charge}`);
   renderHud();
 }
 
@@ -8037,6 +8076,15 @@ function resolveTrapTriggeredEffects(trap, target) {
       expiresAfterOwnTurnEnds: state.turn + 99,
     };
     log(`${target.name} 함정 사냥 표식`);
+  }
+  if (trap.kind !== "rune" && owner.permanent?.trapSnare && isAlive(target)) {
+    target.temporary = target.temporary ?? {};
+    target.temporary.cannotMove = {
+      source: "trap-snare",
+      expiresAfterOwnTurnEnds: state.turn,
+      onExpire: (entity) => log(`${entity.name} 발목 회복`),
+    };
+    log(`${target.name} 발목 노리기: 이동 불가`);
   }
   if (trap.kind !== "rune" && owner.permanent?.trapTriggerShot && isAlive(target)) {
     const shotRange = owner.permanent.trapTriggerShotRange ?? 5;
