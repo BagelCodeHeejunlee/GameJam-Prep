@@ -22,7 +22,7 @@
     <link rel="preload" as="image" href="assets/ui-kit/planner-panel-9slice-v1.png" />
     <link rel="preload" as="image" href="assets/casting/archer/archer-01-2d-illustration-cutout.png" />
     <link rel="preload" as="image" href="assets/characters/archer-token/archer-token-v2-front.png" />
-    <link rel="stylesheet" href="styles.css?v=20260629-auto-reward-mark" />
+    <link rel="stylesheet" href="styles.css?v=20260629-meta-growth" />
   </head>
   <body>
     <main class="app-shell">
@@ -34,6 +34,7 @@
         <div class="controls">
           <a class="tool-link" href="cards.html">카드툴</a>
           <a class="tool-link" href="grass-tile-casting-board.html">타일시안</a>
+          <button id="metaGrowthButton" type="button">성장</button>
           <button id="newRunButton" type="button">새 런</button>
           <button id="pauseButton" type="button">일시정지</button>
           <button id="speedButton" type="button">x1</button>
@@ -144,6 +145,19 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260629-auto-reward-mark"></script>
+    <div id="metaGrowthOverlay" class="overlay meta-growth-overlay hidden">
+      <section class="meta-growth-modal" role="dialog" aria-modal="true" aria-label="캐릭터 성장">
+        <div class="meta-growth-header">
+          <div>
+            <span>OUTGAME GROWTH</span>
+            <h2>캐릭터 성장</h2>
+          </div>
+          <button id="closeMetaGrowthButton" class="icon-button" type="button" aria-label="닫기">x</button>
+        </div>
+        <div id="metaGrowthContent" class="meta-growth-content"></div>
+      </section>
+    </div>
+
+    <script src="app.js?v=20260629-meta-growth"></script>
   </body>
 </html>

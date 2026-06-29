@@ -15,6 +15,9 @@ const CAMERA_FOLLOW_DURATION = 220;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
+const META_PROGRESS_STORAGE_KEY = "gamejam-prep-meta-growth-v1";
+const META_LEVEL_MIN = 1;
+const META_LEVEL_MAX = 8;
 const AUTO_ROUTINE_MODE = true;
 const AUTO_ENEMY_BALANCE_TIERS = [
   { maxWave: 2, hpMultiplier: 3.2, minHp: 18, attackMultiplier: 1, attackBonus: 0 },
@@ -95,6 +98,10 @@ const elements = {
   cardPreviewOverlay: document.querySelector("#cardPreviewOverlay"),
   cardPreviewMount: document.querySelector("#cardPreviewMount"),
   closeCardPreviewButton: document.querySelector("#closeCardPreviewButton"),
+  metaGrowthButton: document.querySelector("#metaGrowthButton"),
+  metaGrowthOverlay: document.querySelector("#metaGrowthOverlay"),
+  metaGrowthContent: document.querySelector("#metaGrowthContent"),
+  closeMetaGrowthButton: document.querySelector("#closeMetaGrowthButton"),
   newRunButton: document.querySelector("#newRunButton"),
   pauseButton: document.querySelector("#pauseButton"),
   speedButton: document.querySelector("#speedButton"),
@@ -103,6 +110,7 @@ const elements = {
 let selectedCharacterId = "archer";
 let speedMultiplier = 1;
 let plannerDrag = null;
+let metaProgress = loadMetaProgress();
 
 const baseArcherCards = [
   card("advance-shot", "전진 사격", "기본", "기본", 54, [
@@ -1185,6 +1193,48 @@ function persistSelectedCharacterId(id) {
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
   }
+}
+
+function defaultMetaProgress() {
+  return { levels: { archer: 1, warrior: 1, mage: 1 } };
+}
+
+function loadMetaProgress() {
+  const fallback = defaultMetaProgress();
+  try {
+    const saved = JSON.parse(localStorage.getItem(META_PROGRESS_STORAGE_KEY) ?? "null");
+    const levels = { ...fallback.levels, ...(saved?.levels ?? {}) };
+    Object.keys(levels).forEach((id) => {
+      levels[id] = clampMetaLevel(levels[id]);
+    });
+    return { levels };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveMetaProgress() {
+  try {
+    localStorage.setItem(META_PROGRESS_STORAGE_KEY, JSON.stringify(metaProgress));
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function clampMetaLevel(value) {
+  const level = Number.isFinite(Number(value)) ? Number(value) : META_LEVEL_MIN;
+  return Math.max(META_LEVEL_MIN, Math.min(META_LEVEL_MAX, Math.round(level)));
+}
+
+function characterMetaLevel(id) {
+  return clampMetaLevel(metaProgress?.levels?.[id] ?? META_LEVEL_MIN);
+}
+
+function setCharacterMetaLevel(id, level) {
+  metaProgress.levels[id] = clampMetaLevel(level);
+  saveMetaProgress();
+  renderMetaGrowth();
+  render();
 }
 
 const monsterDefinitions = {
@@ -4943,6 +4993,24 @@ function showAutoUpgradeRewards() {
   elements.rewardInstr.innerHTML = `자동 루틴 강화 <b>1개</b>를 선택하세요`;
   elements.rewardCards.innerHTML = "";
   elements.rewardCards.className = "reward-cards reward-phase-auto";
+  if (!rewards.length) {
+    elements.rewardInstr.innerHTML = `현재 캐릭터 레벨에서 선택 가능한 강화가 없습니다`;
+    const skip = document.createElement("button");
+    skip.className = "reward-pick auto-upgrade-pick auto-upgrade-skip";
+    skip.type = "button";
+    skip.innerHTML = `
+      <span class="auto-upgrade-meta">
+        <span class="auto-upgrade-owner">메타 성장 필요</span>
+        <b class="auto-upgrade-rarity">PASS</b>
+      </span>
+      <strong>다음 웨이브</strong>
+      <span>성장 화면에서 캐릭터 레벨을 올리면 더 많은 강화가 등장합니다.</span>
+    `;
+    skip.addEventListener("click", continueAfterAutoReward);
+    elements.rewardCards.append(skip);
+    elements.rewardOverlay.classList.remove("hidden");
+    return;
+  }
   rewards.forEach((reward) => {
     const rarity = autoUpgradeRarity(reward);
     const pick = document.createElement("button");
@@ -4970,6 +5038,7 @@ function drawAutoUpgradeRewards() {
 function isAutoUpgradeAvailable(upgrade) {
   const picked = state.autoPickedUpgradeIds ?? new Set();
   if (picked.has(upgrade.id)) return false;
+  if (!isAutoUpgradeMetaUnlocked(upgrade)) return false;
   if (upgrade.requires?.some((id) => !picked.has(id))) return false;
   if (upgrade.requiresAny?.length && !upgrade.requiresAny.some((id) => picked.has(id))) return false;
   return true;
@@ -4994,6 +5063,20 @@ function pickAutoUpgrade(reward) {
   scheduleTurn();
 }
 
+function continueAfterAutoReward() {
+  if (state.rewardLocked) return;
+  state.rewardLocked = true;
+  elements.rewardOverlay.classList.add("hidden");
+  log("선택 가능한 루틴 강화 없음");
+  state.rewardLocked = false;
+  state.waitingReward = false;
+  state.rewardPhase = "auto";
+  state.waveIndex += 1;
+  startWave(state.waveIndex);
+  render();
+  scheduleTurn();
+}
+
 function autoRewardOwnerLabel(owner) {
   if (owner === "party") return "파티";
   return characterDefinitions[owner]?.name ?? owner;
@@ -5007,6 +5090,31 @@ function autoUpgradeRarity(upgrade) {
   return "노말";
 }
 
+function autoUpgradeMetaRequirement(upgrade) {
+  const depth = autoUpgradeDepth(upgrade);
+  if (upgrade.owner === "party") return Math.min(META_LEVEL_MAX, 4 + depth * 2);
+  if (upgrade.route === "공용") return Math.min(META_LEVEL_MAX, 1 + depth);
+  if (depth === 0) return 2;
+  if (depth === 1) return 4;
+  if (depth === 2) return 6;
+  return META_LEVEL_MAX;
+}
+
+function autoUpgradeOwnerMetaLevel(upgrade) {
+  if (upgrade.owner === "party") return partyMetaLevel();
+  return characterMetaLevel(upgrade.owner);
+}
+
+function partyMetaLevel() {
+  const levels = playerPartyCharacters().map((character) => characterMetaLevel(character.id));
+  if (!levels.length) return META_LEVEL_MIN;
+  return Math.floor(levels.reduce((sum, level) => sum + level, 0) / levels.length);
+}
+
+function isAutoUpgradeMetaUnlocked(upgrade) {
+  return autoUpgradeOwnerMetaLevel(upgrade) >= autoUpgradeMetaRequirement(upgrade);
+}
+
 function autoUpgradeDepth(upgrade, seen = new Set()) {
   if (!upgrade || seen.has(upgrade.id)) return 0;
   const requirements = [...(upgrade.requires ?? []), ...(upgrade.requiresAny ?? [])];
@@ -5017,6 +5125,104 @@ function autoUpgradeDepth(upgrade, seen = new Set()) {
     return autoUpgradeDepth(prerequisite, new Set(seen));
   });
   return 1 + Math.max(0, ...depths);
+}
+
+function openMetaGrowth() {
+  renderMetaGrowth();
+  elements.metaGrowthOverlay?.classList.remove("hidden");
+}
+
+function closeMetaGrowth() {
+  elements.metaGrowthOverlay?.classList.add("hidden");
+}
+
+function renderMetaGrowth() {
+  if (!elements.metaGrowthContent) return;
+  const characterCards = playerPartyCharacters()
+    .map((character) => metaCharacterCardMarkup(character))
+    .join("");
+  elements.metaGrowthContent.innerHTML = `
+    <div class="meta-growth-party">
+      <span>파티 평균 Lv.${partyMetaLevel()}</span>
+      <strong>레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.</strong>
+    </div>
+    <div class="meta-character-grid">${characterCards}</div>
+    ${metaPartySynergyMarkup()}
+  `;
+}
+
+function metaCharacterCardMarkup(character) {
+  const level = characterMetaLevel(character.id);
+  const upgrades = autoUpgradeCatalog.filter((upgrade) => upgrade.owner === character.id);
+  const routeMarkup = metaRouteGroupsMarkup(upgrades);
+  return `
+    <article class="meta-character-card auto-owner-${character.id}">
+      <header class="meta-character-head">
+        <span class="meta-character-portrait">${portraitContent(character.image, character.shortLabel ?? character.name, "meta-character-img")}</span>
+        <div>
+          <strong>${escapeMarkup(character.name)}</strong>
+          <span>Lv.${level} / ${META_LEVEL_MAX}</span>
+        </div>
+        <div class="meta-level-controls">
+          <button type="button" data-meta-level-step="-1" data-character-id="${character.id}" aria-label="${character.name} 레벨 내리기">-</button>
+          <button type="button" data-meta-level-step="1" data-character-id="${character.id}" aria-label="${character.name} 레벨 올리기">+</button>
+        </div>
+      </header>
+      <div class="meta-level-bar" aria-hidden="true"><i style="width: ${(level / META_LEVEL_MAX) * 100}%"></i></div>
+      ${routeMarkup}
+    </article>
+  `;
+}
+
+function metaPartySynergyMarkup() {
+  const upgrades = autoUpgradeCatalog.filter((upgrade) => upgrade.owner === "party");
+  if (!upgrades.length) return "";
+  return `
+    <article class="meta-party-card auto-owner-party">
+      <header class="meta-party-head">
+        <strong>파티 시너지</strong>
+        <span>평균 Lv.${partyMetaLevel()} 기준</span>
+      </header>
+      ${metaRouteGroupsMarkup(upgrades)}
+    </article>
+  `;
+}
+
+function metaRouteGroupsMarkup(upgrades) {
+  const routes = new Map();
+  upgrades.forEach((upgrade) => {
+    if (!routes.has(upgrade.route)) routes.set(upgrade.route, []);
+    routes.get(upgrade.route).push(upgrade);
+  });
+  return [...routes.entries()].map(([route, routeUpgrades]) => `
+    <section class="meta-route-group">
+      <h3>${escapeMarkup(route)}</h3>
+      <ul>
+        ${routeUpgrades
+          .sort((a, b) => autoUpgradeMetaRequirement(a) - autoUpgradeMetaRequirement(b) || autoUpgradeDepth(a) - autoUpgradeDepth(b))
+          .map(metaUpgradeItemMarkup)
+          .join("")}
+      </ul>
+    </section>
+  `).join("");
+}
+
+function metaUpgradeItemMarkup(upgrade) {
+  const rarity = autoUpgradeRarity(upgrade);
+  const requiredLevel = autoUpgradeMetaRequirement(upgrade);
+  const unlocked = isAutoUpgradeMetaUnlocked(upgrade);
+  const picked = state?.autoPickedUpgradeIds?.has(upgrade.id);
+  const status = picked ? "선택됨" : unlocked ? "해금" : `Lv.${requiredLevel}`;
+  const desc = unlocked ? upgrade.desc : `${autoRewardOwnerLabel(upgrade.owner)} Lv.${requiredLevel} 필요`;
+  return `
+    <li class="meta-upgrade-item ${rarityClass(rarity)} ${unlocked ? "unlocked" : "locked"} ${picked ? "picked" : ""}">
+      <div>
+        <strong>${escapeMarkup(upgrade.name)}</strong>
+        <span>${escapeMarkup(desc)}</span>
+      </div>
+      <b>${status}</b>
+    </li>
+  `;
 }
 
 function drawPassiveRewards() {
@@ -7558,6 +7764,19 @@ elements.speedButton.addEventListener("click", () => {
   if (state) state.speedMultiplier = speedMultiplier;
   renderHud();
 });
+elements.metaGrowthButton?.addEventListener("click", openMetaGrowth);
+elements.closeMetaGrowthButton?.addEventListener("click", closeMetaGrowth);
+elements.metaGrowthOverlay?.addEventListener("click", (event) => {
+  if (event.target === elements.metaGrowthOverlay) closeMetaGrowth();
+});
+elements.metaGrowthContent?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-meta-level-step]");
+  if (!button) return;
+  const characterId = button.dataset.characterId;
+  const step = Number(button.dataset.metaLevelStep ?? 0);
+  if (!characterId || !step) return;
+  setCharacterMetaLevel(characterId, characterMetaLevel(characterId) + step);
+});
 elements.boardPanel.addEventListener("pointerdown", beginBoardCameraDrag);
 elements.boardPanel.addEventListener("pointermove", moveBoardCameraDrag);
 elements.boardPanel.addEventListener("pointerup", endBoardCameraDrag);
@@ -7620,6 +7839,7 @@ elements.cardPreviewOverlay.addEventListener("click", (event) => {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeCardPreview();
+    closeMetaGrowth();
     elements.iconHelpOverlay.classList.add("hidden");
   }
 });
