@@ -328,7 +328,6 @@ const archerRewardPool = [
   ]),
   card("attack-trap", "공격 함정 설치", "함정", "노말", 24, [
     { type: "placeTrap", range: 2, trap: "attack", count: 2 },
-    { type: "pushTowardTrap", amount: 1, range: 3 },
     { type: "attack", mult: 1, range: 2 },
   ]),
   card("block-trap", "봉쇄 함정 설치", "함정", "노말", 25, [
@@ -1456,10 +1455,6 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-spike-path", "archer", "함정", "가시 길목", "함정 설치 수가 1 증가한다.", () => {
     autoPermanent("archer").autoTrapCount = (autoPermanent("archer").autoTrapCount ?? 1) + 1;
   }, { requires: ["auto-archer-trap"] }),
-  autoUpgrade("auto-archer-trap-herding", "archer", "함정", "덫몰이", "함정이 있으면 궁수가 매 턴 가까운 적을 함정 쪽으로 1칸 유도한다.", () => {
-    autoPermanent("archer").autoTrapLure = true;
-    autoPermanent("archer").autoTrapLureAmount = Math.max(autoPermanent("archer").autoTrapLureAmount ?? 0, 1);
-  }, { requires: ["auto-archer-trap"] }),
   autoUpgrade("auto-archer-ankle-shot", "archer", "함정", "발목 노리기", "함정에 걸린 적은 다음 이동을 할 수 없다.", () => {
     autoPermanent("archer").trapSnare = true;
   }, { requires: ["auto-archer-trap"] }),
@@ -2403,13 +2398,6 @@ function autoArcherRoutineCard(actor) {
       power: permanent.autoTrapPower ?? 2,
     });
   }
-  if (permanent.autoTrapLure && ownedMovementTraps(actor).length) {
-    actions.push({
-      type: "pushTowardTrap",
-      amount: permanent.autoTrapLureAmount ?? 1,
-      range,
-    });
-  }
   if (permanent.autoSnipeChargeMode) {
     const threshold = permanent.autoSnipeThreshold ?? 4;
     const currentCharge = actor.charge ?? 0;
@@ -3179,6 +3167,7 @@ async function attack(actor, action) {
   const hitEvents = [];
   const hitResults = [];
   let chargeRefundAfterReset = 0;
+  const pullEntries = [];
   for (const target of targets) {
     if (!isAlive(actor)) return true;
     if (!isAlive(target)) continue;
@@ -3200,8 +3189,16 @@ async function attack(actor, action) {
     }
     refundChargeOnKill(actor, target, action);
     await handleAttackPush(actor, target, action, targets.length);
-    if (action.pull && isAlive(target)) await pullTarget(actor, target, action.pull);
+    if (action.pull && isAlive(target)) {
+      pullEntries.push({
+        actor,
+        target,
+        amount: action.pull,
+        source: { q: actor.q, r: actor.r, side: actor.side, id: actor.id },
+      });
+    }
   }
+  await resolveAttackPulls(pullEntries);
   if (action.resetChargeAfterAttack) resetAttackCharge(actor);
   if (chargeRefundAfterReset) addCharge(actor, chargeRefundAfterReset, "완전 장전", { lockMove: false });
   consumeEffects(actor, "attack");
@@ -3234,48 +3231,107 @@ async function resolvePendingAttackPushes(actor, cardContext) {
   if (!pendingPushes.length) return false;
 
   cardContext.pendingPushes = [];
-  const blockedTargetIds = new Set();
+  const entries = aggregatePendingAttackPushes(actor, pendingPushes);
+  await resolveAttackPushBatch(entries);
+  return true;
+}
+
+function aggregatePendingAttackPushes(actor, pendingPushes) {
+  const entriesByTarget = new Map();
   for (const pending of pendingPushes) {
     if (state.finished || state.waitingReward) break;
     const pushActor = state.entities.find((entity) => entity.id === pending.actorId) ?? actor;
     const target = state.entities.find((entity) => entity.id === pending.targetId);
-    if (!isAlive(pushActor) || !isAlive(target) || blockedTargetIds.has(target.id)) continue;
+    if (!isAlive(pushActor) || !isAlive(target)) continue;
 
-    const pushedIntoTrap = await resolveSingleAttackPush(
-      pushActor,
+    const key = target.id;
+    const entry = entriesByTarget.get(key) ?? {
+      actor: pushActor,
       target,
-      pending.action,
-      pending.amount,
-      pending.targetCount,
-      pending.source ?? pushActor,
-    );
-    if (pushedIntoTrap === "block") blockedTargetIds.add(target.id);
+      source: pending.source ?? pushActor,
+      amount: 0,
+      targetCount: pending.targetCount,
+      events: [],
+    };
+    entry.actor = pushActor;
+    entry.source = pending.source ?? pushActor;
+    entry.amount += pending.amount;
+    entry.targetCount = Math.max(entry.targetCount ?? 1, pending.targetCount ?? 1);
+    entry.events.push(pending);
+    entriesByTarget.set(key, entry);
   }
 
+  return [...entriesByTarget.values()];
+}
+
+async function resolveAttackPushBatch(entries) {
+  const movements = entries
+    .filter((entry) => entry.amount > 0 && isAlive(entry.actor) && isAlive(entry.target))
+    .map((entry) => ({
+      ...entry,
+      mode: "push",
+    }));
+  if (!movements.length) return false;
+
+  const results = await forceMoveTargets(movements);
+  for (const entry of movements) {
+    const result = results.get(entry.target.id);
+    applyPushAfterEffects(entry, result);
+  }
   return true;
 }
 
 async function resolveSingleAttackPush(actor, target, action, amount, targetCount, source = actor) {
-  const pushedIntoTrap = await pushTarget(source, target, amount);
+  const results = await forceMoveTargets([{ actor, target, source, amount, mode: "push" }]);
+  const result = results.get(target.id);
+  applyPushAfterEffects({
+    actor,
+    target,
+    targetCount,
+    events: [{ action, targetCount }],
+  }, result);
+  return result?.triggeredTrap ?? null;
+}
+
+function applyPushAfterEffects(entry, result) {
+  const { actor, target } = entry;
+  if (!actor || !target || !result) return;
   if (actor.permanent?.pushAreaDamage) {
-    applyEffect(actor, {
-      type: "applyEffect",
-      label: "전장 지배",
-      duration: "nextAttack",
-      modifiers: [{ stat: "damageDealt", amount: actor.permanent.pushAreaDamage }],
-    });
+    const eventCount = Math.max(1, entry.events?.length ?? 1);
+    for (let index = 0; index < eventCount; index += 1) {
+      applyEffect(actor, {
+        type: "applyEffect",
+        label: "전장 지배",
+        duration: "nextAttack",
+        modifiers: [{ stat: "damageDealt", amount: actor.permanent.pushAreaDamage }],
+      });
+    }
   }
-  if (pushedIntoTrap && action.trapHitBonus && isAlive(target)) {
+
+  const bonusEvent = entry.events?.find((event) => event.action?.trapHitBonus);
+  if (result.triggeredTrap && bonusEvent?.action?.trapHitBonus && isAlive(target)) {
+    const action = bonusEvent.action;
     const bonusBeforeHp = target.hp;
     const bonusDamage = dealAttackDamage(actor, target, {
       type: "attack",
       mult: action.trapHitBonus,
       range: action.range,
       melee: action.melee,
-    }, action.trapHitBonus, { targetCount });
+    }, action.trapHitBonus, { targetCount: bonusEvent.targetCount ?? entry.targetCount });
     applyOverkillSplash(actor, target, bonusDamage - bonusBeforeHp, action);
   }
-  return pushedIntoTrap;
+}
+
+async function resolveAttackPulls(entries) {
+  const movements = entries
+    .filter((entry) => entry.amount > 0 && isAlive(entry.actor) && isAlive(entry.target))
+    .map((entry) => ({
+      ...entry,
+      mode: "pull",
+    }));
+  if (!movements.length) return false;
+  await forceMoveTargets(movements);
+  return true;
 }
 
 async function animateActorAttack(actor, targetOrTargets, action) {
@@ -3377,6 +3433,7 @@ async function patternAttack(actor, action) {
   const batchVisuals = placement.targets.length > 1;
   const hitEvents = [];
   const hitResults = [];
+  const pullEntries = [];
   for (const target of placement.targets) {
     if (!isAlive(actor)) break;
     if (!isAlive(target)) continue;
@@ -3395,7 +3452,16 @@ async function patternAttack(actor, action) {
     applyOverkillSplash(actor, target, damage - beforeHp, action);
     refundChargeOnKill(actor, target, action);
     await handleAttackPush(actor, target, action, placement.targets.length);
+    if (action.pull && isAlive(target)) {
+      pullEntries.push({
+        actor,
+        target,
+        amount: action.pull,
+        source: { q: actor.q, r: actor.r, side: actor.side, id: actor.id },
+      });
+    }
   }
+  await resolveAttackPulls(pullEntries);
   consumeEffects(actor, "attack");
   return true;
 }
@@ -4074,6 +4140,55 @@ async function slideActorTo(actor, from, to) {
   }
 }
 
+async function slideActorsTo(moves) {
+  const activeMoves = moves.filter((move) => isAlive(move.actor) && !sameHex(move.from, move.to));
+  if (!activeMoves.length) return;
+
+  activeMoves.forEach((move) => state.entityFacingTargets?.set(move.actor.id, move.to));
+  try {
+    renderBoard();
+    const bounds = boardBounds();
+    const slideEntries = [];
+
+    for (const move of activeMoves) {
+      const entityElement = elements.board.querySelector(`[data-entity-id="${move.actor.id}"]`);
+      if (!entityElement) continue;
+
+      const fromPoint = hexToPixel(move.from, bounds);
+      const toPoint = hexToPixel(move.to, bounds);
+      const deltaX = fromPoint.x - toPoint.x;
+      const deltaY = fromPoint.y - toPoint.y;
+      entityElement.classList.remove("moving");
+      entityElement.style.transition = "none";
+      entityElement.style.left = `${toPoint.x}px`;
+      entityElement.style.top = `${toPoint.y}px`;
+      entityElement.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+      slideEntries.push({ move, entityElement });
+    }
+
+    if (!slideEntries.length) return;
+    elements.board.getBoundingClientRect();
+
+    await nextFrame();
+    const cameraFollows = [];
+    for (const { move, entityElement } of slideEntries) {
+      entityElement.style.transition = "";
+      entityElement.classList.add("moving");
+      const cameraFollow = animateCameraFollowForActor(move.actor, move.from, move.to);
+      if (cameraFollow) cameraFollows.push(cameraFollow);
+    }
+
+    await nextFrame();
+    slideEntries.forEach(({ entityElement }) => {
+      entityElement.style.transform = "";
+    });
+    await sleep(240);
+    if (cameraFollows.length) await Promise.all(cameraFollows);
+  } finally {
+    activeMoves.forEach((move) => state.entityFacingTargets?.delete(move.actor.id));
+  }
+}
+
 function animateCameraFollowForActor(actor, from, to) {
   if (actor.side !== "player" || state.cameraMode !== "focus") return null;
 
@@ -4564,28 +4679,86 @@ async function pullTarget(actor, target, amount) {
 }
 
 async function forceMoveTarget(actor, target, amount, mode) {
-  let current = { q: target.q, r: target.r };
-  let triggeredTrap = null;
-  for (let step = 0; step < amount; step += 1) {
-    const next = nextForcedMoveTile(actor, target, current, mode);
-    if (!next) break;
-    await slideActorTo(target, current, next);
-    current = next;
-    target.q = current.q;
-    target.r = current.r;
-    renderBoard();
-    triggeredTrap = triggerTrap(target) ?? triggeredTrap;
-    if (triggeredTrap === "block" || !isAlive(target)) break;
-    await sleep(35);
-  }
-  return triggeredTrap;
+  const results = await forceMoveTargets([{ actor, source: actor, target, amount, mode }]);
+  return results.get(target.id)?.triggeredTrap ?? null;
 }
 
-function nextForcedMoveTile(actor, target, current, mode) {
+async function forceMoveTargets(entries) {
+  const movers = entries
+    .filter((entry) => entry.amount > 0 && isAlive(entry.target))
+    .map((entry) => ({
+      ...entry,
+      source: entry.source ?? entry.actor,
+      current: { q: entry.target.q, r: entry.target.r },
+      remaining: entry.amount,
+      moved: 0,
+      triggeredTrap: null,
+    }));
+  const results = new Map();
+  if (!movers.length) return results;
+
+  while (movers.some((mover) => mover.remaining > 0 && isAlive(mover.target))) {
+    const reservedDestinations = new Set();
+    const stepMoves = [];
+
+    for (const mover of movers) {
+      if (mover.remaining <= 0 || !isAlive(mover.target) || mover.triggeredTrap === "block") continue;
+      const next = nextForcedMoveTile(mover.source, mover.target, mover.current, mover.mode, {
+        reservedDestinations,
+      });
+      if (!next) {
+        mover.remaining = 0;
+        continue;
+      }
+      reservedDestinations.add(hexKey(next));
+      stepMoves.push({
+        mover,
+        actor: mover.target,
+        from: mover.current,
+        to: next,
+      });
+    }
+
+    if (!stepMoves.length) break;
+
+    await slideActorsTo(stepMoves);
+
+    for (const stepMove of stepMoves) {
+      const { mover, to } = stepMove;
+      if (!isAlive(mover.target)) continue;
+      mover.current = { q: to.q, r: to.r };
+      mover.target.q = to.q;
+      mover.target.r = to.r;
+      mover.remaining -= 1;
+      mover.moved += 1;
+    }
+
+    renderBoard();
+
+    for (const stepMove of stepMoves) {
+      const { mover } = stepMove;
+      if (!isAlive(mover.target)) continue;
+      mover.triggeredTrap = triggerTrap(mover.target) ?? mover.triggeredTrap;
+      if (mover.triggeredTrap === "block" || !isAlive(mover.target)) mover.remaining = 0;
+    }
+
+    await sleep(35);
+  }
+
+  movers.forEach((mover) => {
+    results.set(mover.target.id, {
+      moved: mover.moved,
+      triggeredTrap: mover.triggeredTrap,
+    });
+  });
+  return results;
+}
+
+function nextForcedMoveTile(actor, target, current, mode, options = {}) {
   const currentDistance = axialDistance(actor, current);
   const candidates = directions
     .map((dir) => ({ q: current.q + dir.q, r: current.r + dir.r }))
-    .filter((tile) => isTile(tile) && canEndMoveAt(tile, target))
+    .filter((tile) => isTile(tile) && !options.reservedDestinations?.has(hexKey(tile)) && canEndMoveAt(tile, target))
     .map((tile) => ({ tile, distance: axialDistance(actor, tile), trap: trapAt(tile) }))
     .filter((item) => (mode === "push" ? item.distance > currentDistance : item.distance < currentDistance));
 
