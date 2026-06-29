@@ -19,6 +19,7 @@ const META_PROGRESS_STORAGE_KEY = "gamejam-prep-meta-growth-v1";
 const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
 const AUTO_ROUTINE_MODE = true;
+const ENABLE_PARTY_SYNERGY_UPGRADES = false;
 const AUTO_ENEMY_BALANCE_TIERS = [
   { maxWave: 2, hpMultiplier: 3.2, minHp: 18, attackMultiplier: 1, attackBonus: 0 },
   { maxWave: 5, hpMultiplier: 2.4, minHp: 24, eliteHpMultiplier: 1.15, bossHpMultiplier: 1.35, attackMultiplier: 1.1, attackBonus: 0 },
@@ -5037,11 +5038,16 @@ function drawAutoUpgradeRewards() {
 
 function isAutoUpgradeAvailable(upgrade) {
   const picked = state.autoPickedUpgradeIds ?? new Set();
+  if (!ENABLE_PARTY_SYNERGY_UPGRADES && isPartySynergyUpgrade(upgrade)) return false;
   if (picked.has(upgrade.id)) return false;
   if (!isAutoUpgradeMetaUnlocked(upgrade)) return false;
   if (upgrade.requires?.some((id) => !picked.has(id))) return false;
   if (upgrade.requiresAny?.length && !upgrade.requiresAny.some((id) => picked.has(id))) return false;
   return true;
+}
+
+function isPartySynergyUpgrade(upgrade) {
+  return upgrade?.owner === "party";
 }
 
 function pickAutoUpgrade(reward) {
@@ -5112,6 +5118,7 @@ function partyMetaLevel() {
 }
 
 function isAutoUpgradeMetaUnlocked(upgrade) {
+  if (!ENABLE_PARTY_SYNERGY_UPGRADES && isPartySynergyUpgrade(upgrade)) return false;
   return autoUpgradeOwnerMetaLevel(upgrade) >= autoUpgradeMetaRequirement(upgrade);
 }
 
@@ -5141,11 +5148,21 @@ function renderMetaGrowth() {
   const characterCards = playerPartyCharacters()
     .map((character) => metaCharacterCardMarkup(character))
     .join("");
+  const growthSummary = ENABLE_PARTY_SYNERGY_UPGRADES
+    ? `
+      <div class="meta-growth-party">
+        <span>파티 평균 Lv.${partyMetaLevel()}</span>
+        <strong>레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.</strong>
+      </div>
+    `
+    : `
+      <div class="meta-growth-party">
+        <span>캐릭터 성장</span>
+        <strong>각 캐릭터 레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.</strong>
+      </div>
+    `;
   elements.metaGrowthContent.innerHTML = `
-    <div class="meta-growth-party">
-      <span>파티 평균 Lv.${partyMetaLevel()}</span>
-      <strong>레벨이 오르면 런 중 선택지 풀과 플레이 가능한 트리가 넓어집니다.</strong>
-    </div>
+    ${growthSummary}
     <div class="meta-character-grid">${characterCards}</div>
     ${metaPartySynergyMarkup()}
   `;
@@ -5175,6 +5192,7 @@ function metaCharacterCardMarkup(character) {
 }
 
 function metaPartySynergyMarkup() {
+  if (!ENABLE_PARTY_SYNERGY_UPGRADES) return "";
   const upgrades = autoUpgradeCatalog.filter((upgrade) => upgrade.owner === "party");
   if (!upgrades.length) return "";
   return `
