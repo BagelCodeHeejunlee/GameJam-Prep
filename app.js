@@ -1399,6 +1399,19 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-range", "archer", "공용", "사거리 확보", "궁수 자동 사격 사거리가 1 증가한다.", () => {
     autoPermanent("archer").autoRangeBonus = (autoPermanent("archer").autoRangeBonus ?? 0) + 1;
   }),
+  autoUpgrade("auto-archer-push-arrow", "archer", "공용", "밀어내는 화살", "궁수 공격 시 20% 확률로 적을 1칸 밀친다.", () => {
+    autoPermanent("archer").attackPushChance = Math.max(autoPermanent("archer").attackPushChance ?? 0, 0.2);
+    autoPermanent("archer").attackPushAmount = Math.max(autoPermanent("archer").attackPushAmount ?? 0, 1);
+  }, { metaLevel: 1 }),
+  autoUpgrade("auto-archer-overkill-transfer", "archer", "공용", "잔여 관통", "궁수가 적을 처치하면 남은 피해가 처치 대상 기준 3칸 안의 적에게 전이된다.", () => {
+    autoPermanent("archer").overkillSplashRange = Math.max(autoPermanent("archer").overkillSplashRange ?? 0, 3);
+  }, { metaLevel: 1 }),
+  autoUpgrade("auto-archer-third-pulse", "archer", "공용", "세 번째 파동", "궁수가 3회 공격할 때마다 대상 근처 적 3명에게 현재 체력의 10% 피해를 준다.", () => {
+    autoPermanent("archer").thirdAttackPulseEvery = 3;
+    autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 3);
+    autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.1);
+    autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 1);
+  }, { metaLevel: 1 }),
   autoUpgrade("auto-archer-charge", "archer", "차지", "저격 태세", "궁수의 자동 공격이 차지로 바뀐다. 차지 4가 되면 사거리 제한 없는 공격 4를 한다.", () => {
     autoPermanent("archer").autoSnipeChargeMode = true;
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 4);
@@ -3434,13 +3447,15 @@ function dealAttackDamage(actor, target, action, multiplier, options = {}) {
   const hitPosition = { q: target.q, r: target.r };
   const hadAutoMark = Boolean(target.temporary?.autoMarked);
   applyDamage(target, damage);
-  noteTargetHit(actor, target);
+  const attackHitCount = noteTargetHit(actor, target);
   applyAutoHitEffects(actor, target, hadAutoMark);
+  const pulseHits = triggerThirdAttackPulse(actor, target, attackHitCount);
   resolveAfterHitEffects(actor, target);
   consumeEffects(target, "hit");
   renderBoard();
   renderHud();
   showHitEffect(target, hitPosition, damage);
+  pulseHits.forEach((hit) => showHitEffect(hit.target, hit.position, hit.damage));
   log(`${actor.name} -> ${target.name} ${damage} 피해`);
   return damage;
 }
@@ -3501,8 +3516,44 @@ function damageContext(actor, target, action, options = {}) {
 
 function noteTargetHit(actor, target) {
   const context = state.activeCardContext;
-  if (!context || context.actorId !== actor.id) return;
-  context.targetHits.set(target.id, (context.targetHits.get(target.id) ?? 0) + 1);
+  if (context && context.actorId === actor.id) {
+    context.targetHits.set(target.id, (context.targetHits.get(target.id) ?? 0) + 1);
+  }
+  actor.permanent = actor.permanent ?? {};
+  actor.permanent.attackHitCount = (actor.permanent.attackHitCount ?? 0) + 1;
+  return actor.permanent.attackHitCount;
+}
+
+function triggerThirdAttackPulse(actor, target, attackHitCount) {
+  const every = actor?.permanent?.thirdAttackPulseEvery ?? 0;
+  const percent = actor?.permanent?.thirdAttackPulsePercent ?? 0;
+  const maxTargets = actor?.permanent?.thirdAttackPulseTargets ?? 0;
+  const range = actor?.permanent?.thirdAttackPulseRange ?? 1;
+  if (!every || !percent || !maxTargets || !attackHitCount || attackHitCount % every !== 0) return [];
+
+  const pulseTargets = aliveOpponents(actor)
+    .filter((enemy) => enemy.id !== target.id)
+    .filter((enemy) => wallAwareDistance(target, enemy) <= range && hasLineOfSight(target, enemy))
+    .sort((a, b) => {
+      const distanceA = axialDistance(target, a);
+      const distanceB = axialDistance(target, b);
+      if (distanceA !== distanceB) return distanceA - distanceB;
+      if (a.hp !== b.hp) return b.hp - a.hp;
+      return (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0);
+    })
+    .slice(0, maxTargets);
+
+  return pulseTargets.map((enemy) => {
+    const hitPosition = { q: enemy.q, r: enemy.r };
+    const pulseDamage = Math.max(1, Math.round(enemy.hp * percent));
+    applyDamage(enemy, pulseDamage);
+    log(`${actor.name} 세 번째 파동 -> ${enemy.name} ${pulseDamage} 피해`);
+    return {
+      target: enemy,
+      position: hitPosition,
+      damage: pulseDamage,
+    };
+  });
 }
 
 function outgoingDamageMultiplier(context) {
@@ -3541,11 +3592,21 @@ function adjacentDamagePenalty(context) {
 }
 
 function attackPushAmount(actor, target, action, targetCount) {
+  if (!isAlive(target)) return 0;
   const context = damageContext(actor, target, action, { targetCount });
   const markPush = AUTO_ROUTINE_MODE && actor.characterId === "warrior" && target?.temporary?.autoMarked && state.autoSynergy?.markBreak
     ? 1
     : 0;
-  return Math.max(0, (action.push ?? 0) + markPush + effectModifierTotal(actor, "push", context));
+  const chancePush = rollAttackPush(actor);
+  return Math.max(0, (action.push ?? 0) + markPush + chancePush + effectModifierTotal(actor, "push", context));
+}
+
+function rollAttackPush(actor) {
+  const chance = actor?.permanent?.attackPushChance ?? 0;
+  const amount = actor?.permanent?.attackPushAmount ?? 0;
+  if (!chance || !amount || Math.random() >= chance) return 0;
+  log(`${actor.name} 밀어내는 화살`);
+  return amount;
 }
 
 function refundChargeOnKill(actor, target, action) {
