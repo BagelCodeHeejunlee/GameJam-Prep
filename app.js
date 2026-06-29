@@ -16,6 +16,13 @@ const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
 const AUTO_ROUTINE_MODE = true;
+const AUTO_ENEMY_BALANCE_TIERS = [
+  { maxWave: 2, hpMultiplier: 3.2, minHp: 18, attackMultiplier: 1, attackBonus: 0 },
+  { maxWave: 5, hpMultiplier: 2.4, minHp: 24, eliteHpMultiplier: 1.15, bossHpMultiplier: 1.35, attackMultiplier: 1.1, attackBonus: 0 },
+  { maxWave: 8, hpMultiplier: 1.05, minHp: 28, eliteHpMultiplier: 1, bossHpMultiplier: 1, attackMultiplier: 1, attackBonus: 0 },
+  { maxWave: 12, hpMultiplier: 1, minHp: 30, eliteHpMultiplier: 1, bossHpMultiplier: 1, attackMultiplier: 1, attackBonus: 0 },
+  { maxWave: Infinity, hpMultiplier: 1, minHp: 34, eliteHpMultiplier: 1, bossHpMultiplier: 1, attackMultiplier: 1, attackBonus: 0 },
+];
 const STAT_PERCENT_PASSIVE_CAP_BY_RARITY = {
   "기본": 0.1,
   "노말": 0.1,
@@ -1628,6 +1635,7 @@ function startWave(index) {
     const indexNumber = state.nextEnemyIndex++;
     const kind = enemy.kind ?? "brute";
     const monster = monsterDefinitions[kind] ?? monsterDefinitions.brute;
+    const balancedStats = enemyBattleStats(enemy, monster, state.waveIndex);
     state.entities.push({
       id: `enemy-${indexNumber}`,
       name: enemy.name ?? (enemy.boss ? `보스 ${indexNumber}` : `${monster.name} ${indexNumber}`),
@@ -1636,9 +1644,9 @@ function startWave(index) {
       label: enemy.boss ? "보" : enemy.elite ? "정" : monster.label,
       q: enemy.q,
       r: enemy.r,
-      hp: enemy.hp,
-      maxHp: enemy.hp,
-      baseAtk: enemy.baseAtk ?? (enemy.boss ? 5 : monster.baseAtk),
+      hp: balancedStats.hp,
+      maxHp: balancedStats.hp,
+      baseAtk: balancedStats.baseAtk,
       baseRange: enemy.baseRange ?? monster.baseRange,
       baseMove: enemy.baseMove ?? monster.baseMove,
       monsterIndex: indexNumber,
@@ -1964,6 +1972,33 @@ function wave(radius, walls, enemies) {
 
 function enemy(q, r, hp, options = {}) {
   return { q, r, hp, ...options };
+}
+
+function enemyBattleStats(enemyData, monster, waveIndex) {
+  const baseHp = enemyData.hp;
+  const baseAtk = enemyData.baseAtk ?? (enemyData.boss ? 5 : monster.baseAtk);
+  if (!AUTO_ROUTINE_MODE) return { hp: baseHp, baseAtk };
+
+  const tier = autoEnemyBalanceTier(waveIndex + 1);
+  const roleMultiplier = enemyData.boss
+    ? tier.bossHpMultiplier ?? 1
+    : enemyData.elite
+      ? tier.eliteHpMultiplier ?? 1
+      : 1;
+  const hp = Math.max(
+    tier.minHp ?? 1,
+    Math.round(baseHp * tier.hpMultiplier * roleMultiplier),
+  );
+  const attack = Math.max(
+    1,
+    Math.round(baseAtk * (tier.attackMultiplier ?? 1) + (tier.attackBonus ?? 0)),
+  );
+  return { hp, baseAtk: attack };
+}
+
+function autoEnemyBalanceTier(waveNumber) {
+  return AUTO_ENEMY_BALANCE_TIERS.find((tier) => waveNumber <= tier.maxWave)
+    ?? AUTO_ENEMY_BALANCE_TIERS[AUTO_ENEMY_BALANCE_TIERS.length - 1];
 }
 
 function makeMap(radius) {
