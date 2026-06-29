@@ -4776,7 +4776,6 @@ async function clearWave() {
   }
   state.waitingReward = true;
   if (AUTO_ROUTINE_MODE) {
-    recoverAutoParty();
     state.rewardPhase = "auto";
     render();
     showRewards();
@@ -4839,15 +4838,6 @@ function showRewards() {
     elements.rewardCards.append(pick);
   });
   elements.rewardOverlay.classList.remove("hidden");
-}
-
-function recoverAutoParty() {
-  state.entities
-    .filter((entity) => entity.side === "player")
-    .forEach((actor) => {
-      if (actor.hp <= 0) actor.hp = Math.max(1, Math.ceil(actor.maxHp * 0.45));
-      else actor.hp = Math.min(actor.maxHp, actor.hp + Math.ceil(actor.maxHp * 0.28));
-    });
 }
 
 function showAutoUpgradeRewards() {
