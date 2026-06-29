@@ -12,6 +12,7 @@ const CAMERA_DEAD_ZONE_HEIGHT_RATIO = 0.28;
 const CAMERA_UI_GAP = 16;
 const CAMERA_PLAYER_EDGE_MARGIN = 72;
 const CAMERA_FOLLOW_DURATION = 220;
+const CAMERA_DEAD_ZONE_PAN_DURATION = 300;
 const CAMERA_DRAG_THRESHOLD = 5;
 const CAMERA_MANUAL_PAN_SLACK = 140;
 const SELECTED_CHARACTER_STORAGE_KEY = "gamejam-prep-selected-character-v1";
@@ -1673,6 +1674,8 @@ async function newRun() {
     cameraDrag: null,
     cameraDeadZoneSuppressed: false,
     cameraFocusActorId: null,
+    cameraPanAnimation: null,
+    cameraPanToken: 0,
     entityFacingTargets: new Map(),
     offscreenIndicatorElements: new Map(),
     offscreenIndicatorFrame: 0,
@@ -1757,6 +1760,9 @@ function startWave(index) {
   state.cameraDrag = null;
   state.cameraDeadZoneSuppressed = false;
   state.cameraFocusActorId = null;
+  cancelCameraPanAnimation();
+  state.cameraPanAnimation = null;
+  state.cameraPanToken = (state.cameraPanToken ?? 0) + 1;
   state.offscreenIndicatorElements = new Map();
   state.offscreenIndicatorFrame = 0;
   state.pendingOffscreenBounds = null;
@@ -2259,6 +2265,7 @@ async function runTurn() {
     renderBoard();
     renderDrawnCards();
     renderTimeline(index);
+    await waitForCameraPan();
     await playTurnCue(entry, index);
     await executeTimelineEntry(entry);
     expireTurnEndEffects(entry);
@@ -2344,6 +2351,7 @@ async function runAutoRoutineTurn() {
     renderBoard();
     renderDrawnCards();
     renderTimeline(index);
+    await waitForCameraPan();
     await playTurnCue(entry, index);
     await executeTimelineEntry(entry);
     expireTurnEndEffects(entry);
@@ -4069,6 +4077,7 @@ async function slideActorTo(actor, from, to) {
 function animateCameraFollowForActor(actor, from, to) {
   if (actor.side !== "player" || state.cameraMode !== "focus") return null;
 
+  cancelCameraPanAnimation();
   const bounds = boardBounds();
   const fromPoint = hexToPixel(from, bounds);
   const toPoint = hexToPixel(to, bounds);
@@ -7435,6 +7444,12 @@ function boardBounds() {
 
 function fitBoardToPanel(bounds = boardBounds(), options = {}) {
   const frame = calculateCameraFrame(bounds, options);
+  if (shouldAnimateCameraFrame(frame, options)) {
+    animateBoardCameraToFrame(frame, bounds);
+    return;
+  }
+
+  cancelCameraPanAnimation();
   applyBoardCameraFrame(frame);
   commitCameraFrame(frame);
 }
@@ -7451,6 +7466,8 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
   let offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
 
   const focusActor = getCameraFocusPlayer();
+  let cameraMovedByDeadZone = false;
+  let cameraCentered = false;
   if (state.cameraMode === "focus" && focusActor) {
     scale = Math.max(fitScale, Math.min(CAMERA_FOCUS_MAX_SCALE, CAMERA_FOCUS_TARGET_SCALE));
     const focusPoint = options.focusPoint ?? hexToPixel(focusActor, bounds);
@@ -7461,20 +7478,19 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
     };
     const currentScale = state.cameraScale || scale;
     const panelChanged = state.cameraPanelWidth !== panelWidth || state.cameraPanelHeight !== panelHeight;
-    const focusActorChanged = state.cameraFocusActorId !== focusActor.id;
     const shouldCenterCamera =
       !state.cameraFocusReady ||
       panelChanged ||
-      focusActorChanged ||
       Math.abs(currentScale - scale) > 0.001;
 
     if (shouldCenterCamera) {
       offsetX = focusCenter.x - focusPoint.x * scale;
       offsetY = focusCenter.y - focusPoint.y * scale;
+      cameraCentered = true;
     } else {
       offsetX = Number.isFinite(state.cameraX) ? state.cameraX : offsetX;
       offsetY = Number.isFinite(state.cameraY) ? state.cameraY : offsetY;
-      if (!shouldSuppressCameraDeadZone(options)) {
+      if (!shouldSuppressCameraDeadZone(options) && shouldTrackCameraDeadZoneForActor(focusActor)) {
         const playerScreen = {
           x: offsetX + focusPoint.x * scale,
           y: offsetY + focusPoint.y * scale,
@@ -7487,6 +7503,8 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
         const deadZoneRight = focusCenter.x + deadZone.halfWidth;
         const deadZoneTop = focusCenter.y - deadZone.halfHeight;
         const deadZoneBottom = Math.min(focusCenter.y + deadZone.halfHeight, playArea.bottom - CAMERA_PLAYER_EDGE_MARGIN);
+        const previousOffsetX = offsetX;
+        const previousOffsetY = offsetY;
         if (playerScreen.x < deadZoneLeft) {
           offsetX += deadZoneLeft - playerScreen.x;
         } else if (playerScreen.x > deadZoneRight) {
@@ -7497,6 +7515,7 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
         } else if (playerScreen.y > deadZoneBottom) {
           offsetY -= playerScreen.y - deadZoneBottom;
         }
+        cameraMovedByDeadZone = Math.abs(offsetX - previousOffsetX) > 0.5 || Math.abs(offsetY - previousOffsetY) > 0.5;
       }
     }
     const manualPanSlack = shouldSuppressCameraDeadZone(options) ? CAMERA_MANUAL_PAN_SLACK : 0;
@@ -7504,7 +7523,148 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
     offsetY = clampCameraOffset(offsetY, playArea.top, playArea.bottom, logicalHeight * scale, manualPanSlack);
   }
 
-  return { logicalWidth, logicalHeight, panelWidth, panelHeight, scale, offsetX, offsetY };
+  return {
+    logicalWidth,
+    logicalHeight,
+    panelWidth,
+    panelHeight,
+    scale,
+    offsetX,
+    offsetY,
+    cameraMovedByDeadZone,
+    cameraCentered,
+  };
+}
+
+function shouldTrackCameraDeadZoneForActor(focusActor) {
+  if (!focusActor) return false;
+  const activeEntry = state?.activeTimelineIndex >= 0
+    ? state.currentTimeline[state.activeTimelineIndex]
+    : null;
+  return activeEntry?.actorType === "player" && activeEntry.actorId === focusActor.id;
+}
+
+function shouldAnimateCameraFrame(frame, options = {}) {
+  if (options.immediate || options.smooth === false || shouldSuppressCameraDeadZone(options)) return false;
+  if (state.cameraDrag || state.cameraMode !== "focus" || !state.cameraFocusReady) return false;
+  if (!frame.cameraMovedByDeadZone || frame.cameraCentered) return false;
+  if (state.cameraPanelWidth !== frame.panelWidth || state.cameraPanelHeight !== frame.panelHeight) return false;
+  if (Math.abs((state.cameraScale || frame.scale) - frame.scale) > 0.001) return false;
+
+  const currentFrame = currentCameraFrame(frame);
+  const distance = Math.hypot(frame.offsetX - currentFrame.offsetX, frame.offsetY - currentFrame.offsetY);
+  return distance > 0.5;
+}
+
+function animateBoardCameraToFrame(targetFrame, bounds = boardBounds()) {
+  const targetKey = cameraFrameTargetKey(targetFrame);
+  const existingAnimation = state.cameraPanAnimation;
+  if (existingAnimation?.targetKey === targetKey) return existingAnimation.promise;
+
+  cancelCameraPanAnimation();
+
+  const startFrame = currentCameraFrame(targetFrame);
+  const distance = Math.hypot(targetFrame.offsetX - startFrame.offsetX, targetFrame.offsetY - startFrame.offsetY);
+  if (distance <= 0.5) {
+    applyBoardCameraFrame(targetFrame);
+    commitCameraFrame(targetFrame);
+    return Promise.resolve(false);
+  }
+
+  const token = (state.cameraPanToken ?? 0) + 1;
+  const previousTransition = elements.board.style.transition;
+  state.cameraPanToken = token;
+  elements.board.style.transition = "none";
+
+  let resolveAnimation;
+  const promise = new Promise((resolve) => {
+    resolveAnimation = resolve;
+  });
+  const animation = {
+    token,
+    targetKey,
+    promise,
+    resolve: resolveAnimation,
+    previousTransition,
+    frameId: 0,
+  };
+  state.cameraPanAnimation = animation;
+
+  const startedAt = performance.now();
+  const tick = (now) => {
+    if (!state || state.cameraPanAnimation?.token !== token || state.cameraMode !== "focus") {
+      elements.board.style.transition = previousTransition;
+      if (state?.cameraPanAnimation?.token === token) state.cameraPanAnimation = null;
+      resolveAnimation(false);
+      return;
+    }
+
+    const progress = Math.min(1, (now - startedAt) / CAMERA_DEAD_ZONE_PAN_DURATION);
+    const eased = easeInOut(progress);
+    const frame = interpolateCameraFrame(startFrame, targetFrame, eased);
+    applyBoardCameraFrame(frame, false);
+    commitCameraFrame(frame);
+    scheduleOffscreenEnemyIndicators(bounds);
+
+    if (progress < 1) {
+      animation.frameId = window.requestAnimationFrame(tick);
+      return;
+    }
+
+    applyBoardCameraFrame(targetFrame, false);
+    commitCameraFrame(targetFrame);
+    elements.board.style.transition = previousTransition;
+    state.cameraPanAnimation = null;
+    resolveAnimation(true);
+  };
+
+  animation.frameId = window.requestAnimationFrame(tick);
+  return promise;
+}
+
+function cancelCameraPanAnimation() {
+  const animation = state?.cameraPanAnimation;
+  if (!animation) return;
+  if (animation.frameId && window.cancelAnimationFrame) {
+    window.cancelAnimationFrame(animation.frameId);
+  }
+  elements.board.style.transition = animation.previousTransition ?? "";
+  state.cameraPanAnimation = null;
+  animation.resolve?.(false);
+}
+
+function currentCameraFrame(targetFrame) {
+  return {
+    ...targetFrame,
+    scale: Number.isFinite(state.cameraScale) && state.cameraScale > 0 ? state.cameraScale : targetFrame.scale,
+    offsetX: Number.isFinite(state.cameraX) ? state.cameraX : targetFrame.offsetX,
+    offsetY: Number.isFinite(state.cameraY) ? state.cameraY : targetFrame.offsetY,
+  };
+}
+
+function interpolateCameraFrame(startFrame, targetFrame, progress) {
+  return {
+    ...targetFrame,
+    scale: startFrame.scale + (targetFrame.scale - startFrame.scale) * progress,
+    offsetX: startFrame.offsetX + (targetFrame.offsetX - startFrame.offsetX) * progress,
+    offsetY: startFrame.offsetY + (targetFrame.offsetY - startFrame.offsetY) * progress,
+  };
+}
+
+function cameraFrameTargetKey(frame) {
+  return [
+    Math.round(frame.offsetX * 10) / 10,
+    Math.round(frame.offsetY * 10) / 10,
+    Math.round(frame.scale * 1000) / 1000,
+    frame.panelWidth,
+    frame.panelHeight,
+  ].join(":");
+}
+
+async function waitForCameraPan() {
+  const animation = state?.cameraPanAnimation;
+  if (!animation?.promise) return;
+  await animation.promise;
 }
 
 function releaseManualCameraPanForPlayerTurn(entry) {
@@ -7515,6 +7675,7 @@ function releaseManualCameraPanForPlayerTurn(entry) {
 
 function beginBoardCameraDrag(event) {
   if (!canStartBoardCameraDrag(event)) return;
+  cancelCameraPanAnimation();
   const bounds = boardBounds();
   const metrics = cameraMetrics(bounds);
   const frame = calculateCameraFrame(bounds, { metrics, suppressDeadZone: true });
