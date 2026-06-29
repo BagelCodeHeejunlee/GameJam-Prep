@@ -1323,11 +1323,11 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
   }),
-  autoUpgrade("auto-archer-double", "archer", "연타", "연속 사격", "궁수가 매 턴 2회 사격한다.", () => {
-    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 1, 2);
+  autoUpgrade("auto-archer-double", "archer", "연타", "세 번째 화살", "궁수가 매 턴 3회 사격한다.", () => {
+    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 3);
   }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage", "auto-archer-mark"] }),
-  autoUpgrade("auto-archer-triple", "archer", "연타", "삼연사", "궁수가 매 턴 3회 사격한다.", () => {
-    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 1, 3);
+  autoUpgrade("auto-archer-triple", "archer", "연타", "끝없는 연사", "궁수가 매 턴 4회 사격한다.", () => {
+    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 4);
   }, { requires: ["auto-archer-double"] }),
   autoUpgrade("auto-archer-trap", "archer", "함정", "공격 함정", "궁수가 3턴마다 적 진입 경로에 공격 함정을 설치한다.", () => {
     autoPermanent("archer").autoTrapEvery = 3;
@@ -1793,7 +1793,7 @@ function createPlayerEntity(character, position, previousPlayer = null) {
     r: position.r,
     hp: previousPlayer?.hp ?? character.maxHp,
     maxHp: previousPlayer?.maxHp ?? character.maxHp,
-    baseAtk: previousPlayer?.baseAtk ?? character.baseAtk,
+    baseAtk: previousPlayer?.baseAtk ?? autoBaseAtkForCharacter(character),
     baseRange: character.baseRange,
     baseMove: AUTO_ROUTINE_MODE && character.id === "mage" ? 1 : character.baseMove,
     charge: 0,
@@ -1802,6 +1802,11 @@ function createPlayerEntity(character, position, previousPlayer = null) {
     effects: (previousPlayer?.effects ?? []).filter((effect) => effect.duration === "stage"),
     sustainedCards: [],
   };
+}
+
+function autoBaseAtkForCharacter(character) {
+  if (AUTO_ROUTINE_MODE && character.id === "archer") return 5;
+  return character.baseAtk;
 }
 
 function playerStartPositions(start, count) {
@@ -2216,7 +2221,7 @@ function autoArcherRoutineCard(actor) {
       power: permanent.autoTrapPower ?? 2,
     });
   }
-  const shots = permanent.autoShots ?? 1;
+  const shots = permanent.autoShots ?? 2;
   for (let index = 0; index < shots; index += 1) {
     actions.push({
       type: "attack",
@@ -2227,7 +2232,7 @@ function autoArcherRoutineCard(actor) {
     });
   }
   return {
-    ...card(`auto-archer-${state.turn}`, shots >= 3 ? "자동 삼연사" : shots >= 2 ? "자동 연속 사격" : "자동 사격", "자동 루틴", "기본", 40, actions),
+    ...card(`auto-archer-${state.turn}`, shots >= 4 ? "자동 폭풍 사격" : shots >= 3 ? "자동 삼연사" : "자동 연속 사격", "자동 루틴", "기본", 40, actions),
     instanceId: `auto-archer-${state.turn}`,
   };
 }
