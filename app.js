@@ -1270,9 +1270,36 @@ function setCharacterMetaLevel(id, level) {
 }
 
 const monsterDefinitions = {
-  brute: { name: "브루트", label: "브", image: "assets/characters/brute.png", baseAtk: 3, baseRange: 1, baseMove: 2 },
-  skirmisher: { name: "척후병", label: "척", image: "assets/characters/skirmisher.png", baseAtk: 3, baseRange: 1, baseMove: 3 },
-  shooter: { name: "사수", label: "사", image: "assets/characters/shooter.png", baseAtk: 3, baseRange: 3, baseMove: 2 },
+  brute: {
+    name: "브루트",
+    label: "브",
+    image: "assets/characters/brute.png",
+    baseAtk: 3,
+    baseRange: 1,
+    baseMove: 2,
+    hpScale: 1.18,
+    minHpScale: 1.1,
+  },
+  skirmisher: {
+    name: "척후병",
+    label: "척",
+    image: "assets/characters/skirmisher.png",
+    baseAtk: 3,
+    baseRange: 1,
+    baseMove: 3,
+    hpScale: 0.88,
+    minHpScale: 0.85,
+  },
+  shooter: {
+    name: "사수",
+    label: "사",
+    image: "assets/characters/shooter.png",
+    baseAtk: 3,
+    baseRange: 3,
+    baseMove: 2,
+    hpScale: 0.65,
+    minHpScale: 0.65,
+  },
 };
 
 function spriteImg(src, className, alt = "") {
@@ -2118,20 +2145,28 @@ function enemyBattleStats(enemyData, monster, waveIndex) {
   if (!AUTO_ROUTINE_MODE) return { hp: baseHp, baseAtk };
 
   const tier = autoEnemyBalanceTier(waveIndex + 1);
-  const roleMultiplier = enemyData.boss
-    ? tier.bossHpMultiplier ?? 1
-    : enemyData.elite
-      ? tier.eliteHpMultiplier ?? 1
-      : 1;
+  const hpRoleMultiplier = monsterHpRoleMultiplier(enemyData, monster, tier);
   const hp = Math.max(
-    tier.minHp ?? 1,
-    Math.round(baseHp * tier.hpMultiplier * roleMultiplier),
+    monsterMinHp(enemyData, monster, tier),
+    Math.round(baseHp * tier.hpMultiplier * hpRoleMultiplier),
   );
   const attack = Math.max(
     1,
     Math.round(baseAtk * (tier.attackMultiplier ?? 1) + (tier.attackBonus ?? 0)),
   );
   return { hp, baseAtk: attack };
+}
+
+function monsterHpRoleMultiplier(enemyData, monster, tier) {
+  if (enemyData.boss) return tier.bossHpMultiplier ?? 1;
+  const eliteMultiplier = enemyData.elite ? tier.eliteHpMultiplier ?? 1 : 1;
+  return (monster.hpScale ?? 1) * eliteMultiplier;
+}
+
+function monsterMinHp(enemyData, monster, tier) {
+  const baseMinHp = tier.minHp ?? 1;
+  if (enemyData.boss) return baseMinHp;
+  return Math.max(1, Math.round(baseMinHp * (monster.minHpScale ?? 1)));
 }
 
 function autoEnemyBalanceTier(waveNumber) {
