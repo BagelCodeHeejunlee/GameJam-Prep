@@ -4746,7 +4746,12 @@ function nextForcedMoveTileForPlanning(actor, sourceTile, target, current, mode)
   const candidates = directions
     .map((dir) => ({ q: current.q + dir.q, r: current.r + dir.r }))
     .filter((tile) => isTile(tile) && canForcedMoveEndAtForPlanning(actor, sourceTile, target, tile))
-    .map((tile) => ({ tile, distance: axialDistance(sourceTile, tile), trap: trapAt(tile) }))
+    .map((tile) => ({
+      tile,
+      distance: axialDistance(sourceTile, tile),
+      trap: trapAt(tile),
+      directionScore: forcedMoveDirectionScore(sourceTile, current, tile, mode),
+    }))
     .filter((item) => (mode === "push" ? item.distance > currentDistance : item.distance < currentDistance));
 
   if (!candidates.length) return null;
@@ -4754,6 +4759,7 @@ function nextForcedMoveTileForPlanning(actor, sourceTile, target, current, mode)
   candidates.sort((a, b) => {
     if (Boolean(a.trap) !== Boolean(b.trap)) return a.trap ? -1 : 1;
     if (a.distance !== b.distance) return mode === "push" ? b.distance - a.distance : a.distance - b.distance;
+    if (a.directionScore !== b.directionScore) return b.directionScore - a.directionScore;
     if (a.tile.q !== b.tile.q) return a.tile.q - b.tile.q;
     return a.tile.r - b.tile.r;
   });
@@ -4768,6 +4774,34 @@ function canForcedMoveEndAtForPlanning(actor, sourceTile, target, tile) {
     if (entity.id === actor.id) return sameHex(sourceTile, tile);
     return sameHex(entity, tile);
   });
+}
+
+function forcedMoveDirectionScore(source, current, candidate, mode) {
+  const desired = mode === "push"
+    ? cubeVector(source, current)
+    : cubeVector(current, source);
+  const step = cubeVector(current, candidate);
+  return cubeDot(desired, step);
+}
+
+function cubeVector(from, to) {
+  const fromCube = axialToCube(from);
+  const toCube = axialToCube(to);
+  return {
+    x: toCube.x - fromCube.x,
+    y: toCube.y - fromCube.y,
+    z: toCube.z - fromCube.z,
+  };
+}
+
+function axialToCube(hex) {
+  const x = hex.q;
+  const z = hex.r;
+  return { x, y: -x - z, z };
+}
+
+function cubeDot(a, b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 function isPenaltyFreeTargetFromTile(actor, tile, target, attackAction, targetCount = attackAction?.targets ?? 1) {
@@ -4951,7 +4985,12 @@ function nextForcedMoveTile(actor, target, current, mode, options = {}) {
   const candidates = directions
     .map((dir) => ({ q: current.q + dir.q, r: current.r + dir.r }))
     .filter((tile) => isTile(tile) && !options.reservedDestinations?.has(hexKey(tile)) && canEndMoveAt(tile, target))
-    .map((tile) => ({ tile, distance: axialDistance(actor, tile), trap: trapAt(tile) }))
+    .map((tile) => ({
+      tile,
+      distance: axialDistance(actor, tile),
+      trap: trapAt(tile),
+      directionScore: forcedMoveDirectionScore(actor, current, tile, mode),
+    }))
     .filter((item) => (mode === "push" ? item.distance > currentDistance : item.distance < currentDistance));
 
   if (!candidates.length) return null;
@@ -4959,6 +4998,7 @@ function nextForcedMoveTile(actor, target, current, mode, options = {}) {
   candidates.sort((a, b) => {
     if (Boolean(a.trap) !== Boolean(b.trap)) return a.trap ? -1 : 1;
     if (a.distance !== b.distance) return mode === "push" ? b.distance - a.distance : a.distance - b.distance;
+    if (a.directionScore !== b.directionScore) return b.directionScore - a.directionScore;
     if (a.tile.q !== b.tile.q) return a.tile.q - b.tile.q;
     return a.tile.r - b.tile.r;
   });
