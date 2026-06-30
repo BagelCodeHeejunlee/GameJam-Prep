@@ -9,88 +9,90 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="top-bar">
-        <div>
-          <p class="eyebrow">SLICE RPG PROTOTYPE</p>
-          <h1>칼날 도시락</h1>
-        </div>
-        <button id="restartButton" class="icon-command" type="button" title="새 게임" aria-label="새 게임">↺</button>
-      </header>
-
-      <section class="status-strip" aria-label="전투 상태">
-        <div>
-          <span>스테이지</span>
-          <strong id="stageLabel">1 / 3</strong>
-        </div>
-        <div>
-          <span>체력</span>
-          <strong id="hpLabel">24 / 24</strong>
-        </div>
-        <div>
-          <span>재료</span>
-          <strong id="materialLabel">20</strong>
-        </div>
-      </section>
-
-      <section class="monster-section" aria-label="몬스터 퍼즐">
-        <div class="monster-head">
+      <section class="fill-zone" aria-label="채우는 곳">
+        <header class="top-bar">
           <div>
-            <p id="monsterSub" class="eyebrow">갑피를 먼저 막아라</p>
-            <h2 id="monsterName">철갑 고블린</h2>
+            <p class="eyebrow">BENTO BLOCKS-STYLE PROTOTYPE</p>
+            <h1>칼날 도시락</h1>
           </div>
-          <div class="completion">
-            <span id="completionLabel">0 / 16</span>
-            <div class="completion-track"><i id="completionFill"></i></div>
-          </div>
-        </div>
+          <button id="restartButton" class="icon-command" type="button" title="새 게임" aria-label="새 게임">↺</button>
+        </header>
 
-        <div id="actionCard" class="action-card" aria-live="polite"></div>
-        <div id="monsterGrid" class="monster-grid" aria-label="몬스터 몸체"></div>
-      </section>
-
-      <section class="workbench" aria-label="자르기 작업대">
-        <div class="section-head">
+        <section class="status-strip" aria-label="전투 상태">
           <div>
-            <p class="eyebrow">INGREDIENT</p>
-            <h2>재료판에서 조각 자르기</h2>
+            <span>스테이지</span>
+            <strong id="stageLabel">1 / 3</strong>
           </div>
-          <div class="tool-count"><span>최대</span><strong id="knifeLimitLabel">5칸</strong></div>
-        </div>
+          <div>
+            <span>체력</span>
+            <strong id="hpLabel">24 / 24</strong>
+          </div>
+          <div>
+            <span>재료</span>
+            <strong id="materialLabel">20</strong>
+          </div>
+        </section>
 
-        <div id="materialGrid" class="material-grid" aria-label="재료판"></div>
+        <section class="monster-section" aria-label="몬스터 퍼즐">
+          <div class="monster-head">
+            <div>
+              <p id="monsterSub" class="eyebrow">갑피를 먼저 막아라</p>
+              <h2 id="monsterName">철갑 고블린</h2>
+            </div>
+            <div class="completion">
+              <span id="completionLabel">0 / 16</span>
+              <div class="completion-track"><i id="completionFill"></i></div>
+            </div>
+          </div>
 
-        <div class="tool-row" aria-label="자르기 도구">
-          <button id="clearSelectionButton" type="button" title="선택 해제">선택 해제</button>
-          <button id="cutButton" class="primary" type="button" title="선택한 칸으로 조각 만들기">자르기</button>
-        </div>
+          <div id="actionCard" class="action-card" aria-live="polite"></div>
+          <div id="monsterGrid" class="monster-grid" aria-label="몬스터 몸체"></div>
+        </section>
       </section>
 
-      <section class="piece-section" aria-label="현재 조각과 보관함">
-        <div class="current-piece">
-          <div class="section-head compact">
-            <div>
-              <p class="eyebrow">PIECE</p>
-              <h2>현재 조각</h2>
+      <section class="cut-zone" aria-label="자르는 곳">
+        <section class="piece-section" aria-label="현재 조각과 보관함">
+          <div class="current-piece">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">PIECE</p>
+                <h2>현재 블록</h2>
+              </div>
+              <span id="pieceSizeLabel">0칸</span>
             </div>
-            <button id="rotateButton" class="icon-command" type="button" title="조각 회전" aria-label="조각 회전">↻</button>
+            <div id="piecePreview" class="piece-preview empty">칼을 놓아 블록을 자르세요</div>
+            <div class="tool-row">
+              <button id="cancelPieceButton" type="button" title="현재 블록 버리기">버리기</button>
+              <button id="stashPieceButton" type="button" title="블록을 보관하고 턴 종료">보관</button>
+            </div>
           </div>
-          <div id="piecePreview" class="piece-preview empty">자를 칸을 선택하세요</div>
-          <div class="tool-row">
-            <button id="cancelPieceButton" type="button" title="현재 조각 취소">취소</button>
-            <button id="stashPieceButton" type="button" title="조각을 보관하고 턴 종료">보관</button>
-          </div>
-        </div>
 
-        <div class="stash-panel">
-          <div class="section-head compact">
-            <div>
-              <p class="eyebrow">STASH</p>
-              <h2>보관함</h2>
+          <div class="stash-panel">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">STASH</p>
+                <h2>보관함</h2>
+              </div>
+              <span id="stashCount">0 / 2</span>
             </div>
-            <span id="stashCount">0 / 2</span>
+            <div id="stashSlots" class="stash-slots"></div>
           </div>
-          <div id="stashSlots" class="stash-slots"></div>
-        </div>
+        </section>
+
+        <section class="workbench" aria-label="자르기 작업대">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">KNIFE</p>
+              <h2>칼을 재료 위에 놓기</h2>
+            </div>
+            <div class="tool-count"><span>이번 턴</span><strong id="knifeLimitLabel">3개</strong></div>
+          </div>
+
+          <div id="knifeRack" class="knife-rack" aria-label="이번 턴 칼"></div>
+          <div id="materialGrid" class="material-grid" aria-label="재료판"></div>
+
+          <p id="knifeHint" class="knife-hint">칼을 드래그하거나 선택한 뒤 재료판에 놓으세요.</p>
+        </section>
       </section>
 
       <section class="log-section" aria-label="전투 로그">
@@ -113,6 +115,7 @@
       </div>
     </main>
 
+    <div id="dragGhost" class="drag-ghost hidden" aria-hidden="true"></div>
     <script src="app.js"></script>
   </body>
 </html>
