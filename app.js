@@ -2228,7 +2228,7 @@ function addHexRoom(tiles, center, radius) {
   }
 }
 
-function scheduleTurn() {
+function scheduleTurn(options = {}) {
   if (state.paused || state.busy || state.waitingReward || state.finished) return;
   if (state.cameraMode === "overview") {
     if (state.cameraTransitionScheduled) return;
@@ -2242,7 +2242,7 @@ function scheduleTurn() {
     }, WAVE_INTRO_DELAY);
     return;
   }
-  window.setTimeout(() => runTurn(), turnDelay());
+  window.setTimeout(() => runTurn(), options.immediate ? 0 : turnDelay());
 }
 
 async function runTurn() {
@@ -2344,7 +2344,7 @@ async function runTurn() {
   }
   state.busy = false;
   render();
-  scheduleTurn();
+  scheduleTurn({ immediate: true });
 }
 
 async function runAutoRoutineTurn() {
@@ -2420,7 +2420,7 @@ async function runAutoRoutineTurn() {
 
   state.busy = false;
   render();
-  scheduleTurn();
+  scheduleTurn({ immediate: true });
 }
 
 function autoRoutineCard(actor) {
