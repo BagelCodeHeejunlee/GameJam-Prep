@@ -2437,6 +2437,44 @@ function autoRoutineCard(actor) {
 function autoArcherRoutineCard(actor) {
   const permanent = actor.permanent ?? {};
   const range = actor.baseRange + (permanent.autoRangeBonus ?? 0);
+  if (permanent.autoSnipeChargeMode) {
+    const threshold = permanent.autoSnipeThreshold ?? 4;
+    const currentCharge = actor.charge ?? 0;
+    const chargeGain = permanent.autoSnipeChargeGain ?? 1;
+    const missingCharge = Math.max(0, threshold - currentCharge);
+    const willFire = currentCharge + chargeGain >= threshold;
+    const actions = [];
+    if (willFire) {
+      actions.push({
+        type: "move",
+        amount: 2 + (permanent.autoMoveBonus ?? 0),
+        desiredRange: Math.max(3, range),
+      });
+    }
+    if (missingCharge > 0) {
+      actions.push({
+        type: "charge",
+        amount: Math.min(chargeGain, missingCharge),
+        lockMove: false,
+      });
+    }
+    if (willFire) {
+      actions.push({
+        type: "attack",
+        mult: permanent.autoSnipeDamage ?? 4,
+        range: Infinity,
+        desiredRange: Math.max(3, range),
+        avoidAdjacentPenalty: true,
+        ignoreChargeBonus: true,
+        resetChargeAfterAttack: true,
+        chargeRefundAfterReset: permanent.autoSnipeKillChargeRefund ?? 0,
+      });
+    }
+    return {
+      ...card(`auto-archer-${state.turn}`, willFire ? "자동 저격" : "자동 차지", "자동 루틴", "기본", 40, actions),
+      instanceId: `auto-archer-${state.turn}`,
+    };
+  }
   const actions = [
     { type: "move", amount: 2 + (permanent.autoMoveBonus ?? 0), desiredRange: Math.max(2, range) },
   ];
@@ -2448,33 +2486,6 @@ function autoArcherRoutineCard(actor) {
       count: permanent.autoTrapCount ?? 1,
       power: permanent.autoTrapPower ?? 2,
     });
-  }
-  if (permanent.autoSnipeChargeMode) {
-    const threshold = permanent.autoSnipeThreshold ?? 4;
-    const currentCharge = actor.charge ?? 0;
-    const chargeGain = permanent.autoSnipeChargeGain ?? 1;
-    const missingCharge = Math.max(0, threshold - currentCharge);
-    if (missingCharge > 0) {
-      actions.push({
-        type: "charge",
-        amount: Math.min(chargeGain, missingCharge),
-        lockMove: false,
-      });
-    }
-    if (currentCharge + chargeGain >= threshold) {
-      actions.push({
-        type: "attack",
-        mult: permanent.autoSnipeDamage ?? 4,
-        range: Infinity,
-        ignoreChargeBonus: true,
-        resetChargeAfterAttack: true,
-        chargeRefundAfterReset: permanent.autoSnipeKillChargeRefund ?? 0,
-      });
-    }
-    return {
-      ...card(`auto-archer-${state.turn}`, currentCharge + chargeGain >= threshold ? "자동 저격" : "자동 차지", "자동 루틴", "기본", 40, actions),
-      instanceId: `auto-archer-${state.turn}`,
-    };
   }
   const shots = permanent.autoShots ?? 2;
   for (let index = 0; index < shots; index += 1) {
@@ -4383,7 +4394,7 @@ function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options
   const opponents = aliveOpponents(actor);
   if (!opponents.length) return options.requireAttackTile ? null : actor;
   const desiredRange = attackAction?.type === "attack" || attackAction?.type === "patternAttack"
-    ? effectiveActionRange(actor, attackAction)
+    ? (attackAction.desiredRange ?? effectiveActionRange(actor, attackAction))
     : (attackAction?.desiredRange ?? actor.baseRange);
   const candidateTiles = (options.includeCurrentTile || (isMeleeAttackAction(attackAction) && !options.excludeCurrentTile))
     ? [actor, ...reachable]
@@ -4457,6 +4468,11 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     const trapScore = compareTrapSetupScores(a, b);
     if (trapScore) return trapScore;
+    if (isRangedAttackAction(attackAction)) {
+      const aHasPenaltyFreeTarget = a.nonPenaltyHitCount > 0;
+      const bHasPenaltyFreeTarget = b.nonPenaltyHitCount > 0;
+      if (aHasPenaltyFreeTarget !== bHasPenaltyFreeTarget) return aHasPenaltyFreeTarget ? -1 : 1;
+    }
     if (a.nearestTargetDistance !== b.nearestTargetDistance) {
       return a.nearestTargetDistance - b.nearestTargetDistance;
     }
@@ -4623,7 +4639,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
   const nearestTarget = targets
     .map((target) => ({
       target,
-      distance: targetPriorityDistance(actor, target, attackAction),
+      distance: targetPriorityDistanceFromTile(actor, tile, target, attackAction),
     }))
     .sort((a, b) => {
       if (a.distance !== b.distance) return a.distance - b.distance;
@@ -5634,12 +5650,34 @@ function showAutoUpgradeRewards() {
 function drawAutoUpgradeRewards() {
   const choiceCount = AUTO_REWARD_CHOICES;
   const pool = autoUpgradeCatalog.filter((upgrade) => isAutoUpgradeAvailable(upgrade));
-  const selected = shuffle(pool).slice(0, choiceCount);
+  const selected = drawLockedRouteContinuationRewards(pool, choiceCount);
+  const selectedIds = new Set(selected.map((upgrade) => upgrade.id));
+  selected.push(...shuffle(pool.filter((upgrade) => !selectedIds.has(upgrade.id))).slice(0, choiceCount - selected.length));
   if (selected.length >= choiceCount) return selected;
   return [
     ...selected,
     ...drawAutoTrainingFallbackRewards(choiceCount - selected.length, selected),
   ].slice(0, choiceCount);
+}
+
+function drawLockedRouteContinuationRewards(pool, choiceCount) {
+  const lockedRoutes = activeAutoUpgradeRoutesByOwner();
+  if (!lockedRoutes.size) return [];
+  const selected = [];
+  const usedIds = new Set();
+  for (const [owner, route] of lockedRoutes) {
+    if (selected.length >= choiceCount) break;
+    const candidates = pool.filter((upgrade) => (
+      upgrade.owner === owner
+      && upgrade.route === route
+      && !usedIds.has(upgrade.id)
+    ));
+    if (!candidates.length) continue;
+    const picked = shuffle(candidates)[0];
+    selected.push(picked);
+    usedIds.add(picked.id);
+  }
+  return selected;
 }
 
 function drawAutoTrainingFallbackRewards(count, selected = []) {
@@ -5683,13 +5721,23 @@ function isPartySynergyUpgrade(upgrade) {
 }
 
 function isAutoUpgradeRouteConflict(upgrade, picked) {
-  if (upgrade?.owner !== "archer") return false;
+  if (!upgrade || upgrade.owner === "party" || upgrade.route === "공용") return false;
   const pickedRoutes = new Set(autoUpgradeCatalog
-    .filter((item) => picked.has(item.id))
+    .filter((item) => item.owner === upgrade.owner && picked.has(item.id) && item.route !== "공용")
     .map((item) => item.route));
-  if (upgrade.route === "차지" && pickedRoutes.has("연타")) return true;
-  if (upgrade.route === "연타" && pickedRoutes.has("차지")) return true;
+  if (!pickedRoutes.size) return false;
+  if (!pickedRoutes.has(upgrade.route)) return true;
   return false;
+}
+
+function activeAutoUpgradeRoutesByOwner() {
+  const picked = state.autoPickedUpgradeIds ?? new Set();
+  return autoUpgradeCatalog
+    .filter((upgrade) => picked.has(upgrade.id) && upgrade.owner !== "party" && upgrade.route !== "공용")
+    .reduce((routes, upgrade) => {
+      if (!routes.has(upgrade.owner)) routes.set(upgrade.owner, upgrade.route);
+      return routes;
+    }, new Map());
 }
 
 function pickAutoUpgrade(reward) {
