@@ -5650,34 +5650,12 @@ function showAutoUpgradeRewards() {
 function drawAutoUpgradeRewards() {
   const choiceCount = AUTO_REWARD_CHOICES;
   const pool = autoUpgradeCatalog.filter((upgrade) => isAutoUpgradeAvailable(upgrade));
-  const selected = drawLockedRouteContinuationRewards(pool, choiceCount);
-  const selectedIds = new Set(selected.map((upgrade) => upgrade.id));
-  selected.push(...shuffle(pool.filter((upgrade) => !selectedIds.has(upgrade.id))).slice(0, choiceCount - selected.length));
+  const selected = shuffle(pool).slice(0, choiceCount);
   if (selected.length >= choiceCount) return selected;
   return [
     ...selected,
     ...drawAutoTrainingFallbackRewards(choiceCount - selected.length, selected),
   ].slice(0, choiceCount);
-}
-
-function drawLockedRouteContinuationRewards(pool, choiceCount) {
-  const lockedRoutes = activeAutoUpgradeRoutesByOwner();
-  if (!lockedRoutes.size) return [];
-  const selected = [];
-  const usedIds = new Set();
-  for (const [owner, route] of lockedRoutes) {
-    if (selected.length >= choiceCount) break;
-    const candidates = pool.filter((upgrade) => (
-      upgrade.owner === owner
-      && upgrade.route === route
-      && !usedIds.has(upgrade.id)
-    ));
-    if (!candidates.length) continue;
-    const picked = shuffle(candidates)[0];
-    selected.push(picked);
-    usedIds.add(picked.id);
-  }
-  return selected;
 }
 
 function drawAutoTrainingFallbackRewards(count, selected = []) {
@@ -5728,16 +5706,6 @@ function isAutoUpgradeRouteConflict(upgrade, picked) {
   if (!pickedRoutes.size) return false;
   if (!pickedRoutes.has(upgrade.route)) return true;
   return false;
-}
-
-function activeAutoUpgradeRoutesByOwner() {
-  const picked = state.autoPickedUpgradeIds ?? new Set();
-  return autoUpgradeCatalog
-    .filter((upgrade) => picked.has(upgrade.id) && upgrade.owner !== "party" && upgrade.route !== "공용")
-    .reduce((routes, upgrade) => {
-      if (!routes.has(upgrade.owner)) routes.set(upgrade.owner, upgrade.route);
-      return routes;
-    }, new Map());
 }
 
 function pickAutoUpgrade(reward) {
