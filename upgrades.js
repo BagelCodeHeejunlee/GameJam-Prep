@@ -7,6 +7,7 @@ const META_PROGRESS_STORAGE_KEY = "gamejam-prep-meta-growth-v1";
 const META_LEVEL_MIN = 1;
 const META_LEVEL_MAX = 8;
 const AUTO_UNLOCK_ALL_UPGRADE_LEVELS = true;
+const TREE_STAGE_ORDER = ["기본", "초반", "중반", "고급", "후반", "최종"];
 const ROUTE_ORDER = {
   archer: ["공용", "연타", "함정", "차지"],
   warrior: ["공용", "돌진", "범위 공격", "광전"],
@@ -219,12 +220,30 @@ function renderRouteSections() {
           </div>
           <strong>${unlocked} / ${upgrades.length} 해금</strong>
         </header>
-        <div class="upgrade-grid">
-          ${upgrades.map(upgradeCardMarkup).join("")}
-        </div>
+        ${stageGroupsMarkup(upgrades)}
       </section>
     `;
   }).join("") || `<div class="load-error">표시할 선택지가 없습니다.</div>`;
+}
+
+function stageGroupsMarkup(upgrades) {
+  const groups = new Map();
+  upgrades.forEach((upgrade) => {
+    const stage = autoUpgradeStageLabel(upgrade);
+    if (!groups.has(stage)) groups.set(stage, []);
+    groups.get(stage).push(upgrade);
+  });
+  return [...groups.entries()].map(([stage, stageUpgrades]) => `
+    <section class="tree-stage-group">
+      <header>
+        <span>${escapeHtml(stage)}</span>
+        <strong>${stageUpgrades.length}개</strong>
+      </header>
+      <div class="upgrade-grid">
+        ${stageUpgrades.map(upgradeCardMarkup).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function upgradeCardMarkup(upgrade) {
@@ -233,13 +252,15 @@ function upgradeCardMarkup(upgrade) {
   const custom = hasCustomRequirement(upgrade);
   const unlocked = isUnlockedForCurrentLevel(upgrade);
   const root = isTreeRootUpgrade(upgrade);
+  const stage = autoUpgradeStageLabel(upgrade);
   return `
     <article class="upgrade-card ${unlocked ? "unlocked" : "locked"} ${custom ? "custom" : ""} ${root ? "root" : ""}">
       <div class="upgrade-topline">
-        <span>${root ? "트리 첫 선택지" : `깊이 ${autoUpgradeDepth(upgrade)}`}</span>
+        <span>${root ? `${stage} · 트리 첫 선택지` : `${stage} · 깊이 ${autoUpgradeDepth(upgrade)}`}</span>
         <b>${unlocked ? "해금" : `Lv.${effectiveLevel} 필요`}</b>
       </div>
       <h3>${escapeHtml(upgrade.name)}</h3>
+      ${upgrade.treeRole ? `<strong class="upgrade-role">${escapeHtml(upgrade.treeRole)}</strong>` : ""}
       <p>${escapeHtml(upgrade.desc)}</p>
       ${prerequisiteMarkup(upgrade)}
       <div class="requirement-row">
@@ -336,7 +357,8 @@ function sortedRouteUpgrades(characterId, route) {
   return characterUpgrades(characterId)
     .filter((upgrade) => upgrade.route === route)
     .sort((a, b) => (
-      autoUpgradeDepth(a) - autoUpgradeDepth(b)
+      treeStageRank(a) - treeStageRank(b)
+      || autoUpgradeDepth(a) - autoUpgradeDepth(b)
       || defaultAutoUpgradeMetaRequirement(a) - defaultAutoUpgradeMetaRequirement(b)
       || a.name.localeCompare(b.name, "ko")
     ));
@@ -356,6 +378,26 @@ function requirementName(upgradeId) {
 
 function isTreeRootUpgrade(upgrade) {
   return upgrade.route !== "공용" && !(upgrade.requires?.length) && !(upgrade.requiresAny?.length);
+}
+
+function autoUpgradeStageLabel(upgrade) {
+  if (upgrade?.treeStage) return upgrade.treeStage;
+  const depth = autoUpgradeDepth(upgrade);
+  if (upgrade?.route === "공용") {
+    if (depth <= 0) return "기본";
+    if (depth === 1) return "중반";
+    if (depth === 2) return "후반";
+    return "최종";
+  }
+  if (depth <= 0) return "초반";
+  if (depth === 1) return "중반";
+  if (depth === 2) return "후반";
+  return "최종";
+}
+
+function treeStageRank(upgrade) {
+  const index = TREE_STAGE_ORDER.indexOf(autoUpgradeStageLabel(upgrade));
+  return index >= 0 ? index : TREE_STAGE_ORDER.length + autoUpgradeDepth(upgrade);
 }
 
 function isUnlockedForCurrentLevel(upgrade) {

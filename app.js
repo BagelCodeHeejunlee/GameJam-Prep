@@ -25,6 +25,7 @@ const ENABLE_PARTY_SYNERGY_UPGRADES = false;
 const AUTO_UNLOCK_ALL_UPGRADE_LEVELS = true;
 const AUTO_REWARD_CHOICES = 3;
 const AUTO_TRAINING_FALLBACK_BONUS = 0.1;
+const AUTO_UPGRADE_STAGE_ORDER = ["기본", "초반", "중반", "고급", "후반", "최종"];
 const AUTO_ENEMY_BALANCE_TIERS = [
   { maxWave: 2, hpMultiplier: 3.2, minHp: 18, attackMultiplier: 1, attackBonus: 0 },
   { maxWave: 5, hpMultiplier: 2.4, minHp: 24, eliteHpMultiplier: 1.15, bossHpMultiplier: 1.35, attackMultiplier: 1.1, attackBonus: 0 },
@@ -1423,89 +1424,89 @@ const testPlayerPartyIds = ["archer", "warrior", "mage"];
 const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-damage", "archer", "공용", "안정 사격", "궁수 기본 공격력이 25% 증가한다.", () => {
     increaseAutoHeroBaseAtkPercent("archer", 0.25);
-  }),
+  }, { treeStage: "기본", treeRole: "화력 기반" }),
   autoUpgrade("auto-archer-range", "archer", "공용", "사거리 확보", "궁수 자동 사격 사거리가 1 증가한다.", () => {
     autoPermanent("archer").autoRangeBonus = (autoPermanent("archer").autoRangeBonus ?? 0) + 1;
-  }),
+  }, { treeStage: "기본", treeRole: "거리 안정" }),
   autoUpgrade("auto-archer-push-arrow", "archer", "공용", "밀어내는 화살", "궁수 공격 시 20% 확률로 적을 1칸 밀친다.", () => {
     autoPermanent("archer").attackPushChance = Math.max(autoPermanent("archer").attackPushChance ?? 0, 0.2);
     autoPermanent("archer").attackPushAmount = Math.max(autoPermanent("archer").attackPushAmount ?? 0, 1);
-  }, { metaLevel: 1 }),
+  }, { metaLevel: 1, treeStage: "기본", treeRole: "제어 재료" }),
   autoUpgrade("auto-archer-overkill-transfer", "archer", "공용", "잔여 관통", "궁수가 적을 처치하면 남은 피해가 처치 대상 기준 3칸 안의 적에게 전이된다.", () => {
     autoPermanent("archer").overkillSplashRange = Math.max(autoPermanent("archer").overkillSplashRange ?? 0, 3);
-  }, { metaLevel: 1 }),
-  autoUpgrade("auto-archer-third-pulse", "archer", "공용", "세 번째 파동", "궁수가 3회 공격할 때마다 대상 근처 적 3명에게 현재 체력의 10% 피해를 준다.", () => {
+  }, { metaLevel: 1, treeStage: "중반", treeRole: "처형 연계" }),
+  autoUpgrade("auto-archer-third-pulse", "archer", "공용", "연쇄 파편", "궁수가 3회 공격할 때마다 대상 근처 적 3명에게 현재 체력의 10% 피해를 준다.", () => {
     autoPermanent("archer").thirdAttackPulseEvery = 3;
     autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 3);
     autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.1);
     autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 1);
-  }, { metaLevel: 1 }),
-  autoUpgrade("auto-archer-crack-shot", "archer", "공용", "균열 사격", "세 번째 파동 피해가 현재 체력의 15%로 증가하고 탐색 범위가 2칸으로 넓어진다.", () => {
+  }, { metaLevel: 1, treeStage: "중반", treeRole: "광역 재료" }),
+  autoUpgrade("auto-archer-crack-shot", "archer", "공용", "균열 사격", "연쇄 파편 피해가 현재 체력의 15%로 증가하고 탐색 범위가 2칸으로 넓어진다.", () => {
     autoPermanent("archer").thirdAttackPulseEvery = Math.min(autoPermanent("archer").thirdAttackPulseEvery ?? 3, 3);
     autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 3);
     autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.15);
     autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 2);
-  }, { requires: ["auto-archer-third-pulse"] }),
+  }, { requires: ["auto-archer-third-pulse"], treeStage: "고급", treeRole: "광역 강화" }),
   autoUpgrade("auto-archer-charge", "archer", "차지", "저격 태세", "궁수의 자동 공격이 차지로 바뀐다. 차지 4가 되면 사거리 제한 없는 공격 4를 한다.", () => {
     autoPermanent("archer").autoSnipeChargeMode = true;
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 4);
     autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 4);
-  }, { metaLevel: 1 }),
+  }, { metaLevel: 1, treeStage: "초반", treeRole: "트리 핵심" }),
   autoUpgrade("auto-archer-charge-compress", "archer", "차지", "압축 장전", "저격 발사에 필요한 차지가 3으로 감소하고 저격 피해가 증가한다.", () => {
     autoPermanent("archer").autoSnipeThreshold = Math.min(autoPermanent("archer").autoSnipeThreshold ?? 4, 3);
     autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 5);
-  }, { requires: ["auto-archer-charge"] }),
+  }, { requires: ["auto-archer-charge"], treeStage: "중반", treeRole: "회전율" }),
   autoUpgrade("auto-archer-full-draw", "archer", "차지", "완전 장전", "저격으로 적을 처치하면 저격 후 차지 1을 남긴다.", () => {
     autoPermanent("archer").autoSnipeKillChargeRefund = Math.max(autoPermanent("archer").autoSnipeKillChargeRefund ?? 0, 1);
-  }, { requires: ["auto-archer-charge-compress"] }),
+  }, { requires: ["auto-archer-charge-compress"], treeStage: "후반", treeRole: "처형 보상" }),
   autoUpgrade("auto-archer-sky-piercer", "archer", "차지", "천공 저격", "저격 피해가 크게 증가하고, 차지를 더 빨리 모으며, 저격 처치 후 차지 2를 남긴다.", () => {
     autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 7);
     autoPermanent("archer").autoSnipeChargeGain = Math.max(autoPermanent("archer").autoSnipeChargeGain ?? 1, 2);
     autoPermanent("archer").autoSnipeKillChargeRefund = Math.max(autoPermanent("archer").autoSnipeKillChargeRefund ?? 0, 2);
-  }, { requires: ["auto-archer-full-draw"] }),
+  }, { requires: ["auto-archer-full-draw"], treeStage: "최종", treeRole: "최종 스킬" }),
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
-  }),
+  }, { treeStage: "초반", treeRole: "트리 핵심" }),
   autoUpgrade("auto-archer-double", "archer", "연타", "세 번째 화살", "궁수가 매 턴 3회 사격한다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 3);
-  }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage"] }),
-  autoUpgrade("auto-archer-triple", "archer", "연타", "끝없는 연사", "궁수가 매 턴 4회 사격하고, 연속 사격이 대상 주변에 작은 파동을 만든다.", () => {
+  }, { requiresAny: ["auto-archer-repeat", "auto-archer-damage"], treeStage: "중반", treeRole: "행동 강화" }),
+  autoUpgrade("auto-archer-triple", "archer", "연타", "끝없는 연사", "궁수가 매 턴 4회 사격하고, 연속 사격이 대상 주변에 작은 연쇄 파편을 만든다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 4);
     autoPermanent("archer").thirdAttackPulseEvery = Math.min(autoPermanent("archer").thirdAttackPulseEvery ?? 3, 3);
     autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 2);
     autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.08);
     autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 1);
-  }, { requires: ["auto-archer-double"] }),
-  autoUpgrade("auto-archer-storm-eye", "archer", "연타", "폭풍의 눈", "궁수가 매 턴 5회 사격하고, 2회 공격할 때마다 대상 주변에 파동을 만든다.", () => {
+  }, { requires: ["auto-archer-double"], treeStage: "후반", treeRole: "광역 연계" }),
+  autoUpgrade("auto-archer-storm-eye", "archer", "연타", "폭풍의 눈", "궁수가 매 턴 5회 사격하고, 2회 공격할 때마다 대상 주변에 연쇄 파편을 만든다.", () => {
     autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 5);
     autoPermanent("archer").thirdAttackPulseEvery = Math.min(autoPermanent("archer").thirdAttackPulseEvery ?? 3, 2);
     autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 4);
     autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.12);
     autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 2);
-  }, { requires: ["auto-archer-triple"] }),
+  }, { requires: ["auto-archer-triple"], treeStage: "최종", treeRole: "최종 스킬" }),
   autoUpgrade("auto-archer-trap", "archer", "함정", "공격 함정", "궁수가 3턴마다 적 진입 경로에 공격 함정을 설치한다.", () => {
     autoPermanent("archer").autoTrapEvery = 3;
     autoPermanent("archer").autoTrapCount = Math.max(autoPermanent("archer").autoTrapCount ?? 1, 1);
-  }),
+  }, { treeStage: "초반", treeRole: "트리 핵심" }),
   autoUpgrade("auto-archer-trap-polish", "archer", "함정", "함정 손질", "함정 위력이 증가하고, 함정 발동 후 다음 사격 피해가 오른다.", () => {
     autoPermanent("archer").autoTrapPower = (autoPermanent("archer").autoTrapPower ?? 2) + 1;
     autoPermanent("archer").trapNextAttackDamage = (autoPermanent("archer").trapNextAttackDamage ?? 0) + 0.35;
-  }, { requires: ["auto-archer-trap"] }),
+  }, { requires: ["auto-archer-trap"], treeStage: "중반", treeRole: "피해 강화" }),
   autoUpgrade("auto-archer-spike-path", "archer", "함정", "가시 길목", "함정 설치 수가 1 증가한다.", () => {
     autoPermanent("archer").autoTrapCount = (autoPermanent("archer").autoTrapCount ?? 1) + 1;
-  }, { requires: ["auto-archer-trap"] }),
+  }, { requires: ["auto-archer-trap"], treeStage: "중반", treeRole: "지역 장악" }),
   autoUpgrade("auto-archer-ankle-shot", "archer", "함정", "발목 노리기", "함정에 걸린 적은 다음 이동을 할 수 없다.", () => {
     autoPermanent("archer").trapSnare = true;
-  }, { requires: ["auto-archer-trap"] }),
+  }, { requires: ["auto-archer-trap"], treeStage: "중반", treeRole: "이동 제어" }),
   autoUpgrade("auto-archer-ambush-shot", "archer", "함정", "매복 사격", "함정이 발동하면 궁수가 발동시킨 적을 즉시 공격한다.", () => {
     autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 1);
     autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 5);
-  }, { requires: ["auto-archer-trap"] }),
+  }, { requires: ["auto-archer-trap"], treeStage: "고급", treeRole: "함정-공격 연결" }),
   autoUpgrade("auto-archer-chain-trap", "archer", "함정", "연쇄 함정", "함정이 발동하면 주변 적에게도 피해를 주고 궁수가 즉시 매복 사격한다.", () => {
     autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 2.5);
     autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 1);
     autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 5);
-  }, { requires: ["auto-archer-trap-polish"] }),
+  }, { requires: ["auto-archer-trap-polish"], treeStage: "후반", treeRole: "연쇄 폭발" }),
   autoUpgrade("auto-archer-hunting-ground", "archer", "함정", "사냥터 완성", "궁수가 2턴마다 강한 함정을 설치하고, 함정 발동 시 매복 사격 2회와 강화된 주변 피해를 만든다.", () => {
     autoPermanent("archer").autoTrapEvery = Math.min(autoPermanent("archer").autoTrapEvery ?? 3, 2);
     autoPermanent("archer").autoTrapCount = Math.max(autoPermanent("archer").autoTrapCount ?? 1, 2);
@@ -1514,7 +1515,7 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 2);
     autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 6);
     autoPermanent("archer").trapSnare = true;
-  }, { requires: ["auto-archer-chain-trap"] }),
+  }, { requires: ["auto-archer-chain-trap"], treeStage: "최종", treeRole: "최종 스킬" }),
 
   autoUpgrade("auto-warrior-damage", "warrior", "공용", "강한 베기", "전사 기본 공격력이 25% 증가한다.", () => {
     increaseAutoHeroBaseAtkPercent("warrior", 0.25);
@@ -3803,7 +3804,7 @@ function triggerThirdAttackPulse(actor, target, attackHitCount) {
     const hitPosition = { q: enemy.q, r: enemy.r };
     const pulseDamage = Math.max(1, Math.round(enemy.hp * percent));
     applyDamage(enemy, pulseDamage);
-    log(`${actor.name} 세 번째 파동 -> ${enemy.name} ${pulseDamage} 피해`);
+    log(`${actor.name} 연쇄 파편 -> ${enemy.name} ${pulseDamage} 피해`);
     return {
       target: enemy,
       position: hitPosition,
@@ -5611,15 +5612,17 @@ function showAutoUpgradeRewards() {
   }
   rewards.forEach((reward) => {
     const rarity = autoUpgradeRarity(reward);
+    const stageLabel = autoUpgradeStageLabel(reward);
     const pick = document.createElement("button");
     pick.className = `reward-pick auto-upgrade-pick auto-owner-${reward.owner} ${rarityClass(rarity)}`;
     pick.type = "button";
     pick.innerHTML = `
       <span class="auto-upgrade-meta">
-        <span class="auto-upgrade-owner">${autoRewardOwnerLabel(reward.owner)} · ${reward.route}</span>
+        <span class="auto-upgrade-owner">${autoRewardOwnerLabel(reward.owner)} · ${reward.route} · ${stageLabel}</span>
         <b class="auto-upgrade-rarity">${rarity}</b>
       </span>
       <strong>${reward.name}</strong>
+      ${reward.treeRole ? `<em class="auto-upgrade-role">${escapeMarkup(reward.treeRole)}</em>` : ""}
       <span>${reward.desc}</span>
     `;
     pick.addEventListener("click", () => pickAutoUpgrade(reward));
@@ -5725,6 +5728,26 @@ function continueAfterAutoReward() {
 function autoRewardOwnerLabel(owner) {
   if (owner === "party") return "파티";
   return characterDefinitions[owner]?.name ?? owner;
+}
+
+function autoUpgradeStageLabel(upgrade) {
+  if (upgrade?.treeStage) return upgrade.treeStage;
+  const depth = autoUpgradeDepth(upgrade);
+  if (upgrade?.route === "공용") {
+    if (depth <= 0) return "기본";
+    if (depth === 1) return "중반";
+    if (depth === 2) return "후반";
+    return "최종";
+  }
+  if (depth <= 0) return "초반";
+  if (depth === 1) return "중반";
+  if (depth === 2) return "후반";
+  return "최종";
+}
+
+function autoUpgradeStageRank(upgrade) {
+  const index = AUTO_UPGRADE_STAGE_ORDER.indexOf(autoUpgradeStageLabel(upgrade));
+  return index >= 0 ? index : AUTO_UPGRADE_STAGE_ORDER.length + autoUpgradeDepth(upgrade);
 }
 
 function autoUpgradeRarity(upgrade) {
@@ -5869,7 +5892,11 @@ function metaRouteGroupsMarkup(upgrades) {
       <h3>${escapeMarkup(route)}</h3>
       <ul>
         ${routeUpgrades
-          .sort((a, b) => autoUpgradeMetaRequirement(a) - autoUpgradeMetaRequirement(b) || autoUpgradeDepth(a) - autoUpgradeDepth(b))
+          .sort((a, b) => (
+            autoUpgradeStageRank(a) - autoUpgradeStageRank(b)
+            || autoUpgradeMetaRequirement(a) - autoUpgradeMetaRequirement(b)
+            || autoUpgradeDepth(a) - autoUpgradeDepth(b)
+          ))
           .map(metaUpgradeItemMarkup)
           .join("")}
       </ul>
@@ -5884,11 +5911,13 @@ function metaUpgradeItemMarkup(upgrade) {
   const picked = state?.autoPickedUpgradeIds?.has(upgrade.id);
   const status = picked ? "선택됨" : unlocked ? "해금" : `Lv.${requiredLevel}`;
   const desc = unlocked ? upgrade.desc : `${autoRewardOwnerLabel(upgrade.owner)} Lv.${requiredLevel} 필요`;
+  const stage = autoUpgradeStageLabel(upgrade);
+  const role = upgrade.treeRole ? ` · ${upgrade.treeRole}` : "";
   return `
     <li class="meta-upgrade-item ${rarityClass(rarity)} ${unlocked ? "unlocked" : "locked"} ${picked ? "picked" : ""}">
       <div>
         <strong>${escapeMarkup(upgrade.name)}</strong>
-        <span>${escapeMarkup(desc)}</span>
+        <span>${escapeMarkup(`${stage}${role} | ${desc}`)}</span>
       </div>
       <b>${status}</b>
     </li>

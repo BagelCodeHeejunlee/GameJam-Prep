@@ -4263,6 +4263,19 @@ body.turn-cue-active .turn-scrim {
   line-height: 1.15;
 }
 
+.auto-upgrade-role {
+  width: max-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 211, 108, 0.14);
+  color: #ffe49b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
+  line-height: 1;
+}
+
 .auto-upgrade-pick span {
   color: #d9e5eb;
   font-size: 13px;
