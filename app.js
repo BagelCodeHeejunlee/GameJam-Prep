@@ -1458,6 +1458,11 @@ const autoUpgradeCatalog = [
   autoUpgrade("auto-archer-full-draw", "archer", "차지", "완전 장전", "저격으로 적을 처치하면 저격 후 차지 1을 남긴다.", () => {
     autoPermanent("archer").autoSnipeKillChargeRefund = Math.max(autoPermanent("archer").autoSnipeKillChargeRefund ?? 0, 1);
   }, { requires: ["auto-archer-charge-compress"] }),
+  autoUpgrade("auto-archer-sky-piercer", "archer", "차지", "천공 저격", "저격 피해가 크게 증가하고, 차지를 더 빨리 모으며, 저격 처치 후 차지 2를 남긴다.", () => {
+    autoPermanent("archer").autoSnipeDamage = Math.max(autoPermanent("archer").autoSnipeDamage ?? 4, 7);
+    autoPermanent("archer").autoSnipeChargeGain = Math.max(autoPermanent("archer").autoSnipeChargeGain ?? 1, 2);
+    autoPermanent("archer").autoSnipeKillChargeRefund = Math.max(autoPermanent("archer").autoSnipeKillChargeRefund ?? 0, 2);
+  }, { requires: ["auto-archer-full-draw"] }),
   autoUpgrade("auto-archer-repeat", "archer", "연타", "반복 리듬", "궁수가 같은 적을 연속으로 맞힐 때마다 피해가 25% 증가한다.", () => {
     autoPermanent("archer").comboDamage = (autoPermanent("archer").comboDamage ?? 0) + 0.25;
   }),
@@ -1471,6 +1476,13 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.08);
     autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 1);
   }, { requires: ["auto-archer-double"] }),
+  autoUpgrade("auto-archer-storm-eye", "archer", "연타", "폭풍의 눈", "궁수가 매 턴 5회 사격하고, 2회 공격할 때마다 대상 주변에 파동을 만든다.", () => {
+    autoPermanent("archer").autoShots = Math.max(autoPermanent("archer").autoShots ?? 2, 5);
+    autoPermanent("archer").thirdAttackPulseEvery = Math.min(autoPermanent("archer").thirdAttackPulseEvery ?? 3, 2);
+    autoPermanent("archer").thirdAttackPulseTargets = Math.max(autoPermanent("archer").thirdAttackPulseTargets ?? 0, 4);
+    autoPermanent("archer").thirdAttackPulsePercent = Math.max(autoPermanent("archer").thirdAttackPulsePercent ?? 0, 0.12);
+    autoPermanent("archer").thirdAttackPulseRange = Math.max(autoPermanent("archer").thirdAttackPulseRange ?? 0, 2);
+  }, { requires: ["auto-archer-triple"] }),
   autoUpgrade("auto-archer-trap", "archer", "함정", "공격 함정", "궁수가 3턴마다 적 진입 경로에 공격 함정을 설치한다.", () => {
     autoPermanent("archer").autoTrapEvery = 3;
     autoPermanent("archer").autoTrapCount = Math.max(autoPermanent("archer").autoTrapCount ?? 1, 1);
@@ -1494,6 +1506,15 @@ const autoUpgradeCatalog = [
     autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 1);
     autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 5);
   }, { requires: ["auto-archer-trap-polish"] }),
+  autoUpgrade("auto-archer-hunting-ground", "archer", "함정", "사냥터 완성", "궁수가 2턴마다 강한 함정을 설치하고, 함정 발동 시 매복 사격 2회와 강화된 주변 피해를 만든다.", () => {
+    autoPermanent("archer").autoTrapEvery = Math.min(autoPermanent("archer").autoTrapEvery ?? 3, 2);
+    autoPermanent("archer").autoTrapCount = Math.max(autoPermanent("archer").autoTrapCount ?? 1, 2);
+    autoPermanent("archer").autoTrapPower = Math.max(autoPermanent("archer").autoTrapPower ?? 2, 4);
+    autoPermanent("archer").trapChainDamage = Math.max(autoPermanent("archer").trapChainDamage ?? 0, 3);
+    autoPermanent("archer").trapTriggerShot = Math.max(autoPermanent("archer").trapTriggerShot ?? 0, 2);
+    autoPermanent("archer").trapTriggerShotRange = Math.max(autoPermanent("archer").trapTriggerShotRange ?? 0, 6);
+    autoPermanent("archer").trapSnare = true;
+  }, { requires: ["auto-archer-chain-trap"] }),
 
   autoUpgrade("auto-warrior-damage", "warrior", "공용", "강한 베기", "전사 기본 공격력이 25% 증가한다.", () => {
     increaseAutoHeroBaseAtkPercent("warrior", 0.25);
