@@ -16,6 +16,8 @@
 
   const MAX_HP = 24;
   const BOARD_GAP = 3;
+  const CUT_BOARD_COLS = 8;
+  const CUT_BOARD_ROWS = 6;
 
   const monsters = [
     {
@@ -176,10 +178,10 @@
     monsterCells: new Map(),
     materialCols: 5,
     materialRows: 4,
+    materialOrigin: { x: 0, y: 0 },
     materialPieces: [],
     missingCells: new Set(),
     spoiledCells: new Set(),
-    cutEdges: new Set(),
     knives: [],
     blocked: new Set(),
     coverOrder: [],
@@ -187,6 +189,7 @@
     resultMode: null,
     nextPieceId: 1,
     initialMaterialTotal: 0,
+    draggingPieceId: null,
     drag: null,
   };
 
@@ -224,17 +227,26 @@
     state.turn = 1;
     state.actionIndex = 0;
     state.monsterCells = new Map();
-    state.materialCols = monster.material.cols;
-    state.materialRows = monster.material.rows;
-    state.missingCells = new Set(monster.material.holes);
+    state.materialCols = CUT_BOARD_COLS;
+    state.materialRows = CUT_BOARD_ROWS;
+    state.materialOrigin = {
+      x: Math.floor((CUT_BOARD_COLS - monster.material.cols) / 2),
+      y: Math.floor((CUT_BOARD_ROWS - monster.material.rows) / 2),
+    };
+    state.missingCells = new Set();
     state.spoiledCells = new Set();
-    state.cutEdges = new Set();
-    state.knives = monster.knives.map((knife, index) => ({ ...knife, id: `knife-${index}` }));
+    state.knives = monster.knives.map((knife, index) => ({
+      ...knife,
+      x: knife.x + state.materialOrigin.x,
+      y: knife.y + state.materialOrigin.y,
+      id: `knife-${index}`,
+    }));
     state.blocked = new Set();
     state.coverOrder = [];
     state.log = [];
     state.resultMode = null;
     state.nextPieceId = 1;
+    state.draggingPieceId = null;
     state.drag = null;
 
     monster.cells.forEach((cell) => {
@@ -247,13 +259,16 @@
     });
 
     const cells = [];
-    for (let y = 0; y < state.materialRows; y += 1) {
-      for (let x = 0; x < state.materialCols; x += 1) {
-        if (!state.missingCells.has(key(x, y))) cells.push({ x, y });
+    const materialHoles = new Set(monster.material.holes);
+    for (let y = 0; y < monster.material.rows; y += 1) {
+      for (let x = 0; x < monster.material.cols; x += 1) {
+        if (!materialHoles.has(key(x, y))) {
+          cells.push({ x: x + state.materialOrigin.x, y: y + state.materialOrigin.y });
+        }
       }
     }
     state.initialMaterialTotal = cells.length;
-    state.materialPieces = [{ id: state.nextPieceId, cells }];
+    state.materialPieces = [{ id: state.nextPieceId, cells, cutEdges: new Set() }];
     state.nextPieceId += 1;
 
     addLog(`${monster.name} 등장. 칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.`);
@@ -363,7 +378,7 @@
   }
 
   function renderMaterialBoard() {
-    const pieceByCell = buildPieceByCell();
+    const pieceByCell = buildPieceByCell({ skipDragging: true });
     els.materialGrid.style.gridTemplateColumns = `repeat(${state.materialCols}, var(--small-cell))`;
     els.materialGrid.innerHTML = "";
     els.cutLayer.innerHTML = "";
@@ -402,7 +417,12 @@
   }
 
   function renderCutMarks() {
-    state.cutEdges.forEach((edge) => {
+    const rendered = new Set();
+    state.materialPieces.forEach((piece) => {
+      piece.cutEdges.forEach((edge) => rendered.add(edge));
+    });
+
+    rendered.forEach((edge) => {
       const mark = edgeToMark(edge);
       if (!mark) return;
       const el = document.createElement("span");
@@ -507,10 +527,13 @@
         const edge = type.orientation === "h"
           ? edgeKey(key(knife.x + i, knife.y - 1), key(knife.x + i, knife.y))
           : edgeKey(key(knife.x - 1, knife.y + i), key(knife.x, knife.y + i));
-        if (isValidMaterialEdge(edge) && !state.cutEdges.has(edge)) {
-          state.cutEdges.add(edge);
-          added += 1;
-        }
+
+        state.materialPieces.forEach((piece) => {
+          if (isPieceEdge(edge, piece) && !piece.cutEdges.has(edge)) {
+            piece.cutEdges.add(edge);
+            added += 1;
+          }
+        });
       }
     });
 
@@ -528,6 +551,8 @@
     const min = minCell(piece.cells);
     const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
     state.drag = { type: "piece", pieceId, offset, cells: normalizeCells(piece.cells) };
+    state.draggingPieceId = pieceId;
+    renderMaterialBoard();
     showDragGhost(state.drag.cells, event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
     window.addEventListener("pointerup", onPieceUp, { once: true });
@@ -542,6 +567,7 @@
     window.removeEventListener("pointermove", onPieceMove);
     const drag = state.drag;
     state.drag = null;
+    state.draggingPieceId = null;
     hideDragGhost();
     if (!drag) return;
 
@@ -584,7 +610,9 @@
       return;
     }
 
+    const currentMin = minCell(piece.cells);
     piece.cells = nextCells;
+    piece.cutEdges = translateCutEdges(piece.cutEdges, anchorX - currentMin.x, anchorY - currentMin.y);
     addLog(`${nextCells.length}칸 조각을 재료판 안에서 옮겼다.`);
     render();
   }
@@ -690,41 +718,62 @@
   }
 
   function rebuildPiecesFromCuts() {
-    const occupiedKeys = new Set();
-    state.materialPieces.forEach((piece) => {
-      piece.cells.forEach((cell) => occupiedKeys.add(key(cell.x, cell.y)));
-    });
-    const unseen = new Set(occupiedKeys);
     const nextPieces = [];
 
-    while (unseen.size) {
-      const start = unseen.values().next().value;
-      const queue = [start];
-      const cells = [];
-      unseen.delete(start);
+    state.materialPieces.forEach((piece) => {
+      const pieceKeys = new Set(piece.cells.map((cell) => key(cell.x, cell.y)));
+      const unseen = new Set(pieceKeys);
+      const components = [];
 
-      while (queue.length) {
-        const current = queue.shift();
-        const { x, y } = fromKey(current);
-        cells.push({ x, y });
-        neighbors(x, y).forEach((next) => {
-          if (!unseen.has(next)) return;
-          if (state.cutEdges.has(edgeKey(current, next))) return;
-          unseen.delete(next);
-          queue.push(next);
-        });
+      while (unseen.size) {
+        const start = unseen.values().next().value;
+        const queue = [start];
+        const cells = [];
+        unseen.delete(start);
+
+        while (queue.length) {
+          const current = queue.shift();
+          const { x, y } = fromKey(current);
+          cells.push({ x, y });
+          neighbors(x, y).forEach((next) => {
+            if (!unseen.has(next) || !pieceKeys.has(next)) return;
+            if (piece.cutEdges.has(edgeKey(current, next))) return;
+            unseen.delete(next);
+            queue.push(next);
+          });
+        }
+
+        components.push(cells);
       }
 
-      nextPieces.push({ id: state.nextPieceId, cells });
-      state.nextPieceId += 1;
-    }
+      if (components.length === 1) {
+        const componentKeys = new Set(components[0].map((cell) => key(cell.x, cell.y)));
+        nextPieces.push({
+          id: piece.id,
+          cells: components[0],
+          cutEdges: keepCutEdgesForCells(piece.cutEdges, componentKeys),
+        });
+        return;
+      }
+
+      components.forEach((cells, index) => {
+        const componentKeys = new Set(cells.map((cell) => key(cell.x, cell.y)));
+        nextPieces.push({
+          id: index === 0 ? piece.id : state.nextPieceId,
+          cells,
+          cutEdges: keepCutEdgesForCells(piece.cutEdges, componentKeys),
+        });
+        if (index !== 0) state.nextPieceId += 1;
+      });
+    });
 
     state.materialPieces = nextPieces;
   }
 
-  function buildPieceByCell() {
+  function buildPieceByCell(options = {}) {
     const map = new Map();
     state.materialPieces.forEach((piece) => {
+      if (options.skipDragging && piece.id === state.draggingPieceId) return;
       piece.cells.forEach((cell) => map.set(key(cell.x, cell.y), piece.id));
     });
     return map;
@@ -750,7 +799,7 @@
   function showDragGhost(cells, x, y) {
     els.dragGhost.className = "drag-ghost";
     els.dragGhost.innerHTML = "";
-    els.dragGhost.append(renderPieceGrid(cells));
+    els.dragGhost.append(renderBoardPieceGrid(cells));
     moveDragGhost(x, y);
   }
 
@@ -783,6 +832,26 @@
     return grid;
   }
 
+  function renderBoardPieceGrid(cells) {
+    const normalized = normalizeCells(cells);
+    const maxX = Math.max(...normalized.map((cell) => cell.x));
+    const maxY = Math.max(...normalized.map((cell) => cell.y));
+    const occupied = new Set(normalized.map((cell) => key(cell.x, cell.y)));
+    const grid = document.createElement("div");
+    grid.className = "drag-piece-grid";
+    grid.style.gridTemplateColumns = `repeat(${maxX + 1}, var(--small-cell))`;
+
+    for (let y = 0; y <= maxY; y += 1) {
+      for (let x = 0; x <= maxX; x += 1) {
+        const cell = document.createElement("span");
+        cell.className = "drag-piece-cell";
+        if (!occupied.has(key(x, y))) cell.classList.add("empty");
+        grid.append(cell);
+      }
+    }
+    return grid;
+  }
+
   function normalizeCells(cells) {
     const min = minCell(cells);
     return cells
@@ -801,14 +870,24 @@
     return [a, b].sort().join("|");
   }
 
-  function isValidMaterialEdge(edge) {
+  function isPieceEdge(edge, piece) {
     const [a, b] = edge.split("|");
-    const cellA = fromKey(a);
-    const cellB = fromKey(b);
-    if (cellA.x < 0 || cellA.y < 0 || cellB.x < 0 || cellB.y < 0) return false;
-    if (cellA.x >= state.materialCols || cellB.x >= state.materialCols) return false;
-    if (cellA.y >= state.materialRows || cellB.y >= state.materialRows) return false;
-    return !state.missingCells.has(a) && !state.missingCells.has(b);
+    const pieceKeys = new Set(piece.cells.map((cell) => key(cell.x, cell.y)));
+    return pieceKeys.has(a) && pieceKeys.has(b);
+  }
+
+  function keepCutEdgesForCells(edges, cellKeys) {
+    return new Set([...edges].filter((edge) => {
+      const [a, b] = edge.split("|");
+      return cellKeys.has(a) && cellKeys.has(b);
+    }));
+  }
+
+  function translateCutEdges(edges, dx, dy) {
+    return new Set([...edges].map((edge) => {
+      const [a, b] = edge.split("|").map(fromKey);
+      return edgeKey(key(a.x + dx, a.y + dy), key(b.x + dx, b.y + dy));
+    }));
   }
 
   function edgeToMark(edge) {
@@ -886,6 +965,7 @@
       const cellKey = key(cell.x, cell.y);
       state.spoiledCells.add(cellKey);
       piece.cells = piece.cells.filter((item) => key(item.x, item.y) !== cellKey);
+      piece.cutEdges = keepCutEdgesForCells(piece.cutEdges, new Set(piece.cells.map((item) => key(item.x, item.y))));
     });
     state.materialPieces = state.materialPieces.filter((piece) => piece.cells.length > 0);
     return targets.length;
