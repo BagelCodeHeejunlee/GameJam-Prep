@@ -1718,6 +1718,7 @@ async function newRun() {
     cameraDrag: null,
     cameraDeadZoneSuppressed: false,
     cameraFocusActorId: null,
+    cameraFollowAnimation: null,
     cameraPanAnimation: null,
     cameraPanToken: 0,
     entityFacingTargets: new Map(),
@@ -1803,6 +1804,7 @@ function startWave(index) {
   state.cameraDrag = null;
   state.cameraDeadZoneSuppressed = false;
   state.cameraFocusActorId = null;
+  state.cameraFollowAnimation = null;
   cancelCameraPanAnimation();
   state.cameraPanAnimation = null;
   state.cameraPanToken = (state.cameraPanToken ?? 0) + 1;
@@ -2307,7 +2309,7 @@ async function runTurn() {
     const entry = entries[index];
     state.activeTimelineIndex = index;
     document.body.classList.toggle("player-acting", entry.actorType === "player");
-    releaseManualCameraPanForPlayerTurn(entry);
+    releaseManualCameraPanForCombatTurn(entry);
     renderPriorityStrip();
     renderEnemyActionHud();
     renderPlayerHud();
@@ -2391,7 +2393,7 @@ async function runAutoRoutineTurn() {
     const entry = state.currentTimeline[index];
     state.activeTimelineIndex = index;
     document.body.classList.toggle("player-acting", entry.actorType === "player");
-    releaseManualCameraPanForPlayerTurn(entry);
+    releaseManualCameraPanForCombatTurn(entry);
     renderPriorityStrip();
     renderEnemyActionHud();
     renderPlayerHud();
@@ -4256,7 +4258,7 @@ async function slideActorsTo(moves) {
 }
 
 function animateCameraFollowForActor(actor, from, to) {
-  if (actor.side !== "player" || state.cameraMode !== "focus") return null;
+  if (state.cameraMode !== "focus" || !shouldTrackCameraDeadZoneForActor(actor)) return null;
 
   cancelCameraPanAnimation();
   const bounds = boardBounds();
@@ -4266,6 +4268,7 @@ function animateCameraFollowForActor(actor, from, to) {
   const token = (state.cameraFollowToken ?? 0) + 1;
   const previousTransition = elements.board.style.transition;
   state.cameraFollowToken = token;
+  state.cameraFollowAnimation = { token };
   elements.board.style.transition = "none";
 
   return new Promise((resolve) => {
@@ -4278,6 +4281,7 @@ function animateCameraFollowForActor(actor, from, to) {
           commitCameraFrame(latestFrame);
         }
         elements.board.style.transition = previousTransition;
+        if (state.cameraFollowAnimation?.token === token) state.cameraFollowAnimation = null;
       }
       resolve();
     };
@@ -4285,6 +4289,7 @@ function animateCameraFollowForActor(actor, from, to) {
       if (!state || state.cameraFollowToken !== token || state.cameraMode !== "focus") {
         elements.board.style.transform = "";
         elements.board.style.transition = previousTransition;
+        if (state?.cameraFollowAnimation?.token === token) state.cameraFollowAnimation = null;
         resolve();
         return;
       }
@@ -6445,7 +6450,7 @@ function renderOffscreenEnemyIndicators(bounds) {
     clearOffscreenEnemyIndicators();
     return;
   }
-  const focusActor = getCameraFocusPlayer();
+  const focusActor = getCameraFocusActor();
   if (!focusActor) {
     clearOffscreenEnemyIndicators();
     return;
@@ -7823,9 +7828,20 @@ function fitBoardToPanel(bounds = boardBounds(), options = {}) {
     return;
   }
 
+  if (shouldKeepActiveCameraAnimation(frame, options)) return;
+
   cancelCameraPanAnimation();
   applyBoardCameraFrame(frame);
   commitCameraFrame(frame);
+}
+
+function shouldKeepActiveCameraAnimation(frame, options = {}) {
+  if (options.immediate || options.smooth === false || shouldSuppressCameraDeadZone(options)) return false;
+  if (state.cameraMode !== "focus") return false;
+  if (state.cameraFollowAnimation) return true;
+  if (!state.cameraPanAnimation) return false;
+  if (state.cameraPanelWidth !== frame.panelWidth || state.cameraPanelHeight !== frame.panelHeight) return false;
+  return Math.abs((state.cameraScale || frame.scale) - frame.scale) <= 0.001;
 }
 
 function shouldSuppressCameraDeadZone(options = {}) {
@@ -7839,7 +7855,7 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
   let offsetX = Math.max(0, (panelWidth - logicalWidth * scale) / 2);
   let offsetY = Math.max(0, (panelHeight - logicalHeight * scale) / 2);
 
-  const focusActor = getCameraFocusPlayer();
+  const focusActor = getCameraFocusActor();
   let cameraMovedByDeadZone = false;
   let cameraCentered = false;
   if (state.cameraMode === "focus" && focusActor) {
@@ -7912,10 +7928,14 @@ function calculateCameraFrame(bounds = boardBounds(), options = {}) {
 
 function shouldTrackCameraDeadZoneForActor(focusActor) {
   if (!focusActor) return false;
-  const activeEntry = state?.activeTimelineIndex >= 0
-    ? state.currentTimeline[state.activeTimelineIndex]
-    : null;
-  return activeEntry?.actorType === "player" && activeEntry.actorId === focusActor.id;
+  const activeEntry = activeTimelineEntry();
+  if (activeEntry?.actorType === "player") {
+    return focusActor.side === "player" && activeEntry.actorId === focusActor.id;
+  }
+  if (activeEntry?.actorType === "enemyGroup") {
+    return focusActor.side === "enemy" && focusActor.kind === activeEntry.actorId;
+  }
+  return false;
 }
 
 function shouldAnimateCameraFrame(frame, options = {}) {
@@ -8041,8 +8061,9 @@ async function waitForCameraPan() {
   await animation.promise;
 }
 
-function releaseManualCameraPanForPlayerTurn(entry) {
-  if (entry?.actorType !== "player" || !state.cameraDeadZoneSuppressed) return;
+function releaseManualCameraPanForCombatTurn(entry) {
+  if (!entry || !state.cameraDeadZoneSuppressed) return;
+  if (entry.actorType !== "player" && entry.actorType !== "enemyGroup") return;
   state.cameraDeadZoneSuppressed = false;
   state.cameraFollowToken = (state.cameraFollowToken ?? 0) + 1;
 }
@@ -8392,7 +8413,7 @@ function setBoardTransform(value) {
 }
 
 function commitCameraFrame(frame) {
-  const focusActor = getCameraFocusPlayer();
+  const focusActor = getCameraFocusActor();
   state.cameraFocusReady = state.cameraMode === "focus" && Boolean(focusActor);
   state.cameraFocusActorId = focusActor?.id ?? null;
   state.cameraPanelWidth = frame.panelWidth;
@@ -8465,10 +8486,14 @@ function getPlayer() {
   return state.entities.find((entity) => entity.side === "player" && isAlive(entity));
 }
 
-function getCameraFocusPlayer() {
-  const activeEntry = state?.activeTimelineIndex >= 0
+function activeTimelineEntry() {
+  return state?.activeTimelineIndex >= 0
     ? state.currentTimeline[state.activeTimelineIndex]
     : null;
+}
+
+function getCameraFocusActor() {
+  const activeEntry = activeTimelineEntry();
   if (activeEntry?.actorType === "player") {
     const actor = state.entities.find((entity) => (
       entity.id === activeEntry.actorId &&
@@ -8479,19 +8504,22 @@ function getCameraFocusPlayer() {
   }
 
   if (activeEntry?.actorType === "enemyGroup") {
-    const targetId = activeEntry.targetId ?? state.enemyTargetIds?.[activeEntry.actorId];
-    const target = state.entities.find((entity) => (
-      entity.id === targetId &&
-      entity.side === "player" &&
+    const actingEnemy = state.entities.find((entity) => (
+      entity.id === state.activeCardContext?.actorId &&
+      entity.side === "enemy" &&
+      entity.kind === activeEntry.actorId &&
       isAlive(entity)
     ));
-    if (target) return target;
+    if (actingEnemy) return actingEnemy;
+    const groupEnemy = aliveEnemies()
+      .filter((enemy) => enemy.kind === activeEntry.actorId)
+      .sort((a, b) => (a.monsterIndex ?? 0) - (b.monsterIndex ?? 0))[0];
+    if (groupEnemy) return groupEnemy;
   }
 
   if (state?.cameraFocusActorId) {
     const previousFocus = state.entities.find((entity) => (
       entity.id === state.cameraFocusActorId &&
-      entity.side === "player" &&
       isAlive(entity)
     ));
     if (previousFocus) return previousFocus;
