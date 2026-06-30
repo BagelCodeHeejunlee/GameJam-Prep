@@ -5561,16 +5561,18 @@ function wallAwareDistance(from, to) {
 }
 
 function hasLineOfSight(from, to) {
-  const fromVertices = hexVertices(from);
-  const toVertices = hexVertices(to);
-  const wallPolygons = state.walls.map(hexVertices);
-  for (const a of fromVertices) {
-    for (const b of toVertices) {
-      const blocked = wallPolygons.some((polygon) => segmentTouchesPolygon(a, b, polygon));
-      if (!blocked) return true;
-    }
-  }
-  return false;
+  const a = rawHexToPixel(from);
+  const b = rawHexToPixel(to);
+  return !state.walls.some((wall) => segmentTouchesPolygon(a, b, sightBlockerPolygon(wall)));
+}
+
+function sightBlockerPolygon(wall) {
+  const center = rawHexToPixel(wall);
+  const scale = 0.9;
+  return hexVertices(wall).map((point) => ({
+    x: center.x + (point.x - center.x) * scale,
+    y: center.y + (point.y - center.y) * scale,
+  }));
 }
 
 function segmentTouchesPolygon(a, b, polygon) {
