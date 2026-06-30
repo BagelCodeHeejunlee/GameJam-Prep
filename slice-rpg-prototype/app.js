@@ -8,24 +8,14 @@
     special: { label: "특수", mark: "특", className: "icon-special" },
   };
 
-  const ACTIONS = {
-    attack: { title: "공격" },
-    heal: { title: "회복" },
-    defense: { title: "갑피 전개" },
-    special: { title: "특수 공격" },
+  const KNIFE_TYPES = {
+    h3: { label: "가로 3", orientation: "h", length: 3 },
+    v3: { label: "세로 3", orientation: "v", length: 3 },
+    h2: { label: "가로 2", orientation: "h", length: 2 },
   };
 
-  const KNIVES = [
-    { id: "h2", label: "가로 2", cells: [p(0, 0), p(1, 0)] },
-    { id: "h3", label: "가로 3", cells: [p(0, 0), p(1, 0), p(2, 0)] },
-    { id: "h4", label: "가로 4", cells: [p(0, 0), p(1, 0), p(2, 0), p(3, 0)] },
-    { id: "v2", label: "세로 2", cells: [p(0, 0), p(0, 1)] },
-    { id: "v3", label: "세로 3", cells: [p(0, 0), p(0, 1), p(0, 2)] },
-    { id: "v4", label: "세로 4", cells: [p(0, 0), p(0, 1), p(0, 2), p(0, 3)] },
-  ];
-
-  const STASH_LIMIT = 2;
   const MAX_HP = 24;
+  const BOARD_GAP = 3;
 
   const monsters = [
     {
@@ -35,12 +25,12 @@
       rows: 5,
       baseAttack: 2,
       actions: ["attack", "defense", "attack", "heal", "special"],
-      knifeHands: [
-        ["h3", "v3", "h2"],
-        ["h4", "v2", "h3"],
-        ["v4", "h2", "v3"],
-      ],
       material: { cols: 5, rows: 4, holes: [] },
+      knives: [
+        { type: "h3", x: 1, y: 1 },
+        { type: "v3", x: 3, y: 0 },
+        { type: "h2", x: 0, y: 3 },
+      ],
       cells: [
         c(2, 0),
         c(1, 1, "attack"),
@@ -72,12 +62,12 @@
       rows: 5,
       baseAttack: 1,
       actions: ["heal", "attack", "defense", "special", "attack"],
-      knifeHands: [
-        ["v3", "h2", "v2"],
-        ["h3", "v4", "h2"],
-        ["h4", "v2", "v3"],
-      ],
       material: { cols: 5, rows: 5, holes: [key(0, 0), key(4, 0), key(0, 4), key(4, 4)] },
+      knives: [
+        { type: "v3", x: 2, y: 1 },
+        { type: "h3", x: 1, y: 2 },
+        { type: "h2", x: 2, y: 4 },
+      ],
       cells: [
         c(1, 0, "attack"),
         c(2, 0),
@@ -110,12 +100,12 @@
       rows: 5,
       baseAttack: 3,
       actions: ["attack", "defense", "special", "attack", "heal"],
-      knifeHands: [
-        ["h4", "v3", "h2"],
-        ["v4", "h3", "v2"],
-        ["h2", "v3", "h3"],
-      ],
       material: { cols: 5, rows: 5, holes: [] },
+      knives: [
+        { type: "h3", x: 0, y: 2 },
+        { type: "v3", x: 4, y: 1 },
+        { type: "h2", x: 2, y: 4 },
+      ],
       cells: [
         c(2, 0, "defense"),
         c(3, 0, "attack"),
@@ -141,7 +131,7 @@
       special(state, count) {
         const spoiled = spoilMaterial(count + 1);
         if (spoiled > 0) {
-          addLog(`오우거가 재료판을 짓눌러 ${spoiled}칸을 못 쓰게 만들었다.`);
+          addLog(`오우거가 재료 ${spoiled}칸을 짓눌렀다.`);
         } else {
           const damage = count + 2;
           state.playerHp -= damage;
@@ -156,22 +146,19 @@
     stageLabel: document.querySelector("#stageLabel"),
     hpLabel: document.querySelector("#hpLabel"),
     materialLabel: document.querySelector("#materialLabel"),
-    knifeLimitLabel: document.querySelector("#knifeLimitLabel"),
+    pieceCountLabel: document.querySelector("#pieceCountLabel"),
     monsterSub: document.querySelector("#monsterSub"),
     monsterName: document.querySelector("#monsterName"),
     completionLabel: document.querySelector("#completionLabel"),
     completionFill: document.querySelector("#completionFill"),
     actionCard: document.querySelector("#actionCard"),
     monsterGrid: document.querySelector("#monsterGrid"),
-    knifeRack: document.querySelector("#knifeRack"),
+    materialBoard: document.querySelector("#materialBoard"),
     materialGrid: document.querySelector("#materialGrid"),
+    cutLayer: document.querySelector("#cutLayer"),
+    knifeLayer: document.querySelector("#knifeLayer"),
+    cutButton: document.querySelector("#cutButton"),
     knifeHint: document.querySelector("#knifeHint"),
-    pieceSizeLabel: document.querySelector("#pieceSizeLabel"),
-    piecePreview: document.querySelector("#piecePreview"),
-    cancelPieceButton: document.querySelector("#cancelPieceButton"),
-    stashPieceButton: document.querySelector("#stashPieceButton"),
-    stashCount: document.querySelector("#stashCount"),
-    stashSlots: document.querySelector("#stashSlots"),
     battleLog: document.querySelector("#battleLog"),
     overlay: document.querySelector("#overlay"),
     resultEyebrow: document.querySelector("#resultEyebrow"),
@@ -187,24 +174,21 @@
     actionIndex: 0,
     playerHp: MAX_HP,
     monsterCells: new Map(),
-    material: new Map(),
     materialCols: 5,
     materialRows: 4,
-    selectedKnifeId: null,
-    hoverMaterialKey: null,
-    currentPiece: null,
-    selectedStashIndex: null,
-    stash: [],
+    materialPieces: [],
+    missingCells: new Set(),
+    spoiledCells: new Set(),
+    cutEdges: new Set(),
+    knives: [],
     blocked: new Set(),
     coverOrder: [],
     log: [],
     resultMode: null,
+    nextPieceId: 1,
+    initialMaterialTotal: 0,
     drag: null,
   };
-
-  function p(x, y) {
-    return { x, y };
-  }
 
   function c(x, y, icon = null) {
     return { x, y, icon };
@@ -219,10 +203,6 @@
     return { x, y };
   }
 
-  function getKnife(id) {
-    return KNIVES.find((knife) => knife.id === id);
-  }
-
   function currentMonster() {
     return monsters[state.stageIndex];
   }
@@ -230,11 +210,6 @@
   function currentAction() {
     const monster = currentMonster();
     return monster.actions[state.actionIndex % monster.actions.length];
-  }
-
-  function currentKnifeIds() {
-    const monster = currentMonster();
-    return monster.knifeHands[(state.turn - 1) % monster.knifeHands.length];
   }
 
   function startGame() {
@@ -249,16 +224,17 @@
     state.turn = 1;
     state.actionIndex = 0;
     state.monsterCells = new Map();
-    state.material = new Map();
-    state.selectedKnifeId = null;
-    state.hoverMaterialKey = null;
-    state.currentPiece = null;
-    state.selectedStashIndex = null;
-    state.stash = [];
+    state.materialCols = monster.material.cols;
+    state.materialRows = monster.material.rows;
+    state.missingCells = new Set(monster.material.holes);
+    state.spoiledCells = new Set();
+    state.cutEdges = new Set();
+    state.knives = monster.knives.map((knife, index) => ({ ...knife, id: `knife-${index}` }));
     state.blocked = new Set();
     state.coverOrder = [];
     state.log = [];
     state.resultMode = null;
+    state.nextPieceId = 1;
     state.drag = null;
 
     monster.cells.forEach((cell) => {
@@ -270,17 +246,17 @@
       });
     });
 
-    state.materialCols = monster.material.cols;
-    state.materialRows = monster.material.rows;
-    const holes = new Set(monster.material.holes);
+    const cells = [];
     for (let y = 0; y < state.materialRows; y += 1) {
       for (let x = 0; x < state.materialCols; x += 1) {
-        const cellKey = key(x, y);
-        state.material.set(cellKey, holes.has(cellKey) ? "missing" : "available");
+        if (!state.missingCells.has(key(x, y))) cells.push({ x, y });
       }
     }
+    state.initialMaterialTotal = cells.length;
+    state.materialPieces = [{ id: state.nextPieceId, cells }];
+    state.nextPieceId += 1;
 
-    addLog(`${monster.name} 등장. 칼을 재료 위에 놓아 블록을 만들고 몸 전체를 덮어라.`);
+    addLog(`${monster.name} 등장. 칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.`);
     hideResult();
     render();
   }
@@ -294,32 +270,25 @@
     renderStatus();
     renderActionCard();
     renderMonster();
-    renderKnifeRack();
-    renderMaterial();
-    renderCurrentPiece();
-    renderStash();
+    renderMaterialBoard();
     renderLog();
-    renderButtons();
   }
 
   function renderStatus() {
-    const monster = currentMonster();
     const covered = coveredCount();
     const total = state.monsterCells.size;
-    const selectedKnife = state.selectedKnifeId ? getKnife(state.selectedKnifeId) : null;
     els.stageLabel.textContent = `${state.stageIndex + 1} / ${monsters.length}`;
     els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${MAX_HP}`;
-    els.materialLabel.textContent = `${availableMaterialCount()} / ${usableMaterialTotal()}`;
-    els.knifeLimitLabel.textContent = selectedKnife ? selectedKnife.label : `${currentKnifeIds().length}개`;
-    els.monsterSub.textContent = monster.sub;
-    els.monsterName.textContent = monster.name;
+    els.materialLabel.textContent = `${availableMaterialCount()} / ${state.initialMaterialTotal}`;
+    els.pieceCountLabel.textContent = `${state.materialPieces.length}개`;
+    els.monsterSub.textContent = currentMonster().sub;
+    els.monsterName.textContent = currentMonster().name;
     els.completionLabel.textContent = `${covered} / ${total}`;
     els.completionFill.style.width = `${(covered / total) * 100}%`;
   }
 
   function renderActionCard() {
     const action = currentAction();
-    const meta = ACTIONS[action];
     const attackIcons = uncoveredIconCount("attack");
     const healIcons = uncoveredIconCount("heal");
     const defenseIcons = uncoveredIconCount("defense");
@@ -327,27 +296,25 @@
     const armorBlocks = action === "defense" ? chooseArmorBlocks() : [];
     const healTargets = action === "heal" ? chooseHealTargets(healIcons) : [];
     const monster = currentMonster();
-
+    const title = { attack: "공격", heal: "회복", defense: "갑피 전개", special: "특수 공격" }[action];
     const descriptions = {
-      attack: `기본 공격력 ${monster.baseAttack} + 아직 덮이지 않은 공격 표식 수만큼 피해를 준다.`,
-      heal: "아직 덮이지 않은 회복 표식 수만큼, 최근에 덮인 일반 칸을 다시 비운다.",
-      defense: "아직 덮이지 않은 방어 표식마다 주변 빈칸에 갑피를 만든다. 갑피는 다음 턴 배치 불가.",
-      special: "몬스터 고유 행동. 특수 표식을 덮을수록 효과가 약해진다.",
+      attack: `기본 ${monster.baseAttack} + 남은 공격 표식 수만큼 피해.`,
+      heal: "남은 회복 표식 수만큼 최근 일반 칸을 다시 비움.",
+      defense: "남은 방어 표식마다 다음 턴 갑피 칸 생성.",
+      special: "몬스터 고유 행동. 특수 표식을 덮으면 약화.",
     };
-
     const chips = {
-      attack: [`기본 ${monster.baseAttack}`, `공격 표식 ${attackIcons}`, `피해 ${monster.baseAttack + attackIcons}`],
-      heal: [`회복 표식 ${healIcons}`, `해제 예정 ${healTargets.length}`],
-      defense: [`방어 표식 ${defenseIcons}`, `갑피 예정 ${armorBlocks.length}`],
-      special: [`특수 표식 ${specialIcons}`],
+      attack: [`피해 ${monster.baseAttack + attackIcons}`, `공격 ${attackIcons}`],
+      heal: [`회복 ${healIcons}`, `해제 ${healTargets.length}`],
+      defense: [`방어 ${defenseIcons}`, `갑피 ${armorBlocks.length}`],
+      special: [`특수 ${specialIcons}`],
     };
-
     const blockNotice = state.blocked.size
-      ? `<p>현재 갑피 ${state.blocked.size}칸은 이번 턴 동안 배치할 수 없다.</p>`
+      ? `<p>갑피 ${state.blocked.size}칸은 이번 턴 배치 불가.</p>`
       : "";
 
     els.actionCard.innerHTML = `
-      <strong>${meta.title}</strong>
+      <strong>${title}</strong>
       <p>${descriptions[action]}</p>
       ${blockNotice}
       <div class="chips">${chips[action].map((chip) => `<span class="chip">${chip}</span>`).join("")}</div>
@@ -376,12 +343,10 @@
         button.type = "button";
         button.className = "monster-cell";
         button.dataset.key = cellKey;
-        button.title = "블록 배치";
         if (monsterCell.covered) button.classList.add("covered");
         if (state.blocked.has(cellKey)) button.classList.add("blocked");
         if (armorPreview.has(cellKey)) button.classList.add("preview-block");
         if (healPreview.has(cellKey)) button.classList.add("heal-target");
-        if (state.currentPiece && canPlaceAt(x, y)) button.classList.add("can-place");
 
         if (monsterCell.icon) {
           const icon = document.createElement("span");
@@ -392,266 +357,252 @@
           button.append(icon);
         }
 
-        button.addEventListener("click", () => tryPlaceAt(x, y));
         els.monsterGrid.append(button);
       }
     }
   }
 
-  function renderKnifeRack() {
-    els.knifeRack.innerHTML = "";
-
-    currentKnifeIds().forEach((knifeId) => {
-      const knife = getKnife(knifeId);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "knife-card";
-      button.dataset.knifeId = knife.id;
-      button.title = `${knife.label} 칼`;
-      if (state.selectedKnifeId === knife.id) button.classList.add("selected");
-
-      const label = document.createElement("span");
-      label.textContent = knife.label;
-      button.append(renderPieceGrid(knife.cells, "knife"));
-      button.append(label);
-
-      button.addEventListener("click", () => selectKnife(knife.id));
-      button.addEventListener("pointerdown", (event) => beginDrag(event, { type: "knife", knifeId: knife.id }));
-      els.knifeRack.append(button);
-    });
-  }
-
-  function renderMaterial() {
-    const preview = new Set(getKnifePreviewKeys());
+  function renderMaterialBoard() {
+    const pieceByCell = buildPieceByCell();
     els.materialGrid.style.gridTemplateColumns = `repeat(${state.materialCols}, var(--small-cell))`;
     els.materialGrid.innerHTML = "";
+    els.cutLayer.innerHTML = "";
+    els.knifeLayer.innerHTML = "";
 
     for (let y = 0; y < state.materialRows; y += 1) {
       for (let x = 0; x < state.materialCols; x += 1) {
         const cellKey = key(x, y);
-        const status = state.material.get(cellKey);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "material-cell";
         button.dataset.key = cellKey;
-        button.title = "칼 놓기";
 
-        if (status === "missing") {
+        if (state.missingCells.has(cellKey)) {
           button.classList.add("used");
           button.disabled = true;
-        } else if (status === "used") {
-          button.classList.add("used");
-          button.disabled = true;
-        } else if (status === "spoiled") {
+        } else if (state.spoiledCells.has(cellKey)) {
           button.classList.add("spoiled");
           button.disabled = true;
-        } else if (preview.has(cellKey)) {
-          button.classList.add(canCutAt(x, y) ? "cut-preview" : "bad-preview");
+        } else if (pieceByCell.has(cellKey)) {
+          const pieceId = pieceByCell.get(cellKey);
+          button.dataset.pieceId = String(pieceId);
+          button.classList.add(`piece-tone-${pieceId % 5}`);
+          button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId, x, y));
+        } else {
+          button.classList.add("empty-material");
         }
 
-        button.addEventListener("click", () => {
-          if (state.selectedKnifeId) tryCutAt(x, y, state.selectedKnifeId);
-        });
-        button.addEventListener("pointerenter", () => {
-          state.hoverMaterialKey = cellKey;
-          renderMaterial();
-        });
         els.materialGrid.append(button);
       }
     }
 
-    const selectedKnife = state.selectedKnifeId ? getKnife(state.selectedKnifeId) : null;
-    els.knifeHint.textContent = selectedKnife
-      ? `${selectedKnife.label} 칼을 재료판에 놓을 위치를 고르세요.`
-      : "칼을 드래그하거나 선택한 뒤 재료판에 놓으세요.";
+    renderCutMarks();
+    renderKnives();
+    els.knifeHint.textContent = "칼은 격자선 사이에서만 움직입니다. 자르기 후 분리된 재료를 드래그하세요.";
   }
 
-  function renderCurrentPiece() {
-    const size = state.currentPiece ? state.currentPiece.cells.length : 0;
-    els.pieceSizeLabel.textContent = `${size}칸`;
-
-    if (!state.currentPiece) {
-      els.piecePreview.className = "piece-preview empty";
-      els.piecePreview.textContent = "칼을 놓아 블록을 자르세요";
-      delete els.piecePreview.dataset.pieceSource;
-      return;
-    }
-
-    els.piecePreview.className = "piece-preview draggable-piece";
-    els.piecePreview.textContent = "";
-    els.piecePreview.dataset.pieceSource = "current";
-    els.piecePreview.append(renderPieceGrid(state.currentPiece.cells, "piece"));
-    els.piecePreview.addEventListener("pointerdown", (event) => beginDrag(event, { type: "piece", source: "current" }));
-  }
-
-  function renderStash() {
-    els.stashCount.textContent = `${state.stash.length} / ${STASH_LIMIT}`;
-    els.stashSlots.innerHTML = "";
-
-    for (let i = 0; i < STASH_LIMIT; i += 1) {
-      const slot = document.createElement("button");
-      slot.type = "button";
-      slot.className = "stash-slot";
-      slot.title = "보관 블록 선택";
-
-      if (state.stash[i]) {
-        slot.dataset.stashIndex = String(i);
-        slot.append(renderPieceGrid(state.stash[i].cells, "piece"));
-        slot.addEventListener("click", () => selectStashPiece(i));
-        slot.addEventListener("pointerdown", (event) => beginDrag(event, { type: "piece", source: "stash", index: i }));
+  function renderCutMarks() {
+    state.cutEdges.forEach((edge) => {
+      const mark = edgeToMark(edge);
+      if (!mark) return;
+      const el = document.createElement("span");
+      el.className = `cut-mark ${mark.orientation}`;
+      el.style.left = boardPos(mark.x);
+      el.style.top = boardPos(mark.y);
+      if (mark.orientation === "h") {
+        el.style.width = "var(--small-cell)";
       } else {
-        slot.textContent = "빈 칸";
-        slot.disabled = true;
+        el.style.height = "var(--small-cell)";
       }
-
-      if (state.selectedStashIndex === i) slot.classList.add("selected");
-      els.stashSlots.append(slot);
-    }
-  }
-
-  function renderPieceGrid(cells, mode = "piece") {
-    const normalized = normalizeCells(cells);
-    const maxX = Math.max(...normalized.map((cell) => cell.x));
-    const maxY = Math.max(...normalized.map((cell) => cell.y));
-    const occupied = new Set(normalized.map((cell) => key(cell.x, cell.y)));
-    const grid = document.createElement("div");
-    grid.className = `piece-mini-grid ${mode === "knife" ? "knife-mini-grid" : ""}`;
-    const trackSize = mode === "knife" ? 10 : 12;
-    grid.style.gridTemplateColumns = `repeat(${maxX + 1}, ${trackSize}px)`;
-
-    for (let y = 0; y <= maxY; y += 1) {
-      for (let x = 0; x <= maxX; x += 1) {
-        const cell = document.createElement("span");
-        cell.className = `piece-mini-cell ${mode === "knife" ? "knife-mini-cell" : ""}`;
-        if (!occupied.has(key(x, y))) cell.classList.add("empty");
-        grid.append(cell);
-      }
-    }
-
-    return grid;
-  }
-
-  function renderLog() {
-    els.battleLog.innerHTML = state.log.map((line) => `<p>${line}</p>`).join("");
-  }
-
-  function renderButtons() {
-    els.cancelPieceButton.disabled = state.currentPiece === null;
-    els.stashPieceButton.disabled =
-      state.currentPiece === null ||
-      state.currentPiece.origin !== "cut" ||
-      state.stash.length >= STASH_LIMIT;
-  }
-
-  function selectKnife(knifeId) {
-    if (state.currentPiece) {
-      addLog("현재 블록을 먼저 배치하거나 보관해야 새 칼을 쓸 수 있다.");
-      render();
-      return;
-    }
-    state.selectedKnifeId = state.selectedKnifeId === knifeId ? null : knifeId;
-    render();
-  }
-
-  function getKnifePreviewKeys() {
-    if (!state.selectedKnifeId || !state.hoverMaterialKey) return [];
-    const anchor = fromKey(state.hoverMaterialKey);
-    return getKnife(state.selectedKnifeId).cells.map((cell) => key(anchor.x + cell.x, anchor.y + cell.y));
-  }
-
-  function tryCutAt(anchorX, anchorY, knifeId) {
-    if (state.currentPiece) {
-      addLog("현재 블록을 먼저 배치하거나 보관해야 한다.");
-      render();
-      return;
-    }
-
-    if (!canCutAt(anchorX, anchorY, knifeId)) {
-      addLog("칼이 재료 밖으로 나가거나 이미 빈 칸을 지난다.");
-      render();
-      return;
-    }
-
-    const knife = getKnife(knifeId);
-    const sourceKeys = knife.cells.map((cell) => key(anchorX + cell.x, anchorY + cell.y));
-    sourceKeys.forEach((cellKey) => state.material.set(cellKey, "used"));
-    state.currentPiece = {
-      cells: cloneCells(knife.cells),
-      origin: "cut",
-    };
-    state.selectedKnifeId = null;
-    state.hoverMaterialKey = null;
-    addLog(`${knife.label} 칼로 ${sourceKeys.length}칸 블록을 잘랐다. 블록을 드래그해 몬스터에 놓을 수 있다.`);
-    render();
-  }
-
-  function canCutAt(anchorX, anchorY, knifeId = state.selectedKnifeId) {
-    if (!knifeId) return false;
-    const knife = getKnife(knifeId);
-    return knife.cells.every((cell) => {
-      const cellKey = key(anchorX + cell.x, anchorY + cell.y);
-      return state.material.get(cellKey) === "available";
+      els.cutLayer.append(el);
     });
   }
 
-  function cancelCurrentPiece() {
-    if (!state.currentPiece) return;
+  function renderKnives() {
+    state.knives.forEach((knife, index) => {
+      const type = KNIFE_TYPES[knife.type];
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = `board-knife ${type.orientation}`;
+      el.dataset.knifeIndex = String(index);
+      el.textContent = type.label;
+      el.style.left = knifeLeft(knife);
+      el.style.top = knifeTop(knife);
+      if (type.orientation === "h") {
+        el.style.width = lengthSize(type.length);
+      } else {
+        el.style.height = lengthSize(type.length);
+      }
+      el.addEventListener("pointerdown", (event) => beginKnifeDrag(event, index));
+      els.knifeLayer.append(el);
+    });
+  }
 
-    if (state.currentPiece.origin === "stash") {
-      state.currentPiece = null;
-      state.selectedStashIndex = null;
-      addLog("보관 블록 선택을 취소했다.");
-      render();
-      return;
+  function boardPos(value) {
+    const cell = getMaterialCellSize();
+    return `${getBoardPad() + value * (cell + BOARD_GAP)}px`;
+  }
+
+  function knifeLeft(knife) {
+    const type = KNIFE_TYPES[knife.type];
+    const base = parseFloat(boardPos(knife.x));
+    return `${base - (type.orientation === "v" ? getKnifeThick() / 2 : 0)}px`;
+  }
+
+  function knifeTop(knife) {
+    const type = KNIFE_TYPES[knife.type];
+    const base = parseFloat(boardPos(knife.y));
+    return `${base - (type.orientation === "h" ? getKnifeThick() / 2 : 0)}px`;
+  }
+
+  function lengthSize(length) {
+    const cell = getMaterialCellSize();
+    return `${length * cell + Math.max(0, length - 1) * BOARD_GAP}px`;
+  }
+
+  function beginKnifeDrag(event, index) {
+    event.preventDefault();
+    state.drag = { type: "knife", index };
+    window.addEventListener("pointermove", onKnifeMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+  }
+
+  function onKnifeMove(event) {
+    if (!state.drag || state.drag.type !== "knife") return;
+    moveKnifeToPoint(state.drag.index, event.clientX, event.clientY);
+    renderMaterialBoard();
+  }
+
+  function moveKnifeToPoint(index, clientX, clientY) {
+    const knife = state.knives[index];
+    const type = KNIFE_TYPES[knife.type];
+    const rect = els.materialBoard.getBoundingClientRect();
+    const cell = getMaterialCellSize();
+    const step = cell + BOARD_GAP;
+    const localX = clientX - rect.left - getBoardPad();
+    const localY = clientY - rect.top - getBoardPad();
+    const span = type.length * cell + Math.max(0, type.length - 1) * BOARD_GAP;
+
+    if (type.orientation === "h") {
+      knife.x = clamp(Math.round((localX - span / 2) / step), 0, state.materialCols - type.length);
+      knife.y = clamp(Math.round(localY / step), 1, state.materialRows - 1);
+    } else {
+      knife.x = clamp(Math.round(localX / step), 1, state.materialCols - 1);
+      knife.y = clamp(Math.round((localY - span / 2) / step), 0, state.materialRows - type.length);
     }
-
-    const size = state.currentPiece.cells.length;
-    state.currentPiece = null;
-    state.playerHp -= 1;
-    addLog(`${size}칸 블록을 버렸다. 재료 낭비로 1 피해를 받았다.`);
-    finishPlayerTurn();
   }
 
-  function stashCurrentPiece() {
-    if (!state.currentPiece || state.currentPiece.origin !== "cut") return;
-    if (state.stash.length >= STASH_LIMIT) return;
-
-    state.stash.push({ cells: cloneCells(state.currentPiece.cells) });
-    state.currentPiece = null;
-    state.selectedStashIndex = null;
-    addLog("블록을 보관했다. 이번 턴은 배치 없이 넘어간다.");
-    finishPlayerTurn();
-  }
-
-  function selectStashPiece(index) {
-    const piece = state.stash[index];
-    if (!piece) return;
-    state.currentPiece = {
-      cells: cloneCells(piece.cells),
-      origin: "stash",
-      stashIndex: index,
-    };
-    state.selectedStashIndex = index;
-    state.selectedKnifeId = null;
+  function onPointerUp() {
+    window.removeEventListener("pointermove", onKnifeMove);
+    hideDragGhost();
+    state.drag = null;
     render();
   }
 
-  function tryPlaceAt(anchorX, anchorY) {
-    if (!state.currentPiece) {
-      addLog("먼저 재료 블록을 자르거나 보관함 블록을 선택해야 한다.");
+  function applyCuts() {
+    let added = 0;
+    state.knives.forEach((knife) => {
+      const type = KNIFE_TYPES[knife.type];
+      for (let i = 0; i < type.length; i += 1) {
+        const edge = type.orientation === "h"
+          ? edgeKey(key(knife.x + i, knife.y - 1), key(knife.x + i, knife.y))
+          : edgeKey(key(knife.x - 1, knife.y + i), key(knife.x, knife.y + i));
+        if (isValidMaterialEdge(edge) && !state.cutEdges.has(edge)) {
+          state.cutEdges.add(edge);
+          added += 1;
+        }
+      }
+    });
+
+    const before = state.materialPieces.length;
+    rebuildPiecesFromCuts();
+    const separated = Math.max(0, state.materialPieces.length - before);
+    addLog(added ? `절단선 ${added}개를 냈다. ${separated ? `${separated}개 조각이 새로 분리됐다.` : "아직 흠집만 남아 있다."}` : "새로 잘린 선이 없다.");
+    render();
+  }
+
+  function beginPieceDrag(event, pieceId, grabbedX, grabbedY) {
+    const piece = getPiece(pieceId);
+    if (!piece) return;
+    event.preventDefault();
+    const min = minCell(piece.cells);
+    const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
+    state.drag = { type: "piece", pieceId, offset, cells: normalizeCells(piece.cells) };
+    showDragGhost(state.drag.cells, event.clientX, event.clientY);
+    window.addEventListener("pointermove", onPieceMove);
+    window.addEventListener("pointerup", onPieceUp, { once: true });
+  }
+
+  function onPieceMove(event) {
+    if (!state.drag || state.drag.type !== "piece") return;
+    moveDragGhost(event.clientX, event.clientY);
+  }
+
+  function onPieceUp(event) {
+    window.removeEventListener("pointermove", onPieceMove);
+    const drag = state.drag;
+    state.drag = null;
+    hideDragGhost();
+    if (!drag) return;
+
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const monsterCell = target?.closest("#monsterGrid .monster-cell");
+    if (monsterCell?.dataset.key) {
+      const cell = fromKey(monsterCell.dataset.key);
+      tryPlacePieceOnMonster(drag.pieceId, cell.x - drag.offset.x, cell.y - drag.offset.y);
+      return;
+    }
+
+    const materialCell = target?.closest("#materialGrid .material-cell");
+    if (materialCell?.dataset.key) {
+      const cell = fromKey(materialCell.dataset.key);
+      tryMovePieceOnBoard(drag.pieceId, cell.x - drag.offset.x, cell.y - drag.offset.y);
+      return;
+    }
+
+    render();
+  }
+
+  function tryMovePieceOnBoard(pieceId, anchorX, anchorY) {
+    const piece = getPiece(pieceId);
+    if (!piece) return;
+    const normalized = normalizeCells(piece.cells);
+    const nextCells = normalized.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const currentKeys = new Set(piece.cells.map((cell) => key(cell.x, cell.y)));
+    const occupied = buildPieceByCell();
+
+    const valid = nextCells.every((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      if (cell.x < 0 || cell.y < 0 || cell.x >= state.materialCols || cell.y >= state.materialRows) return false;
+      if (state.missingCells.has(cellKey) || state.spoiledCells.has(cellKey)) return false;
+      return !occupied.has(cellKey) || currentKeys.has(cellKey);
+    });
+
+    if (!valid) {
+      addLog("그 위치에는 재료 조각을 옮길 수 없다.");
       render();
       return;
     }
 
-    if (!canPlaceAt(anchorX, anchorY)) {
-      flashInvalid(anchorX, anchorY);
-      addLog("그 위치에는 블록이 맞지 않는다.");
-      return;
-    }
+    piece.cells = nextCells;
+    addLog(`${nextCells.length}칸 조각을 재료판 안에서 옮겼다.`);
+    render();
+  }
 
-    const mapped = mappedPieceCells(anchorX, anchorY);
-    if (state.currentPiece.origin === "stash") {
-      state.stash.splice(state.currentPiece.stashIndex, 1);
+  function tryPlacePieceOnMonster(pieceId, anchorX, anchorY) {
+    const piece = getPiece(pieceId);
+    if (!piece) return;
+    const mapped = normalizeCells(piece.cells).map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const valid = mapped.every((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      const monsterCell = state.monsterCells.get(cellKey);
+      return monsterCell && !monsterCell.covered && !state.blocked.has(cellKey);
+    });
+
+    if (!valid) {
+      addLog("그 위치에는 재료 조각이 맞지 않는다.");
+      render();
+      return;
     }
 
     mapped.forEach((cell) => {
@@ -661,10 +612,8 @@
       state.coverOrder = state.coverOrder.filter((coveredKey) => coveredKey !== cellKey);
       state.coverOrder.push(cellKey);
     });
-
-    addLog(`${mapped.length}칸 블록을 옮겨 놓았다.`);
-    state.currentPiece = null;
-    state.selectedStashIndex = null;
+    state.materialPieces = state.materialPieces.filter((pieceItem) => pieceItem.id !== pieceId);
+    addLog(`${mapped.length}칸 조각을 몬스터에 채웠다.`);
 
     if (isMonsterComplete()) {
       render();
@@ -690,12 +639,10 @@
 
     state.actionIndex += 1;
     state.turn += 1;
-    state.selectedKnifeId = null;
-    state.hoverMaterialKey = null;
 
     if (remainingCoverPotential() < uncoveredCount()) {
       render();
-      showLoss("재료가 부족하다.", "남은 블록 수로는 몬스터의 모든 칸을 덮을 수 없다.");
+      showLoss("재료가 부족하다.", "남은 재료 칸으로는 몬스터의 모든 칸을 덮을 수 없다.");
       return;
     }
 
@@ -718,8 +665,7 @@
       const healIcons = uncoveredIconCount("heal");
       const targets = chooseHealTargets(healIcons);
       targets.forEach((cellKey) => {
-        const monsterCell = state.monsterCells.get(cellKey);
-        monsterCell.covered = false;
+        state.monsterCells.get(cellKey).covered = false;
       });
       state.coverOrder = state.coverOrder.filter((cellKey) => !targets.includes(cellKey));
       addLog(targets.length ? `회복 실행. 일반 칸 ${targets.length}개가 다시 비었다.` : "회복 표식이 막혀 아무 칸도 되돌리지 못했다.");
@@ -743,95 +689,68 @@
     }
   }
 
-  function mappedPieceCells(anchorX, anchorY) {
-    return state.currentPiece.cells.map((cell) => ({
-      x: anchorX + cell.x,
-      y: anchorY + cell.y,
-    }));
-  }
-
-  function canPlaceAt(anchorX, anchorY) {
-    if (!state.currentPiece) return false;
-    return mappedPieceCells(anchorX, anchorY).every((cell) => {
-      const cellKey = key(cell.x, cell.y);
-      const monsterCell = state.monsterCells.get(cellKey);
-      return monsterCell && !monsterCell.covered && !state.blocked.has(cellKey);
+  function rebuildPiecesFromCuts() {
+    const occupiedKeys = new Set();
+    state.materialPieces.forEach((piece) => {
+      piece.cells.forEach((cell) => occupiedKeys.add(key(cell.x, cell.y)));
     });
-  }
+    const unseen = new Set(occupiedKeys);
+    const nextPieces = [];
 
-  function flashInvalid(anchorX, anchorY) {
-    const cell = els.monsterGrid.querySelector(`[data-key="${key(anchorX, anchorY)}"]`);
-    if (!cell) return;
-    cell.classList.add("invalid-flash");
-    window.setTimeout(() => cell.classList.remove("invalid-flash"), 220);
-  }
+    while (unseen.size) {
+      const start = unseen.values().next().value;
+      const queue = [start];
+      const cells = [];
+      unseen.delete(start);
 
-  function beginDrag(event, payload) {
-    if (event.button !== undefined && event.button !== 0) return;
-    if (payload.type === "knife" && state.currentPiece) {
-      addLog("현재 블록을 먼저 배치하거나 보관해야 새 칼을 쓸 수 있다.");
-      render();
-      return;
-    }
-    if (payload.type === "piece" && payload.source === "current" && !state.currentPiece) return;
-    if (payload.type === "piece" && payload.source === "stash" && !state.stash[payload.index]) return;
+      while (queue.length) {
+        const current = queue.shift();
+        const { x, y } = fromKey(current);
+        cells.push({ x, y });
+        neighbors(x, y).forEach((next) => {
+          if (!unseen.has(next)) return;
+          if (state.cutEdges.has(edgeKey(current, next))) return;
+          unseen.delete(next);
+          queue.push(next);
+        });
+      }
 
-    event.preventDefault();
-    const cells = payload.type === "knife"
-      ? getKnife(payload.knifeId).cells
-      : payload.source === "stash"
-        ? state.stash[payload.index].cells
-        : state.currentPiece.cells;
-
-    state.drag = {
-      ...payload,
-      moved: false,
-      startX: event.clientX,
-      startY: event.clientY,
-    };
-
-    showDragGhost(cells, event.clientX, event.clientY, payload.type);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp, { once: true });
-  }
-
-  function onPointerMove(event) {
-    if (!state.drag) return;
-    const dx = Math.abs(event.clientX - state.drag.startX);
-    const dy = Math.abs(event.clientY - state.drag.startY);
-    if (dx + dy > 5) state.drag.moved = true;
-    moveDragGhost(event.clientX, event.clientY);
-  }
-
-  function onPointerUp(event) {
-    window.removeEventListener("pointermove", onPointerMove);
-    hideDragGhost();
-    const drag = state.drag;
-    state.drag = null;
-    if (!drag || !drag.moved) return;
-
-    const target = document.elementFromPoint(event.clientX, event.clientY);
-    if (!target) return;
-
-    if (drag.type === "knife") {
-      const materialCell = target.closest("#materialGrid .material-cell");
-      if (!materialCell) return;
-      const { x, y } = fromKey(materialCell.dataset.key);
-      tryCutAt(x, y, drag.knifeId);
-      return;
+      nextPieces.push({ id: state.nextPieceId, cells });
+      state.nextPieceId += 1;
     }
 
-    const monsterCell = target.closest("#monsterGrid .monster-cell");
-    if (!monsterCell || !monsterCell.dataset.key) return;
-    if (drag.source === "stash") selectStashPiece(drag.index);
-    const { x, y } = fromKey(monsterCell.dataset.key);
-    tryPlaceAt(x, y);
+    state.materialPieces = nextPieces;
   }
 
-  function showDragGhost(cells, x, y, type) {
-    els.dragGhost.className = `drag-ghost ${type === "knife" ? "knife-ghost" : ""}`;
+  function buildPieceByCell() {
+    const map = new Map();
+    state.materialPieces.forEach((piece) => {
+      piece.cells.forEach((cell) => map.set(key(cell.x, cell.y), piece.id));
+    });
+    return map;
+  }
+
+  function getPiece(pieceId) {
+    return state.materialPieces.find((piece) => piece.id === pieceId);
+  }
+
+  function getMaterialCellSize() {
+    const cell = els.materialGrid.querySelector(".material-cell");
+    return cell ? cell.getBoundingClientRect().width : 22;
+  }
+
+  function getBoardPad() {
+    return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--board-pad")) || 14;
+  }
+
+  function getKnifeThick() {
+    return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--knife-thick")) || 12;
+  }
+
+  function showDragGhost(cells, x, y) {
+    els.dragGhost.className = "drag-ghost";
     els.dragGhost.innerHTML = "";
-    els.dragGhost.append(renderPieceGrid(cells, type === "knife" ? "knife" : "piece"));
+    els.dragGhost.append(renderPieceGrid(cells));
     moveDragGhost(x, y);
   }
 
@@ -844,31 +763,83 @@
     els.dragGhost.innerHTML = "";
   }
 
+  function renderPieceGrid(cells) {
+    const normalized = normalizeCells(cells);
+    const maxX = Math.max(...normalized.map((cell) => cell.x));
+    const maxY = Math.max(...normalized.map((cell) => cell.y));
+    const occupied = new Set(normalized.map((cell) => key(cell.x, cell.y)));
+    const grid = document.createElement("div");
+    grid.className = "piece-mini-grid";
+    grid.style.gridTemplateColumns = `repeat(${maxX + 1}, 12px)`;
+
+    for (let y = 0; y <= maxY; y += 1) {
+      for (let x = 0; x <= maxX; x += 1) {
+        const cell = document.createElement("span");
+        cell.className = "piece-mini-cell";
+        if (!occupied.has(key(x, y))) cell.classList.add("empty");
+        grid.append(cell);
+      }
+    }
+    return grid;
+  }
+
   function normalizeCells(cells) {
-    const minX = Math.min(...cells.map((cell) => cell.x));
-    const minY = Math.min(...cells.map((cell) => cell.y));
+    const min = minCell(cells);
     return cells
-      .map((cell) => ({ x: cell.x - minX, y: cell.y - minY }))
+      .map((cell) => ({ x: cell.x - min.x, y: cell.y - min.y }))
       .sort((a, b) => a.y - b.y || a.x - b.x);
   }
 
-  function cloneCells(cells) {
-    return cells.map((cell) => ({ x: cell.x, y: cell.y }));
+  function minCell(cells) {
+    return {
+      x: Math.min(...cells.map((cell) => cell.x)),
+      y: Math.min(...cells.map((cell) => cell.y)),
+    };
+  }
+
+  function edgeKey(a, b) {
+    return [a, b].sort().join("|");
+  }
+
+  function isValidMaterialEdge(edge) {
+    const [a, b] = edge.split("|");
+    const cellA = fromKey(a);
+    const cellB = fromKey(b);
+    if (cellA.x < 0 || cellA.y < 0 || cellB.x < 0 || cellB.y < 0) return false;
+    if (cellA.x >= state.materialCols || cellB.x >= state.materialCols) return false;
+    if (cellA.y >= state.materialRows || cellB.y >= state.materialRows) return false;
+    return !state.missingCells.has(a) && !state.missingCells.has(b);
+  }
+
+  function edgeToMark(edge) {
+    const [a, b] = edge.split("|").map(fromKey);
+    if (a.x === b.x) {
+      return { orientation: "h", x: a.x, y: Math.max(a.y, b.y) };
+    }
+    if (a.y === b.y) {
+      return { orientation: "v", x: Math.max(a.x, b.x), y: a.y };
+    }
+    return null;
+  }
+
+  function neighbors(x, y) {
+    return [key(x, y - 1), key(x + 1, y), key(x, y + 1), key(x - 1, y)].filter((cellKey) => {
+      const cell = fromKey(cellKey);
+      return cell.x >= 0 && cell.y >= 0 && cell.x < state.materialCols && cell.y < state.materialRows;
+    });
   }
 
   function chooseArmorBlocks() {
     const blocks = [];
     const used = new Set();
-    const defenseCells = [...state.monsterCells.values()].filter(
-      (cell) => cell.icon === "defense" && !cell.covered,
-    );
+    const defenseCells = [...state.monsterCells.values()].filter((cell) => cell.icon === "defense" && !cell.covered);
 
     defenseCells.forEach((cell) => {
-      const ordinary = neighbors(cell.x, cell.y).find((cellKey) => {
+      const ordinary = monsterNeighbors(cell.x, cell.y).find((cellKey) => {
         const target = state.monsterCells.get(cellKey);
         return target && !target.covered && !target.icon && !used.has(cellKey);
       });
-      const fallback = neighbors(cell.x, cell.y).find((cellKey) => {
+      const fallback = monsterNeighbors(cell.x, cell.y).find((cellKey) => {
         const target = state.monsterCells.get(cellKey);
         return target && !target.covered && !used.has(cellKey);
       });
@@ -885,23 +856,15 @@
   function chooseHealTargets(amount) {
     if (!amount) return [];
     const targets = [];
-    const recent = [...state.coverOrder].reverse();
-
-    recent.forEach((cellKey) => {
+    [...state.coverOrder].reverse().forEach((cellKey) => {
       const cell = state.monsterCells.get(cellKey);
-      if (targets.length < amount && cell && cell.covered && !cell.icon) {
-        targets.push(cellKey);
-      }
+      if (targets.length < amount && cell && cell.covered && !cell.icon) targets.push(cellKey);
     });
-
     if (targets.length < amount) {
       [...state.monsterCells.entries()].forEach(([cellKey, cell]) => {
-        if (targets.length < amount && cell.covered && !cell.icon && !targets.includes(cellKey)) {
-          targets.push(cellKey);
-        }
+        if (targets.length < amount && cell.covered && !cell.icon && !targets.includes(cellKey)) targets.push(cellKey);
       });
     }
-
     return targets;
   }
 
@@ -914,16 +877,21 @@
   }
 
   function spoilMaterial(amount) {
-    const available = [...state.material.entries()]
-      .filter(([, status]) => status === "available")
-      .map(([cellKey]) => cellKey)
-      .reverse()
-      .slice(0, amount);
-    available.forEach((cellKey) => state.material.set(cellKey, "spoiled"));
-    return available.length;
+    const cells = [];
+    state.materialPieces.forEach((piece) => {
+      piece.cells.forEach((cell) => cells.push({ piece, cell }));
+    });
+    const targets = cells.slice(-amount);
+    targets.forEach(({ piece, cell }) => {
+      const cellKey = key(cell.x, cell.y);
+      state.spoiledCells.add(cellKey);
+      piece.cells = piece.cells.filter((item) => key(item.x, item.y) !== cellKey);
+    });
+    state.materialPieces = state.materialPieces.filter((piece) => piece.cells.length > 0);
+    return targets.length;
   }
 
-  function neighbors(x, y) {
+  function monsterNeighbors(x, y) {
     return [key(x, y - 1), key(x + 1, y), key(x, y + 1), key(x - 1, y)];
   }
 
@@ -944,17 +912,19 @@
   }
 
   function availableMaterialCount() {
-    return [...state.material.values()].filter((status) => status === "available").length;
-  }
-
-  function usableMaterialTotal() {
-    return [...state.material.values()].filter((status) => status !== "missing").length;
+    return state.materialPieces.reduce((sum, piece) => sum + piece.cells.length, 0);
   }
 
   function remainingCoverPotential() {
-    const stashCells = state.stash.reduce((sum, piece) => sum + piece.cells.length, 0);
-    const currentCells = state.currentPiece ? state.currentPiece.cells.length : 0;
-    return availableMaterialCount() + stashCells + currentCells;
+    return availableMaterialCount();
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function renderLog() {
+    els.battleLog.innerHTML = state.log.map((line) => `<p>${line}</p>`).join("");
   }
 
   function showStageClear() {
@@ -992,8 +962,7 @@
   }
 
   els.restartButton.addEventListener("click", startGame);
-  els.cancelPieceButton.addEventListener("click", cancelCurrentPiece);
-  els.stashPieceButton.addEventListener("click", stashCurrentPiece);
+  els.cutButton.addEventListener("click", applyCuts);
   els.resultButton.addEventListener("click", handleResultButton);
 
   startGame();

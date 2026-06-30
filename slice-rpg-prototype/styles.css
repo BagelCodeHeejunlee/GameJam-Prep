@@ -17,7 +17,9 @@
   --blocked: #2e3440;
   --ok: #246c50;
   --cell: clamp(25px, 7.2vw, 31px);
-  --small-cell: clamp(20px, 5.8vw, 23px);
+  --small-cell: clamp(34px, 9vw, 42px);
+  --board-pad: 14px;
+  --knife-thick: 12px;
   color-scheme: dark;
 }
 
@@ -92,8 +94,7 @@ button:disabled {
 
 .cut-zone {
   display: grid;
-  grid-template-rows: 88px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .top-bar,
@@ -378,9 +379,10 @@ button:disabled {
 .workbench {
   min-height: 0;
   margin-top: 0;
-  padding: 7px;
+  padding: 8px;
   display: grid;
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  position: relative;
 }
 
 .section-head {
@@ -405,37 +407,35 @@ button:disabled {
   text-align: right;
 }
 
+.material-board {
+  position: relative;
+  align-self: center;
+  justify-self: center;
+  width: max-content;
+  height: max-content;
+  padding: var(--board-pad);
+}
+
 .material-grid {
+  position: relative;
+  z-index: 1;
   min-height: 0;
   align-content: center;
 }
 
-.knife-rack {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  margin-bottom: 5px;
+.cut-layer,
+.knife-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.knife-card {
-  display: grid;
-  min-height: 38px;
-  align-content: center;
-  justify-items: center;
-  gap: 3px;
-  padding: 4px 3px;
-  border: 1px solid #b7a47d;
-  background: linear-gradient(180deg, #fff9e9, #e5d3aa);
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.14);
-  color: var(--ink);
-  font-size: 0.62rem;
-  font-weight: 900;
-  touch-action: none;
+.cut-layer {
+  z-index: 3;
 }
 
-.knife-card.selected {
-  border-color: var(--ok);
-  outline: 3px solid rgba(36, 108, 80, 0.28);
+.knife-layer {
+  z-index: 4;
 }
 
 .knife-hint {
@@ -455,27 +455,33 @@ button:disabled {
     radial-gradient(circle at 30% 22%, #fffdf2 0 18%, transparent 19%),
     linear-gradient(145deg, #fff5c9, #dfc06f);
   box-shadow: inset 0 -2px 0 rgba(122, 93, 40, 0.24);
+  touch-action: none;
 }
 
-.material-cell.selected {
-  border-color: var(--ok);
-  outline: 3px solid rgba(46, 159, 109, 0.4);
-  background:
-    radial-gradient(circle at 30% 22%, #fffdf2 0 18%, transparent 19%),
-    linear-gradient(145deg, #cff3cb, #72c78e);
+.material-cell.empty-material {
+  border-color: rgba(68, 58, 40, 0.2);
+  background: rgba(255, 248, 229, 0.16);
+  box-shadow: none;
 }
 
-.material-cell.cut-preview {
-  border-color: var(--ok);
-  outline: 3px solid rgba(36, 108, 80, 0.32);
-  background:
-    radial-gradient(circle at 30% 22%, #fffdf2 0 18%, transparent 19%),
-    linear-gradient(145deg, #d8f6c9, #72c78e);
+.piece-tone-0 {
+  filter: hue-rotate(0deg);
 }
 
-.material-cell.bad-preview {
-  border-color: var(--attack);
-  outline: 3px solid rgba(207, 63, 63, 0.3);
+.piece-tone-1 {
+  filter: hue-rotate(12deg) saturate(1.05);
+}
+
+.piece-tone-2 {
+  filter: hue-rotate(-12deg) saturate(1.04);
+}
+
+.piece-tone-3 {
+  filter: hue-rotate(24deg) saturate(1.06);
+}
+
+.piece-tone-4 {
+  filter: hue-rotate(-24deg) saturate(1.06);
 }
 
 .material-cell.used,
@@ -488,6 +494,65 @@ button:disabled {
 .material-cell.spoiled::after {
   content: "×";
   color: #6b2f38;
+  font-weight: 900;
+}
+
+.board-knife {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  min-width: var(--knife-thick);
+  min-height: var(--knife-thick);
+  border: 1px solid #68768a;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f9fbff 0 28%, #c8d2e2 29% 62%, #59687d 63% 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.32);
+  color: #1d2632;
+  font-size: 0.54rem;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.board-knife.h {
+  height: var(--knife-thick);
+}
+
+.board-knife.v {
+  width: var(--knife-thick);
+  writing-mode: vertical-rl;
+}
+
+.cut-mark {
+  position: absolute;
+  display: block;
+  background: rgba(115, 54, 47, 0.84);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.cut-mark.h {
+  height: 4px;
+  transform: translateY(-2px);
+}
+
+.cut-mark.v {
+  width: 4px;
+  transform: translateX(-2px);
+}
+
+.cut-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  min-width: 72px;
+  min-height: 42px;
+  border-radius: 8px;
+  background: var(--attack);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22), 0 8px 18px rgba(0, 0, 0, 0.24);
+  color: #fff8e5;
   font-weight: 900;
 }
 
@@ -695,17 +760,14 @@ button:disabled {
 
 @media (max-width: 370px) {
   :root {
-    --cell: 34px;
-    --small-cell: 29px;
+    --cell: 25px;
+    --small-cell: 31px;
+    --board-pad: 12px;
   }
 
-  .current-piece,
-  .stash-panel {
-    padding: 9px;
-  }
-
-  .tool-row button {
-    padding: 0 8px;
-    font-size: 0.88rem;
+  .cut-button {
+    min-width: 66px;
+    min-height: 38px;
+    font-size: 0.86rem;
   }
 }

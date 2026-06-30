@@ -51,47 +51,23 @@
       </section>
 
       <section class="cut-zone" aria-label="자르는 곳">
-        <section class="piece-section" aria-label="현재 조각과 보관함">
-          <div class="current-piece">
-            <div class="section-head compact">
-              <div>
-                <p class="eyebrow">PIECE</p>
-                <h2>현재 블록</h2>
-              </div>
-              <span id="pieceSizeLabel">0칸</span>
-            </div>
-            <div id="piecePreview" class="piece-preview empty">칼을 놓아 블록을 자르세요</div>
-            <div class="tool-row">
-              <button id="cancelPieceButton" type="button" title="현재 블록 버리기">버리기</button>
-              <button id="stashPieceButton" type="button" title="블록을 보관하고 턴 종료">보관</button>
-            </div>
-          </div>
-
-          <div class="stash-panel">
-            <div class="section-head compact">
-              <div>
-                <p class="eyebrow">STASH</p>
-                <h2>보관함</h2>
-              </div>
-              <span id="stashCount">0 / 2</span>
-            </div>
-            <div id="stashSlots" class="stash-slots"></div>
-          </div>
-        </section>
-
         <section class="workbench" aria-label="자르기 작업대">
           <div class="section-head">
             <div>
-              <p class="eyebrow">KNIFE</p>
-              <h2>칼을 재료 위에 놓기</h2>
+              <p class="eyebrow">CUT BOARD</p>
+              <h2>칼을 움직이고 자르기</h2>
             </div>
-            <div class="tool-count"><span>이번 턴</span><strong id="knifeLimitLabel">3개</strong></div>
+            <div class="tool-count"><span>조각</span><strong id="pieceCountLabel">1개</strong></div>
           </div>
 
-          <div id="knifeRack" class="knife-rack" aria-label="이번 턴 칼"></div>
-          <div id="materialGrid" class="material-grid" aria-label="재료판"></div>
+          <div id="materialBoard" class="material-board" aria-label="재료와 칼이 놓인 격자판">
+            <div id="materialGrid" class="material-grid" aria-label="재료판"></div>
+            <div id="cutLayer" class="cut-layer" aria-hidden="true"></div>
+            <div id="knifeLayer" class="knife-layer" aria-label="이동 가능한 칼"></div>
+          </div>
 
-          <p id="knifeHint" class="knife-hint">칼을 드래그하거나 선택한 뒤 재료판에 놓으세요.</p>
+          <button id="cutButton" class="cut-button" type="button">자르기</button>
+          <p id="knifeHint" class="knife-hint">칼은 격자선 사이를 움직입니다. 잘린 조각은 드래그해서 옮길 수 있습니다.</p>
         </section>
       </section>
 
