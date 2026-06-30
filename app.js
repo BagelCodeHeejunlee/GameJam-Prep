@@ -3516,14 +3516,21 @@ function selectTargetsFromTile(actor, tile, action) {
     : null;
   const plannedTargetId = plannedTargetIdForActor(actor);
   const singleTarget = isSingleTargetAction(action);
+  const rangedSingle = isRangedSingleTargetAttack(action);
   const candidates = aliveOpponents(actor)
     .filter((target) => canTargetFromTile(tile, actor.side, target, range))
     .sort((a, b) => {
       if (singleTarget) {
+        if (rangedSingle) {
+          const aPenaltyFree = isPenaltyFreeTargetFromTile(actor, tile, a, action);
+          const bPenaltyFree = isPenaltyFreeTargetFromTile(actor, tile, b, action);
+          if (aPenaltyFree !== bPenaltyFree) return aPenaltyFree ? -1 : 1;
+          if (a.hp !== b.hp) return a.hp - b.hp;
+        }
         const distanceA = targetPriorityDistanceFromTile(actor, tile, a, action);
         const distanceB = targetPriorityDistanceFromTile(actor, tile, b, action);
         if (distanceA !== distanceB) return distanceA - distanceB;
-        if (a.hp !== b.hp) return a.hp - b.hp;
+        if (!rangedSingle && a.hp !== b.hp) return a.hp - b.hp;
       }
       if (plannedTargetId) {
         const aPlanned = a.id === plannedTargetId;
@@ -4458,6 +4465,10 @@ function isRangedAttackAction(action) {
   return isAttackMovementAction(action) && !action.melee && (action.range ?? 1) > 1;
 }
 
+function isRangedSingleTargetAttack(action) {
+  return action?.type === "attack" && isRangedAttackAction(action) && isSingleTargetAction(action);
+}
+
 function isSingleTargetAction(action) {
   return (action?.targets ?? 1) <= 1;
 }
@@ -4465,6 +4476,7 @@ function isSingleTargetAction(action) {
 function compareAttackMoveTargetScores(a, b, attackAction) {
   const targetLimit = attackAction?.targets ?? 1;
   if (targetLimit <= 1) {
+    const rangedSingle = isRangedSingleTargetAttack(attackAction);
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     const trapScore = compareTrapSetupScores(a, b);
     if (trapScore) return trapScore;
@@ -4473,10 +4485,13 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
       const bHasPenaltyFreeTarget = b.nonPenaltyHitCount > 0;
       if (aHasPenaltyFreeTarget !== bHasPenaltyFreeTarget) return aHasPenaltyFreeTarget ? -1 : 1;
     }
+    if (rangedSingle && a.nearestTargetHp !== b.nearestTargetHp) {
+      return a.nearestTargetHp - b.nearestTargetHp;
+    }
     if (a.nearestTargetDistance !== b.nearestTargetDistance) {
       return a.nearestTargetDistance - b.nearestTargetDistance;
     }
-    if (a.nearestTargetHp !== b.nearestTargetHp) return a.nearestTargetHp - b.nearestTargetHp;
+    if (!rangedSingle && a.nearestTargetHp !== b.nearestTargetHp) return a.nearestTargetHp - b.nearestTargetHp;
     return 0;
   }
 
@@ -4642,8 +4657,13 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       distance: targetPriorityDistanceFromTile(actor, tile, target, attackAction),
     }))
     .sort((a, b) => {
+      if (isRangedSingleTargetAttack(attackAction) && a.target.hp !== b.target.hp) {
+        return a.target.hp - b.target.hp;
+      }
       if (a.distance !== b.distance) return a.distance - b.distance;
-      if (a.target.hp !== b.target.hp) return a.target.hp - b.target.hp;
+      if (!isRangedSingleTargetAttack(attackAction) && a.target.hp !== b.target.hp) {
+        return a.target.hp - b.target.hp;
+      }
       return (a.target.monsterIndex ?? 0) - (b.target.monsterIndex ?? 0);
     })[0];
   const nonPenaltyTargets = targets.filter((target) =>
