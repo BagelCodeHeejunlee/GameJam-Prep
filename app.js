@@ -4468,6 +4468,8 @@ function compareImmediateMoveScores(a, b, attackAction) {
   if (trapScore) return trapScore;
   const multiScore = compareMultiTargetScores(a, b, attackAction);
   if (multiScore) return multiScore;
+  const penaltyScore = comparePenaltyFreeScores(a, b, attackAction);
+  if (penaltyScore) return penaltyScore;
   return comparePrimaryTargetScores(a, b);
 }
 
@@ -4476,12 +4478,22 @@ function compareApproachMoveScores(a, b, attackAction) {
   if (multiScore) return multiScore;
   const trapScore = compareTrapSetupScores(a, b);
   if (trapScore) return trapScore;
+  const penaltyScore = comparePenaltyFreeScores(a, b, attackAction);
+  if (penaltyScore) return penaltyScore;
   return comparePrimaryTargetScores(a, b);
 }
 
 function compareMultiTargetScores(a, b, attackAction) {
   if ((attackAction?.targets ?? 1) <= 1) return 0;
   if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+  return 0;
+}
+
+function comparePenaltyFreeScores(a, b, attackAction) {
+  if (!isRangedAttackAction(attackAction)) return 0;
+  if (a.nonPenaltyHitCount !== b.nonPenaltyHitCount) {
+    return b.nonPenaltyHitCount - a.nonPenaltyHitCount;
+  }
   return 0;
 }
 
@@ -4499,11 +4511,8 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     const trapScore = compareTrapSetupScores(a, b);
     if (trapScore) return trapScore;
-    if (isRangedAttackAction(attackAction)) {
-      const aHasPenaltyFreeTarget = a.nonPenaltyHitCount > 0;
-      const bHasPenaltyFreeTarget = b.nonPenaltyHitCount > 0;
-      if (aHasPenaltyFreeTarget !== bHasPenaltyFreeTarget) return aHasPenaltyFreeTarget ? -1 : 1;
-    }
+    const penaltyScore = comparePenaltyFreeScores(a, b, attackAction);
+    if (penaltyScore) return penaltyScore;
     if (a.nearestTargetDistance !== b.nearestTargetDistance) {
       return a.nearestTargetDistance - b.nearestTargetDistance;
     }
@@ -4516,9 +4525,8 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
   if (trapScore) return trapScore;
 
   const ranged = isRangedAttackAction(attackAction);
-  if (ranged && targetLimit > 1 && a.nonPenaltyHitCount !== b.nonPenaltyHitCount) {
-    return b.nonPenaltyHitCount - a.nonPenaltyHitCount;
-  }
+  const penaltyScore = comparePenaltyFreeScores(a, b, attackAction);
+  if (penaltyScore) return penaltyScore;
 
   if (ranged && targetLimit <= 1) {
     const aHasPenaltyFreeTarget = Number.isFinite(a.lowestNonPenaltyHp);
