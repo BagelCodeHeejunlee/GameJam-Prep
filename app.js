@@ -4490,16 +4490,16 @@ function isSingleTargetAction(action) {
 function compareImmediateMoveScores(a, b, attackAction) {
   const trapScore = compareTrapSetupScores(a, b);
   if (trapScore) return trapScore;
-  const multiScore = compareMultiTargetScores(a, b, attackAction);
-  if (multiScore) return multiScore;
+  const hitCountScore = compareHitCountScores(a, b);
+  if (hitCountScore) return hitCountScore;
   const penaltyScore = comparePenaltyFreeScores(a, b, attackAction);
   if (penaltyScore) return penaltyScore;
   return comparePrimaryTargetScores(a, b);
 }
 
 function compareApproachMoveScores(a, b, attackAction) {
-  const multiScore = compareMultiTargetScores(a, b, attackAction);
-  if (multiScore) return multiScore;
+  const hitCountScore = compareHitCountScores(a, b);
+  if (hitCountScore) return hitCountScore;
   const trapScore = compareTrapSetupScores(a, b);
   if (trapScore) return trapScore;
   const penaltyScore = comparePenaltyFreeScores(a, b, attackAction);
@@ -4507,8 +4507,7 @@ function compareApproachMoveScores(a, b, attackAction) {
   return comparePrimaryTargetScores(a, b);
 }
 
-function compareMultiTargetScores(a, b, attackAction) {
-  if ((attackAction?.targets ?? 1) <= 1) return 0;
+function compareHitCountScores(a, b) {
   if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
   return 0;
 }
