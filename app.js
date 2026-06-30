@@ -3516,21 +3516,14 @@ function selectTargetsFromTile(actor, tile, action) {
     : null;
   const plannedTargetId = plannedTargetIdForActor(actor);
   const singleTarget = isSingleTargetAction(action);
-  const rangedSingle = isRangedSingleTargetAttack(action);
   const candidates = aliveOpponents(actor)
     .filter((target) => canTargetFromTile(tile, actor.side, target, range))
     .sort((a, b) => {
       if (singleTarget) {
-        if (rangedSingle) {
-          const aPenaltyFree = isPenaltyFreeTargetFromTile(actor, tile, a, action);
-          const bPenaltyFree = isPenaltyFreeTargetFromTile(actor, tile, b, action);
-          if (aPenaltyFree !== bPenaltyFree) return aPenaltyFree ? -1 : 1;
-          if (a.hp !== b.hp) return a.hp - b.hp;
-        }
         const distanceA = targetPriorityDistanceFromTile(actor, tile, a, action);
         const distanceB = targetPriorityDistanceFromTile(actor, tile, b, action);
         if (distanceA !== distanceB) return distanceA - distanceB;
-        if (!rangedSingle && a.hp !== b.hp) return a.hp - b.hp;
+        if (a.hp !== b.hp) return a.hp - b.hp;
       }
       if (plannedTargetId) {
         const aPlanned = a.id === plannedTargetId;
@@ -4327,29 +4320,20 @@ function nextAttackAction(cardData, currentAction) {
 
 function bestCombatMoveTile(actor, safeReachable, fallbackReachable, attackAction, moveOptions = {}) {
   if (isAttackMovementAction(attackAction)) {
-    const safeAttackTile = bestCombatMoveTileFromReachable(actor, safeReachable, attackAction, {
-      requireAttackTile: true,
-      includeCurrentTile: true,
-    });
+    const safeAttackTile = bestImmediateAttackMoveTile(actor, safeReachable, attackAction);
     if (safeAttackTile) return safeAttackTile;
 
     const safePathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, true);
     if (safePathTile && !sameHex(safePathTile, actor)) return safePathTile;
     if (safePathTile && sameHex(safePathTile, actor)) return actor;
 
-    const safeApproachTile = bestCombatMoveTileFromReachable(actor, safeReachable, attackAction, {
-      excludeCurrentTile: true,
-    });
-    if (safeApproachTile && !sameHex(safeApproachTile, actor)) return safeApproachTile;
-
-    const fallbackAttackTile = bestCombatMoveTileFromReachable(actor, fallbackReachable, attackAction, {
-      requireAttackTile: true,
-      includeCurrentTile: true,
-    });
+    const fallbackAttackTile = bestImmediateAttackMoveTile(actor, fallbackReachable, attackAction);
     if (fallbackAttackTile) return fallbackAttackTile;
 
     const fallbackPathTile = bestPathStepTowardAttackTile(actor, attackAction, moveOptions, false);
     if (fallbackPathTile) return fallbackPathTile;
+
+    return actor;
   }
 
   const reachable = safeReachable.length ? safeReachable : fallbackReachable;
@@ -4376,14 +4360,10 @@ function bestPathStepTowardAttackTile(actor, attackAction, moveOptions, avoidTra
   if (!goals.length) return null;
 
   goals.sort((a, b) => {
-    const aReachableNow = a.distance <= amount;
-    const bReachableNow = b.distance <= amount;
-    if (aReachableNow !== bReachableNow) return aReachableNow ? -1 : 1;
-    if (a.trapRisk !== b.trapRisk) return a.trapRisk - b.trapRisk;
-    const targetScore = compareAttackMoveTargetScores(a, b, attackAction);
+    const targetScore = compareApproachMoveScores(a, b, attackAction);
     if (targetScore) return targetScore;
     if (a.distance !== b.distance) return a.distance - b.distance;
-    return a.lowestIndex - b.lowestIndex;
+    return a.primaryTargetIndex - b.primaryTargetIndex;
   });
 
   const best = goals[0];
@@ -4395,6 +4375,15 @@ function bestPathStepTowardAttackTile(actor, attackAction, moveOptions, avoidTra
     distance: movementField.distanceTo(destination),
     trapRisk: movementField.trapRiskTo(destination),
   };
+}
+
+function bestImmediateAttackMoveTile(actor, reachable, attackAction) {
+  const scored = [actor, ...reachable]
+    .map((tile) => ({ tile, ...scoreTargetsFromTile(actor, tile, attackAction) }))
+    .filter((item) => item.hitCount > 0);
+
+  scored.sort((a, b) => compareImmediateMoveScores(a, b, attackAction));
+  return scored[0]?.tile ?? null;
 }
 
 function bestCombatMoveTileFromReachable(actor, reachable, attackAction, options = {}) {
@@ -4465,18 +4454,43 @@ function isRangedAttackAction(action) {
   return isAttackMovementAction(action) && !action.melee && (action.range ?? 1) > 1;
 }
 
-function isRangedSingleTargetAttack(action) {
-  return action?.type === "attack" && isRangedAttackAction(action) && isSingleTargetAction(action);
-}
-
 function isSingleTargetAction(action) {
   return (action?.targets ?? 1) <= 1;
+}
+
+function compareImmediateMoveScores(a, b, attackAction) {
+  const trapScore = compareTrapSetupScores(a, b);
+  if (trapScore) return trapScore;
+  const multiScore = compareMultiTargetScores(a, b, attackAction);
+  if (multiScore) return multiScore;
+  return comparePrimaryTargetScores(a, b);
+}
+
+function compareApproachMoveScores(a, b, attackAction) {
+  const multiScore = compareMultiTargetScores(a, b, attackAction);
+  if (multiScore) return multiScore;
+  const trapScore = compareTrapSetupScores(a, b);
+  if (trapScore) return trapScore;
+  return comparePrimaryTargetScores(a, b);
+}
+
+function compareMultiTargetScores(a, b, attackAction) {
+  if ((attackAction?.targets ?? 1) <= 1) return 0;
+  if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
+  return 0;
+}
+
+function comparePrimaryTargetScores(a, b) {
+  if (a.nearestTargetDistance !== b.nearestTargetDistance) {
+    return a.nearestTargetDistance - b.nearestTargetDistance;
+  }
+  if (a.nearestTargetHp !== b.nearestTargetHp) return a.nearestTargetHp - b.nearestTargetHp;
+  return a.primaryTargetIndex - b.primaryTargetIndex;
 }
 
 function compareAttackMoveTargetScores(a, b, attackAction) {
   const targetLimit = attackAction?.targets ?? 1;
   if (targetLimit <= 1) {
-    const rangedSingle = isRangedSingleTargetAttack(attackAction);
     if (a.hitCount !== b.hitCount) return b.hitCount - a.hitCount;
     const trapScore = compareTrapSetupScores(a, b);
     if (trapScore) return trapScore;
@@ -4485,13 +4499,10 @@ function compareAttackMoveTargetScores(a, b, attackAction) {
       const bHasPenaltyFreeTarget = b.nonPenaltyHitCount > 0;
       if (aHasPenaltyFreeTarget !== bHasPenaltyFreeTarget) return aHasPenaltyFreeTarget ? -1 : 1;
     }
-    if (rangedSingle && a.nearestTargetHp !== b.nearestTargetHp) {
-      return a.nearestTargetHp - b.nearestTargetHp;
-    }
     if (a.nearestTargetDistance !== b.nearestTargetDistance) {
       return a.nearestTargetDistance - b.nearestTargetDistance;
     }
-    if (!rangedSingle && a.nearestTargetHp !== b.nearestTargetHp) return a.nearestTargetHp - b.nearestTargetHp;
+    if (a.nearestTargetHp !== b.nearestTargetHp) return a.nearestTargetHp - b.nearestTargetHp;
     return 0;
   }
 
@@ -4628,6 +4639,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       lowestIndex: 9999,
       nearestTargetDistance: Infinity,
       nearestTargetHp: Infinity,
+      primaryTargetIndex: 9999,
     };
   }
   if (attackAction.type === "patternAttack") {
@@ -4646,6 +4658,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       lowestIndex: placement.lowestIndex,
       nearestTargetDistance: placement.distance ?? Infinity,
       nearestTargetHp: placement.lowestHp,
+      primaryTargetIndex: placement.lowestIndex,
     };
   }
   const targets = selectTargetsFromTile(actor, tile, attackAction);
@@ -4657,13 +4670,8 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
       distance: targetPriorityDistanceFromTile(actor, tile, target, attackAction),
     }))
     .sort((a, b) => {
-      if (isRangedSingleTargetAttack(attackAction) && a.target.hp !== b.target.hp) {
-        return a.target.hp - b.target.hp;
-      }
       if (a.distance !== b.distance) return a.distance - b.distance;
-      if (!isRangedSingleTargetAttack(attackAction) && a.target.hp !== b.target.hp) {
-        return a.target.hp - b.target.hp;
-      }
+      if (a.target.hp !== b.target.hp) return a.target.hp - b.target.hp;
       return (a.target.monsterIndex ?? 0) - (b.target.monsterIndex ?? 0);
     })[0];
   const nonPenaltyTargets = targets.filter((target) =>
@@ -4679,6 +4687,7 @@ function scoreTargetsFromTile(actor, tile, attackAction) {
     lowestIndex: Math.min(...targets.map((target) => target.monsterIndex ?? 0), 9999),
     nearestTargetDistance: nearestTarget?.distance ?? Infinity,
     nearestTargetHp: nearestTarget?.target.hp ?? Infinity,
+    primaryTargetIndex: nearestTarget?.target.monsterIndex ?? 9999,
   };
 }
 
