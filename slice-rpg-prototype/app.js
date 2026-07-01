@@ -553,8 +553,10 @@
           button.disabled = true;
         } else if (pieceByCell.has(cellKey)) {
           const pieceId = pieceByCell.get(cellKey);
+          const piece = getPiece(pieceId);
           button.dataset.pieceId = String(pieceId);
           button.classList.add(`piece-tone-${pieceId % 5}`);
+          if (piece) applyPieceConnections(button, getConnectedSides(piece.cells, piece.cutEdges, x, y));
           button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId));
         } else {
           button.classList.add("empty-material");
@@ -1116,6 +1118,29 @@
     return state.materialPieces.find((piece) => piece.id === pieceId);
   }
 
+  function getConnectedSides(cells, cutEdges, x, y) {
+    const occupied = new Set(cells.map((cell) => key(cell.x, cell.y)));
+    return [
+      { side: "up", dx: 0, dy: -1 },
+      { side: "right", dx: 1, dy: 0 },
+      { side: "down", dx: 0, dy: 1 },
+      { side: "left", dx: -1, dy: 0 },
+    ].filter(({ dx, dy }) => {
+      const currentKey = key(x, y);
+      const nextKey = key(x + dx, y + dy);
+      return occupied.has(nextKey) && !cutEdges.has(edgeKey(currentKey, nextKey));
+    }).map(({ side }) => side);
+  }
+
+  function applyPieceConnections(element, sides) {
+    sides.forEach((side) => {
+      element.classList.add(`connect-${side}`);
+      const bridge = document.createElement("span");
+      bridge.className = `rice-bridge ${side}`;
+      element.append(bridge);
+    });
+  }
+
   function getPlacement(placementId) {
     return state.placedPieces.find((placement) => placement.id === placementId);
   }
@@ -1250,6 +1275,7 @@
         const cell = document.createElement("span");
         cell.className = "drag-piece-cell";
         if (!occupied.has(key(x, y))) cell.classList.add("empty");
+        if (occupied.has(key(x, y))) applyPieceConnections(cell, getConnectedSides(normalized, cutEdges, x, y));
         grid.append(cell);
       }
     }
