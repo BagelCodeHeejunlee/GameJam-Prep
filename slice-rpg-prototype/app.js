@@ -170,6 +170,8 @@
     knifeLayer: document.querySelector("#knifeLayer"),
     cutButton: document.querySelector("#cutButton"),
     endTurnButton: document.querySelector("#endTurnButton"),
+    hpControlLabel: document.querySelector("#hpControlLabel"),
+    cutCountLabel: document.querySelector("#cutCountLabel"),
     knifeHint: document.querySelector("#knifeHint"),
     battleLog: document.querySelector("#battleLog"),
     overlay: document.querySelector("#overlay"),
@@ -331,9 +333,11 @@
     els.monsterName.textContent = currentMonster().name;
     els.completionLabel.textContent = `${covered} / ${total}`;
     els.completionFill.style.width = `${(covered / total) * 100}%`;
-    els.cutButton.textContent = `자르기 ${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
+    els.cutButton.textContent = "자르기";
     els.cutButton.disabled = state.cutsUsed >= MAX_CUTS_PER_TURN || Boolean(state.resultMode);
     if (els.endTurnButton) els.endTurnButton.disabled = Boolean(state.resultMode);
+    if (els.hpControlLabel) els.hpControlLabel.textContent = `${Math.max(0, state.playerHp)}/${MAX_HP}`;
+    if (els.cutCountLabel) els.cutCountLabel.textContent = `${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
   }
 
   function renderActionCard() {
@@ -345,28 +349,40 @@
     const armorBlocks = action === "defense" ? chooseArmorBlocks() : [];
     const healTargets = action === "heal" ? chooseHealTargets(healIcons) : [];
     const monster = currentMonster();
-    const title = { attack: "공격", heal: "회복", defense: "갑피 전개", special: "특수 공격" }[action];
-    const descriptions = {
-      attack: `기본 ${monster.baseAttack} + 남은 공격 표식 수만큼 피해.`,
-      heal: "남은 회복 표식 수만큼 최근 일반 칸을 다시 비움.",
-      defense: "남은 방어 표식마다 다음 턴 갑피 칸 생성.",
-      special: "몬스터 고유 행동. 특수 표식을 덮으면 약화.",
-    };
-    const chips = {
-      attack: [`피해 ${monster.baseAttack + attackIcons}`, `공격 ${attackIcons}`, `자르기 ${remainingCuts()}`],
-      heal: [`회복 ${healIcons}`, `해제 ${healTargets.length}`, `자르기 ${remainingCuts()}`],
-      defense: [`방어 ${defenseIcons}`, `갑피 ${armorBlocks.length}`, `자르기 ${remainingCuts()}`],
-      special: [`특수 ${specialIcons}`, `자르기 ${remainingCuts()}`],
-    };
-    const blockNotice = state.blocked.size
-      ? `<p>갑피 ${state.blocked.size}칸은 이번 턴 배치 불가.</p>`
-      : "";
+    const actionView = {
+      attack: {
+        mark: ICONS.attack.mark,
+        label: "공격",
+        main: `피해 ${monster.baseAttack + attackIcons}`,
+        sub: `기본 ${monster.baseAttack} + 공격 표식 ${attackIcons}`,
+      },
+      heal: {
+        mark: ICONS.heal.mark,
+        label: "회복",
+        main: `회복 ${healTargets.length}칸`,
+        sub: `회복 표식 ${healIcons}`,
+      },
+      defense: {
+        mark: ICONS.defense.mark,
+        label: "방어",
+        main: `갑피 ${armorBlocks.length}칸`,
+        sub: `방어 표식 ${defenseIcons}`,
+      },
+      special: {
+        mark: ICONS.special.mark,
+        label: "특수",
+        main: specialIcons ? "고유 행동" : "행동 실패",
+        sub: `특수 표식 ${specialIcons}`,
+      },
+    }[action];
+    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가` : actionView.sub;
 
+    els.actionCard.className = `action-card action-${action}`;
     els.actionCard.innerHTML = `
-      <strong>${title}</strong>
-      <p>${descriptions[action]}</p>
-      ${blockNotice}
-      <div class="chips">${chips[action].map((chip) => `<span class="chip">${chip}</span>`).join("")}</div>
+      <span class="action-kicker">다음 행동</span>
+      <span class="action-chip"><i>${actionView.mark}</i>${actionView.label}</span>
+      <strong class="action-main">${actionView.main}</strong>
+      <span class="action-sub">${blockedText}</span>
     `;
   }
 
@@ -413,8 +429,10 @@
 
   function monsterAvailableHeight(sectionRect, sectionStyle) {
     const actionRect = els.actionCard.getBoundingClientRect();
+    const headRect = els.monsterSection.querySelector(".monster-head").getBoundingClientRect();
     const bottomPadding = cssPx(sectionStyle.paddingBottom);
-    return Math.max(0, sectionRect.bottom - bottomPadding - actionRect.bottom - 2);
+    const contentBottom = Math.max(actionRect.bottom, headRect.bottom);
+    return Math.max(0, sectionRect.bottom - bottomPadding - contentBottom - 2);
   }
 
   function materialAvailableHeight() {
@@ -422,10 +440,13 @@
     const headerRect = header.getBoundingClientRect();
     const workbenchRect = els.workbench.getBoundingClientRect();
     const workbenchStyle = getComputedStyle(els.workbench);
-    const hintRect = els.knifeHint.getBoundingClientRect();
-    const hintHidden = getComputedStyle(els.knifeHint).display === "none";
-    const bottom = hintHidden ? workbenchRect.bottom - cssPx(workbenchStyle.paddingBottom) : hintRect.top;
-    return Math.max(0, bottom - headerRect.bottom - 2);
+    const headerHidden = getComputedStyle(header).display === "none";
+    const controls = els.workbench.querySelector(".turn-controls");
+    const controlsRect = controls.getBoundingClientRect();
+    const controlsHidden = getComputedStyle(controls).display === "none";
+    const top = headerHidden ? workbenchRect.top + cssPx(workbenchStyle.paddingTop) : headerRect.bottom;
+    const bottom = controlsHidden ? workbenchRect.bottom - cssPx(workbenchStyle.paddingBottom) : controlsRect.top;
+    return Math.max(0, bottom - top - 2);
   }
 
   function cellLimit(available, count) {
