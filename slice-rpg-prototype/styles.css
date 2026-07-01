@@ -19,7 +19,7 @@
   --small-cell: clamp(34px, 9vw, 42px);
   --cell: var(--small-cell);
   --board-pad: 12px;
-  --knife-thick: 13px;
+  --knife-thick: 9px;
   --knife-hit: 25px;
   color-scheme: light;
 }
