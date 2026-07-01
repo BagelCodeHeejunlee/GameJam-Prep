@@ -1284,12 +1284,18 @@
   function getDropPreview(x, y) {
     if (!state.drag || state.drag.type !== "piece") return null;
 
-    const monster = currentMonster();
-    const monsterPreview = getPieceOverlapPreview("monster", x, y, els.monsterGrid, monster.cols, monster.rows, getMonsterCellSize());
-    const materialPreview = getPieceOverlapPreview("material", x, y, els.materialGrid, state.materialCols, state.materialRows, getMaterialCellSize());
-    const previews = [monsterPreview, materialPreview].filter(Boolean);
-    if (!previews.length) return null;
-    return previews.sort((a, b) => b.score - a.score)[0];
+    const guidePoint = getDragGuidePoint(x, y);
+    const monsterCell = getMonsterCellFromAnchorPoint(guidePoint);
+    if (monsterCell) {
+      return buildMonsterDropPreview(monsterCell.x - state.drag.offset.x, monsterCell.y - state.drag.offset.y, state.drag.cells);
+    }
+
+    const materialCell = getGridCellFromAnchorPoint(guidePoint, els.materialGrid, state.materialCols, state.materialRows, getMaterialCellSize());
+    if (materialCell) {
+      return buildMaterialDropPreview(materialCell.x - state.drag.offset.x, materialCell.y - state.drag.offset.y, state.drag.cells);
+    }
+
+    return null;
   }
 
   function getDragGuidePoint(x, y) {
@@ -1299,71 +1305,55 @@
     };
   }
 
-  function getPieceOverlapPreview(zone, clientX, clientY, gridEl, cols, rows, gridCell) {
-    const anchor = getOverlappedPieceAnchor(clientX, clientY, gridEl, cols, rows, gridCell);
-    if (!anchor) return null;
-    const preview = zone === "monster"
-      ? buildMonsterDropPreview(anchor.x, anchor.y, state.drag.cells)
-      : buildMaterialDropPreview(anchor.x, anchor.y, state.drag.cells);
-    preview.score = anchor.score;
-    return preview;
-  }
+  function getMonsterCellFromAnchorPoint(point) {
+    const gridRect = els.monsterGrid.getBoundingClientRect();
+    const cellSize = getMonsterCellSize();
+    const step = cellSize + BOARD_GAP;
+    const margin = cellSize + BOARD_GAP;
 
-  function getOverlappedPieceAnchor(clientX, clientY, gridEl, cols, rows, gridCell) {
-    const gridRect = gridEl.getBoundingClientRect();
-    const ghostCell = getMaterialCellSize();
-    const ghostStep = ghostCell + BOARD_GAP;
-    const gridStep = gridCell + BOARD_GAP;
-    const origin = getPieceGhostOrigin(clientX, clientY, ghostCell);
-    const baseX = Math.round((origin.x - gridRect.left) / gridStep);
-    const baseY = Math.round((origin.y - gridRect.top) / gridStep);
-    let best = null;
-
-    for (let y = baseY - 1; y <= baseY + 1; y += 1) {
-      for (let x = baseX - 1; x <= baseX + 1; x += 1) {
-        const score = pieceOverlapScore(origin, ghostCell, ghostStep, gridRect, gridCell, gridStep, x, y, cols, rows);
-        if (score <= 0) continue;
-        if (!best || score > best.score) best = { x, y, score };
-      }
+    if (
+      point.x < gridRect.left - margin
+      || point.y < gridRect.top - margin
+      || point.x > gridRect.right + margin
+      || point.y > gridRect.bottom + margin
+    ) {
+      return null;
     }
 
-    return best;
+    let best = null;
+    state.monsterCells.forEach((cell) => {
+      const centerX = gridRect.left + cell.x * step + cellSize / 2;
+      const centerY = gridRect.top + cell.y * step + cellSize / 2;
+      const distance = Math.hypot(point.x - centerX, point.y - centerY);
+      if (!best || distance < best.distance) {
+        best = { x: cell.x, y: cell.y, distance };
+      }
+    });
+
+    return best && best.distance <= cellSize * 1.75 ? best : null;
   }
 
-  function getPieceGhostOrigin(clientX, clientY, cell) {
-    const step = cell + BOARD_GAP;
-    const dragOffset = state.drag?.type === "piece" ? state.drag.offset : { x: 0, y: 0 };
+  function getGridCellFromAnchorPoint(point, gridEl, cols, rows, cellSize) {
+    const gridRect = gridEl.getBoundingClientRect();
+    const localX = point.x - gridRect.left;
+    const localY = point.y - gridRect.top;
+    const step = cellSize + BOARD_GAP;
+    const width = cols * cellSize + Math.max(0, cols - 1) * BOARD_GAP;
+    const height = rows * cellSize + Math.max(0, rows - 1) * BOARD_GAP;
+
+    if (
+      localX < -BOARD_GAP / 2
+      || localY < -BOARD_GAP / 2
+      || localX > width + BOARD_GAP / 2
+      || localY > height + BOARD_GAP / 2
+    ) {
+      return null;
+    }
+
     return {
-      x: clientX - DRAG_POINTER_OFFSET - dragOffset.x * step - cell / 2,
-      y: clientY - DRAG_POINTER_OFFSET - dragOffset.y * step - cell / 2,
+      x: clamp(Math.round((localX - cellSize / 2) / step), 0, cols - 1),
+      y: clamp(Math.round((localY - cellSize / 2) / step), 0, rows - 1),
     };
-  }
-
-  function pieceOverlapScore(origin, ghostCell, ghostStep, gridRect, gridCell, gridStep, anchorX, anchorY, cols, rows) {
-    return state.drag.cells.reduce((total, cell) => {
-      const targetX = anchorX + cell.x;
-      const targetY = anchorY + cell.y;
-      if (targetX < 0 || targetY < 0 || targetX >= cols || targetY >= rows) return total;
-      const ghostRect = {
-        left: origin.x + cell.x * ghostStep,
-        top: origin.y + cell.y * ghostStep,
-        right: origin.x + cell.x * ghostStep + ghostCell,
-        bottom: origin.y + cell.y * ghostStep + ghostCell,
-      };
-      const targetRect = {
-        left: gridRect.left + targetX * gridStep,
-        top: gridRect.top + targetY * gridStep,
-        right: gridRect.left + targetX * gridStep + gridCell,
-        bottom: gridRect.top + targetY * gridStep + gridCell,
-      };
-      return total + rectOverlapArea(ghostRect, targetRect);
-    }, 0);
-  }
-
-  function rectOverlapArea(a, b) {
-    const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-    const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-    return width * height;
   }
 
   function buildMaterialDropPreview(anchorX, anchorY, normalizedCells) {
