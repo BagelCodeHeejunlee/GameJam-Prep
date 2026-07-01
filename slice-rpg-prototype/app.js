@@ -18,7 +18,7 @@
   const BOARD_GAP = 3;
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
-  const DRAG_POINTER_OFFSET = 22;
+  const DRAG_POINTER_OFFSET = 44;
   const MAX_CUTS_PER_TURN = 2;
   const MIN_CELL_SIZE = 22;
   const MAX_CELL_SIZE = 42;
