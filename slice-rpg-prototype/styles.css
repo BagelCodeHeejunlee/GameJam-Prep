@@ -430,6 +430,11 @@ button:disabled {
   cursor: grabbing;
 }
 
+.monster-cell.covered.locked {
+  cursor: default;
+  touch-action: manipulation;
+}
+
 .monster-cell.blocked {
   border-color: #344052;
   background:

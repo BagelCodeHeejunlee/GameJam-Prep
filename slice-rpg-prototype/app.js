@@ -498,8 +498,13 @@
         if (monsterCell.covered && !isDraggingPlacedCell) {
           button.classList.add("covered");
           if (monsterCell.placementId) {
-            button.dataset.placementId = String(monsterCell.placementId);
-            button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId, x, y));
+            const placement = getPlacement(monsterCell.placementId);
+            if (isCurrentTurnPlacement(placement)) {
+              button.dataset.placementId = String(monsterCell.placementId);
+              button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId, x, y));
+            } else {
+              button.classList.add("locked");
+            }
           }
         }
         if (state.blocked.has(cellKey)) button.classList.add("blocked");
@@ -841,7 +846,7 @@
 
   function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
     const placement = getPlacement(placementId);
-    if (!placement) return;
+    if (!isCurrentTurnPlacement(placement)) return;
     event.preventDefault();
     const min = minCell(placement.cells);
     const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
@@ -904,6 +909,7 @@
     const placementMin = minCell(placement.cells);
     state.placedPieces.push({
       id: state.nextPlacementId,
+      turn: state.turn,
       cells: placement.cells,
       cutEdges: translateCutEdges(piece.cutEdges, placementMin.x - pieceMin.x, placementMin.y - pieceMin.y),
     });
@@ -922,7 +928,11 @@
 
   function tryReturnPlacedPieceToBoard(placementId, anchorX, anchorY) {
     const placement = getPlacement(placementId);
-    if (!placement) return;
+    if (!isCurrentTurnPlacement(placement)) {
+      addLog("이전 턴에 놓은 조각은 더 이상 움직일 수 없다.");
+      render();
+      return;
+    }
     const boardPlacement = getBoardPlacementFromCells(normalizeCells(placement.cells), anchorX, anchorY);
 
     if (!boardPlacement.valid) {
@@ -945,7 +955,11 @@
 
   function tryMovePlacedPieceOnMonster(placementId, anchorX, anchorY) {
     const placement = getPlacement(placementId);
-    if (!placement) return;
+    if (!isCurrentTurnPlacement(placement)) {
+      addLog("이전 턴에 놓은 조각은 더 이상 움직일 수 없다.");
+      render();
+      return;
+    }
     const monsterPlacement = getMonsterPlacementFromCells(normalizeCells(placement.cells), anchorX, anchorY, placementId);
 
     if (!monsterPlacement.valid) {
@@ -1106,6 +1120,10 @@
 
   function getPlacement(placementId) {
     return state.placedPieces.find((placement) => placement.id === placementId);
+  }
+
+  function isCurrentTurnPlacement(placement) {
+    return Boolean(placement) && placement.turn === state.turn && !state.resultMode;
   }
 
   function getDraggingPlacedCells() {
