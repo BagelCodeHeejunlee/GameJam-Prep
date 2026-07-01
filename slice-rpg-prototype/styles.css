@@ -669,18 +669,38 @@ button:disabled {
   transform: translateX(-2px);
 }
 
-.cut-button {
+.turn-controls {
   position: absolute;
   right: 10px;
   bottom: 10px;
   z-index: 6;
+  display: flex;
+  gap: 6px;
+}
+
+.cut-button,
+.end-turn-button {
   min-width: 72px;
   min-height: 42px;
   border-radius: 8px;
-  background: var(--attack);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22), 0 8px 18px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.22),
+    0 8px 18px rgba(0, 0, 0, 0.24);
   color: #fff8e5;
   font-weight: 900;
+}
+
+.cut-button {
+  background: var(--attack);
+}
+
+.end-turn-button {
+  background: var(--ok);
+}
+
+.cut-button:disabled,
+.end-turn-button:disabled {
+  opacity: 0.56;
 }
 
 .tool-row {
@@ -958,7 +978,8 @@ button:disabled {
     --board-pad: 12px;
   }
 
-  .cut-button {
+  .cut-button,
+  .end-turn-button {
     min-width: 66px;
     min-height: 38px;
     font-size: 0.86rem;

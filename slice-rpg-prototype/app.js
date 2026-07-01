@@ -19,6 +19,7 @@
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
   const DRAG_POINTER_OFFSET = 22;
+  const MAX_CUTS_PER_TURN = 2;
   const MIN_CELL_SIZE = 22;
   const MAX_CELL_SIZE = 42;
   const COMPACT_HEIGHT = 760;
@@ -168,6 +169,7 @@
     cutLayer: document.querySelector("#cutLayer"),
     knifeLayer: document.querySelector("#knifeLayer"),
     cutButton: document.querySelector("#cutButton"),
+    endTurnButton: document.querySelector("#endTurnButton"),
     knifeHint: document.querySelector("#knifeHint"),
     battleLog: document.querySelector("#battleLog"),
     overlay: document.querySelector("#overlay"),
@@ -182,6 +184,7 @@
     stageIndex: 0,
     turn: 1,
     actionIndex: 0,
+    cutsUsed: 0,
     playerHp: MAX_HP,
     monsterCells: new Map(),
     materialCols: 5,
@@ -246,6 +249,7 @@
     state.stageIndex = index;
     state.turn = 1;
     state.actionIndex = 0;
+    state.cutsUsed = 0;
     state.monsterCells = new Map();
     state.materialCols = CUT_BOARD_COLS;
     state.materialRows = CUT_BOARD_ROWS;
@@ -327,6 +331,9 @@
     els.monsterName.textContent = currentMonster().name;
     els.completionLabel.textContent = `${covered} / ${total}`;
     els.completionFill.style.width = `${(covered / total) * 100}%`;
+    els.cutButton.textContent = `자르기 ${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
+    els.cutButton.disabled = state.cutsUsed >= MAX_CUTS_PER_TURN || Boolean(state.resultMode);
+    if (els.endTurnButton) els.endTurnButton.disabled = Boolean(state.resultMode);
   }
 
   function renderActionCard() {
@@ -346,10 +353,10 @@
       special: "몬스터 고유 행동. 특수 표식을 덮으면 약화.",
     };
     const chips = {
-      attack: [`피해 ${monster.baseAttack + attackIcons}`, `공격 ${attackIcons}`],
-      heal: [`회복 ${healIcons}`, `해제 ${healTargets.length}`],
-      defense: [`방어 ${defenseIcons}`, `갑피 ${armorBlocks.length}`],
-      special: [`특수 ${specialIcons}`],
+      attack: [`피해 ${monster.baseAttack + attackIcons}`, `공격 ${attackIcons}`, `자르기 ${remainingCuts()}`],
+      heal: [`회복 ${healIcons}`, `해제 ${healTargets.length}`, `자르기 ${remainingCuts()}`],
+      defense: [`방어 ${defenseIcons}`, `갑피 ${armorBlocks.length}`, `자르기 ${remainingCuts()}`],
+      special: [`특수 ${specialIcons}`, `자르기 ${remainingCuts()}`],
     };
     const blockNotice = state.blocked.size
       ? `<p>갑피 ${state.blocked.size}칸은 이번 턴 배치 불가.</p>`
@@ -704,6 +711,13 @@
   }
 
   function applyCuts() {
+    if (state.cutsUsed >= MAX_CUTS_PER_TURN) {
+      addLog("이번 턴에는 더 자를 수 없다.");
+      render();
+      return;
+    }
+
+    state.cutsUsed += 1;
     let added = 0;
     state.knives.forEach((knife) => {
       const type = KNIFE_TYPES[knife.type];
@@ -724,7 +738,8 @@
     const before = state.materialPieces.length;
     rebuildPiecesFromCuts();
     const separated = Math.max(0, state.materialPieces.length - before);
-    addLog(added ? `절단선 ${added}개를 냈다. ${separated ? `${separated}개 조각이 새로 분리됐다.` : "아직 흠집만 남아 있다."}` : "새로 잘린 선이 없다.");
+    const cutSuffix = `남은 자르기 ${remainingCuts()}회.`;
+    addLog(added ? `절단선 ${added}개를 냈다. ${separated ? `${separated}개 조각이 새로 분리됐다.` : "아직 흠집만 남아 있다."} ${cutSuffix}` : `새로 잘린 선이 없다. ${cutSuffix}`);
     render();
   }
 
@@ -881,7 +896,7 @@
       return;
     }
 
-    finishPlayerTurn();
+    render();
   }
 
   function tryReturnPlacedPieceToBoard(placementId, anchorX, anchorY) {
@@ -936,6 +951,7 @@
   }
 
   function finishPlayerTurn() {
+    addLog("턴 종료. 몬스터가 예고한 행동을 실행한다.");
     const oldBlocks = state.blocked.size;
     state.blocked = new Set();
     if (oldBlocks) addLog("이번 턴을 막던 갑피가 떨어졌다.");
@@ -950,6 +966,7 @@
 
     state.actionIndex += 1;
     state.turn += 1;
+    state.cutsUsed = 0;
 
     if (remainingCoverPotential() < uncoveredCount()) {
       render();
@@ -1494,6 +1511,10 @@
     return state.materialPieces.reduce((sum, piece) => sum + piece.cells.length, 0);
   }
 
+  function remainingCuts() {
+    return Math.max(0, MAX_CUTS_PER_TURN - state.cutsUsed);
+  }
+
   function remainingCoverPotential() {
     return availableMaterialCount();
   }
@@ -1540,6 +1561,11 @@
     startGame();
   }
 
+  function handleEndTurn() {
+    if (state.resultMode) return;
+    finishPlayerTurn();
+  }
+
   function markInputStart() {
     inputActive = true;
   }
@@ -1581,6 +1607,7 @@
   window.addEventListener("pointercancel", markInputEnd, { capture: true, passive: true });
   els.restartButton.addEventListener("click", startGame);
   els.cutButton.addEventListener("click", applyCuts);
+  els.endTurnButton?.addEventListener("click", handleEndTurn);
   els.resultButton.addEventListener("click", handleResultButton);
   window.addEventListener("resize", scheduleResponsiveRender);
   window.visualViewport?.addEventListener("resize", scheduleResponsiveRender);
