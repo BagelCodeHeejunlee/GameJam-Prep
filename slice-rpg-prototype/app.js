@@ -18,7 +18,7 @@
   const BOARD_GAP = 3;
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
-  const DRAG_POINTER_OFFSET = 14;
+  const DRAG_POINTER_OFFSET = 22;
 
   const monsters = [
     {
@@ -497,14 +497,21 @@
   function beginKnifeDrag(event, index) {
     event.preventDefault();
     state.drag = { type: "knife", index };
+    moveKnifeWithDragOffset(index, event.clientX, event.clientY);
+    renderMaterialBoard();
     window.addEventListener("pointermove", onKnifeMove);
     window.addEventListener("pointerup", onPointerUp, { once: true });
   }
 
   function onKnifeMove(event) {
     if (!state.drag || state.drag.type !== "knife") return;
-    moveKnifeToPoint(state.drag.index, event.clientX, event.clientY);
+    moveKnifeWithDragOffset(state.drag.index, event.clientX, event.clientY);
     renderMaterialBoard();
+  }
+
+  function moveKnifeWithDragOffset(index, clientX, clientY) {
+    const guidePoint = getDragGuidePoint(clientX, clientY);
+    moveKnifeToPoint(index, guidePoint.x, guidePoint.y);
   }
 
   function moveKnifeToPoint(index, clientX, clientY) {
