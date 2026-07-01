@@ -745,6 +745,7 @@ button:disabled {
 .board-knife::after {
   content: "";
   position: absolute;
+  box-sizing: border-box;
   border: 2px solid #627084;
   border-radius: 999px;
   background: linear-gradient(135deg, #fafdff 0 26%, #ccd9e8 27% 62%, #607186 63% 100%);
@@ -789,13 +790,23 @@ button:disabled {
   display: block;
   min-width: var(--knife-thick);
   min-height: var(--knife-thick);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.knife-guide::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
   border: 3px solid #ffe34a;
   border-radius: 999px;
   background: rgba(255, 222, 65, 0.34);
   box-shadow:
     inset 0 0 0 2px rgba(255, 255, 255, 0.7),
     0 0 0 2px rgba(37, 34, 29, 0.26);
-  pointer-events: none;
 }
 
 .knife-guide.h {
@@ -804,6 +815,22 @@ button:disabled {
 
 .knife-guide.v {
   width: var(--knife-hit);
+}
+
+.knife-guide.h::after {
+  right: 0;
+  left: 0;
+  top: 50%;
+  height: var(--knife-thick);
+  transform: translateY(-50%);
+}
+
+.knife-guide.v::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--knife-thick);
+  transform: translateX(-50%);
 }
 
 .board-knife.h {
@@ -1169,6 +1196,7 @@ button:disabled {
 .knife-drag-ghost::after {
   content: "";
   position: absolute;
+  box-sizing: border-box;
   border: 2px solid #627084;
   border-radius: 999px;
   background: linear-gradient(135deg, #fafdff 0 26%, #ccd9e8 27% 62%, #607186 63% 100%);
