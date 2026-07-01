@@ -18,8 +18,7 @@
   const BOARD_GAP = 3;
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
-  const DRAG_GHOST_MARGIN = 8;
-  const DRAG_GHOST_LIFT = 76;
+  const DRAG_POINTER_OFFSET = 14;
 
   const monsters = [
     {
@@ -805,15 +804,11 @@
   }
 
   function moveDragGhost(x, y) {
-    const rect = els.dragGhost.getBoundingClientRect();
-    const right = window.innerWidth - rect.width - DRAG_GHOST_MARGIN;
-    const bottom = window.innerHeight - rect.height - DRAG_GHOST_MARGIN;
-    let nextX = x + 18;
-    let nextY = y - rect.height - DRAG_GHOST_LIFT;
-
-    if (nextY < DRAG_GHOST_MARGIN) nextY = y + 24;
-    nextX = clamp(nextX, DRAG_GHOST_MARGIN, Math.max(DRAG_GHOST_MARGIN, right));
-    nextY = clamp(nextY, DRAG_GHOST_MARGIN, Math.max(DRAG_GHOST_MARGIN, bottom));
+    const cell = getMaterialCellSize();
+    const step = cell + BOARD_GAP;
+    const dragOffset = state.drag?.type === "piece" ? state.drag.offset : { x: 0, y: 0 };
+    const nextX = x - dragOffset.x * step - cell / 2 - DRAG_POINTER_OFFSET;
+    const nextY = y - dragOffset.y * step - cell / 2 - DRAG_POINTER_OFFSET;
     els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
   }
 
@@ -875,19 +870,27 @@
   function getDropPreview(x, y) {
     if (!state.drag || state.drag.type !== "piece") return null;
 
-    const monsterPoint = getMonsterCellFromPoint(x, y);
+    const guidePoint = getDragGuidePoint(x, y);
+    const monsterPoint = getMonsterCellFromPoint(guidePoint.x, guidePoint.y);
     if (monsterPoint) {
       const cell = monsterPoint;
       return buildMonsterDropPreview(state.drag.pieceId, cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
     }
 
-    const materialPoint = getMaterialCellFromPoint(x, y);
+    const materialPoint = getMaterialCellFromPoint(guidePoint.x, guidePoint.y);
     if (materialPoint) {
       const cell = materialPoint;
       return buildMaterialDropPreview(state.drag.pieceId, cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
     }
 
     return null;
+  }
+
+  function getDragGuidePoint(x, y) {
+    return {
+      x: x - DRAG_POINTER_OFFSET,
+      y: y - DRAG_POINTER_OFFSET,
+    };
   }
 
   function buildMaterialDropPreview(pieceId, anchorX, anchorY, normalizedCells) {

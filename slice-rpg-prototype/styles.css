@@ -16,7 +16,7 @@
   --warning: #d88d28;
   --blocked: #2e3440;
   --ok: #246c50;
-  --cell: clamp(25px, 7.2vw, 31px);
+  --cell: clamp(23px, 6.8vw, 28px);
   --small-cell: clamp(34px, 9vw, 42px);
   --board-pad: 14px;
   --knife-thick: 12px;
@@ -89,7 +89,7 @@ button:disabled {
 .fill-zone {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 6px;
+  gap: 5px;
 }
 
 .cut-zone {
@@ -110,7 +110,7 @@ button:disabled {
 
 .top-bar {
   color: #fff9e8;
-  min-height: 34px;
+  min-height: 28px;
 }
 
 .top-bar h1,
@@ -122,7 +122,7 @@ button:disabled {
 }
 
 .top-bar h1 {
-  font-size: 1.12rem;
+  font-size: 1.02rem;
 }
 
 .eyebrow {
@@ -150,7 +150,7 @@ button:disabled {
 }
 
 .status-strip {
-  padding: 7px 9px;
+  padding: 5px 8px;
   border: 1px solid rgba(255, 248, 229, 0.24);
   border-radius: 8px;
   background: rgba(255, 248, 229, 0.1);
@@ -165,7 +165,7 @@ button:disabled {
 .tool-count span {
   display: block;
   color: #d6c7a6;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
@@ -173,7 +173,7 @@ button:disabled {
 .tool-count strong {
   display: block;
   margin-top: 2px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   line-height: 1;
 }
 
@@ -190,14 +190,14 @@ button:disabled {
 
 .monster-section {
   min-height: 0;
-  padding: 8px;
+  padding: 6px;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .monster-head {
   align-items: flex-start;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .completion {
@@ -230,9 +230,9 @@ button:disabled {
 }
 
 .action-card {
-  min-height: 50px;
-  margin-bottom: 6px;
-  padding: 7px 8px;
+  min-height: 40px;
+  margin-bottom: 4px;
+  padding: 5px 7px;
   border-radius: 8px;
   background: #27241f;
   color: #fff8e5;
@@ -240,33 +240,33 @@ button:disabled {
 
 .action-card strong {
   display: block;
-  margin-bottom: 2px;
-  font-size: 0.9rem;
+  margin-bottom: 1px;
+  font-size: 0.82rem;
 }
 
 .action-card p {
   margin: 0;
   color: #e9d9b4;
-  font-size: 0.72rem;
-  line-height: 1.25;
+  font-size: 0.66rem;
+  line-height: 1.2;
 }
 
 .action-card .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 5px;
+  margin-top: 3px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 6px;
+  padding: 2px 5px;
   border-radius: 999px;
   background: rgba(255, 248, 229, 0.14);
   color: #fff8e5;
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 800;
 }
 
@@ -281,6 +281,7 @@ button:disabled {
 .monster-grid {
   min-height: 0;
   align-content: center;
+  overflow: visible;
 }
 
 .monster-cell,
@@ -758,10 +759,10 @@ button:disabled {
   top: 0;
   z-index: 50;
   padding: 0;
-  border: 1px solid rgba(255, 248, 229, 0.45);
+  border: 0;
   border-radius: 8px;
-  background: rgba(37, 34, 29, 0.88);
-  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.32);
+  background: transparent;
+  box-shadow: none;
   pointer-events: none;
   will-change: transform;
 }
@@ -773,7 +774,7 @@ button:disabled {
 .drag-piece-grid {
   display: grid;
   gap: 3px;
-  padding: 4px;
+  padding: 0;
 }
 
 .drag-piece-cell {
@@ -808,7 +809,7 @@ button:disabled {
 
 @media (max-width: 370px) {
   :root {
-    --cell: 25px;
+    --cell: 23px;
     --small-cell: 31px;
     --board-pad: 12px;
   }
