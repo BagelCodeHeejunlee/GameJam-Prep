@@ -208,6 +208,10 @@
   };
 
   let resizeFrame = null;
+  let resizeTimer = null;
+  let inputActive = false;
+  let pendingResponsiveRender = false;
+  let lastViewportSize = { width: 0, height: 0 };
 
   function c(x, y, icon = null) {
     return { x, y, icon };
@@ -366,6 +370,7 @@
   }
 
   function updateAdaptiveCellSize() {
+    lastViewportSize = { width: viewportWidth(), height: viewportHeight() };
     const nextSize = calculateAdaptiveCellSize();
     if (!Number.isFinite(nextSize) || Math.abs(nextSize - state.cellSize) < 0.1) return;
     state.cellSize = nextSize;
@@ -624,7 +629,8 @@
     renderMaterialBoard();
     showKnifeGhost(index, event.clientX, event.clientY);
     window.addEventListener("pointermove", onKnifeMove);
-    window.addEventListener("pointerup", onPointerUp, { once: true });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onKnifeCancel);
   }
 
   function onKnifeMove(event) {
@@ -671,7 +677,7 @@
   }
 
   function onPointerUp() {
-    window.removeEventListener("pointermove", onKnifeMove);
+    removeKnifeDragListeners();
     if (state.drag?.type === "knife" && state.knifePreview) {
       const knife = state.knives[state.drag.index];
       knife.x = state.knifePreview.x;
@@ -681,6 +687,20 @@
     state.knifePreview = null;
     state.drag = null;
     render();
+  }
+
+  function onKnifeCancel() {
+    removeKnifeDragListeners();
+    hideDragGhost();
+    state.knifePreview = null;
+    state.drag = null;
+    render();
+  }
+
+  function removeKnifeDragListeners() {
+    window.removeEventListener("pointermove", onKnifeMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onKnifeCancel);
   }
 
   function applyCuts() {
@@ -723,7 +743,8 @@
     showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY);
     updateDropPreview(event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
-    window.addEventListener("pointerup", onPieceUp, { once: true });
+    window.addEventListener("pointerup", onPieceUp);
+    window.addEventListener("pointercancel", onPieceCancel);
   }
 
   function onPieceMove(event) {
@@ -733,7 +754,7 @@
   }
 
   function onPieceUp(event) {
-    window.removeEventListener("pointermove", onPieceMove);
+    removePieceDragListeners();
     const drag = state.drag;
     const dropPreview = getDropPreview(event.clientX, event.clientY);
     state.drag = null;
@@ -766,6 +787,22 @@
     render();
   }
 
+  function onPieceCancel() {
+    removePieceDragListeners();
+    state.drag = null;
+    state.draggingPieceId = null;
+    state.draggingPlacementId = null;
+    state.dropPreview = null;
+    hideDragGhost();
+    render();
+  }
+
+  function removePieceDragListeners() {
+    window.removeEventListener("pointermove", onPieceMove);
+    window.removeEventListener("pointerup", onPieceUp);
+    window.removeEventListener("pointercancel", onPieceCancel);
+  }
+
   function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
     const placement = getPlacement(placementId);
     if (!placement) return;
@@ -786,7 +823,8 @@
     showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY);
     updateDropPreview(event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
-    window.addEventListener("pointerup", onPieceUp, { once: true });
+    window.addEventListener("pointerup", onPieceUp);
+    window.addEventListener("pointercancel", onPieceCancel);
   }
 
   function tryMovePieceOnBoard(pieceId, anchorX, anchorY) {
@@ -1502,14 +1540,45 @@
     startGame();
   }
 
-  function scheduleResponsiveRender() {
-    if (resizeFrame) cancelAnimationFrame(resizeFrame);
-    resizeFrame = requestAnimationFrame(() => {
-      resizeFrame = null;
-      render();
-    });
+  function markInputStart() {
+    inputActive = true;
   }
 
+  function markInputEnd() {
+    window.setTimeout(() => {
+      inputActive = false;
+      if (!pendingResponsiveRender) return;
+      pendingResponsiveRender = false;
+      scheduleResponsiveRender();
+    }, 140);
+  }
+
+  function scheduleResponsiveRender() {
+    const nextSize = { width: viewportWidth(), height: viewportHeight() };
+    const changed = Math.abs(nextSize.width - lastViewportSize.width) > 0.5
+      || Math.abs(nextSize.height - lastViewportSize.height) > 0.5;
+    if (!changed) return;
+
+    if (inputActive) {
+      pendingResponsiveRender = true;
+      return;
+    }
+
+    lastViewportSize = nextSize;
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    if (resizeTimer) window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      resizeTimer = null;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        render();
+      });
+    }, 80);
+  }
+
+  window.addEventListener("pointerdown", markInputStart, { capture: true, passive: true });
+  window.addEventListener("pointerup", markInputEnd, { capture: true, passive: true });
+  window.addEventListener("pointercancel", markInputEnd, { capture: true, passive: true });
   els.restartButton.addEventListener("click", startGame);
   els.cutButton.addEventListener("click", applyCuts);
   els.resultButton.addEventListener("click", handleResultButton);
