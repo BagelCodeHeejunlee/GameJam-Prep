@@ -1306,31 +1306,22 @@
   }
 
   function getMonsterCellFromAnchorPoint(point) {
-    const gridRect = els.monsterGrid.getBoundingClientRect();
     const cellSize = getMonsterCellSize();
-    const step = cellSize + BOARD_GAP;
-    const margin = cellSize + BOARD_GAP;
+    const monster = currentMonster();
+    const gridCell = getGridCellFromAnchorPoint(point, els.monsterGrid, monster.cols, monster.rows, cellSize);
 
-    if (
-      point.x < gridRect.left - margin
-      || point.y < gridRect.top - margin
-      || point.x > gridRect.right + margin
-      || point.y > gridRect.bottom + margin
-    ) {
-      return null;
-    }
+    if (!gridCell) return null;
+    if (state.monsterCells.has(key(gridCell.x, gridCell.y))) return gridCell;
 
     let best = null;
     state.monsterCells.forEach((cell) => {
-      const centerX = gridRect.left + cell.x * step + cellSize / 2;
-      const centerY = gridRect.top + cell.y * step + cellSize / 2;
-      const distance = Math.hypot(point.x - centerX, point.y - centerY);
-      if (!best || distance < best.distance) {
-        best = { x: cell.x, y: cell.y, distance };
+      const gridDistance = Math.hypot(gridCell.x - cell.x, gridCell.y - cell.y);
+      if (!best || gridDistance < best.gridDistance) {
+        best = { x: cell.x, y: cell.y, gridDistance };
       }
     });
 
-    return best && best.distance <= cellSize * 1.75 ? best : null;
+    return best && best.gridDistance <= 1.5 ? best : null;
   }
 
   function getGridCellFromAnchorPoint(point, gridEl, cols, rows, cellSize) {
