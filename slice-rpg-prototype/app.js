@@ -184,13 +184,16 @@
     missingCells: new Set(),
     spoiledCells: new Set(),
     knives: [],
+    placedPieces: [],
     blocked: new Set(),
     coverOrder: [],
     log: [],
     resultMode: null,
     nextPieceId: 1,
+    nextPlacementId: 1,
     initialMaterialTotal: 0,
     draggingPieceId: null,
+    draggingPlacementId: null,
     dropPreview: null,
     knifePreview: null,
     drag: null,
@@ -244,12 +247,15 @@
       y: knife.y + state.materialOrigin.y,
       id: `knife-${index}`,
     }));
+    state.placedPieces = [];
     state.blocked = new Set();
     state.coverOrder = [];
     state.log = [];
     state.resultMode = null;
     state.nextPieceId = 1;
+    state.nextPlacementId = 1;
     state.draggingPieceId = null;
+    state.draggingPlacementId = null;
     state.dropPreview = null;
     state.knifePreview = null;
     state.drag = null;
@@ -347,6 +353,7 @@
     const healPreview = new Set(currentAction() === "heal" ? chooseHealTargets(uncoveredIconCount("heal")) : []);
     const dropPreview = state.dropPreview?.zone === "monster" ? state.dropPreview : null;
     const dropPreviewCells = new Set(dropPreview?.cells || []);
+    const draggingPlacedCells = getDraggingPlacedCells();
     els.monsterGrid.style.gridTemplateColumns = `repeat(${monster.cols}, var(--cell))`;
     els.monsterGrid.innerHTML = "";
 
@@ -365,7 +372,14 @@
         button.type = "button";
         button.className = "monster-cell";
         button.dataset.key = cellKey;
-        if (monsterCell.covered) button.classList.add("covered");
+        const isDraggingPlacedCell = draggingPlacedCells.has(cellKey);
+        if (monsterCell.covered && !isDraggingPlacedCell) {
+          button.classList.add("covered");
+          if (monsterCell.placementId) {
+            button.dataset.placementId = String(monsterCell.placementId);
+            button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId, x, y));
+          }
+        }
         if (state.blocked.has(cellKey)) button.classList.add("blocked");
         if (armorPreview.has(cellKey)) button.classList.add("preview-block");
         if (healPreview.has(cellKey)) button.classList.add("heal-target");
@@ -436,6 +450,7 @@
   function renderCutMarks() {
     const rendered = new Set();
     state.materialPieces.forEach((piece) => {
+      if (piece.id === state.draggingPieceId) return;
       piece.cutEdges.forEach((edge) => rendered.add(edge));
     });
 
@@ -611,10 +626,12 @@
     const min = minCell(piece.cells);
     const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
     state.drag = { type: "piece", pieceId, offset, cells: normalizeCells(piece.cells) };
+    state.drag.cutEdges = normalizeCutEdges(piece.cutEdges, min);
+    state.drag.source = "material";
     state.draggingPieceId = pieceId;
     state.dropPreview = null;
     renderMaterialBoard();
-    showDragGhost(state.drag.cells, event.clientX, event.clientY);
+    showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY);
     updateDropPreview(event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
     window.addEventListener("pointerup", onPieceUp, { once: true });
@@ -632,21 +649,55 @@
     const dropPreview = getDropPreview(event.clientX, event.clientY);
     state.drag = null;
     state.draggingPieceId = null;
+    state.draggingPlacementId = null;
     state.dropPreview = null;
     hideDragGhost();
     if (!drag) return;
 
-    if (dropPreview?.zone === "monster") {
+    if (drag.source === "monster" && dropPreview?.zone === "material") {
+      tryReturnPlacedPieceToBoard(drag.placementId, dropPreview.anchorX, dropPreview.anchorY);
+      return;
+    }
+
+    if (drag.source === "monster" && dropPreview?.zone === "monster") {
+      tryMovePlacedPieceOnMonster(drag.placementId, dropPreview.anchorX, dropPreview.anchorY);
+      return;
+    }
+
+    if (drag.source === "material" && dropPreview?.zone === "monster") {
       tryPlacePieceOnMonster(drag.pieceId, dropPreview.anchorX, dropPreview.anchorY);
       return;
     }
 
-    if (dropPreview?.zone === "material") {
+    if (drag.source === "material" && dropPreview?.zone === "material") {
       tryMovePieceOnBoard(drag.pieceId, dropPreview.anchorX, dropPreview.anchorY);
       return;
     }
 
     render();
+  }
+
+  function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
+    const placement = getPlacement(placementId);
+    if (!placement) return;
+    event.preventDefault();
+    const min = minCell(placement.cells);
+    const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
+    state.drag = {
+      type: "piece",
+      source: "monster",
+      placementId,
+      offset,
+      cells: normalizeCells(placement.cells),
+      cutEdges: normalizeCutEdges(placement.cutEdges, min),
+    };
+    state.draggingPlacementId = placementId;
+    state.dropPreview = null;
+    renderMonster();
+    showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY);
+    updateDropPreview(event.clientX, event.clientY);
+    window.addEventListener("pointermove", onPieceMove);
+    window.addEventListener("pointerup", onPieceUp, { once: true });
   }
 
   function tryMovePieceOnBoard(pieceId, anchorX, anchorY) {
@@ -682,9 +733,18 @@
       const cellKey = key(cell.x, cell.y);
       const monsterCell = state.monsterCells.get(cellKey);
       monsterCell.covered = true;
+      monsterCell.placementId = state.nextPlacementId;
       state.coverOrder = state.coverOrder.filter((coveredKey) => coveredKey !== cellKey);
       state.coverOrder.push(cellKey);
     });
+    const pieceMin = minCell(piece.cells);
+    const placementMin = minCell(placement.cells);
+    state.placedPieces.push({
+      id: state.nextPlacementId,
+      cells: placement.cells,
+      cutEdges: translateCutEdges(piece.cutEdges, placementMin.x - pieceMin.x, placementMin.y - pieceMin.y),
+    });
+    state.nextPlacementId += 1;
     state.materialPieces = state.materialPieces.filter((pieceItem) => pieceItem.id !== pieceId);
     addLog(`${placement.cells.length}칸 조각을 몬스터에 채웠다.`);
 
@@ -695,6 +755,57 @@
     }
 
     finishPlayerTurn();
+  }
+
+  function tryReturnPlacedPieceToBoard(placementId, anchorX, anchorY) {
+    const placement = getPlacement(placementId);
+    if (!placement) return;
+    const boardPlacement = getBoardPlacementFromCells(normalizeCells(placement.cells), anchorX, anchorY);
+
+    if (!boardPlacement.valid) {
+      addLog("그 위치에는 회수한 조각을 놓을 수 없다.");
+      render();
+      return;
+    }
+
+    removePlacementCoverage(placement);
+    state.placedPieces = state.placedPieces.filter((item) => item.id !== placementId);
+    state.materialPieces.push({
+      id: state.nextPieceId,
+      cells: boardPlacement.cells,
+      cutEdges: translateCutEdges(placement.cutEdges, anchorX - minCell(placement.cells).x, anchorY - minCell(placement.cells).y),
+    });
+    state.nextPieceId += 1;
+    addLog(`${boardPlacement.cells.length}칸 조각을 다시 재료판으로 가져왔다.`);
+    render();
+  }
+
+  function tryMovePlacedPieceOnMonster(placementId, anchorX, anchorY) {
+    const placement = getPlacement(placementId);
+    if (!placement) return;
+    const monsterPlacement = getMonsterPlacementFromCells(normalizeCells(placement.cells), anchorX, anchorY, placementId);
+
+    if (!monsterPlacement.valid) {
+      addLog("그 위치에는 조각을 다시 놓을 수 없다.");
+      render();
+      return;
+    }
+
+    const currentMin = minCell(placement.cells);
+    const nextMin = minCell(monsterPlacement.cells);
+    removePlacementCoverage(placement);
+    placement.cells = monsterPlacement.cells;
+    placement.cutEdges = translateCutEdges(placement.cutEdges, nextMin.x - currentMin.x, nextMin.y - currentMin.y);
+    placement.cells.forEach((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      const monsterCell = state.monsterCells.get(cellKey);
+      monsterCell.covered = true;
+      monsterCell.placementId = placement.id;
+      state.coverOrder = state.coverOrder.filter((coveredKey) => coveredKey !== cellKey);
+      state.coverOrder.push(cellKey);
+    });
+    addLog(`${placement.cells.length}칸 조각을 몬스터 위에서 옮겼다.`);
+    render();
   }
 
   function finishPlayerTurn() {
@@ -737,10 +848,9 @@
     if (action === "heal") {
       const healIcons = uncoveredIconCount("heal");
       const targets = chooseHealTargets(healIcons);
-      targets.forEach((cellKey) => {
-        state.monsterCells.get(cellKey).covered = false;
-      });
+      targets.forEach((cellKey) => uncoverMonsterCell(cellKey));
       state.coverOrder = state.coverOrder.filter((cellKey) => !targets.includes(cellKey));
+      prunePlacedPieces();
       addLog(targets.length ? `회복 실행. 일반 칸 ${targets.length}개가 다시 비었다.` : "회복 표식이 막혀 아무 칸도 되돌리지 못했다.");
       return;
     }
@@ -829,6 +939,44 @@
     return state.materialPieces.find((piece) => piece.id === pieceId);
   }
 
+  function getPlacement(placementId) {
+    return state.placedPieces.find((placement) => placement.id === placementId);
+  }
+
+  function getDraggingPlacedCells() {
+    const placement = state.draggingPlacementId ? getPlacement(state.draggingPlacementId) : null;
+    return new Set(placement ? placement.cells.map((cell) => key(cell.x, cell.y)) : []);
+  }
+
+  function removePlacementCoverage(placement) {
+    const removed = new Set(placement.cells.map((cell) => key(cell.x, cell.y)));
+    placement.cells.forEach((cell) => {
+      const monsterCell = state.monsterCells.get(key(cell.x, cell.y));
+      if (!monsterCell || monsterCell.placementId !== placement.id) return;
+      monsterCell.covered = false;
+      delete monsterCell.placementId;
+    });
+    state.coverOrder = state.coverOrder.filter((cellKey) => !removed.has(cellKey));
+  }
+
+  function uncoverMonsterCell(cellKey) {
+    const monsterCell = state.monsterCells.get(cellKey);
+    if (!monsterCell) return;
+    monsterCell.covered = false;
+    delete monsterCell.placementId;
+  }
+
+  function prunePlacedPieces() {
+    state.placedPieces.forEach((placement) => {
+      placement.cells = placement.cells.filter((cell) => {
+        const monsterCell = state.monsterCells.get(key(cell.x, cell.y));
+        return monsterCell?.covered && monsterCell.placementId === placement.id;
+      });
+      placement.cutEdges = keepCutEdgesForCells(placement.cutEdges, new Set(placement.cells.map((cell) => key(cell.x, cell.y))));
+    });
+    state.placedPieces = state.placedPieces.filter((placement) => placement.cells.length > 0);
+  }
+
   function getMaterialCellSize() {
     const cell = els.materialGrid.querySelector(".material-cell");
     return cell ? cell.getBoundingClientRect().width : 22;
@@ -842,10 +990,10 @@
     return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--knife-thick")) || 12;
   }
 
-  function showDragGhost(cells, x, y) {
+  function showDragGhost(cells, cutEdges, x, y) {
     els.dragGhost.className = "drag-ghost";
     els.dragGhost.innerHTML = "";
-    els.dragGhost.append(renderBoardPieceGrid(cells));
+    els.dragGhost.append(renderBoardPieceGrid(cells, cutEdges));
     moveDragGhost(x, y);
   }
 
@@ -907,7 +1055,7 @@
     return grid;
   }
 
-  function renderBoardPieceGrid(cells) {
+  function renderBoardPieceGrid(cells, cutEdges = new Set()) {
     const normalized = normalizeCells(cells);
     const maxX = Math.max(...normalized.map((cell) => cell.x));
     const maxY = Math.max(...normalized.map((cell) => cell.y));
@@ -924,6 +1072,21 @@
         grid.append(cell);
       }
     }
+
+    cutEdges.forEach((edge) => {
+      const mark = edgeToMark(edge);
+      if (!mark) return;
+      const el = document.createElement("span");
+      el.className = `drag-cut-mark ${mark.orientation}`;
+      el.style.left = dragGridPos(mark.x);
+      el.style.top = dragGridPos(mark.y);
+      if (mark.orientation === "h") {
+        el.style.width = "var(--small-cell)";
+      } else {
+        el.style.height = "var(--small-cell)";
+      }
+      grid.append(el);
+    });
     return grid;
   }
 
@@ -944,13 +1107,13 @@
     const monsterPoint = getMonsterCellFromPoint(guidePoint.x, guidePoint.y);
     if (monsterPoint) {
       const cell = monsterPoint;
-      return buildMonsterDropPreview(state.drag.pieceId, cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
+      return buildMonsterDropPreview(cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
     }
 
     const materialPoint = getMaterialCellFromPoint(guidePoint.x, guidePoint.y);
     if (materialPoint) {
       const cell = materialPoint;
-      return buildMaterialDropPreview(state.drag.pieceId, cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
+      return buildMaterialDropPreview(cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
     }
 
     return null;
@@ -963,10 +1126,9 @@
     };
   }
 
-  function buildMaterialDropPreview(pieceId, anchorX, anchorY, normalizedCells) {
-    const piece = getPiece(pieceId);
-    if (!piece) return null;
-    const placement = getBoardPlacement(piece, anchorX, anchorY, normalizedCells);
+  function buildMaterialDropPreview(anchorX, anchorY, normalizedCells) {
+    const skipPieceId = state.drag?.source === "material" ? state.drag.pieceId : null;
+    const placement = getBoardPlacementFromCells(normalizedCells, anchorX, anchorY, skipPieceId);
     return {
       zone: "material",
       anchorX,
@@ -976,10 +1138,9 @@
     };
   }
 
-  function buildMonsterDropPreview(pieceId, anchorX, anchorY, normalizedCells) {
-    const piece = getPiece(pieceId);
-    if (!piece) return null;
-    const placement = getMonsterPlacement(piece, anchorX, anchorY, normalizedCells);
+  function buildMonsterDropPreview(anchorX, anchorY, normalizedCells) {
+    const skipPlacementId = state.drag?.source === "monster" ? state.drag.placementId : null;
+    const placement = getMonsterPlacementFromCells(normalizedCells, anchorX, anchorY, skipPlacementId);
     return {
       zone: "monster",
       anchorX,
@@ -990,8 +1151,12 @@
   }
 
   function getBoardPlacement(piece, anchorX, anchorY, normalizedCells = normalizeCells(piece.cells)) {
+    return getBoardPlacementFromCells(normalizedCells, anchorX, anchorY, piece.id);
+  }
+
+  function getBoardPlacementFromCells(normalizedCells, anchorX, anchorY, skipPieceId = null) {
     const cells = normalizedCells.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
-    const occupied = buildPieceByCell({ skipPieceId: piece.id });
+    const occupied = buildPieceByCell(skipPieceId ? { skipPieceId } : {});
     const valid = cells.every((cell) => {
       const cellKey = key(cell.x, cell.y);
       if (cell.x < 0 || cell.y < 0 || cell.x >= state.materialCols || cell.y >= state.materialRows) return false;
@@ -1002,13 +1167,22 @@
   }
 
   function getMonsterPlacement(piece, anchorX, anchorY, normalizedCells = normalizeCells(piece.cells)) {
+    return getMonsterPlacementFromCells(normalizedCells, anchorX, anchorY);
+  }
+
+  function getMonsterPlacementFromCells(normalizedCells, anchorX, anchorY, skipPlacementId = null) {
     const cells = normalizedCells.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
     const valid = cells.every((cell) => {
       const cellKey = key(cell.x, cell.y);
       const monsterCell = state.monsterCells.get(cellKey);
-      return monsterCell && !monsterCell.covered && !state.blocked.has(cellKey);
+      const ownCoveredCell = skipPlacementId && monsterCell?.placementId === skipPlacementId;
+      return monsterCell && (!monsterCell.covered || ownCoveredCell) && !state.blocked.has(cellKey);
     });
     return { cells, valid };
+  }
+
+  function dragGridPos(value) {
+    return `calc(${value} * (var(--small-cell) + ${BOARD_GAP}px))`;
   }
 
   function getMaterialCellFromPoint(x, y) {
@@ -1048,6 +1222,13 @@
     return cells
       .map((cell) => ({ x: cell.x - min.x, y: cell.y - min.y }))
       .sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function normalizeCutEdges(edges, min) {
+    return new Set([...edges].map((edge) => {
+      const [a, b] = edge.split("|").map(fromKey);
+      return edgeKey(key(a.x - min.x, a.y - min.y), key(b.x - min.x, b.y - min.y));
+    }));
   }
 
   function minCell(cells) {
