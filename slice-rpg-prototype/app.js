@@ -18,6 +18,8 @@
   const BOARD_GAP = 3;
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
+  const DRAG_GHOST_MARGIN = 8;
+  const DRAG_GHOST_LIFT = 76;
 
   const monsters = [
     {
@@ -190,6 +192,7 @@
     nextPieceId: 1,
     initialMaterialTotal: 0,
     draggingPieceId: null,
+    dropPreview: null,
     drag: null,
   };
 
@@ -247,6 +250,7 @@
     state.resultMode = null;
     state.nextPieceId = 1;
     state.draggingPieceId = null;
+    state.dropPreview = null;
     state.drag = null;
 
     monster.cells.forEach((cell) => {
@@ -340,6 +344,8 @@
     const monster = currentMonster();
     const armorPreview = new Set(currentAction() === "defense" ? chooseArmorBlocks() : []);
     const healPreview = new Set(currentAction() === "heal" ? chooseHealTargets(uncoveredIconCount("heal")) : []);
+    const dropPreview = state.dropPreview?.zone === "monster" ? state.dropPreview : null;
+    const dropPreviewCells = new Set(dropPreview?.cells || []);
     els.monsterGrid.style.gridTemplateColumns = `repeat(${monster.cols}, var(--cell))`;
     els.monsterGrid.innerHTML = "";
 
@@ -362,6 +368,9 @@
         if (state.blocked.has(cellKey)) button.classList.add("blocked");
         if (armorPreview.has(cellKey)) button.classList.add("preview-block");
         if (healPreview.has(cellKey)) button.classList.add("heal-target");
+        if (dropPreviewCells.has(cellKey)) {
+          button.classList.add(dropPreview.valid ? "preview-place" : "preview-invalid");
+        }
 
         if (monsterCell.icon) {
           const icon = document.createElement("span");
@@ -379,6 +388,8 @@
 
   function renderMaterialBoard() {
     const pieceByCell = buildPieceByCell({ skipDragging: true });
+    const dropPreview = state.dropPreview?.zone === "material" ? state.dropPreview : null;
+    const dropPreviewCells = new Set(dropPreview?.cells || []);
     els.materialGrid.style.gridTemplateColumns = `repeat(${state.materialCols}, var(--small-cell))`;
     els.materialGrid.innerHTML = "";
     els.cutLayer.innerHTML = "";
@@ -405,6 +416,10 @@
           button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId, x, y));
         } else {
           button.classList.add("empty-material");
+        }
+
+        if (dropPreviewCells.has(cellKey)) {
+          button.classList.add(dropPreview.valid ? "preview-place" : "preview-invalid");
         }
 
         els.materialGrid.append(button);
@@ -552,8 +567,10 @@
     const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
     state.drag = { type: "piece", pieceId, offset, cells: normalizeCells(piece.cells) };
     state.draggingPieceId = pieceId;
+    state.dropPreview = null;
     renderMaterialBoard();
     showDragGhost(state.drag.cells, event.clientX, event.clientY);
+    updateDropPreview(event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
     window.addEventListener("pointerup", onPieceUp, { once: true });
   }
@@ -561,28 +578,26 @@
   function onPieceMove(event) {
     if (!state.drag || state.drag.type !== "piece") return;
     moveDragGhost(event.clientX, event.clientY);
+    updateDropPreview(event.clientX, event.clientY);
   }
 
   function onPieceUp(event) {
     window.removeEventListener("pointermove", onPieceMove);
     const drag = state.drag;
+    const dropPreview = getDropPreview(event.clientX, event.clientY);
     state.drag = null;
     state.draggingPieceId = null;
+    state.dropPreview = null;
     hideDragGhost();
     if (!drag) return;
 
-    const target = document.elementFromPoint(event.clientX, event.clientY);
-    const monsterCell = target?.closest("#monsterGrid .monster-cell");
-    if (monsterCell?.dataset.key) {
-      const cell = fromKey(monsterCell.dataset.key);
-      tryPlacePieceOnMonster(drag.pieceId, cell.x - drag.offset.x, cell.y - drag.offset.y);
+    if (dropPreview?.zone === "monster") {
+      tryPlacePieceOnMonster(drag.pieceId, dropPreview.anchorX, dropPreview.anchorY);
       return;
     }
 
-    const materialCell = target?.closest("#materialGrid .material-cell");
-    if (materialCell?.dataset.key) {
-      const cell = fromKey(materialCell.dataset.key);
-      tryMovePieceOnBoard(drag.pieceId, cell.x - drag.offset.x, cell.y - drag.offset.y);
+    if (dropPreview?.zone === "material") {
+      tryMovePieceOnBoard(drag.pieceId, dropPreview.anchorX, dropPreview.anchorY);
       return;
     }
 
@@ -592,48 +607,33 @@
   function tryMovePieceOnBoard(pieceId, anchorX, anchorY) {
     const piece = getPiece(pieceId);
     if (!piece) return;
-    const normalized = normalizeCells(piece.cells);
-    const nextCells = normalized.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
-    const currentKeys = new Set(piece.cells.map((cell) => key(cell.x, cell.y)));
-    const occupied = buildPieceByCell();
+    const placement = getBoardPlacement(piece, anchorX, anchorY);
 
-    const valid = nextCells.every((cell) => {
-      const cellKey = key(cell.x, cell.y);
-      if (cell.x < 0 || cell.y < 0 || cell.x >= state.materialCols || cell.y >= state.materialRows) return false;
-      if (state.missingCells.has(cellKey) || state.spoiledCells.has(cellKey)) return false;
-      return !occupied.has(cellKey) || currentKeys.has(cellKey);
-    });
-
-    if (!valid) {
+    if (!placement.valid) {
       addLog("그 위치에는 재료 조각을 옮길 수 없다.");
       render();
       return;
     }
 
     const currentMin = minCell(piece.cells);
-    piece.cells = nextCells;
+    piece.cells = placement.cells;
     piece.cutEdges = translateCutEdges(piece.cutEdges, anchorX - currentMin.x, anchorY - currentMin.y);
-    addLog(`${nextCells.length}칸 조각을 재료판 안에서 옮겼다.`);
+    addLog(`${placement.cells.length}칸 조각을 재료판 안에서 옮겼다.`);
     render();
   }
 
   function tryPlacePieceOnMonster(pieceId, anchorX, anchorY) {
     const piece = getPiece(pieceId);
     if (!piece) return;
-    const mapped = normalizeCells(piece.cells).map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
-    const valid = mapped.every((cell) => {
-      const cellKey = key(cell.x, cell.y);
-      const monsterCell = state.monsterCells.get(cellKey);
-      return monsterCell && !monsterCell.covered && !state.blocked.has(cellKey);
-    });
+    const placement = getMonsterPlacement(piece, anchorX, anchorY);
 
-    if (!valid) {
+    if (!placement.valid) {
       addLog("그 위치에는 재료 조각이 맞지 않는다.");
       render();
       return;
     }
 
-    mapped.forEach((cell) => {
+    placement.cells.forEach((cell) => {
       const cellKey = key(cell.x, cell.y);
       const monsterCell = state.monsterCells.get(cellKey);
       monsterCell.covered = true;
@@ -641,7 +641,7 @@
       state.coverOrder.push(cellKey);
     });
     state.materialPieces = state.materialPieces.filter((pieceItem) => pieceItem.id !== pieceId);
-    addLog(`${mapped.length}칸 조각을 몬스터에 채웠다.`);
+    addLog(`${placement.cells.length}칸 조각을 몬스터에 채웠다.`);
 
     if (isMonsterComplete()) {
       render();
@@ -774,6 +774,7 @@
     const map = new Map();
     state.materialPieces.forEach((piece) => {
       if (options.skipDragging && piece.id === state.draggingPieceId) return;
+      if (options.skipPieceId && piece.id === options.skipPieceId) return;
       piece.cells.forEach((cell) => map.set(key(cell.x, cell.y), piece.id));
     });
     return map;
@@ -804,7 +805,16 @@
   }
 
   function moveDragGhost(x, y) {
-    els.dragGhost.style.transform = `translate(${x + 12}px, ${y + 12}px)`;
+    const rect = els.dragGhost.getBoundingClientRect();
+    const right = window.innerWidth - rect.width - DRAG_GHOST_MARGIN;
+    const bottom = window.innerHeight - rect.height - DRAG_GHOST_MARGIN;
+    let nextX = x + 18;
+    let nextY = y - rect.height - DRAG_GHOST_LIFT;
+
+    if (nextY < DRAG_GHOST_MARGIN) nextY = y + 24;
+    nextX = clamp(nextX, DRAG_GHOST_MARGIN, Math.max(DRAG_GHOST_MARGIN, right));
+    nextY = clamp(nextY, DRAG_GHOST_MARGIN, Math.max(DRAG_GHOST_MARGIN, bottom));
+    els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
   }
 
   function hideDragGhost() {
@@ -850,6 +860,114 @@
       }
     }
     return grid;
+  }
+
+  function updateDropPreview(x, y) {
+    const nextPreview = getDropPreview(x, y);
+    const nextSignature = dropPreviewSignature(nextPreview);
+    const currentSignature = dropPreviewSignature(state.dropPreview);
+    if (nextSignature === currentSignature) return;
+    state.dropPreview = nextPreview;
+    renderMonster();
+    renderMaterialBoard();
+  }
+
+  function getDropPreview(x, y) {
+    if (!state.drag || state.drag.type !== "piece") return null;
+
+    const monsterPoint = getMonsterCellFromPoint(x, y);
+    if (monsterPoint) {
+      const cell = monsterPoint;
+      return buildMonsterDropPreview(state.drag.pieceId, cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
+    }
+
+    const materialPoint = getMaterialCellFromPoint(x, y);
+    if (materialPoint) {
+      const cell = materialPoint;
+      return buildMaterialDropPreview(state.drag.pieceId, cell.x - state.drag.offset.x, cell.y - state.drag.offset.y, state.drag.cells);
+    }
+
+    return null;
+  }
+
+  function buildMaterialDropPreview(pieceId, anchorX, anchorY, normalizedCells) {
+    const piece = getPiece(pieceId);
+    if (!piece) return null;
+    const placement = getBoardPlacement(piece, anchorX, anchorY, normalizedCells);
+    return {
+      zone: "material",
+      anchorX,
+      anchorY,
+      cells: placement.cells.map((cell) => key(cell.x, cell.y)),
+      valid: placement.valid,
+    };
+  }
+
+  function buildMonsterDropPreview(pieceId, anchorX, anchorY, normalizedCells) {
+    const piece = getPiece(pieceId);
+    if (!piece) return null;
+    const placement = getMonsterPlacement(piece, anchorX, anchorY, normalizedCells);
+    return {
+      zone: "monster",
+      anchorX,
+      anchorY,
+      cells: placement.cells.map((cell) => key(cell.x, cell.y)),
+      valid: placement.valid,
+    };
+  }
+
+  function getBoardPlacement(piece, anchorX, anchorY, normalizedCells = normalizeCells(piece.cells)) {
+    const cells = normalizedCells.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const occupied = buildPieceByCell({ skipPieceId: piece.id });
+    const valid = cells.every((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      if (cell.x < 0 || cell.y < 0 || cell.x >= state.materialCols || cell.y >= state.materialRows) return false;
+      if (state.missingCells.has(cellKey) || state.spoiledCells.has(cellKey)) return false;
+      return !occupied.has(cellKey);
+    });
+    return { cells, valid };
+  }
+
+  function getMonsterPlacement(piece, anchorX, anchorY, normalizedCells = normalizeCells(piece.cells)) {
+    const cells = normalizedCells.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const valid = cells.every((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      const monsterCell = state.monsterCells.get(cellKey);
+      return monsterCell && !monsterCell.covered && !state.blocked.has(cellKey);
+    });
+    return { cells, valid };
+  }
+
+  function getMaterialCellFromPoint(x, y) {
+    return getGridCellFromPoint(x, y, els.materialGrid, state.materialCols, state.materialRows, getMaterialCellSize());
+  }
+
+  function getMonsterCellFromPoint(x, y) {
+    const monster = currentMonster();
+    return getGridCellFromPoint(x, y, els.monsterGrid, monster.cols, monster.rows, getMonsterCellSize());
+  }
+
+  function getGridCellFromPoint(x, y, gridEl, cols, rows, cellSize) {
+    const rect = gridEl.getBoundingClientRect();
+    const localX = x - rect.left;
+    const localY = y - rect.top;
+    if (localX < -BOARD_GAP || localY < -BOARD_GAP || localX > rect.width + BOARD_GAP || localY > rect.height + BOARD_GAP) return null;
+
+    const step = cellSize + BOARD_GAP;
+    return {
+      x: clamp(Math.round((localX - cellSize / 2) / step), 0, cols - 1),
+      y: clamp(Math.round((localY - cellSize / 2) / step), 0, rows - 1),
+    };
+  }
+
+  function getMonsterCellSize() {
+    const cell = els.monsterGrid.querySelector(".monster-cell");
+    return cell ? cell.getBoundingClientRect().width : 25;
+  }
+
+  function dropPreviewSignature(preview) {
+    if (!preview) return "";
+    return `${preview.zone}:${preview.anchorX},${preview.anchorY}:${preview.valid}:${preview.cells.join(";")}`;
   }
 
   function normalizeCells(cells) {
