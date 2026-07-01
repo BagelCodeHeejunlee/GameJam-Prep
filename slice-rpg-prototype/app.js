@@ -19,6 +19,10 @@
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
   const DRAG_POINTER_OFFSET = 22;
+  const MIN_CELL_SIZE = 22;
+  const MAX_CELL_SIZE = 42;
+  const COMPACT_HEIGHT = 760;
+  const TINY_HEIGHT = 680;
 
   const monsters = [
     {
@@ -145,6 +149,7 @@
   ];
 
   const els = {
+    appShell: document.querySelector(".app-shell"),
     restartButton: document.querySelector("#restartButton"),
     stageLabel: document.querySelector("#stageLabel"),
     hpLabel: document.querySelector("#hpLabel"),
@@ -155,7 +160,9 @@
     completionLabel: document.querySelector("#completionLabel"),
     completionFill: document.querySelector("#completionFill"),
     actionCard: document.querySelector("#actionCard"),
+    monsterSection: document.querySelector(".monster-section"),
     monsterGrid: document.querySelector("#monsterGrid"),
+    workbench: document.querySelector(".workbench"),
     materialBoard: document.querySelector("#materialBoard"),
     materialGrid: document.querySelector("#materialGrid"),
     cutLayer: document.querySelector("#cutLayer"),
@@ -197,7 +204,10 @@
     dropPreview: null,
     knifePreview: null,
     drag: null,
+    cellSize: 0,
   };
+
+  let resizeFrame = null;
 
   function c(x, y, icon = null) {
     return { x, y, icon };
@@ -295,6 +305,8 @@
   function render() {
     renderStatus();
     renderActionCard();
+    updateLayoutMode();
+    updateAdaptiveCellSize();
     renderMonster();
     renderMaterialBoard();
     renderLog();
@@ -345,6 +357,83 @@
       ${blockNotice}
       <div class="chips">${chips[action].map((chip) => `<span class="chip">${chip}</span>`).join("")}</div>
     `;
+  }
+
+  function updateLayoutMode() {
+    const height = viewportHeight();
+    els.appShell.classList.toggle("compact-layout", height < COMPACT_HEIGHT);
+    els.appShell.classList.toggle("tiny-layout", height < TINY_HEIGHT);
+  }
+
+  function updateAdaptiveCellSize() {
+    const nextSize = calculateAdaptiveCellSize();
+    if (!Number.isFinite(nextSize) || Math.abs(nextSize - state.cellSize) < 0.1) return;
+    state.cellSize = nextSize;
+    document.documentElement.style.setProperty("--small-cell", `${nextSize}px`);
+    document.documentElement.style.setProperty("--cell", `${nextSize}px`);
+  }
+
+  function calculateAdaptiveCellSize() {
+    const monster = currentMonster();
+    const shellWidth = Math.min(viewportWidth(), 440);
+    const preferredSize = shellWidth <= 370 ? 31 : clamp(shellWidth * 0.09, 34, MAX_CELL_SIZE);
+    const limits = [preferredSize];
+    const boardPad = getBoardPad();
+
+    const monsterSectionRect = els.monsterSection.getBoundingClientRect();
+    const monsterSectionStyle = getComputedStyle(els.monsterSection);
+    const monsterInnerWidth = monsterSectionRect.width - horizontalPadding(monsterSectionStyle) - 2;
+    const monsterGridHeight = monsterAvailableHeight(monsterSectionRect, monsterSectionStyle);
+    limits.push(cellLimit(monsterInnerWidth, monster.cols));
+    limits.push(cellLimit(monsterGridHeight, monster.rows));
+
+    const workbenchRect = els.workbench.getBoundingClientRect();
+    const workbenchStyle = getComputedStyle(els.workbench);
+    const workbenchInnerWidth = workbenchRect.width - horizontalPadding(workbenchStyle) - 2;
+    const materialGridWidth = workbenchInnerWidth - boardPad * 2;
+    const materialGridHeight = materialAvailableHeight() - boardPad * 2;
+    limits.push(cellLimit(materialGridWidth, state.materialCols));
+    limits.push(cellLimit(materialGridHeight, state.materialRows));
+
+    const safeSize = Math.min(...limits.filter((value) => Number.isFinite(value) && value > 0));
+    return Math.floor(clamp(safeSize, MIN_CELL_SIZE, preferredSize) * 10) / 10;
+  }
+
+  function monsterAvailableHeight(sectionRect, sectionStyle) {
+    const actionRect = els.actionCard.getBoundingClientRect();
+    const bottomPadding = cssPx(sectionStyle.paddingBottom);
+    return Math.max(0, sectionRect.bottom - bottomPadding - actionRect.bottom - 2);
+  }
+
+  function materialAvailableHeight() {
+    const header = els.workbench.querySelector(".section-head");
+    const headerRect = header.getBoundingClientRect();
+    const workbenchRect = els.workbench.getBoundingClientRect();
+    const workbenchStyle = getComputedStyle(els.workbench);
+    const hintRect = els.knifeHint.getBoundingClientRect();
+    const hintHidden = getComputedStyle(els.knifeHint).display === "none";
+    const bottom = hintHidden ? workbenchRect.bottom - cssPx(workbenchStyle.paddingBottom) : hintRect.top;
+    return Math.max(0, bottom - headerRect.bottom - 2);
+  }
+
+  function cellLimit(available, count) {
+    return (available - BOARD_GAP * Math.max(0, count - 1)) / count;
+  }
+
+  function horizontalPadding(style) {
+    return cssPx(style.paddingLeft) + cssPx(style.paddingRight);
+  }
+
+  function cssPx(value) {
+    return Number.parseFloat(value) || 0;
+  }
+
+  function viewportWidth() {
+    return window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || 390;
+  }
+
+  function viewportHeight() {
+    return window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 740;
   }
 
   function renderMonster() {
@@ -1413,9 +1502,19 @@
     startGame();
   }
 
+  function scheduleResponsiveRender() {
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = null;
+      render();
+    });
+  }
+
   els.restartButton.addEventListener("click", startGame);
   els.cutButton.addEventListener("click", applyCuts);
   els.resultButton.addEventListener("click", handleResultButton);
+  window.addEventListener("resize", scheduleResponsiveRender);
+  window.visualViewport?.addEventListener("resize", scheduleResponsiveRender);
 
   startGame();
 })();

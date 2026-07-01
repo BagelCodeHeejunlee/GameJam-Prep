@@ -80,6 +80,15 @@ button:disabled {
   overflow: hidden;
 }
 
+.app-shell.compact-layout {
+  padding: calc(env(safe-area-inset-top) + 7px) 8px calc(env(safe-area-inset-bottom) + 7px);
+  gap: 6px;
+}
+
+.app-shell.compact-layout .fill-zone {
+  gap: 4px;
+}
+
 .fill-zone,
 .cut-zone {
   min-height: 0;
@@ -113,6 +122,10 @@ button:disabled {
   min-height: 28px;
 }
 
+.app-shell.compact-layout .top-bar {
+  min-height: 24px;
+}
+
 .top-bar h1,
 .monster-head h2,
 .section-head h2 {
@@ -123,6 +136,10 @@ button:disabled {
 
 .top-bar h1 {
   font-size: 1.02rem;
+}
+
+.app-shell.compact-layout .top-bar h1 {
+  font-size: 0.96rem;
 }
 
 .eyebrow {
@@ -155,6 +172,10 @@ button:disabled {
   border-radius: 8px;
   background: rgba(255, 248, 229, 0.1);
   color: #fff8e5;
+}
+
+.app-shell.compact-layout .status-strip {
+  padding: 3px 7px;
 }
 
 .status-strip div {
@@ -195,9 +216,17 @@ button:disabled {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+.app-shell.compact-layout .monster-section {
+  padding: 5px;
+}
+
 .monster-head {
   align-items: flex-start;
   margin-bottom: 4px;
+}
+
+.app-shell.compact-layout .monster-head {
+  margin-bottom: 2px;
 }
 
 .completion {
@@ -238,6 +267,12 @@ button:disabled {
   color: #fff8e5;
 }
 
+.app-shell.compact-layout .action-card {
+  min-height: 30px;
+  margin-bottom: 2px;
+  padding: 4px 6px;
+}
+
 .action-card strong {
   display: block;
   margin-bottom: 1px;
@@ -251,11 +286,19 @@ button:disabled {
   line-height: 1.2;
 }
 
+.app-shell.compact-layout .action-card p {
+  display: none;
+}
+
 .action-card .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 3px;
+}
+
+.app-shell.compact-layout .action-card .chips {
+  margin-top: 2px;
 }
 
 .chip {
@@ -410,9 +453,17 @@ button:disabled {
   position: relative;
 }
 
+.app-shell.compact-layout .workbench {
+  padding: 6px;
+}
+
 .section-head {
   align-items: flex-start;
   margin-bottom: 4px;
+}
+
+.app-shell.compact-layout .section-head {
+  margin-bottom: 2px;
 }
 
 .section-head.compact {
@@ -470,6 +521,27 @@ button:disabled {
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.app-shell.compact-layout .knife-hint {
+  min-height: 12px;
+  margin-top: 2px;
+  font-size: 0.58rem;
+  line-height: 1.2;
+}
+
+.app-shell.tiny-layout .top-bar .eyebrow,
+.app-shell.tiny-layout #monsterSub,
+.app-shell.tiny-layout .knife-hint {
+  display: none;
+}
+
+.app-shell.tiny-layout .action-card {
+  min-height: 24px;
+}
+
+.app-shell.tiny-layout .action-card .chips {
+  display: none;
 }
 
 .material-cell {
