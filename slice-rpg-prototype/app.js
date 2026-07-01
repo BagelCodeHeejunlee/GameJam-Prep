@@ -192,6 +192,7 @@
     initialMaterialTotal: 0,
     draggingPieceId: null,
     dropPreview: null,
+    knifePreview: null,
     drag: null,
   };
 
@@ -250,6 +251,7 @@
     state.nextPieceId = 1;
     state.draggingPieceId = null;
     state.dropPreview = null;
+    state.knifePreview = null;
     state.drag = null;
 
     monster.cells.forEach((cell) => {
@@ -426,6 +428,7 @@
     }
 
     renderCutMarks();
+    renderKnifeGuide();
     renderKnives();
     els.knifeHint.textContent = "칼은 격자선 사이에서만 움직입니다. 자르기 후 분리된 재료를 드래그하세요.";
   }
@@ -454,6 +457,7 @@
 
   function renderKnives() {
     state.knives.forEach((knife, index) => {
+      if (state.drag?.type === "knife" && state.drag.index === index) return;
       const type = KNIFE_TYPES[knife.type];
       const el = document.createElement("button");
       el.type = "button";
@@ -470,6 +474,21 @@
       el.addEventListener("pointerdown", (event) => beginKnifeDrag(event, index));
       els.knifeLayer.append(el);
     });
+  }
+
+  function renderKnifeGuide() {
+    if (!state.knifePreview) return;
+    const type = KNIFE_TYPES[state.knifePreview.type];
+    const el = document.createElement("span");
+    el.className = `knife-guide ${type.orientation}`;
+    el.style.left = knifeLeft(state.knifePreview);
+    el.style.top = knifeTop(state.knifePreview);
+    if (type.orientation === "h") {
+      el.style.width = lengthSize(type.length);
+    } else {
+      el.style.height = lengthSize(type.length);
+    }
+    els.knifeLayer.append(el);
   }
 
   function boardPos(value) {
@@ -497,26 +516,36 @@
   function beginKnifeDrag(event, index) {
     event.preventDefault();
     state.drag = { type: "knife", index };
-    moveKnifeWithDragOffset(index, event.clientX, event.clientY);
+    state.knifePreview = getKnifePreview(index, event.clientX, event.clientY);
     renderMaterialBoard();
+    showKnifeGhost(index, event.clientX, event.clientY);
     window.addEventListener("pointermove", onKnifeMove);
     window.addEventListener("pointerup", onPointerUp, { once: true });
   }
 
   function onKnifeMove(event) {
     if (!state.drag || state.drag.type !== "knife") return;
-    moveKnifeWithDragOffset(state.drag.index, event.clientX, event.clientY);
+    state.knifePreview = getKnifePreview(state.drag.index, event.clientX, event.clientY);
+    moveKnifeGhost(event.clientX, event.clientY);
     renderMaterialBoard();
   }
 
-  function moveKnifeWithDragOffset(index, clientX, clientY) {
+  function getKnifePreview(index, clientX, clientY) {
+    const knife = state.knives[index];
     const guidePoint = getDragGuidePoint(clientX, clientY);
-    moveKnifeToPoint(index, guidePoint.x, guidePoint.y);
+    return {
+      ...knife,
+      ...getKnifePositionFromPoint(knife.type, guidePoint.x, guidePoint.y),
+    };
   }
 
   function moveKnifeToPoint(index, clientX, clientY) {
     const knife = state.knives[index];
-    const type = KNIFE_TYPES[knife.type];
+    Object.assign(knife, getKnifePositionFromPoint(knife.type, clientX, clientY));
+  }
+
+  function getKnifePositionFromPoint(knifeType, clientX, clientY) {
+    const type = KNIFE_TYPES[knifeType];
     const rect = els.materialBoard.getBoundingClientRect();
     const cell = getMaterialCellSize();
     const step = cell + BOARD_GAP;
@@ -525,17 +554,27 @@
     const span = type.length * cell + Math.max(0, type.length - 1) * BOARD_GAP;
 
     if (type.orientation === "h") {
-      knife.x = clamp(Math.round((localX - span / 2) / step), 0, state.materialCols - type.length);
-      knife.y = clamp(Math.round(localY / step), 1, state.materialRows - 1);
-    } else {
-      knife.x = clamp(Math.round(localX / step), 1, state.materialCols - 1);
-      knife.y = clamp(Math.round((localY - span / 2) / step), 0, state.materialRows - type.length);
+      return {
+        x: clamp(Math.round((localX - span / 2) / step), 0, state.materialCols - type.length),
+        y: clamp(Math.round(localY / step), 1, state.materialRows - 1),
+      };
     }
+
+    return {
+      x: clamp(Math.round(localX / step), 1, state.materialCols - 1),
+      y: clamp(Math.round((localY - span / 2) / step), 0, state.materialRows - type.length),
+    };
   }
 
   function onPointerUp() {
     window.removeEventListener("pointermove", onKnifeMove);
+    if (state.drag?.type === "knife" && state.knifePreview) {
+      const knife = state.knives[state.drag.index];
+      knife.x = state.knifePreview.x;
+      knife.y = state.knifePreview.y;
+    }
     hideDragGhost();
+    state.knifePreview = null;
     state.drag = null;
     render();
   }
@@ -810,12 +849,36 @@
     moveDragGhost(x, y);
   }
 
+  function showKnifeGhost(index, x, y) {
+    const knife = state.knives[index];
+    const type = KNIFE_TYPES[knife.type];
+    const el = document.createElement("div");
+    el.className = `knife-drag-ghost ${type.orientation}`;
+    el.textContent = type.label;
+    if (type.orientation === "h") {
+      el.style.width = lengthSize(type.length);
+    } else {
+      el.style.height = lengthSize(type.length);
+    }
+    els.dragGhost.className = "drag-ghost knife-ghost";
+    els.dragGhost.innerHTML = "";
+    els.dragGhost.append(el);
+    moveKnifeGhost(x, y);
+  }
+
   function moveDragGhost(x, y) {
     const cell = getMaterialCellSize();
     const step = cell + BOARD_GAP;
     const dragOffset = state.drag?.type === "piece" ? state.drag.offset : { x: 0, y: 0 };
     const nextX = x - dragOffset.x * step - cell / 2 - DRAG_POINTER_OFFSET;
     const nextY = y - dragOffset.y * step - cell / 2 - DRAG_POINTER_OFFSET;
+    els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
+  }
+
+  function moveKnifeGhost(x, y) {
+    const rect = els.dragGhost.getBoundingClientRect();
+    const nextX = x - rect.width / 2 - DRAG_POINTER_OFFSET;
+    const nextY = y - rect.height / 2 - DRAG_POINTER_OFFSET;
     els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
   }
 

@@ -542,6 +542,28 @@ button:disabled {
   touch-action: none;
 }
 
+.knife-guide {
+  position: absolute;
+  display: block;
+  min-width: var(--knife-thick);
+  min-height: var(--knife-thick);
+  border: 2px solid #e5b83d;
+  border-radius: 999px;
+  background: rgba(229, 184, 61, 0.32);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 248, 229, 0.58),
+    0 0 0 2px rgba(37, 34, 29, 0.26);
+  pointer-events: none;
+}
+
+.knife-guide.h {
+  height: var(--knife-thick);
+}
+
+.knife-guide.v {
+  width: var(--knife-thick);
+}
+
 .board-knife.h {
   height: var(--knife-thick);
 }
@@ -768,7 +790,7 @@ button:disabled {
 }
 
 .drag-ghost.knife-ghost {
-  background: rgba(29, 35, 45, 0.9);
+  background: transparent;
 }
 
 .drag-piece-grid {
@@ -790,6 +812,30 @@ button:disabled {
 
 .drag-piece-cell.empty {
   visibility: hidden;
+}
+
+.knife-drag-ghost {
+  display: grid;
+  min-width: var(--knife-thick);
+  min-height: var(--knife-thick);
+  place-items: center;
+  border: 1px solid #68768a;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f9fbff 0 28%, #c8d2e2 29% 62%, #59687d 63% 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.32);
+  color: #1d2632;
+  font-size: 0.54rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.knife-drag-ghost.h {
+  height: var(--knife-thick);
+}
+
+.knife-drag-ghost.v {
+  width: var(--knife-thick);
+  writing-mode: vertical-rl;
 }
 
 @keyframes shake {
