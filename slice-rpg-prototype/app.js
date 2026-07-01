@@ -501,7 +501,7 @@
             const placement = getPlacement(monsterCell.placementId);
             if (isCurrentTurnPlacement(placement)) {
               button.dataset.placementId = String(monsterCell.placementId);
-              button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId));
+              button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId, x, y));
             } else {
               button.classList.add("locked");
             }
@@ -553,11 +553,9 @@
           button.disabled = true;
         } else if (pieceByCell.has(cellKey)) {
           const pieceId = pieceByCell.get(cellKey);
-          const piece = getPiece(pieceId);
           button.dataset.pieceId = String(pieceId);
           button.classList.add(`piece-tone-${pieceId % 5}`);
-          if (piece) applyPieceConnections(button, getConnectedSides(piece.cells, piece.cutEdges, x, y));
-          button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId));
+          button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId, x, y));
         } else {
           button.classList.add("empty-material");
         }
@@ -688,7 +686,6 @@
     const type = KNIFE_TYPES[knifeType];
     const rect = els.materialBoard.getBoundingClientRect();
     const cell = getMaterialCellSize();
-    const hitSize = getKnifeHitSize();
     const step = cell + BOARD_GAP;
     const localX = clientX - rect.left - getBoardPad();
     const localY = clientY - rect.top - getBoardPad();
@@ -696,14 +693,14 @@
 
     if (type.orientation === "h") {
       return {
-        x: clamp(Math.round((localX - span) / step), 0, state.materialCols - type.length),
-        y: clamp(Math.round((localY - hitSize / 2) / step), 1, state.materialRows - 1),
+        x: clamp(Math.round((localX - span / 2) / step), 0, state.materialCols - type.length),
+        y: clamp(Math.round(localY / step), 1, state.materialRows - 1),
       };
     }
 
     return {
-      x: clamp(Math.round((localX - hitSize / 2) / step), 1, state.materialCols - 1),
-      y: clamp(Math.round((localY - span) / step), 0, state.materialRows - type.length),
+      x: clamp(Math.round(localX / step), 1, state.materialCols - 1),
+      y: clamp(Math.round((localY - span / 2) / step), 0, state.materialRows - type.length),
     };
   }
 
@@ -767,13 +764,13 @@
     render();
   }
 
-  function beginPieceDrag(event, pieceId) {
+  function beginPieceDrag(event, pieceId, grabbedX, grabbedY) {
     const piece = getPiece(pieceId);
     if (!piece) return;
     event.preventDefault();
     const min = minCell(piece.cells);
     const cells = normalizeCells(piece.cells);
-    const offset = getDragAnchorOffset(cells);
+    const offset = getGrabbedCellOffset(min, grabbedX, grabbedY);
     state.drag = { type: "piece", pieceId, offset, cells };
     state.drag.cutEdges = normalizeCutEdges(piece.cutEdges, min);
     state.drag.source = "material";
@@ -843,13 +840,13 @@
     window.removeEventListener("pointercancel", onPieceCancel);
   }
 
-  function beginPlacedPieceDrag(event, placementId) {
+  function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
     const placement = getPlacement(placementId);
     if (!isCurrentTurnPlacement(placement)) return;
     event.preventDefault();
     const min = minCell(placement.cells);
     const cells = normalizeCells(placement.cells);
-    const offset = getDragAnchorOffset(cells);
+    const offset = getGrabbedCellOffset(min, grabbedX, grabbedY);
     state.drag = {
       type: "piece",
       source: "monster",
@@ -1118,29 +1115,6 @@
     return state.materialPieces.find((piece) => piece.id === pieceId);
   }
 
-  function getConnectedSides(cells, cutEdges, x, y) {
-    const occupied = new Set(cells.map((cell) => key(cell.x, cell.y)));
-    return [
-      { side: "up", dx: 0, dy: -1 },
-      { side: "right", dx: 1, dy: 0 },
-      { side: "down", dx: 0, dy: 1 },
-      { side: "left", dx: -1, dy: 0 },
-    ].filter(({ dx, dy }) => {
-      const currentKey = key(x, y);
-      const nextKey = key(x + dx, y + dy);
-      return occupied.has(nextKey) && !cutEdges.has(edgeKey(currentKey, nextKey));
-    }).map(({ side }) => side);
-  }
-
-  function applyPieceConnections(element, sides) {
-    sides.forEach((side) => {
-      element.classList.add(`connect-${side}`);
-      const bridge = document.createElement("span");
-      bridge.className = `rice-bridge ${side}`;
-      element.append(bridge);
-    });
-  }
-
   function getPlacement(placementId) {
     return state.placedPieces.find((placement) => placement.id === placementId);
   }
@@ -1224,15 +1198,15 @@
     const cell = getMaterialCellSize();
     const step = cell + BOARD_GAP;
     const dragOffset = state.drag?.type === "piece" ? state.drag.offset : { x: 0, y: 0 };
-    const nextX = x - dragOffset.x * step - cell / 2 - DRAG_POINTER_OFFSET;
+    const nextX = x - dragOffset.x * step - cell / 2;
     const nextY = y - dragOffset.y * step - cell / 2 - DRAG_POINTER_OFFSET;
     els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
   }
 
   function moveKnifeGhost(x, y) {
     const rect = els.dragGhost.getBoundingClientRect();
-    const nextX = x - rect.width - DRAG_POINTER_OFFSET;
-    const nextY = y - rect.height - DRAG_POINTER_OFFSET;
+    const nextX = x - rect.width / 2;
+    const nextY = y - rect.height / 2 - DRAG_POINTER_OFFSET;
     els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
   }
 
@@ -1275,7 +1249,6 @@
         const cell = document.createElement("span");
         cell.className = "drag-piece-cell";
         if (!occupied.has(key(x, y))) cell.classList.add("empty");
-        if (occupied.has(key(x, y))) applyPieceConnections(cell, getConnectedSides(normalized, cutEdges, x, y));
         grid.append(cell);
       }
     }
@@ -1326,7 +1299,7 @@
 
   function getDragGuidePoint(x, y) {
     return {
-      x: x - DRAG_POINTER_OFFSET,
+      x,
       y: y - DRAG_POINTER_OFFSET,
     };
   }
@@ -1334,29 +1307,18 @@
   function getMonsterCellFromAnchorPoint(point) {
     const cellSize = getMonsterCellSize();
     const monster = currentMonster();
-    const gridCell = getGridCellFromAnchorPoint(point, els.monsterGrid, monster.cols, monster.rows, cellSize);
-
-    if (!gridCell) return null;
-    if (state.monsterCells.has(key(gridCell.x, gridCell.y))) return gridCell;
-
-    let best = null;
-    state.monsterCells.forEach((cell) => {
-      const gridDistance = Math.hypot(gridCell.x - cell.x, gridCell.y - cell.y);
-      if (!best || gridDistance < best.gridDistance) {
-        best = { x: cell.x, y: cell.y, gridDistance };
-      }
-    });
-
-    return best && best.gridDistance <= 1.5 ? best : null;
+    return getGridCellFromAnchorPoint(point, els.monsterGrid, monster.cols, monster.rows, cellSize);
   }
 
   function getGridCellFromAnchorPoint(point, gridEl, cols, rows, cellSize) {
     const gridRect = gridEl.getBoundingClientRect();
-    const localX = point.x - gridRect.left;
-    const localY = point.y - gridRect.top;
     const step = cellSize + BOARD_GAP;
     const width = cols * cellSize + Math.max(0, cols - 1) * BOARD_GAP;
     const height = rows * cellSize + Math.max(0, rows - 1) * BOARD_GAP;
+    const contentLeft = Math.max(0, (gridRect.width - width) / 2);
+    const contentTop = Math.max(0, (gridRect.height - height) / 2);
+    const localX = point.x - gridRect.left - contentLeft;
+    const localY = point.y - gridRect.top - contentTop;
 
     if (
       localX < -BOARD_GAP / 2
@@ -1449,10 +1411,10 @@
       .sort((a, b) => a.y - b.y || a.x - b.x);
   }
 
-  function getDragAnchorOffset(normalizedCells) {
+  function getGrabbedCellOffset(min, grabbedX, grabbedY) {
     return {
-      x: Math.max(...normalizedCells.map((cell) => cell.x)),
-      y: Math.max(...normalizedCells.map((cell) => cell.y)),
+      x: grabbedX - min.x,
+      y: grabbedY - min.y,
     };
   }
 
