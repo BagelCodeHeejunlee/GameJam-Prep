@@ -20,6 +20,7 @@
   --cell: var(--small-cell);
   --board-pad: 12px;
   --knife-thick: 13px;
+  --knife-hit: 38px;
   color-scheme: light;
 }
 
@@ -718,14 +719,12 @@ button:disabled {
   position: absolute;
   display: grid;
   place-items: center;
-  min-width: var(--knife-thick);
-  min-height: var(--knife-thick);
-  border: 2px solid #627084;
+  min-width: var(--knife-hit);
+  min-height: var(--knife-hit);
+  border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #fafdff 0 26%, #ccd9e8 27% 62%, #607186 63% 100%);
-  box-shadow:
-    0 3px 0 rgba(63, 72, 84, 0.3),
-    0 5px 10px rgba(74, 46, 22, 0.18);
+  background: transparent;
+  box-shadow: none;
   color: #1d2632;
   font-size: 0;
   font-weight: 900;
@@ -737,18 +736,52 @@ button:disabled {
 .board-knife::before {
   content: "";
   position: absolute;
+  z-index: 1;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
+.board-knife::after {
+  content: "";
+  position: absolute;
+  border: 2px solid #627084;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fafdff 0 26%, #ccd9e8 27% 62%, #607186 63% 100%);
+  box-shadow:
+    0 3px 0 rgba(63, 72, 84, 0.3),
+    0 5px 10px rgba(74, 46, 22, 0.18);
+  pointer-events: none;
 }
 
 .board-knife.h::before {
   width: calc(100% - 14px);
   height: 3px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .board-knife.v::before {
   width: 3px;
   height: calc(100% - 14px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.board-knife.h::after {
+  right: 0;
+  left: 0;
+  top: 50%;
+  height: var(--knife-thick);
+  transform: translateY(-50%);
+}
+
+.board-knife.v::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--knife-thick);
+  transform: translateX(-50%);
 }
 
 .knife-guide {
@@ -766,19 +799,19 @@ button:disabled {
 }
 
 .knife-guide.h {
-  height: var(--knife-thick);
+  height: var(--knife-hit);
 }
 
 .knife-guide.v {
-  width: var(--knife-thick);
+  width: var(--knife-hit);
 }
 
 .board-knife.h {
-  height: var(--knife-thick);
+  height: var(--knife-hit);
 }
 
 .board-knife.v {
-  width: var(--knife-thick);
+  width: var(--knife-hit);
   writing-mode: vertical-rl;
 }
 
@@ -1110,16 +1143,14 @@ button:disabled {
 
 .knife-drag-ghost {
   display: grid;
-  min-width: var(--knife-thick);
-  min-height: var(--knife-thick);
+  min-width: var(--knife-hit);
+  min-height: var(--knife-hit);
   place-items: center;
   position: relative;
-  border: 2px solid #627084;
+  border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #fafdff 0 26%, #ccd9e8 27% 62%, #607186 63% 100%);
-  box-shadow:
-    0 3px 0 rgba(63, 72, 84, 0.3),
-    0 5px 10px rgba(74, 46, 22, 0.18);
+  background: transparent;
+  box-shadow: none;
   color: #1d2632;
   font-size: 0;
   font-weight: 900;
@@ -1129,26 +1160,60 @@ button:disabled {
 .knife-drag-ghost::before {
   content: "";
   position: absolute;
+  z-index: 1;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
+.knife-drag-ghost::after {
+  content: "";
+  position: absolute;
+  border: 2px solid #627084;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fafdff 0 26%, #ccd9e8 27% 62%, #607186 63% 100%);
+  box-shadow:
+    0 3px 0 rgba(63, 72, 84, 0.3),
+    0 5px 10px rgba(74, 46, 22, 0.18);
+  pointer-events: none;
 }
 
 .knife-drag-ghost.h::before {
   width: calc(100% - 14px);
   height: 3px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .knife-drag-ghost.v::before {
   width: 3px;
   height: calc(100% - 14px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.knife-drag-ghost.h::after {
+  right: 0;
+  left: 0;
+  top: 50%;
+  height: var(--knife-thick);
+  transform: translateY(-50%);
+}
+
+.knife-drag-ghost.v::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--knife-thick);
+  transform: translateX(-50%);
 }
 
 .knife-drag-ghost.h {
-  height: var(--knife-thick);
+  height: var(--knife-hit);
 }
 
 .knife-drag-ghost.v {
-  width: var(--knife-thick);
+  width: var(--knife-hit);
   writing-mode: vertical-rl;
 }
 

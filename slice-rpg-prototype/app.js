@@ -641,13 +641,13 @@
   function knifeLeft(knife) {
     const type = KNIFE_TYPES[knife.type];
     const base = parseFloat(boardPos(knife.x));
-    return `${base - (type.orientation === "v" ? getKnifeThick() / 2 : 0)}px`;
+    return `${base - (type.orientation === "v" ? getKnifeHitSize() / 2 : 0)}px`;
   }
 
   function knifeTop(knife) {
     const type = KNIFE_TYPES[knife.type];
     const base = parseFloat(boardPos(knife.y));
-    return `${base - (type.orientation === "h" ? getKnifeThick() / 2 : 0)}px`;
+    return `${base - (type.orientation === "h" ? getKnifeHitSize() / 2 : 0)}px`;
   }
 
   function lengthSize(length) {
@@ -682,15 +682,11 @@
     };
   }
 
-  function moveKnifeToPoint(index, clientX, clientY) {
-    const knife = state.knives[index];
-    Object.assign(knife, getKnifePositionFromPoint(knife.type, clientX, clientY));
-  }
-
   function getKnifePositionFromPoint(knifeType, clientX, clientY) {
     const type = KNIFE_TYPES[knifeType];
     const rect = els.materialBoard.getBoundingClientRect();
     const cell = getMaterialCellSize();
+    const hitSize = getKnifeHitSize();
     const step = cell + BOARD_GAP;
     const localX = clientX - rect.left - getBoardPad();
     const localY = clientY - rect.top - getBoardPad();
@@ -698,14 +694,14 @@
 
     if (type.orientation === "h") {
       return {
-        x: clamp(Math.round((localX - span / 2) / step), 0, state.materialCols - type.length),
-        y: clamp(Math.round(localY / step), 1, state.materialRows - 1),
+        x: clamp(Math.round((localX - span) / step), 0, state.materialCols - type.length),
+        y: clamp(Math.round((localY - hitSize / 2) / step), 1, state.materialRows - 1),
       };
     }
 
     return {
-      x: clamp(Math.round(localX / step), 1, state.materialCols - 1),
-      y: clamp(Math.round((localY - span / 2) / step), 0, state.materialRows - type.length),
+      x: clamp(Math.round((localX - hitSize / 2) / step), 1, state.materialCols - 1),
+      y: clamp(Math.round((localY - span) / step), 0, state.materialRows - type.length),
     };
   }
 
@@ -1171,8 +1167,8 @@
     return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--board-pad")) || 14;
   }
 
-  function getKnifeThick() {
-    return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--knife-thick")) || 12;
+  function getKnifeHitSize() {
+    return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--knife-hit")) || 38;
   }
 
   function showDragGhost(cells, cutEdges, x, y) {
@@ -1210,8 +1206,8 @@
 
   function moveKnifeGhost(x, y) {
     const rect = els.dragGhost.getBoundingClientRect();
-    const nextX = x - rect.width / 2 - DRAG_POINTER_OFFSET;
-    const nextY = y - rect.height / 2 - DRAG_POINTER_OFFSET;
+    const nextX = x - rect.width - DRAG_POINTER_OFFSET;
+    const nextY = y - rect.height - DRAG_POINTER_OFFSET;
     els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
   }
 
