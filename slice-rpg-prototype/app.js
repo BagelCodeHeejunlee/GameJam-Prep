@@ -501,7 +501,7 @@
             const placement = getPlacement(monsterCell.placementId);
             if (isCurrentTurnPlacement(placement)) {
               button.dataset.placementId = String(monsterCell.placementId);
-              button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId, x, y));
+              button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId));
             } else {
               button.classList.add("locked");
             }
@@ -555,7 +555,7 @@
           const pieceId = pieceByCell.get(cellKey);
           button.dataset.pieceId = String(pieceId);
           button.classList.add(`piece-tone-${pieceId % 5}`);
-          button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId, x, y));
+          button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId));
         } else {
           button.classList.add("empty-material");
         }
@@ -769,13 +769,14 @@
     render();
   }
 
-  function beginPieceDrag(event, pieceId, grabbedX, grabbedY) {
+  function beginPieceDrag(event, pieceId) {
     const piece = getPiece(pieceId);
     if (!piece) return;
     event.preventDefault();
     const min = minCell(piece.cells);
-    const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
-    state.drag = { type: "piece", pieceId, offset, cells: normalizeCells(piece.cells) };
+    const cells = normalizeCells(piece.cells);
+    const offset = getDragAnchorOffset(cells);
+    state.drag = { type: "piece", pieceId, offset, cells };
     state.drag.cutEdges = normalizeCutEdges(piece.cutEdges, min);
     state.drag.source = "material";
     state.draggingPieceId = pieceId;
@@ -844,18 +845,19 @@
     window.removeEventListener("pointercancel", onPieceCancel);
   }
 
-  function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
+  function beginPlacedPieceDrag(event, placementId) {
     const placement = getPlacement(placementId);
     if (!isCurrentTurnPlacement(placement)) return;
     event.preventDefault();
     const min = minCell(placement.cells);
-    const offset = { x: grabbedX - min.x, y: grabbedY - min.y };
+    const cells = normalizeCells(placement.cells);
+    const offset = getDragAnchorOffset(cells);
     state.drag = {
       type: "piece",
       source: "monster",
       placementId,
       offset,
-      cells: normalizeCells(placement.cells),
+      cells,
       cutEdges: normalizeCutEdges(placement.cutEdges, min),
     };
     state.draggingPlacementId = placementId;
@@ -1405,6 +1407,13 @@
     return cells
       .map((cell) => ({ x: cell.x - min.x, y: cell.y - min.y }))
       .sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function getDragAnchorOffset(normalizedCells) {
+    return {
+      x: Math.max(...normalizedCells.map((cell) => cell.x)),
+      y: Math.max(...normalizedCells.map((cell) => cell.y)),
+    };
   }
 
   function normalizeCutEdges(edges, min) {
