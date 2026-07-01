@@ -20,7 +20,7 @@
   --cell: var(--small-cell);
   --board-pad: 12px;
   --knife-thick: 13px;
-  --knife-hit: 38px;
+  --knife-hit: 30px;
   color-scheme: light;
 }
 
