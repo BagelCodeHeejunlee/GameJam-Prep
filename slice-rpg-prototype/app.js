@@ -135,6 +135,13 @@
       cols: 3,
       rows: 3,
       baseAttack: 2,
+      levels: [
+        { minLevel: 1, attack: 2 },
+        { minLevel: 3, attack: 3, note: "공격 표식 증가", boardConditions: { icons: [c(2, 1, "attack")] } },
+        { minLevel: 5, attack: 4, note: "갑피 표식 증가", boardConditions: { icons: [c(1, 2, "defense")] } },
+        { minLevel: 8, attack: 5, note: "특수 표식 개방", boardConditions: { icons: [c(0, 1, "special")] } },
+        { minLevel: 11, attack: 6, note: "공격 표식 강화", boardConditions: { icons: [c(1, 2, "attack")] } },
+      ],
       actions: ["attack", "defense", "attack", "heal"],
       cells: [
         c(1, 0, "attack"),
@@ -157,6 +164,13 @@
       cols: 4,
       rows: 4,
       baseAttack: 1,
+      levels: [
+        { minLevel: 1, attack: 1 },
+        { minLevel: 3, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
+        { minLevel: 5, attack: 3, note: "갑피 표식 증가", boardConditions: { icons: [c(3, 2, "defense")] } },
+        { minLevel: 8, attack: 4, note: "특수 표식 증가", boardConditions: { icons: [c(1, 3, "special")] } },
+        { minLevel: 11, attack: 5, note: "공격 표식 추가", boardConditions: { icons: [c(0, 2, "attack")] } },
+      ],
       actions: ["heal", "attack", "defense", "special", "attack"],
       cells: [
         c(1, 0, "attack"),
@@ -184,6 +198,13 @@
       cols: 5,
       rows: 4,
       baseAttack: 3,
+      levels: [
+        { minLevel: 1, attack: 3 },
+        { minLevel: 3, attack: 4, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
+        { minLevel: 5, attack: 5, note: "갑피 표식 증가", boardConditions: { icons: [c(2, 1, "defense")] } },
+        { minLevel: 8, attack: 6, note: "특수 표식 증가", boardConditions: { icons: [c(4, 2, "special")] } },
+        { minLevel: 11, attack: 7, note: "공격 표식 추가", boardConditions: { icons: [c(2, 3, "attack")] } },
+      ],
       actions: ["attack", "defense", "special", "attack", "heal"],
       cells: [
         c(2, 0, "defense"),
@@ -573,18 +594,49 @@
 
   function scaledMonster(monster, roundIndex = state.roundIndex) {
     const level = monsterPowerLevel(roundIndex);
-    const attackBonus = Math.floor((level - 1) / 2);
+    const profile = monsterLevelProfile(monster, level);
+    const cells = monsterCellsForLevel(monster, level);
+    const note = profile.note ? ` · ${profile.note}` : level > 1 ? ` · 위험도 ${level}` : "";
     return {
       ...monster,
       level,
-      baseAttack: monster.baseAttack + attackBonus,
+      cells,
+      levelProfile: profile,
+      baseAttack: profile.attack ?? monster.baseAttack,
       displayName: `${monster.name} Lv.${level}`,
-      sub: level > 1 ? `${monster.sub} · 위험도 ${level}` : monster.sub,
+      sub: `${monster.sub}${note}`,
     };
   }
 
   function monsterPowerLevel(roundIndex = state.roundIndex) {
     return 1 + state.stageIndex * 3 + state.waveIndex + Math.floor(roundIndex / 2);
+  }
+
+  function monsterLevelProfile(monster, level) {
+    const levels = [...(monster.levels || [])].sort((a, b) => a.minLevel - b.minLevel);
+    return levels.filter((profile) => level >= profile.minLevel).pop() || levels[0] || { minLevel: 1, attack: monster.baseAttack };
+  }
+
+  function monsterLevelProfiles(monster, level) {
+    return [...(monster.levels || [])]
+      .filter((profile) => level >= profile.minLevel)
+      .sort((a, b) => a.minLevel - b.minLevel);
+  }
+
+  function monsterCellsForLevel(monster, level) {
+    const cellMap = new Map(monster.cells.map((cell) => [key(cell.x, cell.y), { ...cell }]));
+    monsterLevelProfiles(monster, level).forEach((profile) => {
+      applyMonsterBoardConditionCells(cellMap, profile.boardConditions?.icons, monster);
+      applyMonsterBoardConditionCells(cellMap, profile.boardConditions?.extraCells, monster);
+    });
+    return [...cellMap.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function applyMonsterBoardConditionCells(cellMap, cells = [], monster) {
+    cells.forEach((cell) => {
+      if (cell.x < 0 || cell.y < 0 || cell.x >= monster.cols || cell.y >= monster.rows) return;
+      cellMap.set(key(cell.x, cell.y), { ...cell });
+    });
   }
 
   function currentAction() {
