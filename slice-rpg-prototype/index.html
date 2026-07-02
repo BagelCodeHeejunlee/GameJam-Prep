@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Bento Blocks</title>
     <meta name="theme-color" content="#f8e8c8" />
-    <link rel="stylesheet" href="styles.css?v=bento-knife-1" />
+    <link rel="stylesheet" href="styles.css?v=bento-reward-drag-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -67,6 +67,17 @@
             <div id="knifeLayer" class="knife-layer" aria-label="이동 가능한 칼"></div>
           </div>
 
+          <section id="rewardTray" class="reward-tray hidden" aria-label="보상 작업대">
+            <div class="reward-tray-head">
+              <div>
+                <p class="eyebrow">REWARD</p>
+                <h2>보상을 판에 붙이기</h2>
+              </div>
+              <button id="rewardDoneButton" class="reward-done-button" type="button">완료</button>
+            </div>
+            <div id="rewardItems" class="reward-items"></div>
+          </section>
+
           <div class="turn-controls" aria-label="턴 행동">
             <div class="control-chip hp-chip"><span>체력</span><strong id="hpControlLabel">24/24</strong></div>
             <div class="control-chip cuts-chip"><span>칼질</span><strong id="cutCountLabel">2/2</strong></div>
@@ -100,6 +111,6 @@
     </main>
 
     <div id="dragGhost" class="drag-ghost hidden" aria-hidden="true"></div>
-    <script src="app.js?v=bento-knife-1"></script>
+    <script src="app.js?v=bento-reward-drag-1"></script>
   </body>
 </html>
