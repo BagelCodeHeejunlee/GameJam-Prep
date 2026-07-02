@@ -212,6 +212,7 @@
     knifeHint: document.querySelector("#knifeHint"),
     battleLog: document.querySelector("#battleLog"),
     overlay: document.querySelector("#overlay"),
+    resultModal: document.querySelector(".result-modal"),
     resultEyebrow: document.querySelector("#resultEyebrow"),
     resultTitle: document.querySelector("#resultTitle"),
     resultText: document.querySelector("#resultText"),
@@ -2215,7 +2216,7 @@
       .map((id) => REWARDS[id])
       .filter((reward) => reward && isRewardAvailable(reward));
     const fallback = Object.values(REWARDS).filter((reward) => isRewardAvailable(reward) && !preferred.includes(reward));
-    state.rewardOptions = [...preferred, ...fallback].slice(0, 4);
+    state.rewardOptions = [...preferred, ...fallback].slice(0, 3);
     return state.rewardOptions;
   }
 
@@ -2245,12 +2246,76 @@
     rewards.forEach((reward) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `reward-card${reward.rarity === "rare" ? " rare" : ""}`;
+      button.className = `reward-card reward-${rewardVisualType(reward)}${reward.rarity === "rare" ? " rare" : ""}`;
       const label = reward.rarity === "rare" ? "희귀" : rewardLabel(reward);
-      button.innerHTML = `<span>${label}</span><strong>${reward.title}</strong><em>${reward.text}</em>`;
+      const icon = renderRewardChoiceIcon(reward);
+      const copy = document.createElement("span");
+      copy.className = "reward-card-copy";
+      const labelEl = document.createElement("span");
+      labelEl.className = "reward-card-label";
+      labelEl.textContent = label;
+      const title = document.createElement("strong");
+      title.textContent = reward.title;
+      const text = document.createElement("em");
+      text.textContent = rewardChoiceText(reward);
+      copy.append(labelEl, title, text);
+      button.append(icon, copy);
       button.addEventListener("click", () => applyReward(reward.id));
       els.rewardChoices.append(button);
     });
+  }
+
+  function renderRewardChoiceIcon(reward) {
+    const wrap = document.createElement("span");
+    wrap.className = `reward-choice-icon reward-choice-${rewardVisualType(reward)}`;
+
+    if (reward.type === "expand") {
+      const cells = normalizeCells(reward.shape);
+      const maxX = Math.max(...cells.map((cell) => cell.x));
+      const maxY = Math.max(...cells.map((cell) => cell.y));
+      const occupied = new Set(cells.map((cell) => key(cell.x, cell.y)));
+      const grid = document.createElement("span");
+      grid.className = "reward-icon-grid";
+      grid.style.gridTemplateColumns = `repeat(${maxX + 1}, 24px)`;
+      for (let y = 0; y <= maxY; y += 1) {
+        for (let x = 0; x <= maxX; x += 1) {
+          const cell = document.createElement("span");
+          cell.className = "reward-icon-rice";
+          if (!occupied.has(key(x, y))) cell.classList.add("empty");
+          grid.append(cell);
+        }
+      }
+      wrap.append(grid);
+      return wrap;
+    }
+
+    if (reward.type === "link") {
+      const meta = LINK_META[reward.linkType];
+      const left = document.createElement("span");
+      left.className = "reward-icon-rice";
+      const right = document.createElement("span");
+      right.className = "reward-icon-rice";
+      const bridge = document.createElement("span");
+      bridge.className = `reward-icon-link ${meta.className}`;
+      const mark = document.createElement("span");
+      mark.className = `reward-icon-mark ${meta.className}`;
+      mark.textContent = meta.mark;
+      wrap.append(left, bridge, mark, right);
+      return wrap;
+    }
+
+    if (reward.type === "knife" || reward.type === "knifeAny") {
+      const knife = document.createElement("span");
+      knife.className = "reward-icon-knife";
+      wrap.append(knife);
+      return wrap;
+    }
+
+    const badge = document.createElement("span");
+    badge.className = "reward-icon-badge";
+    badge.textContent = "무";
+    wrap.append(badge);
+    return wrap;
   }
 
   function rewardLabel(reward) {
@@ -2258,6 +2323,27 @@
     if (reward.type === "link") return LINK_META[reward.linkType].label;
     if (reward.type === "knife" || reward.type === "knifeAny") return "칼 성장";
     return "보정";
+  }
+
+  function rewardVisualType(reward) {
+    if (reward.type === "expand") return "expand";
+    if (reward.type === "link") return reward.linkType;
+    if (reward.type === "knife" || reward.type === "knifeAny") return "knife";
+    return "rare";
+  }
+
+  function rewardChoiceText(reward) {
+    if (reward.id === "expand1") return "도시락 판에 직접 붙이기";
+    if (reward.id === "expand2") return "2칸 조각을 회전해 붙이기";
+    if (reward.id === "linkHeal") return "자르면 체력 +1";
+    if (reward.id === "linkAttack") return "자르면 1칸 조각 생성";
+    if (reward.id === "linkDefense") return "자르면 쉴드 +1";
+    if (reward.id === "growH") return "가로 2칸 -> 3칸";
+    if (reward.id === "growV") return "세로 2칸 -> 3칸";
+    if (reward.id === "bendL") return "직선 칼 -> ㄱ자 칼";
+    if (reward.id === "growL") return "ㄱ자 칼 더 길게";
+    if (reward.id === "silentRefill") return "새 판 요청 1회 안전";
+    return reward.text;
   }
 
   function applyReward(rewardId) {
@@ -2645,11 +2731,12 @@
   function showStageClear() {
     const isFinal = state.stageIndex === monsters.length - 1;
     state.resultMode = isFinal ? "complete" : "reward";
+    els.resultModal?.classList.toggle("reward-modal", !isFinal);
     els.resultEyebrow.textContent = isFinal ? "RUN CLEAR" : "STAGE CLEAR";
-    els.resultTitle.textContent = isFinal ? "모든 몬스터 포장 완료" : "몬스터 포장 완료";
+    els.resultTitle.textContent = isFinal ? "모든 몬스터 포장 완료" : "보상 선택";
     els.resultText.textContent = isFinal
       ? "한 마리씩 전부 덮는 퍼즐 전투를 클리어했다."
-      : "보상을 하나 골라 다음 전투의 재료판을 만든다.";
+      : "다음 도시락을 강화하세요.";
     els.resultButton.textContent = isFinal ? "다시 시작" : "다음 몬스터";
     els.resultButton.classList.toggle("hidden", !isFinal);
     renderRewardChoices(isFinal ? [] : dealRewardOptions());
@@ -2658,6 +2745,7 @@
 
   function showLoss(title, text) {
     state.resultMode = "loss";
+    els.resultModal?.classList.remove("reward-modal");
     els.resultEyebrow.textContent = "DEFEAT";
     els.resultTitle.textContent = title;
     els.resultText.textContent = text;
@@ -2669,6 +2757,7 @@
 
   function hideResult() {
     els.overlay.classList.add("hidden");
+    els.resultModal?.classList.remove("reward-modal");
     els.resultButton.classList.remove("hidden");
     renderRewardChoices([]);
   }
