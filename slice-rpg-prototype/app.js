@@ -220,9 +220,9 @@
       staminaCost: 1,
       clearReward: { gold: 1200, heroShards: 2 },
       waves: [
-        { id: "forest-1-1-w1", name: "웨이브 1", monsterIds: ["iron-goblin", "swamp-slime"] },
-        { id: "forest-1-1-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "stone-ogre"] },
-        { id: "forest-1-1-w3", name: "웨이브 3", monsterIds: ["iron-goblin", "stone-ogre"] },
+        { id: "forest-1-1-w1", name: "웨이브 1", monsterIds: ["iron-goblin", "swamp-slime", "stone-ogre"] },
+        { id: "forest-1-1-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "stone-ogre", "iron-goblin"] },
+        { id: "forest-1-1-w3", name: "웨이브 3", monsterIds: ["stone-ogre", "iron-goblin", "swamp-slime"] },
       ],
     },
     {
@@ -235,9 +235,9 @@
       staminaCost: 1,
       clearReward: { gold: 1400, heroShards: 2 },
       waves: [
-        { id: "forest-1-2-w1", name: "웨이브 1", monsterIds: ["swamp-slime", "iron-goblin"] },
-        { id: "forest-1-2-w2", name: "웨이브 2", monsterIds: ["iron-goblin", "stone-ogre"] },
-        { id: "forest-1-2-w3", name: "웨이브 3", monsterIds: ["swamp-slime", "stone-ogre"] },
+        { id: "forest-1-2-w1", name: "웨이브 1", monsterIds: ["swamp-slime", "iron-goblin", "stone-ogre"] },
+        { id: "forest-1-2-w2", name: "웨이브 2", monsterIds: ["iron-goblin", "stone-ogre", "swamp-slime"] },
+        { id: "forest-1-2-w3", name: "웨이브 3", monsterIds: ["stone-ogre", "swamp-slime", "iron-goblin"] },
       ],
     },
     {
@@ -250,9 +250,9 @@
       staminaCost: 1,
       clearReward: { gold: 1600, heroShards: 3 },
       waves: [
-        { id: "forest-1-3-w1", name: "웨이브 1", monsterIds: ["stone-ogre", "iron-goblin"] },
-        { id: "forest-1-3-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "iron-goblin"] },
-        { id: "forest-1-3-w3", name: "웨이브 3", monsterIds: ["stone-ogre", "swamp-slime"] },
+        { id: "forest-1-3-w1", name: "웨이브 1", monsterIds: ["stone-ogre", "iron-goblin", "swamp-slime"] },
+        { id: "forest-1-3-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "iron-goblin", "stone-ogre"] },
+        { id: "forest-1-3-w3", name: "웨이브 3", monsterIds: ["iron-goblin", "stone-ogre", "swamp-slime"] },
       ],
     },
   ];
@@ -374,6 +374,7 @@
     actionCard: document.querySelector("#actionCard"),
     monsterSection: document.querySelector(".monster-section"),
     monsterGrid: document.querySelector("#monsterGrid"),
+    waveTracker: document.querySelector("#waveTracker"),
     workbench: document.querySelector(".workbench"),
     materialBoard: document.querySelector("#materialBoard"),
     materialGrid: document.querySelector("#materialGrid"),
@@ -440,6 +441,7 @@
     resultMode: null,
     rewardOptions: [],
     boardEdit: null,
+    roundTransition: null,
     nextPieceId: 1,
     nextPlacementId: 1,
     initialMaterialTotal: 0,
@@ -547,7 +549,13 @@
   }
 
   function currentMonster() {
-    const monsterId = currentMonsterId();
+    return monsterForRound(state.roundIndex);
+  }
+
+  function monsterForRound(roundIndex) {
+    const wave = currentWave();
+    const monsterIds = wave.monsterIds || wave.rounds || [];
+    const monsterId = monsterIds[roundIndex] ?? monsterIds[0];
     if (typeof monsterId === "number") return MONSTER_DEFS[monsterId] || MONSTER_DEFS[0];
     return MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
   }
@@ -642,6 +650,7 @@
     state.shield = 0;
     state.rewardOptions = [];
     state.boardEdit = null;
+    state.roundTransition = null;
     state.pendingLogs = [];
     state.boardEffects = [];
     startStage(state.stageIndex);
@@ -654,7 +663,8 @@
     startRound(index, 0, 0);
   }
 
-  function startRound(stageIndex = state.stageIndex, waveIndex = state.waveIndex, roundIndex = state.roundIndex) {
+  function startRound(stageIndex = state.stageIndex, waveIndex = state.waveIndex, roundIndex = state.roundIndex, options = {}) {
+    const resetMaterial = options.resetMaterial !== false;
     const pendingLogs = state.pendingLogs;
     state.stageIndex = stageIndex;
     state.waveIndex = waveIndex;
@@ -664,12 +674,6 @@
     state.actionIndex = 0;
     state.cutsUsed = 0;
     state.monsterCells = new Map();
-    state.materialCols = CUT_BOARD_COLS;
-    state.materialRows = CUT_BOARD_ROWS;
-    state.materialOrigin = { x: 0, y: 0 };
-    state.missingCells = new Set();
-    state.spoiledCells = new Set();
-    state.knives = [];
     state.placedPieces = [];
     state.blocked = new Set();
     state.coverOrder = [];
@@ -679,9 +683,18 @@
     state.resultMode = null;
     state.rewardOptions = [];
     state.boardEdit = null;
-    state.shield = 0;
-    state.silentRefills = state.silentRefillUpgrades;
-    state.nextPieceId = 1;
+    state.roundTransition = options.transition || null;
+    if (resetMaterial) {
+      state.materialCols = CUT_BOARD_COLS;
+      state.materialRows = CUT_BOARD_ROWS;
+      state.materialOrigin = { x: 0, y: 0 };
+      state.missingCells = new Set();
+      state.spoiledCells = new Set();
+      state.knives = [];
+      state.shield = 0;
+      state.silentRefills = state.silentRefillUpgrades;
+      state.nextPieceId = 1;
+    }
     state.nextPlacementId = 1;
     state.draggingPieceId = null;
     state.draggingPlacementId = null;
@@ -700,9 +713,10 @@
       });
     });
 
-    resetMaterialBoard();
+    if (resetMaterial) resetMaterialBoard();
 
     addLog(`${currentWave().name} ${state.roundIndex + 1}/${roundCount()}. ${monster.name} 등장.`);
+    if (!resetMaterial) addLog("이전 몬스터에서 남긴 재료판을 그대로 이어간다.");
     addLog("칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.");
     pendingLogs.forEach((line) => addLog(line));
     hideResult();
@@ -1156,6 +1170,7 @@
     renderSceneMode();
     renderStatus();
     renderActionCard();
+    renderWaveTracker();
     updateLayoutMode();
     updateAdaptiveCellSize();
     renderMonster();
@@ -1166,6 +1181,8 @@
   function renderSceneMode() {
     els.appShell.classList.toggle("reward-edit-mode", Boolean(state.boardEdit));
     els.appShell.classList.toggle("reward-edit-closing", Boolean(state.boardEdit?.closing));
+    els.appShell.classList.toggle("monster-transition-mode", state.roundTransition?.phase === "out");
+    els.appShell.classList.toggle("monster-enter-mode", state.roundTransition?.phase === "in");
   }
 
   function renderStatus() {
@@ -1238,6 +1255,35 @@
       <span class="action-chip"><i>${actionView.mark}</i>${actionView.label}</span>
       <strong class="action-main">${actionView.main}</strong>
       <span class="action-sub">${blockedText}</span>
+    `;
+  }
+
+  function renderWaveTracker() {
+    if (!els.waveTracker) return;
+    const transition = state.roundTransition;
+    const cards = (currentWave().monsterIds || currentWave().rounds || []).map((monsterId, index) => {
+      const monster = typeof monsterId === "number" ? MONSTER_DEFS[monsterId] : MONSTERS_BY_ID.get(monsterId);
+      const stateClass = index < state.roundIndex ? "done" : index === state.roundIndex ? "active" : "waiting";
+      const transitionClass = transition && index === transition.fromIndex && transition.phase === "out"
+        ? " exiting"
+        : transition && index === transition.toIndex
+          ? ` entering ${transition.phase === "in" ? "open" : ""}`
+          : "";
+      const label = monster?.name || "몬스터";
+      return `
+        <div class="monster-queue-card ${stateClass}${transitionClass}" aria-label="${index + 1}번째 ${label}">
+          <span>${index + 1}</span>
+          <strong>${label.slice(0, 2)}</strong>
+        </div>
+      `;
+    }).join("");
+
+    els.waveTracker.innerHTML = `
+      <div class="wave-count">
+        <span>웨이브</span>
+        <strong>${state.waveIndex + 1}/${waveCount()}</strong>
+      </div>
+      <div class="monster-queue" aria-label="웨이브 몬스터 순서">${cards}</div>
     `;
   }
 
@@ -1621,7 +1667,7 @@
   }
 
   function beginKnifeDrag(event, index) {
-    if (state.boardEdit) return;
+    if (state.boardEdit || state.resultMode) return;
     event.preventDefault();
     state.selectedPlacementId = null;
     state.drag = { type: "knife", index };
@@ -1796,7 +1842,7 @@
   }
 
   function beginPieceDrag(event, pieceId, grabbedX, grabbedY) {
-    if (state.boardEdit) return;
+    if (state.boardEdit || state.resultMode) return;
     const piece = getPiece(pieceId);
     if (!piece) return;
     event.preventDefault();
@@ -1967,6 +2013,7 @@
 
   function selectLockedPlacement(event, placementId) {
     event.preventDefault();
+    if (state.resultMode) return;
     const placement = getPlacement(placementId);
     if (!placement || isCurrentTurnPlacement(placement)) return;
     state.selectedPlacementId = state.selectedPlacementId === placementId ? null : placementId;
@@ -1975,7 +2022,7 @@
   }
 
   function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
-    if (state.boardEdit) return;
+    if (state.boardEdit || state.resultMode) return;
     const placement = getPlacement(placementId);
     if (!isCurrentTurnPlacement(placement)) return;
     event.preventDefault();
@@ -3636,15 +3683,7 @@
 
   function showStageClear() {
     if (hasNextRound()) {
-      state.resultMode = "round";
-      els.resultModal?.classList.remove("reward-modal");
-      els.resultEyebrow.textContent = "ROUND CLEAR";
-      els.resultTitle.textContent = `${currentMonster().name} 포장 완료`;
-      els.resultText.textContent = `보상은 ${currentWave().name}의 모든 몬스터를 정리한 뒤 제공됩니다.`;
-      els.resultButton.textContent = "다음 몬스터";
-      els.resultButton.classList.remove("hidden");
-      renderRewardChoices([]);
-      els.overlay.classList.remove("hidden");
+      transitionToNextMonster();
       return;
     }
 
@@ -3660,6 +3699,28 @@
     els.resultButton.classList.toggle("hidden", !isFinal);
     renderRewardChoices(isFinal ? [] : dealRewardOptions());
     els.overlay.classList.remove("hidden");
+  }
+
+  function transitionToNextMonster() {
+    const fromIndex = state.roundIndex;
+    const toIndex = state.roundIndex + 1;
+    const fromMonster = currentMonster();
+    const nextMonster = monsterForRound(toIndex);
+    state.resultMode = "round-transition";
+    state.roundTransition = { fromIndex, toIndex, phase: "out" };
+    addLog(`${fromMonster.name} 정리 완료. ${nextMonster.name} 카드가 펼쳐진다.`);
+    render();
+
+    window.setTimeout(() => {
+      const transition = { fromIndex, toIndex, phase: "in" };
+      startRound(state.stageIndex, state.waveIndex, toIndex, { resetMaterial: false, transition });
+      window.setTimeout(() => {
+        if (state.roundTransition?.phase === "in" && state.roundIndex === toIndex) {
+          state.roundTransition = null;
+          render();
+        }
+      }, 360);
+    }, 360);
   }
 
   function showLoss(title, text) {
@@ -3682,10 +3743,6 @@
   }
 
   function handleResultButton() {
-    if (state.resultMode === "round") {
-      startRound(state.stageIndex, state.waveIndex, state.roundIndex + 1);
-      return;
-    }
     if (state.resultMode === "complete") {
       setStageRewardReady(currentStage().id, true);
       enterMetaMode("main", "main");
