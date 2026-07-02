@@ -9,9 +9,87 @@
   };
 
   const KNIFE_TYPES = {
-    h3: { label: "가로 3", orientation: "h", length: 3 },
-    v3: { label: "세로 3", orientation: "v", length: 3 },
-    h2: { label: "가로 2", orientation: "h", length: 2 },
+    h2: {
+      label: "가로 2",
+      segments: [
+        { orientation: "h", x: 0, y: 0 },
+        { orientation: "h", x: 1, y: 0 },
+      ],
+    },
+    h3: {
+      label: "가로 3",
+      segments: [
+        { orientation: "h", x: 0, y: 0 },
+        { orientation: "h", x: 1, y: 0 },
+        { orientation: "h", x: 2, y: 0 },
+      ],
+    },
+    v2: {
+      label: "세로 2",
+      segments: [
+        { orientation: "v", x: 0, y: 0 },
+        { orientation: "v", x: 0, y: 1 },
+      ],
+    },
+    v3: {
+      label: "세로 3",
+      segments: [
+        { orientation: "v", x: 0, y: 0 },
+        { orientation: "v", x: 0, y: 1 },
+        { orientation: "v", x: 0, y: 2 },
+      ],
+    },
+    l3: {
+      label: "ㄱ 3",
+      segments: [
+        { orientation: "h", x: 0, y: 0 },
+        { orientation: "h", x: 1, y: 0 },
+        { orientation: "v", x: 2, y: 0 },
+      ],
+    },
+    l4: {
+      label: "ㄱ 4",
+      segments: [
+        { orientation: "h", x: 0, y: 0 },
+        { orientation: "h", x: 1, y: 0 },
+        { orientation: "v", x: 2, y: 0 },
+        { orientation: "v", x: 2, y: 1 },
+      ],
+    },
+  };
+
+  const BASE_BOARD_CELLS = [
+    c(2, 1),
+    c(3, 1),
+    c(2, 2),
+    c(4, 2),
+    c(2, 3),
+    c(3, 3),
+    c(4, 3),
+  ];
+
+  const BASE_KNIVES = [
+    { type: "h2", x: 2, y: 2 },
+    { type: "v2", x: 4, y: 2 },
+  ];
+
+  const LINK_META = {
+    heal: { label: "회복", mark: "회", className: "link-heal" },
+    attack: { label: "공격", mark: "공", className: "link-attack" },
+    defense: { label: "방어", mark: "방", className: "link-defense" },
+  };
+
+  const REWARDS = {
+    expand1: { id: "expand1", title: "한 칸 추가", text: "1칸 재료를 도시락 판에 직접 붙입니다.", type: "expand", shape: [{ x: 0, y: 0 }] },
+    expand2: { id: "expand2", title: "두 칸 추가", text: "2칸 직선 재료를 회전해 붙입니다.", type: "expand", shape: [{ x: 0, y: 0 }, { x: 1, y: 0 }] },
+    linkHeal: { id: "linkHeal", title: "회복 링크", text: "인접한 2칸을 회복 링크로 바꿉니다. 링크를 자르면 체력 1 회복.", type: "link", linkType: "heal" },
+    linkAttack: { id: "linkAttack", title: "공격 링크", text: "인접한 2칸을 공격 링크로 바꿉니다. 링크를 자르면 1칸 조각 생성.", type: "link", linkType: "attack" },
+    linkDefense: { id: "linkDefense", title: "방어 링크", text: "인접한 2칸을 방어 링크로 바꿉니다. 링크를 자르면 쉴드 1 획득.", type: "link", linkType: "defense" },
+    growH: { id: "growH", title: "가로 칼 성장", text: "가로 칼 하나의 길이를 2에서 3으로 늘립니다.", type: "knife", from: "h2", to: "h3" },
+    growV: { id: "growV", title: "세로 칼 성장", text: "세로 칼 하나의 길이를 2에서 3으로 늘립니다.", type: "knife", from: "v2", to: "v3" },
+    bendL: { id: "bendL", title: "ㄱ자 칼 변형", text: "직선 칼 하나를 짧은 ㄱ자 칼로 바꿉니다.", type: "knifeAny", to: "l3" },
+    growL: { id: "growL", title: "ㄱ자 칼 성장", text: "ㄱ자 칼을 더 긴 ㄱ자 칼로 늘립니다.", type: "knife", from: "l3", to: "l4" },
+    silentRefill: { id: "silentRefill", title: "무음 재충전", text: "전투당 1회 새 판 요청 시 몬스터 액션을 무시합니다.", type: "silentRefill", rarity: "rare" },
   };
 
   const MAX_HP = 24;
@@ -20,6 +98,7 @@
   const CUT_BOARD_ROWS = 6;
   const DRAG_POINTER_OFFSET = 44;
   const MAX_CUTS_PER_TURN = 2;
+  const LINK_TRIGGER_LIMIT_PER_CUT = 2;
   const MIN_CELL_SIZE = 22;
   const MAX_CELL_SIZE = 42;
   const COMPACT_HEIGHT = 760;
@@ -28,72 +107,44 @@
   const monsters = [
     {
       name: "철갑 고블린",
-      sub: "갑피를 먼저 막아라",
-      cols: 5,
-      rows: 5,
+      sub: "작은 몸통의 주먹부터 막아라",
+      cols: 3,
+      rows: 3,
       baseAttack: 2,
-      actions: ["attack", "defense", "attack", "heal", "special"],
-      material: { cols: 5, rows: 4, holes: [] },
-      knives: [
-        { type: "h3", x: 1, y: 1 },
-        { type: "v3", x: 3, y: 0 },
-        { type: "h2", x: 0, y: 3 },
-      ],
+      actions: ["attack", "defense", "attack", "heal"],
       cells: [
-        c(2, 0),
-        c(1, 1, "attack"),
+        c(1, 0, "attack"),
+        c(0, 1),
+        c(1, 1, "defense"),
         c(2, 1),
-        c(3, 1, "defense"),
-        c(0, 2, "attack"),
+        c(0, 2, "heal"),
         c(1, 2),
-        c(2, 2),
-        c(3, 2),
-        c(4, 2, "attack"),
-        c(1, 3, "heal"),
-        c(2, 3),
-        c(3, 3, "defense"),
-        c(4, 3),
-        c(2, 4),
-        c(3, 4),
-        c(4, 4, "special"),
+        c(2, 2, "attack"),
       ],
       special(state, count) {
-        const damage = count + 1;
-        state.playerHp -= damage;
+        const damage = takeDamage(count + 1);
         addLog(`고블린이 위협 공격을 했다. 특수 표식 ${count}개로 ${damage} 피해.`);
       },
     },
     {
       name: "늪지 점액술사",
       sub: "회복 표식을 방치하면 재료가 말린다",
-      cols: 5,
-      rows: 5,
+      cols: 4,
+      rows: 4,
       baseAttack: 1,
       actions: ["heal", "attack", "defense", "special", "attack"],
-      material: { cols: 5, rows: 5, holes: [key(0, 0), key(4, 0), key(0, 4), key(4, 4)] },
-      knives: [
-        { type: "v3", x: 2, y: 1 },
-        { type: "h3", x: 1, y: 2 },
-        { type: "h2", x: 2, y: 4 },
-      ],
       cells: [
         c(1, 0, "attack"),
-        c(2, 0),
-        c(3, 0, "heal"),
+        c(2, 0, "heal"),
         c(0, 1),
         c(1, 1, "defense"),
         c(2, 1),
         c(3, 1, "attack"),
-        c(4, 1),
-        c(0, 2, "special"),
         c(1, 2),
-        c(2, 2, "heal"),
+        c(2, 2, "special"),
         c(3, 2),
-        c(4, 2, "attack"),
         c(1, 3),
-        c(2, 3, "defense"),
-        c(3, 3),
-        c(2, 4),
+        c(2, 3, "heal"),
       ],
       special(state, count) {
         const blocks = chooseOpenCells(count + 1);
@@ -104,45 +155,30 @@
     {
       name: "돌껍질 오우거",
       sub: "큰 몸이지만 낭비할 재료는 적다",
-      cols: 6,
-      rows: 5,
+      cols: 5,
+      rows: 4,
       baseAttack: 3,
       actions: ["attack", "defense", "special", "attack", "heal"],
-      material: { cols: 5, rows: 5, holes: [] },
-      knives: [
-        { type: "h3", x: 0, y: 2 },
-        { type: "v3", x: 4, y: 1 },
-        { type: "h2", x: 2, y: 4 },
-      ],
       cells: [
         c(2, 0, "defense"),
-        c(3, 0, "attack"),
         c(1, 1),
         c(2, 1),
         c(3, 1, "heal"),
-        c(4, 1),
         c(0, 2, "attack"),
         c(1, 2),
         c(2, 2, "special"),
         c(3, 2),
-        c(4, 2),
-        c(5, 2, "attack"),
-        c(0, 3),
+        c(4, 2, "attack"),
         c(1, 3, "defense"),
         c(2, 3),
         c(3, 3, "special"),
-        c(4, 3),
-        c(5, 3, "attack"),
-        c(2, 4),
-        c(3, 4),
       ],
       special(state, count) {
         const spoiled = spoilMaterial(count + 1);
         if (spoiled > 0) {
           addLog(`오우거가 재료 ${spoiled}칸을 짓눌렀다.`);
         } else {
-          const damage = count + 2;
-          state.playerHp -= damage;
+          const damage = takeDamage(count + 2);
           addLog(`짓누를 재료가 없어 충격파로 ${damage} 피해를 받았다.`);
         }
       },
@@ -179,6 +215,7 @@
     resultEyebrow: document.querySelector("#resultEyebrow"),
     resultTitle: document.querySelector("#resultTitle"),
     resultText: document.querySelector("#resultText"),
+    rewardChoices: document.querySelector("#rewardChoices"),
     resultButton: document.querySelector("#resultButton"),
     dragGhost: document.querySelector("#dragGhost"),
   };
@@ -190,6 +227,13 @@
     cutsUsed: 0,
     playerHp: MAX_HP,
     monsterCells: new Map(),
+    boardCells: new Set(),
+    boardCellTypes: new Map(),
+    boardLinks: new Map(),
+    knifeLoadout: [],
+    silentRefillUpgrades: 0,
+    silentRefills: 0,
+    shield: 0,
     materialCols: 5,
     materialRows: 4,
     materialOrigin: { x: 0, y: 0 },
@@ -201,7 +245,10 @@
     blocked: new Set(),
     coverOrder: [],
     log: [],
+    pendingLogs: [],
     resultMode: null,
+    rewardOptions: [],
+    boardEdit: null,
     nextPieceId: 1,
     nextPlacementId: 1,
     initialMaterialTotal: 0,
@@ -245,11 +292,22 @@
   function startGame() {
     state.stageIndex = 0;
     state.playerHp = MAX_HP;
+    state.boardCells = new Set(BASE_BOARD_CELLS.map((cell) => key(cell.x, cell.y)));
+    state.boardCellTypes = new Map();
+    state.boardLinks = new Map();
+    state.knifeLoadout = BASE_KNIVES.map((knife) => ({ ...knife }));
+    state.silentRefillUpgrades = 0;
+    state.silentRefills = 0;
+    state.shield = 0;
+    state.rewardOptions = [];
+    state.boardEdit = null;
+    state.pendingLogs = [];
     startStage(0);
   }
 
   function startStage(index) {
     const monster = monsters[index];
+    const pendingLogs = state.pendingLogs;
     state.stageIndex = index;
     state.turn = 1;
     state.actionIndex = 0;
@@ -257,23 +315,20 @@
     state.monsterCells = new Map();
     state.materialCols = CUT_BOARD_COLS;
     state.materialRows = CUT_BOARD_ROWS;
-    state.materialOrigin = {
-      x: Math.floor((CUT_BOARD_COLS - monster.material.cols) / 2),
-      y: Math.floor((CUT_BOARD_ROWS - monster.material.rows) / 2),
-    };
+    state.materialOrigin = { x: 0, y: 0 };
     state.missingCells = new Set();
     state.spoiledCells = new Set();
-    state.knives = monster.knives.map((knife, index) => ({
-      ...knife,
-      x: knife.x + state.materialOrigin.x,
-      y: knife.y + state.materialOrigin.y,
-      id: `knife-${index}`,
-    }));
+    state.knives = [];
     state.placedPieces = [];
     state.blocked = new Set();
     state.coverOrder = [];
     state.log = [];
+    state.pendingLogs = [];
     state.resultMode = null;
+    state.rewardOptions = [];
+    state.boardEdit = null;
+    state.shield = 0;
+    state.silentRefills = state.silentRefillUpgrades;
     state.nextPieceId = 1;
     state.nextPlacementId = 1;
     state.draggingPieceId = null;
@@ -295,39 +350,32 @@
     resetMaterialBoard();
 
     addLog(`${monster.name} 등장. 칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.`);
+    pendingLogs.forEach((line) => addLog(line));
     hideResult();
     render();
   }
 
   function resetMaterialBoard() {
-    const monster = currentMonster();
     state.materialCols = CUT_BOARD_COLS;
     state.materialRows = CUT_BOARD_ROWS;
-    state.materialOrigin = {
-      x: Math.floor((CUT_BOARD_COLS - monster.material.cols) / 2),
-      y: Math.floor((CUT_BOARD_ROWS - monster.material.rows) / 2),
-    };
+    state.materialOrigin = { x: 0, y: 0 };
     state.missingCells = new Set();
     state.spoiledCells = new Set();
-    state.knives = monster.knives.map((knife, index) => ({
+    state.knives = state.knifeLoadout.map((knife, index) => ({
       ...knife,
-      x: knife.x + state.materialOrigin.x,
-      y: knife.y + state.materialOrigin.y,
       id: `knife-${index}`,
     }));
 
-    const cells = [];
-    const materialHoles = new Set(monster.material.holes);
-    for (let y = 0; y < monster.material.rows; y += 1) {
-      for (let x = 0; x < monster.material.cols; x += 1) {
-        if (!materialHoles.has(key(x, y))) {
-          cells.push({ x: x + state.materialOrigin.x, y: y + state.materialOrigin.y });
-        }
-      }
-    }
+    const cells = [...state.boardCells].map(fromKey).sort((a, b) => a.y - b.y || a.x - b.x);
 
     state.initialMaterialTotal = cells.length;
-    state.materialPieces = [{ id: state.nextPieceId, cells, cutEdges: new Set() }];
+    state.materialPieces = [{
+      id: state.nextPieceId,
+      cells,
+      cutEdges: new Set(),
+      specialCells: cloneSpecialCells(state.boardCellTypes),
+      specialLinks: cloneSpecialLinks(state.boardLinks),
+    }];
     state.nextPieceId += 1;
   }
 
@@ -350,8 +398,9 @@
   function renderStatus() {
     const covered = coveredCount();
     const total = state.monsterCells.size;
+    const shieldText = state.shield ? ` +${state.shield}` : "";
     els.stageLabel.textContent = `${state.stageIndex + 1} / ${monsters.length}`;
-    els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${MAX_HP}`;
+    els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${MAX_HP}${shieldText}`;
     els.materialLabel.textContent = `${availableMaterialCount()} / ${state.initialMaterialTotal}`;
     els.pieceCountLabel.textContent = `${state.materialPieces.length}개`;
     els.monsterSub.textContent = currentMonster().sub;
@@ -359,12 +408,16 @@
     els.completionLabel.textContent = `${covered} / ${total}`;
     els.completionFill.style.width = `${(covered / total) * 100}%`;
     const selectedPlacement = getPlacement(state.selectedPlacementId);
-    els.cutButton.textContent = selectedPlacement ? "회수" : "자르기";
+    if (state.boardEdit) {
+      els.cutButton.textContent = state.boardEdit.reward.type === "expand" && state.boardEdit.shape.length > 1 ? "회전" : "취소";
+    } else {
+      els.cutButton.textContent = selectedPlacement ? "회수" : "자르기";
+    }
     els.cutButton.classList.toggle("recover-mode", Boolean(selectedPlacement));
-    els.cutButton.disabled = state.cutsUsed >= MAX_CUTS_PER_TURN || Boolean(state.resultMode);
-    if (els.newBoardButton) els.newBoardButton.disabled = Boolean(state.resultMode);
-    if (els.endTurnButton) els.endTurnButton.disabled = Boolean(state.resultMode);
-    if (els.hpControlLabel) els.hpControlLabel.textContent = `${Math.max(0, state.playerHp)}/${MAX_HP}`;
+    els.cutButton.disabled = state.boardEdit ? false : state.cutsUsed >= MAX_CUTS_PER_TURN || Boolean(state.resultMode);
+    if (els.newBoardButton) els.newBoardButton.disabled = Boolean(state.resultMode || state.boardEdit);
+    if (els.endTurnButton) els.endTurnButton.disabled = Boolean(state.resultMode || state.boardEdit);
+    if (els.hpControlLabel) els.hpControlLabel.textContent = `${Math.max(0, state.playerHp)}/${MAX_HP}${shieldText}`;
     if (els.cutCountLabel) els.cutCountLabel.textContent = `${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
   }
 
@@ -562,8 +615,10 @@
 
   function renderMaterialBoard() {
     const pieceByCell = buildPieceByCell({ skipDragging: true });
+    const specialByCell = buildSpecialByCell({ skipDragging: true });
     const dropPreview = state.dropPreview?.zone === "material" ? state.dropPreview : null;
     const dropPreviewCells = new Set(dropPreview?.cells || []);
+    const editPreview = state.boardEdit ? getBoardEditPreview() : null;
     els.materialGrid.style.gridTemplateColumns = `repeat(${state.materialCols}, var(--small-cell))`;
     els.materialGrid.innerHTML = "";
     els.cutLayer.innerHTML = "";
@@ -577,6 +632,16 @@
         button.className = "material-cell";
         button.dataset.key = cellKey;
 
+        if (state.boardEdit) {
+          button.addEventListener("click", () => handleBoardEditCell(x, y));
+          if (state.boardCells.has(cellKey)) button.classList.add("board-source-cell");
+          if (editPreview?.selectedKey === cellKey) button.classList.add("edit-selected");
+          if (editPreview?.validCells?.has(cellKey)) button.classList.add("edit-valid");
+          if (editPreview?.previewCells?.has(cellKey)) {
+            button.classList.add(editPreview.previewValid ? "preview-place" : "preview-invalid");
+          }
+        }
+
         if (state.missingCells.has(cellKey)) {
           button.classList.add("used");
           button.disabled = true;
@@ -587,7 +652,18 @@
           const pieceId = pieceByCell.get(cellKey);
           button.dataset.pieceId = String(pieceId);
           button.classList.add(`piece-tone-${pieceId % 5}`);
-          button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId, x, y));
+          const specialType = specialByCell.get(cellKey);
+          if (specialType) {
+            const meta = LINK_META[specialType];
+            button.classList.add("special-cell", meta.className);
+            const badge = document.createElement("span");
+            badge.className = "special-cell-mark";
+            badge.textContent = meta.mark;
+            button.append(badge);
+          }
+          if (!state.boardEdit) {
+            button.addEventListener("pointerdown", (event) => beginPieceDrag(event, pieceId, x, y));
+          }
         } else {
           button.classList.add("empty-material");
         }
@@ -600,6 +676,7 @@
       }
     }
 
+    renderSpecialLinks();
     renderCutMarks();
     renderKnifeGuide();
     renderKnives();
@@ -607,6 +684,14 @@
   }
 
   function renderWorkbenchHint() {
+    if (state.boardEdit) {
+      if (state.boardEdit.reward.type === "expand") {
+        els.knifeHint.textContent = "노란 가이드에 보상 칸을 붙입니다. 자르기 버튼으로 2칸 보상을 회전합니다.";
+        return;
+      }
+      els.knifeHint.textContent = "보드 위 인접한 2칸을 차례로 선택해 링크를 설치합니다.";
+      return;
+    }
     if (getPlacement(state.selectedPlacementId)) {
       els.knifeHint.textContent = "회수는 칼질 1회를 써서 고정된 조각을 재료판으로 되돌립니다.";
       return;
@@ -642,21 +727,12 @@
   }
 
   function renderKnives() {
+    if (state.boardEdit) return;
     state.knives.forEach((knife, index) => {
       if (state.drag?.type === "knife" && state.drag.index === index) return;
-      const type = KNIFE_TYPES[knife.type];
-      const el = document.createElement("button");
+      const el = renderKnifeShape(knife, "board-knife", true);
       el.type = "button";
-      el.className = `board-knife ${type.orientation}`;
       el.dataset.knifeIndex = String(index);
-      el.textContent = type.label;
-      el.style.left = knifeLeft(knife);
-      el.style.top = knifeTop(knife);
-      if (type.orientation === "h") {
-        el.style.width = lengthSize(type.length);
-      } else {
-        el.style.height = lengthSize(type.length);
-      }
       el.addEventListener("pointerdown", (event) => beginKnifeDrag(event, index));
       els.knifeLayer.append(el);
     });
@@ -664,16 +740,7 @@
 
   function renderKnifeGuide() {
     if (!state.knifePreview) return;
-    const type = KNIFE_TYPES[state.knifePreview.type];
-    const el = document.createElement("span");
-    el.className = `knife-guide ${type.orientation}`;
-    el.style.left = knifeLeft(state.knifePreview);
-    el.style.top = knifeTop(state.knifePreview);
-    if (type.orientation === "h") {
-      el.style.width = lengthSize(type.length);
-    } else {
-      el.style.height = lengthSize(type.length);
-    }
+    const el = renderKnifeShape(state.knifePreview, "knife-guide", true);
     els.knifeLayer.append(el);
   }
 
@@ -682,21 +749,63 @@
     return `${getBoardPad() + value * (cell + BOARD_GAP)}px`;
   }
 
-  function knifeLeft(knife) {
-    const type = KNIFE_TYPES[knife.type];
-    const base = parseFloat(boardPos(knife.x));
-    return `${base - (type.orientation === "v" ? getKnifeHitSize() / 2 : 0)}px`;
+  function boardLinePx(value) {
+    return getBoardPad() + value * (getMaterialCellSize() + BOARD_GAP);
   }
 
-  function knifeTop(knife) {
+  function renderKnifeShape(knife, className, absolute) {
     const type = KNIFE_TYPES[knife.type];
-    const base = parseFloat(boardPos(knife.y));
-    return `${base - (type.orientation === "h" ? getKnifeHitSize() / 2 : 0)}px`;
+    const box = knifeBox(knife);
+    const el = document.createElement(absolute && className === "board-knife" ? "button" : "span");
+    el.className = className;
+    el.textContent = type.label;
+    el.style.width = `${box.width}px`;
+    el.style.height = `${box.height}px`;
+    if (absolute) {
+      el.style.left = `${box.left}px`;
+      el.style.top = `${box.top}px`;
+    }
+
+    knifeSegments(knife).forEach((segment) => {
+      const rect = knifeSegmentRect(segment);
+      const blade = document.createElement("span");
+      blade.className = `knife-segment ${segment.orientation}`;
+      blade.style.left = `${rect.left - box.left}px`;
+      blade.style.top = `${rect.top - box.top}px`;
+      blade.style.width = `${rect.width}px`;
+      blade.style.height = `${rect.height}px`;
+      el.append(blade);
+    });
+    return el;
   }
 
-  function lengthSize(length) {
+  function knifeBox(knife) {
+    const rects = knifeSegments(knife).map(knifeSegmentRect);
+    const left = Math.min(...rects.map((rect) => rect.left));
+    const top = Math.min(...rects.map((rect) => rect.top));
+    const right = Math.max(...rects.map((rect) => rect.left + rect.width));
+    const bottom = Math.max(...rects.map((rect) => rect.top + rect.height));
+    return { left, top, width: right - left, height: bottom - top };
+  }
+
+  function knifeSegments(knife) {
+    return KNIFE_TYPES[knife.type].segments.map((segment) => ({
+      orientation: segment.orientation,
+      x: knife.x + segment.x,
+      y: knife.y + segment.y,
+    }));
+  }
+
+  function knifeSegmentRect(segment) {
     const cell = getMaterialCellSize();
-    return `${length * cell + Math.max(0, length - 1) * BOARD_GAP}px`;
+    const step = cell + BOARD_GAP;
+    const hit = getKnifeHitSize();
+    const lineX = boardLinePx(segment.x);
+    const lineY = boardLinePx(segment.y);
+    if (segment.orientation === "h") {
+      return { left: lineX, top: lineY - hit / 2, width: step, height: hit };
+    }
+    return { left: lineX - hit / 2, top: lineY, width: hit, height: step };
   }
 
   function beginKnifeDrag(event, index) {
@@ -734,18 +843,57 @@
     const step = cell + BOARD_GAP;
     const localX = clientX - rect.left - getBoardPad();
     const localY = clientY - rect.top - getBoardPad();
-    const span = type.length * cell + Math.max(0, type.length - 1) * BOARD_GAP;
-
-    if (type.orientation === "h") {
-      return {
-        x: clamp(Math.round((localX - span / 2) / step), 0, state.materialCols - type.length),
-        y: clamp(Math.round(localY / step), 1, state.materialRows - 1),
-      };
-    }
+    const relativeCenter = knifeRelativeCenter(type);
+    const range = knifeAnchorRange(type);
 
     return {
-      x: clamp(Math.round(localX / step), 1, state.materialCols - 1),
-      y: clamp(Math.round((localY - span / 2) / step), 0, state.materialRows - type.length),
+      x: clamp(Math.round((localX - relativeCenter.x) / step), range.minX, range.maxX),
+      y: clamp(Math.round((localY - relativeCenter.y) / step), range.minY, range.maxY),
+    };
+  }
+
+  function knifeRelativeCenter(type) {
+    const cell = getMaterialCellSize();
+    const step = cell + BOARD_GAP;
+    const hit = getKnifeHitSize();
+    const rects = type.segments.map((segment) => {
+      if (segment.orientation === "h") {
+        return { left: segment.x * step, top: segment.y * step - hit / 2, right: (segment.x + 1) * step, bottom: segment.y * step + hit / 2 };
+      }
+      return { left: segment.x * step - hit / 2, top: segment.y * step, right: segment.x * step + hit / 2, bottom: (segment.y + 1) * step };
+    });
+    const left = Math.min(...rects.map((item) => item.left));
+    const top = Math.min(...rects.map((item) => item.top));
+    const right = Math.max(...rects.map((item) => item.right));
+    const bottom = Math.max(...rects.map((item) => item.bottom));
+    return { x: (left + right) / 2, y: (top + bottom) / 2 };
+  }
+
+  function knifeAnchorRange(type) {
+    let minX = -Infinity;
+    let minY = -Infinity;
+    let maxX = Infinity;
+    let maxY = Infinity;
+
+    type.segments.forEach((segment) => {
+      if (segment.orientation === "h") {
+        minX = Math.max(minX, -segment.x);
+        maxX = Math.min(maxX, state.materialCols - 1 - segment.x);
+        minY = Math.max(minY, 1 - segment.y);
+        maxY = Math.min(maxY, state.materialRows - 1 - segment.y);
+      } else {
+        minX = Math.max(minX, 1 - segment.x);
+        maxX = Math.min(maxX, state.materialCols - 1 - segment.x);
+        minY = Math.max(minY, -segment.y);
+        maxY = Math.min(maxY, state.materialRows - 1 - segment.y);
+      }
+    });
+
+    return {
+      minX: Number.isFinite(minX) ? minX : 0,
+      minY: Number.isFinite(minY) ? minY : 0,
+      maxX: Number.isFinite(maxX) ? maxX : 0,
+      maxY: Number.isFinite(maxY) ? maxY : 0,
     };
   }
 
@@ -786,28 +934,51 @@
     state.cutsUsed += 1;
     state.selectedPlacementId = null;
     let added = 0;
+    let triggered = 0;
+    const linkRewards = { heal: 0, attack: 0, defense: 0 };
     state.knives.forEach((knife) => {
-      const type = KNIFE_TYPES[knife.type];
-      for (let i = 0; i < type.length; i += 1) {
-        const edge = type.orientation === "h"
-          ? edgeKey(key(knife.x + i, knife.y - 1), key(knife.x + i, knife.y))
-          : edgeKey(key(knife.x - 1, knife.y + i), key(knife.x, knife.y + i));
-
+      knifeCutEdges(knife).forEach((edge) => {
         state.materialPieces.forEach((piece) => {
           if (isPieceEdge(edge, piece) && !piece.cutEdges.has(edge)) {
             piece.cutEdges.add(edge);
             added += 1;
+            const link = piece.specialLinks?.get(edge);
+            if (link?.active && triggered < LINK_TRIGGER_LIMIT_PER_CUT) {
+              link.active = false;
+              const [left, right] = edge.split("|");
+              piece.specialCells?.delete(left);
+              piece.specialCells?.delete(right);
+              triggered += 1;
+              linkRewards[link.type] += 1;
+            }
           }
         });
-      }
+      });
     });
 
+    if (linkRewards.heal) {
+      state.playerHp = Math.min(MAX_HP, state.playerHp + linkRewards.heal);
+    }
+    if (linkRewards.defense) {
+      state.shield += linkRewards.defense;
+    }
     const before = state.materialPieces.length;
     rebuildPiecesFromCuts();
+    if (linkRewards.attack) spawnSingleCellPieces(linkRewards.attack);
     const separated = Math.max(0, state.materialPieces.length - before);
     const cutSuffix = `남은 자르기 ${remainingCuts()}회.`;
-    addLog(added ? `절단선 ${added}개를 냈다. ${separated ? `${separated}개 조각이 새로 분리됐다.` : "아직 흠집만 남아 있다."} ${cutSuffix}` : `새로 잘린 선이 없다. ${cutSuffix}`);
+    const linkText = formatLinkRewardLog(linkRewards);
+    addLog(added ? `절단선 ${added}개를 냈다. ${separated ? `${separated}개 조각이 새로 분리됐다.` : "아직 흠집만 남아 있다."}${linkText} ${cutSuffix}` : `새로 잘린 선이 없다. ${cutSuffix}`);
     render();
+  }
+
+  function knifeCutEdges(knife) {
+    return knifeSegments(knife).map((segment) => {
+      if (segment.orientation === "h") {
+        return edgeKey(key(segment.x, segment.y - 1), key(segment.x, segment.y));
+      }
+      return edgeKey(key(segment.x - 1, segment.y), key(segment.x, segment.y));
+    });
   }
 
   function beginPieceDrag(event, pieceId, grabbedX, grabbedY) {
@@ -820,11 +991,13 @@
     state.selectedPlacementId = null;
     state.drag = { type: "piece", pieceId, offset, cells };
     state.drag.cutEdges = normalizeCutEdges(piece.cutEdges, min);
+    state.drag.specialCells = normalizeSpecialCells(piece.specialCells, min);
+    state.drag.specialLinks = normalizeSpecialLinks(piece.specialLinks, min);
     state.drag.source = "material";
     state.draggingPieceId = pieceId;
     state.dropPreview = null;
     renderMaterialBoard();
-    showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY);
+    showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY, state.drag.specialCells, state.drag.specialLinks);
     updateDropPreview(event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
     window.addEventListener("pointerup", onPieceUp);
@@ -911,11 +1084,13 @@
       offset,
       cells,
       cutEdges: normalizeCutEdges(placement.cutEdges, min),
+      specialCells: normalizeSpecialCells(placement.specialCells, min),
+      specialLinks: normalizeSpecialLinks(placement.specialLinks, min),
     };
     state.draggingPlacementId = placementId;
     state.dropPreview = null;
     renderMonster();
-    showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY);
+    showDragGhost(state.drag.cells, state.drag.cutEdges, event.clientX, event.clientY, state.drag.specialCells, state.drag.specialLinks);
     updateDropPreview(event.clientX, event.clientY);
     window.addEventListener("pointermove", onPieceMove);
     window.addEventListener("pointerup", onPieceUp);
@@ -934,8 +1109,12 @@
     }
 
     const currentMin = minCell(piece.cells);
+    const dx = anchorX - currentMin.x;
+    const dy = anchorY - currentMin.y;
     piece.cells = placement.cells;
-    piece.cutEdges = translateCutEdges(piece.cutEdges, anchorX - currentMin.x, anchorY - currentMin.y);
+    piece.cutEdges = translateCutEdges(piece.cutEdges, dx, dy);
+    piece.specialCells = translateSpecialCells(piece.specialCells, dx, dy);
+    piece.specialLinks = translateSpecialLinks(piece.specialLinks, dx, dy);
     addLog(`${placement.cells.length}칸 조각을 재료판 안에서 옮겼다.`);
     render();
   }
@@ -966,6 +1145,8 @@
       turn: state.turn,
       cells: placement.cells,
       cutEdges: translateCutEdges(piece.cutEdges, placementMin.x - pieceMin.x, placementMin.y - pieceMin.y),
+      specialCells: translateSpecialCells(piece.specialCells, placementMin.x - pieceMin.x, placementMin.y - pieceMin.y),
+      specialLinks: translateSpecialLinks(piece.specialLinks, placementMin.x - pieceMin.x, placementMin.y - pieceMin.y),
     });
     state.nextPlacementId += 1;
     state.materialPieces = state.materialPieces.filter((pieceItem) => pieceItem.id !== pieceId);
@@ -1001,6 +1182,8 @@
       id: state.nextPieceId,
       cells: boardPlacement.cells,
       cutEdges: translateCutEdges(placement.cutEdges, anchorX - minCell(placement.cells).x, anchorY - minCell(placement.cells).y),
+      specialCells: translateSpecialCells(placement.specialCells, anchorX - minCell(placement.cells).x, anchorY - minCell(placement.cells).y),
+      specialLinks: translateSpecialLinks(placement.specialLinks, anchorX - minCell(placement.cells).x, anchorY - minCell(placement.cells).y),
     });
     state.nextPieceId += 1;
     addLog(`${boardPlacement.cells.length}칸 조각을 다시 재료판으로 가져왔다.`);
@@ -1024,9 +1207,13 @@
 
     const currentMin = minCell(placement.cells);
     const nextMin = minCell(monsterPlacement.cells);
+    const dx = nextMin.x - currentMin.x;
+    const dy = nextMin.y - currentMin.y;
     removePlacementCoverage(placement);
     placement.cells = monsterPlacement.cells;
-    placement.cutEdges = translateCutEdges(placement.cutEdges, nextMin.x - currentMin.x, nextMin.y - currentMin.y);
+    placement.cutEdges = translateCutEdges(placement.cutEdges, dx, dy);
+    placement.specialCells = translateSpecialCells(placement.specialCells, dx, dy);
+    placement.specialLinks = translateSpecialLinks(placement.specialLinks, dx, dy);
     placement.cells.forEach((cell) => {
       const cellKey = key(cell.x, cell.y);
       const monsterCell = state.monsterCells.get(cellKey);
@@ -1067,6 +1254,8 @@
       id: state.nextPieceId,
       cells: boardPlacement.cells,
       cutEdges: translateCutEdges(placement.cutEdges, boardPlacement.anchorX - placementMin.x, boardPlacement.anchorY - placementMin.y),
+      specialCells: translateSpecialCells(placement.specialCells, boardPlacement.anchorX - placementMin.x, boardPlacement.anchorY - placementMin.y),
+      specialLinks: translateSpecialLinks(placement.specialLinks, boardPlacement.anchorX - placementMin.x, boardPlacement.anchorY - placementMin.y),
     });
     state.nextPieceId += 1;
     state.cutsUsed += 1;
@@ -1119,7 +1308,13 @@
     state.blocked = new Set();
     if (oldBlocks) addLog("이번 턴을 막던 갑피가 떨어졌다.");
 
-    executeMonsterAction();
+    const skipsMonsterAction = discardMaterial && refillBoard && state.silentRefills > 0;
+    if (skipsMonsterAction) {
+      state.silentRefills -= 1;
+      addLog("무음 재충전으로 몬스터 행동을 1회 무시했다.");
+    } else {
+      executeMonsterAction();
+    }
 
     if (state.playerHp <= 0) {
       render();
@@ -1146,8 +1341,9 @@
     if (action === "attack") {
       const attackIcons = uncoveredIconCount("attack");
       const damage = monster.baseAttack + attackIcons;
-      state.playerHp -= damage;
-      addLog(`공격 실행. 기본 ${monster.baseAttack} + 공격 표식 ${attackIcons} = ${damage} 피해.`);
+      const taken = takeDamage(damage);
+      const shielded = damage - taken;
+      addLog(`공격 실행. 기본 ${monster.baseAttack} + 공격 표식 ${attackIcons} = ${taken} 피해${shielded ? `, 쉴드 ${shielded} 흡수` : ""}.`);
       return;
     }
 
@@ -1176,6 +1372,14 @@
       }
       monster.special(state, specialIcons);
     }
+  }
+
+  function takeDamage(amount) {
+    const shielded = Math.min(state.shield, amount);
+    state.shield -= shielded;
+    const damage = amount - shielded;
+    state.playerHp -= damage;
+    return damage;
   }
 
   function rebuildPiecesFromCuts() {
@@ -1213,6 +1417,8 @@
           id: piece.id,
           cells: components[0],
           cutEdges: keepCutEdgesForCells(piece.cutEdges, componentKeys),
+          specialCells: keepSpecialCellsForCells(piece.specialCells, componentKeys),
+          specialLinks: keepSpecialLinksForCells(piece.specialLinks, componentKeys),
         });
         return;
       }
@@ -1223,6 +1429,8 @@
           id: index === 0 ? piece.id : state.nextPieceId,
           cells,
           cutEdges: keepCutEdgesForCells(piece.cutEdges, componentKeys),
+          specialCells: keepSpecialCellsForCells(piece.specialCells, componentKeys),
+          specialLinks: keepSpecialLinksForCells(piece.specialLinks, componentKeys),
         });
         if (index !== 0) state.nextPieceId += 1;
       });
@@ -1289,7 +1497,10 @@
         const monsterCell = state.monsterCells.get(key(cell.x, cell.y));
         return monsterCell?.covered && monsterCell.placementId === placement.id;
       });
-      placement.cutEdges = keepCutEdgesForCells(placement.cutEdges, new Set(placement.cells.map((cell) => key(cell.x, cell.y))));
+      const cellKeys = new Set(placement.cells.map((cell) => key(cell.x, cell.y)));
+      placement.cutEdges = keepCutEdgesForCells(placement.cutEdges, cellKeys);
+      placement.specialCells = keepSpecialCellsForCells(placement.specialCells, cellKeys);
+      placement.specialLinks = keepSpecialLinksForCells(placement.specialLinks, cellKeys);
     });
     state.placedPieces = state.placedPieces.filter((placement) => placement.cells.length > 0);
   }
@@ -1307,24 +1518,16 @@
     return parseFloat(getComputedStyle(els.materialBoard).getPropertyValue("--knife-hit")) || 38;
   }
 
-  function showDragGhost(cells, cutEdges, x, y) {
+  function showDragGhost(cells, cutEdges, x, y, specialCells = new Map(), specialLinks = new Map()) {
     els.dragGhost.className = "drag-ghost";
     els.dragGhost.innerHTML = "";
-    els.dragGhost.append(renderBoardPieceGrid(cells, cutEdges));
+    els.dragGhost.append(renderBoardPieceGrid(cells, cutEdges, specialCells, specialLinks));
     moveDragGhost(x, y);
   }
 
   function showKnifeGhost(index, x, y) {
     const knife = state.knives[index];
-    const type = KNIFE_TYPES[knife.type];
-    const el = document.createElement("div");
-    el.className = `knife-drag-ghost ${type.orientation}`;
-    el.textContent = type.label;
-    if (type.orientation === "h") {
-      el.style.width = lengthSize(type.length);
-    } else {
-      el.style.height = lengthSize(type.length);
-    }
+    const el = renderKnifeShape(knife, "knife-drag-ghost", false);
     els.dragGhost.className = "drag-ghost knife-ghost";
     els.dragGhost.innerHTML = "";
     els.dragGhost.append(el);
@@ -1372,7 +1575,7 @@
     return grid;
   }
 
-  function renderBoardPieceGrid(cells, cutEdges = new Set()) {
+  function renderBoardPieceGrid(cells, cutEdges = new Set(), specialCells = new Map(), specialLinks = new Map()) {
     const normalized = normalizeCells(cells);
     const maxX = Math.max(...normalized.map((cell) => cell.x));
     const maxY = Math.max(...normalized.map((cell) => cell.y));
@@ -1385,10 +1588,37 @@
       for (let x = 0; x <= maxX; x += 1) {
         const cell = document.createElement("span");
         cell.className = "drag-piece-cell";
-        if (!occupied.has(key(x, y))) cell.classList.add("empty");
+        const cellKey = key(x, y);
+        if (!occupied.has(cellKey)) {
+          cell.classList.add("empty");
+        } else if (specialCells.has(cellKey)) {
+          const type = specialCells.get(cellKey);
+          const meta = LINK_META[type];
+          cell.classList.add("special-cell", meta.className);
+          const badge = document.createElement("span");
+          badge.className = "special-cell-mark";
+          badge.textContent = meta.mark;
+          cell.append(badge);
+        }
         grid.append(cell);
       }
     }
+
+    specialLinks.forEach((link, edge) => {
+      if (!link.active) return;
+      const mark = edgeToMark(edge);
+      if (!mark) return;
+      const el = document.createElement("span");
+      el.className = `drag-special-link ${mark.orientation} ${LINK_META[link.type].className}`;
+      el.style.left = dragGridPos(mark.x);
+      el.style.top = dragGridPos(mark.y);
+      if (mark.orientation === "h") {
+        el.style.width = "var(--small-cell)";
+      } else {
+        el.style.height = "var(--small-cell)";
+      }
+      grid.append(el);
+    });
 
     cutEdges.forEach((edge) => {
       const mark = edgeToMark(edge);
@@ -1593,6 +1823,127 @@
     }));
   }
 
+  function cloneSpecialCells(cells = new Map()) {
+    return new Map(cells);
+  }
+
+  function cloneSpecialLinks(links = new Map()) {
+    return new Map([...links].map(([edge, link]) => [edge, { ...link }]));
+  }
+
+  function normalizeSpecialCells(cells = new Map(), min) {
+    return new Map([...cells].map(([cellKey, type]) => {
+      const cell = fromKey(cellKey);
+      return [key(cell.x - min.x, cell.y - min.y), type];
+    }));
+  }
+
+  function normalizeSpecialLinks(links = new Map(), min) {
+    return new Map([...links].map(([edge, link]) => {
+      const [a, b] = edge.split("|").map(fromKey);
+      return [edgeKey(key(a.x - min.x, a.y - min.y), key(b.x - min.x, b.y - min.y)), { ...link }];
+    }));
+  }
+
+  function translateSpecialCells(cells = new Map(), dx, dy) {
+    return new Map([...cells].map(([cellKey, type]) => {
+      const cell = fromKey(cellKey);
+      return [key(cell.x + dx, cell.y + dy), type];
+    }));
+  }
+
+  function translateSpecialLinks(links = new Map(), dx, dy) {
+    return new Map([...links].map(([edge, link]) => {
+      const [a, b] = edge.split("|").map(fromKey);
+      return [edgeKey(key(a.x + dx, a.y + dy), key(b.x + dx, b.y + dy)), { ...link }];
+    }));
+  }
+
+  function keepSpecialCellsForCells(cells = new Map(), cellKeys) {
+    return new Map([...cells].filter(([cellKey]) => cellKeys.has(cellKey)));
+  }
+
+  function keepSpecialLinksForCells(links = new Map(), cellKeys) {
+    return new Map([...links].filter(([edge]) => {
+      const [a, b] = edge.split("|");
+      return cellKeys.has(a) && cellKeys.has(b);
+    }));
+  }
+
+  function buildSpecialByCell(options = {}) {
+    const map = new Map();
+    state.materialPieces.forEach((piece) => {
+      if (options.skipDragging && piece.id === state.draggingPieceId) return;
+      piece.specialCells?.forEach((type, cellKey) => map.set(cellKey, type));
+    });
+    return map;
+  }
+
+  function renderSpecialLinks() {
+    const rendered = new Set();
+    state.materialPieces.forEach((piece) => {
+      if (piece.id === state.draggingPieceId) return;
+      piece.specialLinks?.forEach((link, edge) => {
+        if (!link.active || rendered.has(edge)) return;
+        const mark = edgeToMark(edge);
+        if (!mark) return;
+        rendered.add(edge);
+        const el = document.createElement("span");
+        el.className = `special-link ${mark.orientation} ${LINK_META[link.type].className}`;
+        el.style.left = boardPos(mark.x);
+        el.style.top = boardPos(mark.y);
+        if (mark.orientation === "h") {
+          el.style.width = "var(--small-cell)";
+        } else {
+          el.style.height = "var(--small-cell)";
+        }
+        els.cutLayer.append(el);
+      });
+    });
+  }
+
+  function spawnSingleCellPieces(amount) {
+    let spawned = 0;
+    for (let i = 0; i < amount; i += 1) {
+      const spot = findSingleCellSpot();
+      if (!spot) break;
+      state.materialPieces.push({
+        id: state.nextPieceId,
+        cells: [{ x: spot.x, y: spot.y }],
+        cutEdges: new Set(),
+        specialCells: new Map(),
+        specialLinks: new Map(),
+      });
+      state.nextPieceId += 1;
+      spawned += 1;
+    }
+    if (spawned < amount) addLog(`공격 링크 보너스 ${amount - spawned}개는 놓을 빈칸이 없어 사라졌다.`);
+  }
+
+  function findSingleCellSpot() {
+    const occupied = buildPieceByCell();
+    const centerX = (state.materialCols - 1) / 2;
+    const centerY = (state.materialRows - 1) / 2;
+    const spots = [];
+    for (let y = 0; y < state.materialRows; y += 1) {
+      for (let x = 0; x < state.materialCols; x += 1) {
+        const cellKey = key(x, y);
+        if (occupied.has(cellKey) || state.missingCells.has(cellKey) || state.spoiledCells.has(cellKey)) continue;
+        spots.push({ x, y, distance: Math.hypot(x - centerX, y - centerY) });
+      }
+    }
+    spots.sort((a, b) => a.distance - b.distance || a.y - b.y || a.x - b.x);
+    return spots[0] || null;
+  }
+
+  function formatLinkRewardLog(rewards) {
+    const parts = [];
+    if (rewards.heal) parts.push(`회복 ${rewards.heal}`);
+    if (rewards.attack) parts.push(`1칸 생성 ${rewards.attack}`);
+    if (rewards.defense) parts.push(`쉴드 ${rewards.defense}`);
+    return parts.length ? ` 링크 보상: ${parts.join(", ")}.` : "";
+  }
+
   function edgeToMark(edge) {
     const [a, b] = edge.split("|").map(fromKey);
     if (a.x === b.x) {
@@ -1668,7 +2019,10 @@
       const cellKey = key(cell.x, cell.y);
       state.spoiledCells.add(cellKey);
       piece.cells = piece.cells.filter((item) => key(item.x, item.y) !== cellKey);
-      piece.cutEdges = keepCutEdgesForCells(piece.cutEdges, new Set(piece.cells.map((item) => key(item.x, item.y))));
+      const cellKeys = new Set(piece.cells.map((item) => key(item.x, item.y)));
+      piece.cutEdges = keepCutEdgesForCells(piece.cutEdges, cellKeys);
+      piece.specialCells = keepSpecialCellsForCells(piece.specialCells, cellKeys);
+      piece.specialLinks = keepSpecialLinksForCells(piece.specialLinks, cellKeys);
     });
     state.materialPieces = state.materialPieces.filter((piece) => piece.cells.length > 0);
     return targets.length;
@@ -1710,15 +2064,259 @@
     els.battleLog.innerHTML = state.log.map((line) => `<p>${line}</p>`).join("");
   }
 
+  function dealRewardOptions() {
+    const rewardSets = [
+      ["expand1", "linkHeal", "growH", "bendL"],
+      ["expand2", "linkAttack", "linkDefense", "growV", "silentRefill"],
+      ["expand1", "growL", "linkDefense", "silentRefill"],
+    ];
+    const preferred = rewardSets[state.stageIndex % rewardSets.length]
+      .map((id) => REWARDS[id])
+      .filter((reward) => reward && isRewardAvailable(reward));
+    const fallback = Object.values(REWARDS).filter((reward) => isRewardAvailable(reward) && !preferred.includes(reward));
+    state.rewardOptions = [...preferred, ...fallback].slice(0, 4);
+    return state.rewardOptions;
+  }
+
+  function isRewardAvailable(reward) {
+    if (reward.type === "knife") {
+      return state.knifeLoadout.some((knife) => knife.type === reward.from);
+    }
+    if (reward.type === "knifeAny") {
+      return state.knifeLoadout.some((knife) => knife.type !== reward.to);
+    }
+    if (reward.type === "silentRefill") {
+      return state.silentRefillUpgrades < 1;
+    }
+    if (reward.type === "link") {
+      return hasBoardLinkSpot();
+    }
+    if (reward.type === "expand") {
+      return hasExpansionSpot(reward.shape);
+    }
+    return true;
+  }
+
+  function renderRewardChoices(rewards) {
+    if (!els.rewardChoices) return;
+    els.rewardChoices.innerHTML = "";
+    els.rewardChoices.classList.toggle("hidden", rewards.length === 0);
+    rewards.forEach((reward) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `reward-card${reward.rarity === "rare" ? " rare" : ""}`;
+      const label = reward.rarity === "rare" ? "희귀" : rewardLabel(reward);
+      button.innerHTML = `<span>${label}</span><strong>${reward.title}</strong><em>${reward.text}</em>`;
+      button.addEventListener("click", () => applyReward(reward.id));
+      els.rewardChoices.append(button);
+    });
+  }
+
+  function rewardLabel(reward) {
+    if (reward.type === "expand") return "판 확장";
+    if (reward.type === "link") return LINK_META[reward.linkType].label;
+    if (reward.type === "knife" || reward.type === "knifeAny") return "칼 성장";
+    return "보정";
+  }
+
+  function applyReward(rewardId) {
+    const reward = REWARDS[rewardId];
+    if (!reward || !isRewardAvailable(reward)) return;
+
+    if (reward.type === "expand" || reward.type === "link") {
+      enterBoardEdit(reward);
+      return;
+    }
+
+    applyImmediateReward(reward);
+    advanceAfterReward();
+  }
+
+  function applyImmediateReward(reward) {
+    if (reward.type === "knife") {
+      const knife = state.knifeLoadout.find((item) => item.type === reward.from);
+      if (knife) {
+        knife.type = reward.to;
+        state.pendingLogs.push(`${reward.title} 적용. ${KNIFE_TYPES[reward.to].label} 사용 가능.`);
+      }
+      return;
+    }
+    if (reward.type === "knifeAny") {
+      const knife = state.knifeLoadout.find((item) => item.type !== reward.to);
+      if (knife) {
+        knife.type = reward.to;
+        state.pendingLogs.push(`${reward.title} 적용. 칼 하나가 ${KNIFE_TYPES[reward.to].label}이 됐다.`);
+      }
+      return;
+    }
+    if (reward.type === "silentRefill") {
+      state.silentRefillUpgrades += 1;
+      state.pendingLogs.push("무음 재충전 획득. 전투마다 새 판 요청 1회가 안전해진다.");
+    }
+  }
+
+  function enterBoardEdit(reward) {
+    state.resultMode = null;
+    state.boardEdit = {
+      reward,
+      shape: reward.shape ? reward.shape.map((cell) => ({ ...cell })) : [],
+      selectedKey: null,
+    };
+    resetMaterialBoard();
+    hideResult();
+    addLog(reward.type === "expand" ? "보상 칸을 하단 판에 직접 붙여라." : `${LINK_META[reward.linkType].label} 링크를 넣을 인접한 두 칸을 고르자.`);
+    render();
+  }
+
+  function handleBoardEditToolButton() {
+    if (!state.boardEdit) return;
+    if (state.boardEdit.reward.type === "expand" && state.boardEdit.shape.length > 1) {
+      state.boardEdit.shape = rotateShape(state.boardEdit.shape);
+      render();
+      return;
+    }
+    state.boardEdit.selectedKey = null;
+    render();
+  }
+
+  function handleBoardEditCell(x, y) {
+    if (!state.boardEdit) return;
+    const reward = state.boardEdit.reward;
+    if (reward.type === "expand") {
+      const placement = getExpansionPlacement(x, y, state.boardEdit.shape);
+      if (!placement.valid) {
+        addLog("그 위치에는 판을 붙일 수 없다.");
+        render();
+        return;
+      }
+      placement.cells.forEach((cell) => state.boardCells.add(key(cell.x, cell.y)));
+      state.boardEdit = null;
+      state.pendingLogs.push(`${placement.cells.length}칸 판을 확장했다.`);
+      advanceAfterReward();
+      return;
+    }
+
+    if (reward.type === "link") {
+      const cellKey = key(x, y);
+      if (!state.boardCells.has(cellKey)) return;
+      if (!state.boardEdit.selectedKey) {
+        state.boardEdit.selectedKey = cellKey;
+        render();
+        return;
+      }
+      if (state.boardEdit.selectedKey === cellKey) {
+        state.boardEdit.selectedKey = null;
+        render();
+        return;
+      }
+      if (!areAdjacentKeys(state.boardEdit.selectedKey, cellKey)) {
+        addLog("링크는 인접한 두 칸에만 설치할 수 있다.");
+        render();
+        return;
+      }
+      installBoardLink(reward.linkType, state.boardEdit.selectedKey, cellKey);
+      state.boardEdit = null;
+      state.pendingLogs.push(`${LINK_META[reward.linkType].label} 링크를 설치했다.`);
+      advanceAfterReward();
+    }
+  }
+
+  function advanceAfterReward() {
+    state.playerHp = Math.min(MAX_HP, state.playerHp + 6);
+    startStage(state.stageIndex + 1);
+  }
+
+  function getBoardEditPreview() {
+    if (!state.boardEdit) return null;
+    const reward = state.boardEdit.reward;
+    if (reward.type === "expand") {
+      const validCells = new Set();
+      for (let y = 0; y < state.materialRows; y += 1) {
+        for (let x = 0; x < state.materialCols; x += 1) {
+          if (getExpansionPlacement(x, y, state.boardEdit.shape).valid) validCells.add(key(x, y));
+        }
+      }
+      return { validCells, previewCells: new Set(), previewValid: false, selectedKey: null };
+    }
+
+    const validCells = new Set();
+    if (!state.boardEdit.selectedKey) {
+      state.boardCells.forEach((cellKey) => validCells.add(cellKey));
+    } else {
+      const selected = fromKey(state.boardEdit.selectedKey);
+      monsterNeighbors(selected.x, selected.y).forEach((cellKey) => {
+        if (state.boardCells.has(cellKey)) validCells.add(cellKey);
+      });
+    }
+    return { validCells, previewCells: new Set(), previewValid: false, selectedKey: state.boardEdit.selectedKey };
+  }
+
+  function hasExpansionSpot(shape) {
+    for (let y = 0; y < state.materialRows; y += 1) {
+      for (let x = 0; x < state.materialCols; x += 1) {
+        if (getExpansionPlacement(x, y, shape).valid) return true;
+      }
+    }
+    return false;
+  }
+
+  function getExpansionPlacement(anchorX, anchorY, shape) {
+    const cells = shape.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const valid = cells.every((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      return cell.x >= 0
+        && cell.y >= 0
+        && cell.x < state.materialCols
+        && cell.y < state.materialRows
+        && !state.boardCells.has(cellKey);
+    }) && cells.some((cell) => monsterNeighbors(cell.x, cell.y).some((neighbor) => state.boardCells.has(neighbor)));
+    return { cells, valid };
+  }
+
+  function hasBoardLinkSpot() {
+    return [...state.boardCells].some((cellKey) => {
+      const cell = fromKey(cellKey);
+      return monsterNeighbors(cell.x, cell.y).some((neighbor) => state.boardCells.has(neighbor));
+    });
+  }
+
+  function installBoardLink(type, a, b) {
+    const affected = new Set([a, b]);
+    state.boardLinks.forEach((link, edge) => {
+      const [left, right] = edge.split("|");
+      if (affected.has(left) || affected.has(right)) {
+        state.boardLinks.delete(edge);
+        state.boardCellTypes.delete(left);
+        state.boardCellTypes.delete(right);
+      }
+    });
+    state.boardCellTypes.set(a, type);
+    state.boardCellTypes.set(b, type);
+    state.boardLinks.set(edgeKey(a, b), { type, active: true });
+  }
+
+  function rotateShape(shape) {
+    const rotated = shape.map((cell) => ({ x: -cell.y, y: cell.x }));
+    return normalizeCells(rotated);
+  }
+
+  function areAdjacentKeys(a, b) {
+    const left = fromKey(a);
+    const right = fromKey(b);
+    return Math.abs(left.x - right.x) + Math.abs(left.y - right.y) === 1;
+  }
+
   function showStageClear() {
     const isFinal = state.stageIndex === monsters.length - 1;
-    state.resultMode = isFinal ? "complete" : "stage";
+    state.resultMode = isFinal ? "complete" : "reward";
     els.resultEyebrow.textContent = isFinal ? "RUN CLEAR" : "STAGE CLEAR";
     els.resultTitle.textContent = isFinal ? "모든 몬스터 포장 완료" : "몬스터 포장 완료";
     els.resultText.textContent = isFinal
       ? "한 마리씩 전부 덮는 퍼즐 전투를 클리어했다."
-      : "다음 몬스터로 넘어간다. 남은 체력은 일부 회복된다.";
+      : "보상을 하나 골라 다음 전투의 재료판을 만든다.";
     els.resultButton.textContent = isFinal ? "다시 시작" : "다음 몬스터";
+    els.resultButton.classList.toggle("hidden", !isFinal);
+    renderRewardChoices(isFinal ? [] : dealRewardOptions());
     els.overlay.classList.remove("hidden");
   }
 
@@ -1728,23 +2326,26 @@
     els.resultTitle.textContent = title;
     els.resultText.textContent = text;
     els.resultButton.textContent = "다시 시작";
+    els.resultButton.classList.remove("hidden");
+    renderRewardChoices([]);
     els.overlay.classList.remove("hidden");
   }
 
   function hideResult() {
     els.overlay.classList.add("hidden");
+    els.resultButton.classList.remove("hidden");
+    renderRewardChoices([]);
   }
 
   function handleResultButton() {
-    if (state.resultMode === "stage") {
-      state.playerHp = Math.min(MAX_HP, state.playerHp + 6);
-      startStage(state.stageIndex + 1);
-      return;
-    }
     startGame();
   }
 
   function handleCutButton() {
+    if (state.boardEdit) {
+      handleBoardEditToolButton();
+      return;
+    }
     if (state.resultMode) return;
     if (getPlacement(state.selectedPlacementId)) {
       recoverSelectedPlacement();
@@ -1754,12 +2355,12 @@
   }
 
   function handleNewBoard() {
-    if (state.resultMode) return;
+    if (state.resultMode || state.boardEdit) return;
     finishPlayerTurn({ discardMaterial: true, refillBoard: true });
   }
 
   function handleEndTurn() {
-    if (state.resultMode) return;
+    if (state.resultMode || state.boardEdit) return;
     finishPlayerTurn();
   }
 
