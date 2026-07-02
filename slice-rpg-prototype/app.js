@@ -189,9 +189,9 @@
     {
       name: "도시락 숲",
       waves: [
-        { name: "웨이브 1", rounds: [0, 0] },
-        { name: "웨이브 2", rounds: [1, 0] },
-        { name: "웨이브 3", rounds: [1, 2] },
+        { name: "웨이브 1", rounds: [0, 1] },
+        { name: "웨이브 2", rounds: [1, 2] },
+        { name: "웨이브 3", rounds: [0, 2] },
       ],
     },
   ];
@@ -347,7 +347,7 @@
   }
 
   function progressionLabel() {
-    return `W${state.waveIndex + 1}/${waveCount()} R${state.roundIndex + 1}/${roundCount()}`;
+    return `W${state.waveIndex + 1}/${waveCount()} M${state.roundIndex + 1}/${roundCount()}`;
   }
 
   function startGame() {
@@ -542,7 +542,7 @@
 
     els.actionCard.className = `action-card action-${action}`;
     els.actionCard.innerHTML = `
-      <span class="action-kicker">${currentWave().name} · ${state.roundIndex + 1}/${roundCount()}</span>
+      <span class="action-kicker">${currentWave().name} · 몬스터 ${state.roundIndex + 1}/${roundCount()}</span>
       <span class="action-chip"><i>${actionView.mark}</i>${actionView.label}</span>
       <strong class="action-main">${actionView.main}</strong>
       <span class="action-sub">${blockedText}</span>
@@ -702,6 +702,7 @@
     const dropPreviewCells = new Set(dropPreview?.cells || []);
     const editPreview = state.boardEdit ? getBoardEditPreview() : null;
     const editPreviewCells = editPreview?.previewCells || new Set();
+    const rewardEditByCell = state.boardEdit ? getBoardEditPlacedRewardByCell({ skipDragging: true }) : new Map();
     els.materialGrid.style.gridTemplateColumns = `repeat(${state.materialCols}, var(--small-cell))`;
     els.materialGrid.innerHTML = "";
     els.cutLayer.innerHTML = "";
@@ -714,6 +715,7 @@
         button.type = "button";
         button.className = "material-cell";
         button.dataset.key = cellKey;
+        const rewardEditItem = rewardEditByCell.get(cellKey);
 
         if (state.boardEdit) {
           if (state.boardCells.has(cellKey)) button.classList.add("board-source-cell");
@@ -730,6 +732,11 @@
         } else if (state.spoiledCells.has(cellKey)) {
           button.classList.add("spoiled");
           button.disabled = true;
+        } else if (rewardEditItem) {
+          button.classList.add("reward-temp-cell", "edit-selected");
+          button.dataset.rewardItemId = rewardEditItem.id;
+          renderRewardEditCellMark(button, rewardEditItem);
+          button.addEventListener("pointerdown", (event) => beginPlacedRewardDrag(event, rewardEditItem.id, x, y));
         } else if (pieceByCell.has(cellKey)) {
           const pieceId = pieceByCell.get(cellKey);
           const piece = getPiece(pieceId);
@@ -1178,7 +1185,7 @@
 
   function beginRewardDrag(event, itemId, grabbedX, grabbedY) {
     const item = getBoardEditItem(itemId);
-    if (!item || item.placed || state.boardEdit?.closing) return;
+    if (!item || state.boardEdit?.closing) return;
     event.preventDefault();
     const min = minCell(item.shape);
     const cells = normalizeCells(item.shape);
@@ -1193,6 +1200,31 @@
     };
     state.draggingRewardItemId = item.id;
     state.dropPreview = null;
+    renderRewardTray();
+    showDragGhost(state.drag.cells, new Set(), event.clientX, event.clientY, state.drag.specialCells, state.drag.specialLinks);
+    updateRewardDropPreview(event.clientX, event.clientY);
+    window.addEventListener("pointermove", onRewardMove);
+    window.addEventListener("pointerup", onRewardUp);
+    window.addEventListener("pointercancel", onRewardCancel);
+  }
+
+  function beginPlacedRewardDrag(event, itemId, boardX, boardY) {
+    const item = getBoardEditItem(itemId);
+    if (!item || !item.placed || state.boardEdit?.closing) return;
+    event.preventDefault();
+    const min = minCell(item.cells);
+    const offset = getGrabbedCellOffset(min, boardX, boardY);
+    state.drag = {
+      type: "reward",
+      rewardItemId: item.id,
+      offset,
+      cells: normalizeCells(item.cells),
+      specialCells: rewardItemSpecialCells(item),
+      specialLinks: rewardItemSpecialLinks(item),
+    };
+    state.draggingRewardItemId = item.id;
+    state.dropPreview = null;
+    renderMaterialBoard();
     renderRewardTray();
     showDragGhost(state.drag.cells, new Set(), event.clientX, event.clientY, state.drag.specialCells, state.drag.specialLinks);
     updateRewardDropPreview(event.clientX, event.clientY);
@@ -2513,8 +2545,9 @@
     if (!state.boardEdit) return null;
     const validCells = new Set();
     const placedCells = new Set();
+    const draggingRewardId = state.drag?.type === "reward" ? state.drag.rewardItemId : null;
     state.boardEdit.items.forEach((item) => {
-      if (item.placed) item.cells.forEach((cell) => placedCells.add(key(cell.x, cell.y)));
+      if (item.placed && item.id !== draggingRewardId) item.cells.forEach((cell) => placedCells.add(key(cell.x, cell.y)));
     });
 
     const drag = state.drag?.type === "reward" ? state.drag : null;
@@ -2534,6 +2567,26 @@
       previewCells: new Set(preview?.cells || []),
       previewValid: Boolean(preview?.valid),
     };
+  }
+
+  function getBoardEditPlacedRewardByCell({ skipDragging = false } = {}) {
+    const result = new Map();
+    const draggingRewardId = skipDragging && state.drag?.type === "reward" ? state.drag.rewardItemId : null;
+    state.boardEdit?.items.forEach((item) => {
+      if (!item.placed || item.id === draggingRewardId) return;
+      item.cells.forEach((cell) => result.set(key(cell.x, cell.y), item));
+    });
+    return result;
+  }
+
+  function renderRewardEditCellMark(cellElement, item) {
+    if (item.type !== "link") return;
+    const meta = LINK_META[item.linkType];
+    cellElement.classList.add("special-cell", meta.className);
+    const mark = document.createElement("span");
+    mark.className = "special-cell-mark";
+    mark.textContent = meta.mark;
+    cellElement.append(mark);
   }
 
   function renderRewardTray() {
@@ -2608,9 +2661,7 @@
             mark.textContent = meta.mark;
             cell.append(mark);
           }
-          if (!item.placed) {
-            cell.addEventListener("pointerdown", (event) => beginRewardDrag(event, item.id, x, y));
-          }
+          cell.addEventListener("pointerdown", (event) => beginRewardDrag(event, item.id, x, y));
         }
         grid.append(cell);
       }
@@ -2689,24 +2740,56 @@
 
   function getRewardItemPlacement(item, anchorX, anchorY) {
     if (item.type === "expand") {
-      return getExpansionPlacement(anchorX, anchorY, item.shape);
+      return getBoardEditExpansionPlacement(item, anchorX, anchorY);
     }
 
     const cells = item.shape.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const validBoardCells = getBoardEditBoardLikeCells(item.id);
     const valid = cells.every((cell) => {
       const cellKey = key(cell.x, cell.y);
       return cell.x >= 0
         && cell.y >= 0
         && cell.x < state.materialCols
         && cell.y < state.materialRows
-        && state.boardCells.has(cellKey);
+        && validBoardCells.has(cellKey);
     }) && cells.length === 2 && areAdjacentKeys(key(cells[0].x, cells[0].y), key(cells[1].x, cells[1].y));
     return { cells, valid };
   }
 
+  function getBoardEditExpansionPlacement(item, anchorX, anchorY) {
+    const cells = item.shape.map((cell) => ({ x: anchorX + cell.x, y: anchorY + cell.y }));
+    const temporaryExpansionCells = getBoardEditExpansionCells(item.id);
+    const validBoardCells = getBoardEditBoardLikeCells(item.id);
+    const valid = cells.every((cell) => {
+      const cellKey = key(cell.x, cell.y);
+      return cell.x >= 0
+        && cell.y >= 0
+        && cell.x < state.materialCols
+        && cell.y < state.materialRows
+        && !state.boardCells.has(cellKey)
+        && !temporaryExpansionCells.has(cellKey);
+    }) && cells.some((cell) => monsterNeighbors(cell.x, cell.y).some((neighbor) => validBoardCells.has(neighbor)));
+    return { cells, valid };
+  }
+
+  function getBoardEditBoardLikeCells(exceptItemId = null) {
+    const cells = new Set(state.boardCells);
+    getBoardEditExpansionCells(exceptItemId).forEach((cellKey) => cells.add(cellKey));
+    return cells;
+  }
+
+  function getBoardEditExpansionCells(exceptItemId = null) {
+    const cells = new Set();
+    state.boardEdit?.items.forEach((item) => {
+      if (!item.placed || item.id === exceptItemId || item.type !== "expand") return;
+      item.cells.forEach((cell) => cells.add(key(cell.x, cell.y)));
+    });
+    return cells;
+  }
+
   function placeRewardItem(itemId, anchorX, anchorY) {
     const item = getBoardEditItem(itemId);
-    if (!item || item.placed) return;
+    if (!item) return;
     const placement = getRewardItemPlacement(item, anchorX, anchorY);
     if (!placement.valid) {
       addLog("그 위치에는 보상을 붙일 수 없다.");
@@ -2714,18 +2797,9 @@
       return;
     }
 
-    if (item.type === "expand") {
-      placement.cells.forEach((cell) => state.boardCells.add(key(cell.x, cell.y)));
-      state.pendingLogs.push(`${placement.cells.length}칸 판을 확장했다.`);
-    } else {
-      installBoardLink(item.linkType, key(placement.cells[0].x, placement.cells[0].y), key(placement.cells[1].x, placement.cells[1].y));
-      state.pendingLogs.push(`${LINK_META[item.linkType].label} 링크를 설치했다.`);
-    }
-
     item.placed = true;
     item.cells = placement.cells;
-    resetMaterialBoard();
-    addLog(`${item.title} 배치 완료. 완료 버튼으로 다음 전투를 시작한다.`);
+    addLog(`${item.title} 위치 지정. 완료 전까지 다시 옮길 수 있다.`);
     render();
   }
 
@@ -2743,9 +2817,26 @@
     state.boardEdit.closing = true;
     render();
     window.setTimeout(() => {
+      commitBoardEditItems(state.boardEdit.items);
       state.boardEdit = null;
       advanceAfterReward();
     }, 260);
+  }
+
+  function commitBoardEditItems(items) {
+    items
+      .filter((item) => item.type === "expand")
+      .forEach((item) => {
+        item.cells.forEach((cell) => state.boardCells.add(key(cell.x, cell.y)));
+        state.pendingLogs.push(`${item.cells.length}칸 판을 확장했다.`);
+      });
+
+    items
+      .filter((item) => item.type === "link")
+      .forEach((item) => {
+        installBoardLink(item.linkType, key(item.cells[0].x, item.cells[0].y), key(item.cells[1].x, item.cells[1].y));
+        state.pendingLogs.push(`${LINK_META[item.linkType].label} 링크를 설치했다.`);
+      });
   }
 
   function hasExpansionSpot(shape) {

@@ -574,6 +574,27 @@ button:disabled {
   align-self: center;
 }
 
+.app-shell.reward-edit-mode .reward-tray {
+  position: relative;
+  padding-bottom: 54px;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app-shell.reward-edit-mode .reward-tray-head {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+}
+
+.app-shell.reward-edit-mode .reward-tray-head > div {
+  display: none;
+}
+
+.app-shell.reward-edit-mode .reward-items {
+  align-content: center;
+}
+
 .app-shell.reward-edit-mode .turn-controls,
 .app-shell.reward-edit-mode .knife-hint {
   display: none;
@@ -1516,9 +1537,22 @@ button:disabled {
 .material-cell.edit-selected {
   outline: 4px solid #ffcf3d;
   outline-offset: -3px;
+  background:
+    radial-gradient(circle at 30% 22%, #fffdf2 0 18%, transparent 19%),
+    radial-gradient(circle at 68% 62%, #f8df95 0 15%, transparent 16%),
+    linear-gradient(145deg, #fff7ce, #e5b955);
   box-shadow:
     inset 0 0 0 3px rgba(255, 255, 255, 0.66),
     0 0 0 2px rgba(104, 71, 40, 0.26);
+}
+
+.material-cell.reward-temp-cell {
+  border-color: #d49734;
+  cursor: grab;
+}
+
+.material-cell.reward-temp-cell:active {
+  cursor: grabbing;
 }
 
 .reward-choices {
