@@ -107,6 +107,7 @@
   const MIN_MONSTERS_PER_WAVE = 3;
   const MAX_MONSTERS_PER_WAVE = 6;
   const MONSTER_ROTATION = ["iron-goblin", "swamp-slime", "stone-ogre"];
+  const MONSTER_EDITOR_STORAGE_KEY = "bento-monster-editor-data-v1";
 
   const HERO_LEVEL_RULES = {
     default: {
@@ -231,6 +232,8 @@
       },
     },
   ];
+
+  applyMonsterEditorOverrides(MONSTER_DEFS);
 
   const MONSTERS_BY_ID = new Map(MONSTER_DEFS.map((monster) => [monster.id, monster]));
 
@@ -487,6 +490,79 @@
     return { x, y };
   }
 
+  function applyMonsterEditorOverrides(monsters) {
+    let saved;
+    try {
+      saved = JSON.parse(window.localStorage?.getItem(MONSTER_EDITOR_STORAGE_KEY) || "null");
+    } catch {
+      return;
+    }
+    if (!Array.isArray(saved?.monsters)) return;
+
+    saved.monsters.forEach((editedMonster) => {
+      const monster = monsters.find((item) => item.id === editedMonster.id);
+      if (!monster) return;
+      monster.name = cleanMonsterText(editedMonster.name, monster.name);
+      monster.sub = cleanMonsterText(editedMonster.sub, monster.sub);
+      monster.cols = clampInteger(editedMonster.cols, 1, 8, monster.cols);
+      monster.rows = clampInteger(editedMonster.rows, 1, 8, monster.rows);
+      monster.baseAttack = clampInteger(editedMonster.baseAttack, 0, 99, monster.baseAttack);
+      monster.actions = normalizeMonsterActions(editedMonster.actions, monster.actions);
+      monster.cells = normalizeMonsterCells(editedMonster.cells, monster.cols, monster.rows);
+      monster.levels = normalizeMonsterLevels(editedMonster.levels, monster.cols, monster.rows, monster.baseAttack);
+    });
+  }
+
+  function cleanMonsterText(value, fallback) {
+    return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  }
+
+  function clampInteger(value, min, max, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? clamp(parsed, min, max) : fallback;
+  }
+
+  function normalizeMonsterActions(actions, fallback) {
+    const allowed = new Set(Object.keys(ICONS));
+    const normalized = Array.isArray(actions) ? actions.filter((action) => allowed.has(action)) : [];
+    return normalized.length ? normalized : [...fallback];
+  }
+
+  function normalizeMonsterCells(cells, cols, rows) {
+    const seen = new Map();
+    (Array.isArray(cells) ? cells : []).forEach((cell) => {
+      const normalized = normalizeMonsterCell(cell, cols, rows);
+      if (normalized) seen.set(key(normalized.x, normalized.y), normalized);
+    });
+    return [...seen.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function normalizeMonsterCell(cell, cols, rows) {
+    const x = Number.parseInt(cell?.x, 10);
+    const y = Number.parseInt(cell?.y, 10);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= cols || y >= rows) return null;
+    const icon = Object.prototype.hasOwnProperty.call(cell, "icon") ? cell.icon : undefined;
+    return Object.keys(ICONS).includes(icon) ? { x, y, icon } : { x, y };
+  }
+
+  function normalizeMonsterLevels(levels, cols, rows, fallbackAttack) {
+    const normalized = (Array.isArray(levels) ? levels : []).map((level) => {
+      const minLevel = clampInteger(level?.minLevel, 1, 99, 1);
+      const boardConditions = level?.boardConditions || {};
+      return {
+        minLevel,
+        attack: clampInteger(level?.attack, 0, 99, fallbackAttack),
+        note: cleanMonsterText(level?.note, ""),
+        boardConditions: {
+          icons: normalizeMonsterCells(boardConditions.icons, cols, rows),
+          extraCells: normalizeMonsterCells(boardConditions.extraCells, cols, rows),
+          removeCells: normalizeMonsterCells(boardConditions.removeCells, cols, rows).map((cell) => ({ x: cell.x, y: cell.y })),
+        },
+      };
+    });
+    return normalized.length ? normalized.sort((a, b) => a.minLevel - b.minLevel) : [{ minLevel: 1, attack: fallbackAttack }];
+  }
+
   function createStageWaves(stageId, rotationOffset = 0) {
     return Array.from({ length: WAVES_PER_STAGE }, (_, waveIndex) => {
       const monsterCount = monsterCountForWave(waveIndex);
@@ -626,10 +702,17 @@
   function monsterCellsForLevel(monster, level) {
     const cellMap = new Map(monster.cells.map((cell) => [key(cell.x, cell.y), { ...cell }]));
     monsterLevelProfiles(monster, level).forEach((profile) => {
+      applyMonsterBoardConditionRemovals(cellMap, profile.boardConditions?.removeCells);
       applyMonsterBoardConditionCells(cellMap, profile.boardConditions?.icons, monster);
       applyMonsterBoardConditionCells(cellMap, profile.boardConditions?.extraCells, monster);
     });
     return [...cellMap.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function applyMonsterBoardConditionRemovals(cellMap, cells = []) {
+    cells.forEach((cell) => {
+      cellMap.delete(key(cell.x, cell.y));
+    });
   }
 
   function applyMonsterBoardConditionCells(cellMap, cells = [], monster) {
