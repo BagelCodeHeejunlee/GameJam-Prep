@@ -1751,7 +1751,7 @@
   function moveDragGhost(x, y) {
     const cell = getMaterialCellSize();
     const step = cell + BOARD_GAP;
-    const dragOffset = state.drag?.type === "piece" ? state.drag.offset : { x: 0, y: 0 };
+    const dragOffset = state.drag?.type === "piece" || state.drag?.type === "reward" ? state.drag.offset : { x: 0, y: 0 };
     const nextX = x - dragOffset.x * step - cell / 2;
     const nextY = y - dragOffset.y * step - cell / 2 - DRAG_POINTER_OFFSET;
     els.dragGhost.style.transform = `translate(${nextX}px, ${nextY}px)`;
@@ -2642,7 +2642,7 @@
     const occupied = new Set(normalized.map((cell) => key(cell.x, cell.y)));
     const grid = document.createElement("div");
     grid.className = "reward-item-grid";
-    grid.style.gridTemplateColumns = `repeat(${maxX + 1}, 28px)`;
+    grid.style.gridTemplateColumns = `repeat(${maxX + 1}, var(--small-cell))`;
 
     for (let y = 0; y <= maxY; y += 1) {
       for (let x = 0; x <= maxX; x += 1) {
@@ -2674,12 +2674,12 @@
         if (!mark) return;
         const el = document.createElement("span");
         el.className = `reward-item-link ${mark.orientation} ${LINK_META[link.type].className}`;
-        el.style.left = `calc(${mark.x} * (28px + 3px))`;
-        el.style.top = `calc(${mark.y} * (28px + 3px))`;
+        el.style.left = `calc(${mark.x} * (var(--small-cell) + ${BOARD_GAP}px))`;
+        el.style.top = `calc(${mark.y} * (var(--small-cell) + ${BOARD_GAP}px))`;
         if (mark.orientation === "h") {
-          el.style.width = "28px";
+          el.style.width = "var(--small-cell)";
         } else {
-          el.style.height = "28px";
+          el.style.height = "var(--small-cell)";
         }
         grid.append(el);
       });
