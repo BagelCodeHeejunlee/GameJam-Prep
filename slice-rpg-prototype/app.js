@@ -758,7 +758,8 @@
     const box = knifeBox(knife);
     const el = document.createElement(absolute && className === "board-knife" ? "button" : "span");
     el.className = className;
-    el.textContent = type.label;
+    el.setAttribute("aria-label", type.label);
+    el.title = type.label;
     el.style.width = `${box.width}px`;
     el.style.height = `${box.height}px`;
     if (absolute) {
@@ -766,10 +767,10 @@
       el.style.top = `${box.top}px`;
     }
 
-    knifeSegments(knife).forEach((segment) => {
-      const rect = knifeSegmentRect(segment);
+    knifeBladeRuns(knife).forEach((run) => {
+      const rect = knifeBladeRect(run);
       const blade = document.createElement("span");
-      blade.className = `knife-segment ${segment.orientation}`;
+      blade.className = `knife-blade ${run.orientation}`;
       blade.style.left = `${rect.left - box.left}px`;
       blade.style.top = `${rect.top - box.top}px`;
       blade.style.width = `${rect.width}px`;
@@ -780,7 +781,7 @@
   }
 
   function knifeBox(knife) {
-    const rects = knifeSegments(knife).map(knifeSegmentRect);
+    const rects = knifeBladeRuns(knife).map(knifeBladeRect);
     const left = Math.min(...rects.map((rect) => rect.left));
     const top = Math.min(...rects.map((rect) => rect.top));
     const right = Math.max(...rects.map((rect) => rect.left + rect.width));
@@ -796,16 +797,46 @@
     }));
   }
 
-  function knifeSegmentRect(segment) {
+  function knifeBladeRuns(knife) {
+    return segmentsToBladeRuns(knifeSegments(knife));
+  }
+
+  function segmentsToBladeRuns(segments) {
+    const runs = [];
+    const horizontal = segments.filter((segment) => segment.orientation === "h").sort((a, b) => a.y - b.y || a.x - b.x);
+    const vertical = segments.filter((segment) => segment.orientation === "v").sort((a, b) => a.x - b.x || a.y - b.y);
+
+    horizontal.forEach((segment) => {
+      const last = runs[runs.length - 1];
+      if (last?.orientation === "h" && last.y === segment.y && last.x + last.length === segment.x) {
+        last.length += 1;
+        return;
+      }
+      runs.push({ orientation: "h", x: segment.x, y: segment.y, length: 1 });
+    });
+
+    vertical.forEach((segment) => {
+      const last = runs[runs.length - 1];
+      if (last?.orientation === "v" && last.x === segment.x && last.y + last.length === segment.y) {
+        last.length += 1;
+        return;
+      }
+      runs.push({ orientation: "v", x: segment.x, y: segment.y, length: 1 });
+    });
+
+    return runs;
+  }
+
+  function knifeBladeRect(run) {
     const cell = getMaterialCellSize();
-    const step = cell + BOARD_GAP;
     const hit = getKnifeHitSize();
-    const lineX = boardLinePx(segment.x);
-    const lineY = boardLinePx(segment.y);
-    if (segment.orientation === "h") {
-      return { left: lineX, top: lineY - hit / 2, width: step, height: hit };
+    const span = run.length * cell + Math.max(0, run.length - 1) * BOARD_GAP;
+    const lineX = boardLinePx(run.x);
+    const lineY = boardLinePx(run.y);
+    if (run.orientation === "h") {
+      return { left: lineX, top: lineY - hit / 2, width: span, height: hit };
     }
-    return { left: lineX - hit / 2, top: lineY, width: hit, height: step };
+    return { left: lineX - hit / 2, top: lineY, width: hit, height: span };
   }
 
   function beginKnifeDrag(event, index) {
@@ -856,11 +887,12 @@
     const cell = getMaterialCellSize();
     const step = cell + BOARD_GAP;
     const hit = getKnifeHitSize();
-    const rects = type.segments.map((segment) => {
-      if (segment.orientation === "h") {
-        return { left: segment.x * step, top: segment.y * step - hit / 2, right: (segment.x + 1) * step, bottom: segment.y * step + hit / 2 };
+    const rects = segmentsToBladeRuns(type.segments).map((run) => {
+      const span = run.length * cell + Math.max(0, run.length - 1) * BOARD_GAP;
+      if (run.orientation === "h") {
+        return { left: run.x * step, top: run.y * step - hit / 2, right: run.x * step + span, bottom: run.y * step + hit / 2 };
       }
-      return { left: segment.x * step - hit / 2, top: segment.y * step, right: segment.x * step + hit / 2, bottom: (segment.y + 1) * step };
+      return { left: run.x * step - hit / 2, top: run.y * step, right: run.x * step + hit / 2, bottom: run.y * step + span };
     });
     const left = Math.min(...rects.map((item) => item.left));
     const top = Math.min(...rects.map((item) => item.top));

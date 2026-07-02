@@ -1300,7 +1300,7 @@ button:disabled {
   overflow: visible;
 }
 
-.knife-segment {
+.knife-blade {
   position: absolute;
   box-sizing: border-box;
   border: 2px solid #627084;
@@ -1312,14 +1312,14 @@ button:disabled {
   pointer-events: none;
 }
 
-.knife-segment::before {
+.knife-blade::before {
   content: "";
   position: absolute;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.7);
 }
 
-.knife-segment.h::before {
+.knife-blade.h::before {
   left: 7px;
   right: 7px;
   top: 50%;
@@ -1327,7 +1327,7 @@ button:disabled {
   transform: translateY(-50%);
 }
 
-.knife-segment.v::before {
+.knife-blade.v::before {
   top: 7px;
   bottom: 7px;
   left: 50%;
@@ -1335,7 +1335,7 @@ button:disabled {
   transform: translateX(-50%);
 }
 
-.knife-guide .knife-segment {
+.knife-guide .knife-blade {
   border: 3px solid #ffe34a;
   background: rgba(255, 222, 65, 0.34);
   box-shadow:
@@ -1343,7 +1343,7 @@ button:disabled {
     0 0 0 2px rgba(37, 34, 29, 0.26);
 }
 
-.knife-guide .knife-segment::before {
+.knife-guide .knife-blade::before {
   display: none;
 }
 
@@ -1471,13 +1471,13 @@ button:disabled {
   color: #68409f;
 }
 
-.knife-segment {
+.knife-blade {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
-.knife-segment::after {
+.knife-blade::after {
   content: "";
   position: absolute;
   box-sizing: border-box;
@@ -1489,7 +1489,7 @@ button:disabled {
     0 5px 10px rgba(74, 46, 22, 0.18);
 }
 
-.knife-segment.h::after {
+.knife-blade.h::after {
   left: 0;
   right: 0;
   top: 50%;
@@ -1497,7 +1497,7 @@ button:disabled {
   transform: translateY(-50%);
 }
 
-.knife-segment.v::after {
+.knife-blade.v::after {
   top: 0;
   bottom: 0;
   left: 50%;
@@ -1505,13 +1505,13 @@ button:disabled {
   transform: translateX(-50%);
 }
 
-.knife-guide .knife-segment {
+.knife-guide .knife-blade {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
-.knife-guide .knife-segment::after {
+.knife-guide .knife-blade::after {
   border: 3px solid #ffe34a;
   background: rgba(255, 222, 65, 0.34);
   box-shadow:
