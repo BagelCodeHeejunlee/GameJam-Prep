@@ -436,6 +436,14 @@ button:disabled {
   touch-action: manipulation;
 }
 
+.monster-cell.selected-recall {
+  outline: 3px solid #ffcf3d;
+  outline-offset: -2px;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.62),
+    0 0 0 2px rgba(104, 71, 40, 0.34);
+}
+
 .monster-cell.blocked {
   border-color: #344052;
   background:
@@ -866,14 +874,14 @@ button:disabled {
   bottom: auto;
   z-index: 6;
   display: grid;
-  grid-template-columns: minmax(62px, 0.72fr) minmax(58px, 0.64fr) minmax(68px, 1fr) minmax(72px, 1fr);
+  grid-template-columns: minmax(55px, 0.72fr) minmax(52px, 0.64fr) minmax(58px, 0.92fr) minmax(55px, 0.88fr) minmax(62px, 0.98fr);
   gap: 5px;
 }
 
 .control-chip {
   min-width: 0;
   min-height: 40px;
-  padding: 5px 7px;
+  padding: 5px 5px;
   border: 2px solid rgba(104, 71, 40, 0.62);
   border-radius: 8px;
   background: #fff7dd;
@@ -895,7 +903,7 @@ button:disabled {
   display: block;
   margin-top: 3px;
   overflow: hidden;
-  font-size: 0.88rem;
+  font-size: 0.76rem;
   font-weight: 950;
   line-height: 1;
   text-overflow: ellipsis;
@@ -911,17 +919,18 @@ button:disabled {
 }
 
 .cut-button,
+.new-board-button,
 .end-turn-button {
   min-width: 0;
   min-height: 40px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 2px solid rgba(78, 47, 22, 0.58);
   border-radius: 8px;
   box-shadow:
     inset 0 -4px 0 rgba(0, 0, 0, 0.18),
     0 3px 0 rgba(104, 71, 40, 0.24);
   color: #fffdf0;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -930,11 +939,21 @@ button:disabled {
   background: var(--attack);
 }
 
+.cut-button.recover-mode {
+  background: var(--warning);
+  color: #3f2815;
+}
+
+.new-board-button {
+  background: #5f8fd8;
+}
+
 .end-turn-button {
   background: var(--ok);
 }
 
 .cut-button:disabled,
+.new-board-button:disabled,
 .end-turn-button:disabled {
   opacity: 0.56;
 }
@@ -1268,13 +1287,13 @@ button:disabled {
   }
 
   .turn-controls {
-    grid-template-columns: minmax(54px, 0.68fr) minmax(50px, 0.62fr) minmax(62px, 1fr) minmax(64px, 1fr);
+    grid-template-columns: minmax(47px, 0.66fr) minmax(43px, 0.58fr) minmax(50px, 0.82fr) minmax(47px, 0.76fr) minmax(52px, 0.88fr);
     gap: 4px;
   }
 
   .control-chip {
     min-height: 37px;
-    padding: 5px 5px;
+    padding: 5px 4px;
   }
 
   .control-chip span {
@@ -1282,13 +1301,14 @@ button:disabled {
   }
 
   .control-chip strong {
-    font-size: 0.76rem;
+    font-size: 0.66rem;
   }
 
   .cut-button,
+  .new-board-button,
   .end-turn-button {
     min-height: 37px;
-    padding: 0 5px;
-    font-size: 0.82rem;
+    padding: 0 3px;
+    font-size: 0.72rem;
   }
 }

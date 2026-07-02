@@ -169,6 +169,7 @@
     cutLayer: document.querySelector("#cutLayer"),
     knifeLayer: document.querySelector("#knifeLayer"),
     cutButton: document.querySelector("#cutButton"),
+    newBoardButton: document.querySelector("#newBoardButton"),
     endTurnButton: document.querySelector("#endTurnButton"),
     hpControlLabel: document.querySelector("#hpControlLabel"),
     cutCountLabel: document.querySelector("#cutCountLabel"),
@@ -206,6 +207,7 @@
     initialMaterialTotal: 0,
     draggingPieceId: null,
     draggingPlacementId: null,
+    selectedPlacementId: null,
     dropPreview: null,
     knifePreview: null,
     drag: null,
@@ -276,6 +278,7 @@
     state.nextPlacementId = 1;
     state.draggingPieceId = null;
     state.draggingPlacementId = null;
+    state.selectedPlacementId = null;
     state.dropPreview = null;
     state.knifePreview = null;
     state.drag = null;
@@ -289,6 +292,30 @@
       });
     });
 
+    resetMaterialBoard();
+
+    addLog(`${monster.name} 등장. 칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.`);
+    hideResult();
+    render();
+  }
+
+  function resetMaterialBoard() {
+    const monster = currentMonster();
+    state.materialCols = CUT_BOARD_COLS;
+    state.materialRows = CUT_BOARD_ROWS;
+    state.materialOrigin = {
+      x: Math.floor((CUT_BOARD_COLS - monster.material.cols) / 2),
+      y: Math.floor((CUT_BOARD_ROWS - monster.material.rows) / 2),
+    };
+    state.missingCells = new Set();
+    state.spoiledCells = new Set();
+    state.knives = monster.knives.map((knife, index) => ({
+      ...knife,
+      x: knife.x + state.materialOrigin.x,
+      y: knife.y + state.materialOrigin.y,
+      id: `knife-${index}`,
+    }));
+
     const cells = [];
     const materialHoles = new Set(monster.material.holes);
     for (let y = 0; y < monster.material.rows; y += 1) {
@@ -298,13 +325,10 @@
         }
       }
     }
+
     state.initialMaterialTotal = cells.length;
     state.materialPieces = [{ id: state.nextPieceId, cells, cutEdges: new Set() }];
     state.nextPieceId += 1;
-
-    addLog(`${monster.name} 등장. 칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.`);
-    hideResult();
-    render();
   }
 
   function addLog(text) {
@@ -313,6 +337,7 @@
   }
 
   function render() {
+    syncSelectedPlacement();
     renderStatus();
     renderActionCard();
     updateLayoutMode();
@@ -333,8 +358,11 @@
     els.monsterName.textContent = currentMonster().name;
     els.completionLabel.textContent = `${covered} / ${total}`;
     els.completionFill.style.width = `${(covered / total) * 100}%`;
-    els.cutButton.textContent = "자르기";
+    const selectedPlacement = getPlacement(state.selectedPlacementId);
+    els.cutButton.textContent = selectedPlacement ? "회수" : "자르기";
+    els.cutButton.classList.toggle("recover-mode", Boolean(selectedPlacement));
     els.cutButton.disabled = state.cutsUsed >= MAX_CUTS_PER_TURN || Boolean(state.resultMode);
+    if (els.newBoardButton) els.newBoardButton.disabled = Boolean(state.resultMode);
     if (els.endTurnButton) els.endTurnButton.disabled = Boolean(state.resultMode);
     if (els.hpControlLabel) els.hpControlLabel.textContent = `${Math.max(0, state.playerHp)}/${MAX_HP}`;
     if (els.cutCountLabel) els.cutCountLabel.textContent = `${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
@@ -379,7 +407,7 @@
 
     els.actionCard.className = `action-card action-${action}`;
     els.actionCard.innerHTML = `
-      <span class="action-kicker">다음 행동</span>
+      <span class="action-kicker">몬스터 턴</span>
       <span class="action-chip"><i>${actionView.mark}</i>${actionView.label}</span>
       <strong class="action-main">${actionView.main}</strong>
       <span class="action-sub">${blockedText}</span>
@@ -495,6 +523,7 @@
         button.className = "monster-cell";
         button.dataset.key = cellKey;
         const isDraggingPlacedCell = draggingPlacedCells.has(cellKey);
+        const isSelectedPlacement = monsterCell.placementId && monsterCell.placementId === state.selectedPlacementId;
         if (monsterCell.covered && !isDraggingPlacedCell) {
           button.classList.add("covered");
           if (monsterCell.placementId) {
@@ -504,9 +533,12 @@
               button.addEventListener("pointerdown", (event) => beginPlacedPieceDrag(event, monsterCell.placementId, x, y));
             } else {
               button.classList.add("locked");
+              button.dataset.placementId = String(monsterCell.placementId);
+              button.addEventListener("pointerdown", (event) => selectLockedPlacement(event, monsterCell.placementId));
             }
           }
         }
+        if (isSelectedPlacement) button.classList.add("selected-recall");
         if (state.blocked.has(cellKey)) button.classList.add("blocked");
         if (armorPreview.has(cellKey)) button.classList.add("preview-block");
         if (healPreview.has(cellKey)) button.classList.add("heal-target");
@@ -571,7 +603,19 @@
     renderCutMarks();
     renderKnifeGuide();
     renderKnives();
-    els.knifeHint.textContent = "칼은 격자선 사이에서만 움직입니다. 자르기 후 분리된 재료를 드래그하세요.";
+    renderWorkbenchHint();
+  }
+
+  function renderWorkbenchHint() {
+    if (getPlacement(state.selectedPlacementId)) {
+      els.knifeHint.textContent = "회수는 칼질 1회를 써서 고정된 조각을 재료판으로 되돌립니다.";
+      return;
+    }
+    if (!availableMaterialCount()) {
+      els.knifeHint.textContent = "남은 조각이 없습니다. 몬스터 행동 후 새 재료판을 받습니다.";
+      return;
+    }
+    els.knifeHint.textContent = "새 판은 남은 조각을 버리고 몬스터 행동 후 새 재료판을 받습니다.";
   }
 
   function renderCutMarks() {
@@ -657,6 +701,7 @@
 
   function beginKnifeDrag(event, index) {
     event.preventDefault();
+    state.selectedPlacementId = null;
     state.drag = { type: "knife", index };
     state.knifePreview = getKnifePreview(index, event.clientX, event.clientY);
     renderMaterialBoard();
@@ -739,6 +784,7 @@
     }
 
     state.cutsUsed += 1;
+    state.selectedPlacementId = null;
     let added = 0;
     state.knives.forEach((knife) => {
       const type = KNIFE_TYPES[knife.type];
@@ -771,6 +817,7 @@
     const min = minCell(piece.cells);
     const cells = normalizeCells(piece.cells);
     const offset = getGrabbedCellOffset(min, grabbedX, grabbedY);
+    state.selectedPlacementId = null;
     state.drag = { type: "piece", pieceId, offset, cells };
     state.drag.cutEdges = normalizeCutEdges(piece.cutEdges, min);
     state.drag.source = "material";
@@ -840,6 +887,15 @@
     window.removeEventListener("pointercancel", onPieceCancel);
   }
 
+  function selectLockedPlacement(event, placementId) {
+    event.preventDefault();
+    const placement = getPlacement(placementId);
+    if (!placement || isCurrentTurnPlacement(placement)) return;
+    state.selectedPlacementId = state.selectedPlacementId === placementId ? null : placementId;
+    state.dropPreview = null;
+    render();
+  }
+
   function beginPlacedPieceDrag(event, placementId, grabbedX, grabbedY) {
     const placement = getPlacement(placementId);
     if (!isCurrentTurnPlacement(placement)) return;
@@ -847,6 +903,7 @@
     const min = minCell(placement.cells);
     const cells = normalizeCells(placement.cells);
     const offset = getGrabbedCellOffset(min, grabbedX, grabbedY);
+    state.selectedPlacementId = null;
     state.drag = {
       type: "piece",
       source: "monster",
@@ -982,8 +1039,82 @@
     render();
   }
 
-  function finishPlayerTurn() {
-    addLog("턴 종료. 몬스터가 예고한 행동을 실행한다.");
+  function recoverSelectedPlacement() {
+    const placement = getPlacement(state.selectedPlacementId);
+    if (!placement) {
+      state.selectedPlacementId = null;
+      render();
+      return;
+    }
+    if (state.cutsUsed >= MAX_CUTS_PER_TURN) {
+      addLog("회수하려면 남은 칼질이 필요하다.");
+      render();
+      return;
+    }
+
+    const normalized = normalizeCells(placement.cells);
+    const boardPlacement = findBoardPlacementForCells(normalized);
+    if (!boardPlacement) {
+      addLog("재료판에 회수할 공간이 없다.");
+      render();
+      return;
+    }
+
+    const placementMin = minCell(placement.cells);
+    removePlacementCoverage(placement);
+    state.placedPieces = state.placedPieces.filter((item) => item.id !== placement.id);
+    state.materialPieces.push({
+      id: state.nextPieceId,
+      cells: boardPlacement.cells,
+      cutEdges: translateCutEdges(placement.cutEdges, boardPlacement.anchorX - placementMin.x, boardPlacement.anchorY - placementMin.y),
+    });
+    state.nextPieceId += 1;
+    state.cutsUsed += 1;
+    state.selectedPlacementId = null;
+    addLog(`${boardPlacement.cells.length}칸 조각을 회수했다. 칼질 1회를 사용했다.`);
+    render();
+  }
+
+  function findBoardPlacementForCells(normalizedCells) {
+    const anchors = [];
+    const centerX = (state.materialCols - 1) / 2;
+    const centerY = (state.materialRows - 1) / 2;
+    const maxX = Math.max(...normalizedCells.map((cell) => cell.x));
+    const maxY = Math.max(...normalizedCells.map((cell) => cell.y));
+
+    for (let y = 0; y <= state.materialRows - maxY - 1; y += 1) {
+      for (let x = 0; x <= state.materialCols - maxX - 1; x += 1) {
+        const placement = getBoardPlacementFromCells(normalizedCells, x, y);
+        if (!placement.valid) continue;
+        const pieceCenterX = x + maxX / 2;
+        const pieceCenterY = y + maxY / 2;
+        anchors.push({
+          ...placement,
+          anchorX: x,
+          anchorY: y,
+          distance: Math.hypot(pieceCenterX - centerX, pieceCenterY - centerY),
+        });
+      }
+    }
+
+    anchors.sort((a, b) => a.distance - b.distance || a.anchorY - b.anchorY || a.anchorX - b.anchorX);
+    return anchors[0] || null;
+  }
+
+  function finishPlayerTurn(options = {}) {
+    const { discardMaterial = false, refillBoard = false } = options;
+    state.selectedPlacementId = null;
+
+    if (discardMaterial) {
+      const discarded = availableMaterialCount();
+      state.materialPieces = [];
+      state.missingCells = new Set();
+      state.spoiledCells = new Set();
+      addLog(discarded ? `남은 재료 ${discarded}칸을 버리고 새 판을 요청했다.` : "새 판을 요청했다.");
+    } else {
+      addLog("턴 종료. 몬스터가 예고한 행동을 실행한다.");
+    }
+
     const oldBlocks = state.blocked.size;
     state.blocked = new Set();
     if (oldBlocks) addLog("이번 턴을 막던 갑피가 떨어졌다.");
@@ -1000,10 +1131,9 @@
     state.turn += 1;
     state.cutsUsed = 0;
 
-    if (remainingCoverPotential() < uncoveredCount()) {
-      render();
-      showLoss("재료가 부족하다.", "남은 재료 칸으로는 몬스터의 모든 칸을 덮을 수 없다.");
-      return;
+    if (refillBoard || !availableMaterialCount()) {
+      resetMaterialBoard();
+      addLog("새 재료판을 받았다.");
     }
 
     render();
@@ -1117,6 +1247,13 @@
 
   function getPlacement(placementId) {
     return state.placedPieces.find((placement) => placement.id === placementId);
+  }
+
+  function syncSelectedPlacement() {
+    const placement = getPlacement(state.selectedPlacementId);
+    if (!placement || isCurrentTurnPlacement(placement) || state.resultMode) {
+      state.selectedPlacementId = null;
+    }
   }
 
   function isCurrentTurnPlacement(placement) {
@@ -1565,10 +1702,6 @@
     return Math.max(0, MAX_CUTS_PER_TURN - state.cutsUsed);
   }
 
-  function remainingCoverPotential() {
-    return availableMaterialCount();
-  }
-
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -1583,7 +1716,7 @@
     els.resultEyebrow.textContent = isFinal ? "RUN CLEAR" : "STAGE CLEAR";
     els.resultTitle.textContent = isFinal ? "모든 몬스터 포장 완료" : "몬스터 포장 완료";
     els.resultText.textContent = isFinal
-      ? "한 마리씩 전부 덮는 퍼즐 전투 프로토타입을 클리어했다."
+      ? "한 마리씩 전부 덮는 퍼즐 전투를 클리어했다."
       : "다음 몬스터로 넘어간다. 남은 체력은 일부 회복된다.";
     els.resultButton.textContent = isFinal ? "다시 시작" : "다음 몬스터";
     els.overlay.classList.remove("hidden");
@@ -1609,6 +1742,20 @@
       return;
     }
     startGame();
+  }
+
+  function handleCutButton() {
+    if (state.resultMode) return;
+    if (getPlacement(state.selectedPlacementId)) {
+      recoverSelectedPlacement();
+      return;
+    }
+    applyCuts();
+  }
+
+  function handleNewBoard() {
+    if (state.resultMode) return;
+    finishPlayerTurn({ discardMaterial: true, refillBoard: true });
   }
 
   function handleEndTurn() {
@@ -1656,7 +1803,8 @@
   window.addEventListener("pointerup", markInputEnd, { capture: true, passive: true });
   window.addEventListener("pointercancel", markInputEnd, { capture: true, passive: true });
   els.restartButton.addEventListener("click", startGame);
-  els.cutButton.addEventListener("click", applyCuts);
+  els.cutButton.addEventListener("click", handleCutButton);
+  els.newBoardButton?.addEventListener("click", handleNewBoard);
   els.endTurnButton?.addEventListener("click", handleEndTurn);
   els.resultButton.addEventListener("click", handleResultButton);
   window.addEventListener("resize", scheduleResponsiveRender);
