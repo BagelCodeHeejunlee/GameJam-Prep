@@ -103,6 +103,10 @@
   const MAX_CELL_SIZE = 42;
   const COMPACT_HEIGHT = 760;
   const TINY_HEIGHT = 680;
+  const WAVES_PER_STAGE = 10;
+  const MIN_MONSTERS_PER_WAVE = 3;
+  const MAX_MONSTERS_PER_WAVE = 6;
+  const MONSTER_ROTATION = ["iron-goblin", "swamp-slime", "stone-ogre"];
 
   const HERO_LEVEL_RULES = {
     default: {
@@ -219,11 +223,7 @@
       recommendedLevel: 1,
       staminaCost: 1,
       clearReward: { gold: 1200, heroShards: 2 },
-      waves: [
-        { id: "forest-1-1-w1", name: "웨이브 1", monsterIds: ["iron-goblin", "swamp-slime", "stone-ogre"] },
-        { id: "forest-1-1-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "stone-ogre", "iron-goblin"] },
-        { id: "forest-1-1-w3", name: "웨이브 3", monsterIds: ["stone-ogre", "iron-goblin", "swamp-slime"] },
-      ],
+      waves: createStageWaves("forest-1-1", 0),
     },
     {
       id: "forest-1-2",
@@ -234,11 +234,7 @@
       recommendedLevel: 2,
       staminaCost: 1,
       clearReward: { gold: 1400, heroShards: 2 },
-      waves: [
-        { id: "forest-1-2-w1", name: "웨이브 1", monsterIds: ["swamp-slime", "iron-goblin", "stone-ogre"] },
-        { id: "forest-1-2-w2", name: "웨이브 2", monsterIds: ["iron-goblin", "stone-ogre", "swamp-slime"] },
-        { id: "forest-1-2-w3", name: "웨이브 3", monsterIds: ["stone-ogre", "swamp-slime", "iron-goblin"] },
-      ],
+      waves: createStageWaves("forest-1-2", 1),
     },
     {
       id: "forest-1-3",
@@ -249,11 +245,7 @@
       recommendedLevel: 3,
       staminaCost: 1,
       clearReward: { gold: 1600, heroShards: 3 },
-      waves: [
-        { id: "forest-1-3-w1", name: "웨이브 1", monsterIds: ["stone-ogre", "iron-goblin", "swamp-slime"] },
-        { id: "forest-1-3-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "iron-goblin", "stone-ogre"] },
-        { id: "forest-1-3-w3", name: "웨이브 3", monsterIds: ["iron-goblin", "stone-ogre", "swamp-slime"] },
-      ],
+      waves: createStageWaves("forest-1-3", 2),
     },
   ];
 
@@ -474,6 +466,25 @@
     return { x, y };
   }
 
+  function createStageWaves(stageId, rotationOffset = 0) {
+    return Array.from({ length: WAVES_PER_STAGE }, (_, waveIndex) => {
+      const monsterCount = monsterCountForWave(waveIndex);
+      const monsterIds = Array.from({ length: monsterCount }, (_, roundIndex) => {
+        const rotationIndex = (rotationOffset + waveIndex + roundIndex) % MONSTER_ROTATION.length;
+        return MONSTER_ROTATION[rotationIndex];
+      });
+      return {
+        id: `${stageId}-w${waveIndex + 1}`,
+        name: `웨이브 ${waveIndex + 1}`,
+        monsterIds,
+      };
+    });
+  }
+
+  function monsterCountForWave(waveIndex) {
+    return clamp(MIN_MONSTERS_PER_WAVE + Math.floor(waveIndex / 3), MIN_MONSTERS_PER_WAVE, MAX_MONSTERS_PER_WAVE);
+  }
+
   function createHeroInstance(def) {
     const progress = HERO_PROGRESS_INITIAL[def.id] || {};
     return {
@@ -556,8 +567,24 @@
     const wave = currentWave();
     const monsterIds = wave.monsterIds || wave.rounds || [];
     const monsterId = monsterIds[roundIndex] ?? monsterIds[0];
-    if (typeof monsterId === "number") return MONSTER_DEFS[monsterId] || MONSTER_DEFS[0];
-    return MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
+    const baseMonster = typeof monsterId === "number" ? MONSTER_DEFS[monsterId] || MONSTER_DEFS[0] : MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
+    return scaledMonster(baseMonster, roundIndex);
+  }
+
+  function scaledMonster(monster, roundIndex = state.roundIndex) {
+    const level = monsterPowerLevel(roundIndex);
+    const attackBonus = Math.floor((level - 1) / 2);
+    return {
+      ...monster,
+      level,
+      baseAttack: monster.baseAttack + attackBonus,
+      displayName: `${monster.name} Lv.${level}`,
+      sub: level > 1 ? `${monster.sub} · 위험도 ${level}` : monster.sub,
+    };
+  }
+
+  function monsterPowerLevel(roundIndex = state.roundIndex) {
+    return 1 + state.stageIndex * 3 + state.waveIndex + Math.floor(roundIndex / 2);
   }
 
   function currentAction() {
@@ -1194,8 +1221,9 @@
     els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${maxHp}${shieldText}`;
     els.materialLabel.textContent = `${availableMaterialCount()} / ${state.initialMaterialTotal}`;
     els.pieceCountLabel.textContent = `${state.materialPieces.length}개`;
-    els.monsterSub.textContent = currentMonster().sub;
-    els.monsterName.textContent = currentMonster().name;
+    const monster = currentMonster();
+    els.monsterSub.textContent = monster.sub;
+    els.monsterName.textContent = monster.displayName || monster.name;
     els.completionLabel.textContent = `${covered} / ${total}`;
     els.completionFill.style.width = `${(covered / total) * 100}%`;
     const selectedPlacement = getPlacement(state.selectedPlacementId);
@@ -1262,18 +1290,17 @@
     if (!els.waveTracker) return;
     const transition = state.roundTransition;
     const cards = (currentWave().monsterIds || currentWave().rounds || []).map((monsterId, index) => {
-      const monster = typeof monsterId === "number" ? MONSTER_DEFS[monsterId] : MONSTERS_BY_ID.get(monsterId);
+      const monster = monsterForRound(index);
       const stateClass = index < state.roundIndex ? "done" : index === state.roundIndex ? "active" : "waiting";
       const transitionClass = transition && index === transition.fromIndex && transition.phase === "out"
         ? " exiting"
         : transition && index === transition.toIndex
           ? ` entering ${transition.phase === "in" ? "open" : ""}`
           : "";
-      const label = monster?.name || "몬스터";
+      const label = monster?.displayName || monster?.name || "몬스터";
       return `
         <div class="monster-queue-card ${stateClass}${transitionClass}" aria-label="${index + 1}번째 ${label}">
           <span>${index + 1}</span>
-          <strong>${label.slice(0, 2)}</strong>
         </div>
       `;
     }).join("");
