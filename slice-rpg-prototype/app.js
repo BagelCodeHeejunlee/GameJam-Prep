@@ -185,6 +185,17 @@
     },
   ];
 
+  const stages = [
+    {
+      name: "도시락 숲",
+      waves: [
+        { name: "웨이브 1", rounds: [0, 0] },
+        { name: "웨이브 2", rounds: [1, 0] },
+        { name: "웨이브 3", rounds: [1, 2] },
+      ],
+    },
+  ];
+
   const els = {
     appShell: document.querySelector(".app-shell"),
     restartButton: document.querySelector("#restartButton"),
@@ -226,6 +237,8 @@
 
   const state = {
     stageIndex: 0,
+    waveIndex: 0,
+    roundIndex: 0,
     turn: 1,
     actionIndex: 0,
     cutsUsed: 0,
@@ -286,8 +299,22 @@
     return { x, y };
   }
 
+  function currentStage() {
+    return stages[state.stageIndex] || stages[0];
+  }
+
+  function currentWave() {
+    const stage = currentStage();
+    return stage.waves[state.waveIndex] || stage.waves[0];
+  }
+
+  function currentMonsterIndex() {
+    const wave = currentWave();
+    return wave.rounds[state.roundIndex] ?? wave.rounds[0];
+  }
+
   function currentMonster() {
-    return monsters[state.stageIndex];
+    return monsters[currentMonsterIndex()] || monsters[0];
   }
 
   function currentAction() {
@@ -295,8 +322,38 @@
     return monster.actions[state.actionIndex % monster.actions.length];
   }
 
+  function waveCount() {
+    return currentStage().waves.length;
+  }
+
+  function roundCount() {
+    return currentWave().rounds.length;
+  }
+
+  function hasNextRound() {
+    return state.roundIndex < roundCount() - 1;
+  }
+
+  function hasNextWave() {
+    return state.waveIndex < waveCount() - 1;
+  }
+
+  function hasNextStage() {
+    return state.stageIndex < stages.length - 1;
+  }
+
+  function isRunComplete() {
+    return !hasNextRound() && !hasNextWave() && !hasNextStage();
+  }
+
+  function progressionLabel() {
+    return `W${state.waveIndex + 1}/${waveCount()} R${state.roundIndex + 1}/${roundCount()}`;
+  }
+
   function startGame() {
     state.stageIndex = 0;
+    state.waveIndex = 0;
+    state.roundIndex = 0;
     state.playerHp = MAX_HP;
     state.boardCells = new Set(BASE_BOARD_CELLS.map((cell) => key(cell.x, cell.y)));
     state.boardCellTypes = new Map();
@@ -313,9 +370,18 @@
   }
 
   function startStage(index) {
-    const monster = monsters[index];
-    const pendingLogs = state.pendingLogs;
     state.stageIndex = index;
+    state.waveIndex = 0;
+    state.roundIndex = 0;
+    startRound(index, 0, 0);
+  }
+
+  function startRound(stageIndex = state.stageIndex, waveIndex = state.waveIndex, roundIndex = state.roundIndex) {
+    const pendingLogs = state.pendingLogs;
+    state.stageIndex = stageIndex;
+    state.waveIndex = waveIndex;
+    state.roundIndex = roundIndex;
+    const monster = currentMonster();
     state.turn = 1;
     state.actionIndex = 0;
     state.cutsUsed = 0;
@@ -358,7 +424,8 @@
 
     resetMaterialBoard();
 
-    addLog(`${monster.name} 등장. 칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.`);
+    addLog(`${currentWave().name} ${state.roundIndex + 1}/${currentWave().rounds.length}. ${monster.name} 등장.`);
+    addLog("칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.");
     pendingLogs.forEach((line) => addLog(line));
     hideResult();
     render();
@@ -414,7 +481,7 @@
     const covered = coveredCount();
     const total = state.monsterCells.size;
     const shieldText = state.shield ? ` +${state.shield}` : "";
-    els.stageLabel.textContent = `${state.stageIndex + 1} / ${monsters.length}`;
+    els.stageLabel.textContent = progressionLabel();
     els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${MAX_HP}${shieldText}`;
     els.materialLabel.textContent = `${availableMaterialCount()} / ${state.initialMaterialTotal}`;
     els.pieceCountLabel.textContent = `${state.materialPieces.length}개`;
@@ -475,7 +542,7 @@
 
     els.actionCard.className = `action-card action-${action}`;
     els.actionCard.innerHTML = `
-      <span class="action-kicker">몬스터 턴</span>
+      <span class="action-kicker">${currentWave().name} · ${state.roundIndex + 1}/${roundCount()}</span>
       <span class="action-chip"><i>${actionView.mark}</i>${actionView.label}</span>
       <strong class="action-main">${actionView.main}</strong>
       <span class="action-sub">${blockedText}</span>
@@ -2212,7 +2279,7 @@
       ["expand2", "linkAttack", "linkDefense", "growV", "silentRefill"],
       ["expand1", "growL", "linkDefense", "silentRefill"],
     ];
-    const preferred = rewardSets[state.stageIndex % rewardSets.length]
+    const preferred = rewardSets[(state.stageIndex + state.waveIndex) % rewardSets.length]
       .map((id) => REWARDS[id])
       .filter((reward) => reward && isRewardAvailable(reward));
     const fallback = Object.values(REWARDS).filter((reward) => isRewardAvailable(reward) && !preferred.includes(reward));
@@ -2431,7 +2498,15 @@
 
   function advanceAfterReward() {
     state.playerHp = Math.min(MAX_HP, state.playerHp + 6);
-    startStage(state.stageIndex + 1);
+    if (hasNextWave()) {
+      startRound(state.stageIndex, state.waveIndex + 1, 0);
+      return;
+    }
+    if (hasNextStage()) {
+      startStage(state.stageIndex + 1);
+      return;
+    }
+    startGame();
   }
 
   function getBoardEditPreview() {
@@ -2729,15 +2804,28 @@
   }
 
   function showStageClear() {
-    const isFinal = state.stageIndex === monsters.length - 1;
+    if (hasNextRound()) {
+      state.resultMode = "round";
+      els.resultModal?.classList.remove("reward-modal");
+      els.resultEyebrow.textContent = "ROUND CLEAR";
+      els.resultTitle.textContent = `${currentMonster().name} 포장 완료`;
+      els.resultText.textContent = `보상은 ${currentWave().name}의 모든 몬스터를 정리한 뒤 제공됩니다.`;
+      els.resultButton.textContent = "다음 몬스터";
+      els.resultButton.classList.remove("hidden");
+      renderRewardChoices([]);
+      els.overlay.classList.remove("hidden");
+      return;
+    }
+
+    const isFinal = isRunComplete();
     state.resultMode = isFinal ? "complete" : "reward";
     els.resultModal?.classList.toggle("reward-modal", !isFinal);
-    els.resultEyebrow.textContent = isFinal ? "RUN CLEAR" : "STAGE CLEAR";
-    els.resultTitle.textContent = isFinal ? "모든 몬스터 포장 완료" : "보상 선택";
+    els.resultEyebrow.textContent = isFinal ? "RUN CLEAR" : "WAVE CLEAR";
+    els.resultTitle.textContent = isFinal ? "스테이지 클리어" : "보상 선택";
     els.resultText.textContent = isFinal
-      ? "한 마리씩 전부 덮는 퍼즐 전투를 클리어했다."
-      : "다음 도시락을 강화하세요.";
-    els.resultButton.textContent = isFinal ? "다시 시작" : "다음 몬스터";
+      ? "모든 웨이브의 몬스터를 전부 덮어 클리어했다."
+      : `${currentWave().name} 클리어. 다음 웨이브를 위해 도시락을 강화하세요.`;
+    els.resultButton.textContent = isFinal ? "다시 시작" : "다음 웨이브";
     els.resultButton.classList.toggle("hidden", !isFinal);
     renderRewardChoices(isFinal ? [] : dealRewardOptions());
     els.overlay.classList.remove("hidden");
@@ -2763,7 +2851,13 @@
   }
 
   function handleResultButton() {
-    startGame();
+    if (state.resultMode === "round") {
+      startRound(state.stageIndex, state.waveIndex, state.roundIndex + 1);
+      return;
+    }
+    if (state.resultMode === "complete" || state.resultMode === "loss") {
+      startGame();
+    }
   }
 
   function handleCutButton() {
