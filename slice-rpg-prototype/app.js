@@ -2315,8 +2315,23 @@
       .map((id) => REWARDS[id])
       .filter((reward) => reward && isRewardAvailable(reward));
     const fallback = Object.values(REWARDS).filter((reward) => isRewardAvailable(reward) && !preferred.includes(reward));
-    state.rewardOptions = [...preferred, ...fallback].slice(0, 3);
+    state.rewardOptions = [...preferred, ...fallback].slice(0, 3).map((reward, index) => createRewardOption(reward, index));
     return state.rewardOptions;
+  }
+
+  function createRewardOption(reward, index) {
+    if (reward.type !== "link") return reward;
+    return {
+      ...reward,
+      shape: linkRewardShape(reward, index),
+    };
+  }
+
+  function linkRewardShape(reward, index) {
+    const vertical = (state.stageIndex + state.waveIndex + index + reward.id.length) % 2 === 1;
+    return vertical
+      ? [{ x: 0, y: 0 }, { x: 0, y: 1 }]
+      : [{ x: 0, y: 0 }, { x: 1, y: 0 }];
   }
 
   function isRewardAvailable(reward) {
@@ -2390,16 +2405,34 @@
 
     if (reward.type === "link") {
       const meta = LINK_META[reward.linkType];
-      const left = document.createElement("span");
-      left.className = "reward-icon-rice";
-      const right = document.createElement("span");
-      right.className = "reward-icon-rice";
-      const bridge = document.createElement("span");
-      bridge.className = `reward-icon-link ${meta.className}`;
+      const cells = normalizeCells(reward.shape || defaultLinkShape());
+      const maxX = Math.max(...cells.map((cell) => cell.x));
+      const maxY = Math.max(...cells.map((cell) => cell.y));
+      const occupied = new Set(cells.map((cell) => key(cell.x, cell.y)));
+      const grid = document.createElement("span");
+      grid.className = "reward-icon-grid reward-icon-link-grid";
+      grid.style.gridTemplateColumns = `repeat(${maxX + 1}, 24px)`;
+      for (let y = 0; y <= maxY; y += 1) {
+        for (let x = 0; x <= maxX; x += 1) {
+          const cell = document.createElement("span");
+          cell.className = "reward-icon-rice";
+          if (!occupied.has(key(x, y))) cell.classList.add("empty");
+          grid.append(cell);
+        }
+      }
+      rewardShapeSpecialLinks({ shape: cells, linkType: reward.linkType }).forEach((link, edge) => {
+        const linkMark = edgeToMark(edge);
+        if (!linkMark) return;
+        const bridge = document.createElement("span");
+        bridge.className = `reward-icon-link ${linkMark.orientation} ${meta.className}`;
+        bridge.style.left = `calc(${linkMark.x} * (24px + 3px))`;
+        bridge.style.top = `calc(${linkMark.y} * (24px + 3px))`;
+        grid.append(bridge);
+      });
       const mark = document.createElement("span");
       mark.className = `reward-icon-mark ${meta.className}`;
       mark.textContent = meta.mark;
-      wrap.append(left, bridge, mark, right);
+      wrap.append(grid, mark);
       return wrap;
     }
 
@@ -2434,9 +2467,9 @@
   function rewardChoiceText(reward) {
     if (reward.id === "expand1") return "도시락 판에 직접 붙이기";
     if (reward.id === "expand2") return "2칸 조각을 회전해 붙이기";
-    if (reward.id === "linkHeal") return "자르면 체력 +1";
-    if (reward.id === "linkAttack") return "자르면 1칸 조각 생성";
-    if (reward.id === "linkDefense") return "자르면 쉴드 +1";
+    if (reward.id === "linkHeal") return `${linkDirectionLabel(reward.shape)} 링크 · 자르면 체력 +1`;
+    if (reward.id === "linkAttack") return `${linkDirectionLabel(reward.shape)} 링크 · 자르면 1칸 조각 생성`;
+    if (reward.id === "linkDefense") return `${linkDirectionLabel(reward.shape)} 링크 · 자르면 쉴드 +1`;
     if (reward.id === "growH") return "가로 2칸 -> 3칸";
     if (reward.id === "growV") return "세로 2칸 -> 3칸";
     if (reward.id === "bendL") return "직선 칼 -> ㄱ자 칼";
@@ -2446,7 +2479,7 @@
   }
 
   function applyReward(rewardId) {
-    const reward = REWARDS[rewardId];
+    const reward = state.rewardOptions.find((option) => option.id === rewardId) || REWARDS[rewardId];
     if (!reward || !isRewardAvailable(reward)) return;
 
     if (reward.type === "expand" || reward.type === "link") {
@@ -2503,10 +2536,7 @@
 
     return {
       ...base,
-      shape: [
-        { x: 0, y: 0 },
-        { x: 1, y: 0 },
-      ],
+      shape: normalizeCells((reward.shape || defaultLinkShape()).map((cell) => ({ ...cell }))),
     };
   }
 
@@ -2613,7 +2643,7 @@
       const grid = renderRewardItemGrid(item);
       card.append(label, grid, title);
 
-      if (!item.placed && item.shape.length > 1) {
+      if (canRotateRewardItem(item)) {
         const rotate = document.createElement("button");
         rotate.type = "button";
         rotate.className = "reward-rotate-button";
@@ -2694,9 +2724,13 @@
 
   function rotateRewardItem(itemId) {
     const item = getBoardEditItem(itemId);
-    if (!item || item.placed || item.shape.length < 2) return;
+    if (!canRotateRewardItem(item)) return;
     item.shape = rotateShape(item.shape);
     render();
+  }
+
+  function canRotateRewardItem(item) {
+    return Boolean(item) && item.type === "expand" && !item.placed && item.shape.length > 1;
   }
 
   function rewardItemSpecialCells(item) {
@@ -2706,8 +2740,22 @@
 
   function rewardItemSpecialLinks(item) {
     if (item.type !== "link" || item.shape.length < 2) return new Map();
+    return rewardShapeSpecialLinks(item);
+  }
+
+  function rewardShapeSpecialLinks(item) {
+    if (item.shape.length < 2) return new Map();
     const [a, b] = item.shape;
     return new Map([[edgeKey(key(a.x, a.y), key(b.x, b.y)), { type: item.linkType, active: true }]]);
+  }
+
+  function defaultLinkShape() {
+    return [{ x: 0, y: 0 }, { x: 1, y: 0 }];
+  }
+
+  function linkDirectionLabel(shape = defaultLinkShape()) {
+    const cells = normalizeCells(shape);
+    return cells.length >= 2 && cells[0].x === cells[1].x ? "세로" : "가로";
   }
 
   function updateRewardDropPreview(x, y) {

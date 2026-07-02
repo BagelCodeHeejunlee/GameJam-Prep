@@ -1652,6 +1652,10 @@ button:disabled {
   justify-content: center;
 }
 
+.reward-icon-link-grid {
+  position: relative;
+}
+
 .reward-icon-rice {
   display: grid;
   width: 34px;
@@ -1683,13 +1687,23 @@ button:disabled {
 }
 
 .reward-icon-link {
+  position: absolute;
   display: block;
-  width: 24px;
-  height: 9px;
-  margin: 0 -4px;
   border: 2px solid rgba(255, 253, 240, 0.8);
   border-radius: 999px;
   z-index: 1;
+}
+
+.reward-icon-link.h {
+  width: 24px;
+  height: 9px;
+  transform: translateY(-4.5px);
+}
+
+.reward-icon-link.v {
+  width: 9px;
+  height: 24px;
+  transform: translateX(-4.5px);
 }
 
 .reward-icon-mark {
