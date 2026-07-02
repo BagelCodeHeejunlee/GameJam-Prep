@@ -92,7 +92,7 @@
     silentRefill: { id: "silentRefill", title: "무음 재충전", text: "전투당 1회 새 판 요청 시 몬스터 액션을 무시합니다.", type: "silentRefill", rarity: "rare" },
   };
 
-  const MAX_HP = 24;
+  const BASE_MAX_HP = 24;
   const BOARD_GAP = 3;
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
@@ -196,8 +196,99 @@
     },
   ];
 
+  const HERO_DEFS = [
+    {
+      id: "mina",
+      name: "Mina",
+      icon: "🍱",
+      grade: 3,
+      level: 7,
+      shards: 24,
+      unlocked: true,
+      tag: "균형",
+      baseBoard: BASE_BOARD_CELLS,
+      growthCells: [
+        { level: 10, cells: [c(3, 2), c(5, 3)] },
+        { level: 20, cells: [c(1, 2), c(3, 4)] },
+      ],
+      knives: [{ type: "h2" }, { type: "v2" }],
+    },
+    {
+      id: "taro",
+      name: "Taro",
+      icon: "🥢",
+      grade: 2,
+      level: 5,
+      shards: 18,
+      unlocked: true,
+      tag: "직선",
+      baseBoard: [c(2, 1), c(3, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3)],
+      growthCells: [{ level: 10, cells: [c(4, 1), c(3, 3)] }],
+      knives: [{ type: "h2" }, { type: "h2" }],
+    },
+    {
+      id: "luna",
+      name: "Luna",
+      icon: "🍙",
+      grade: 3,
+      level: 9,
+      shards: 31,
+      unlocked: true,
+      tag: "링크",
+      baseBoard: [c(2, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3), c(3, 3)],
+      growthCells: [{ level: 10, cells: [c(3, 1), c(4, 3)] }],
+      knives: [{ type: "v2" }, { type: "l3" }],
+    },
+    {
+      id: "bori",
+      name: "Bori",
+      icon: "🍚",
+      grade: 1,
+      level: 3,
+      shards: 8,
+      unlocked: true,
+      tag: "작은 판",
+      baseBoard: [c(3, 2), c(4, 2), c(3, 3), c(4, 3)],
+      growthCells: [{ level: 10, cells: [c(2, 2), c(5, 3)] }],
+      knives: [{ type: "h2" }, { type: "v2" }],
+    },
+    {
+      id: "nori",
+      name: "Nori",
+      icon: "?",
+      grade: 4,
+      level: 1,
+      shards: 12,
+      unlocked: false,
+      tag: "잠김",
+      baseBoard: [c(2, 2), c(3, 2), c(4, 2), c(3, 3)],
+      growthCells: [{ level: 10, cells: [c(2, 3), c(4, 3)] }],
+      knives: [{ type: "h2" }, { type: "v2" }],
+    },
+  ];
+
+  const META_INITIAL = {
+    gold: 12400,
+    gems: 320,
+    stamina: 18,
+    maxStamina: 20,
+    selectedStage: {
+      title: "도시락 숲 1-5",
+      waves: 3,
+      recommendedLevel: 6,
+      rewardReady: true,
+    },
+  };
+
   const els = {
     appShell: document.querySelector(".app-shell"),
+    metaScreen: document.querySelector("#metaScreen"),
+    metaContent: document.querySelector("#metaContent"),
+    goldLabel: document.querySelector("#goldLabel"),
+    gemLabel: document.querySelector("#gemLabel"),
+    staminaLabel: document.querySelector("#staminaLabel"),
+    metaSettingsButton: document.querySelector("#metaSettingsButton"),
+    metaTabs: [...document.querySelectorAll(".meta-tab")],
     restartButton: document.querySelector("#restartButton"),
     stageLabel: document.querySelector("#stageLabel"),
     hpLabel: document.querySelector("#hpLabel"),
@@ -235,6 +326,15 @@
     dragGhost: document.querySelector("#dragGhost"),
   };
 
+  const metaState = {
+    activeTab: "main",
+    view: "main",
+    heroes: HERO_DEFS.map((hero) => ({ ...hero })),
+    deployedHeroId: "mina",
+    selectedHeroId: "mina",
+    resources: { ...META_INITIAL },
+  };
+
   const state = {
     stageIndex: 0,
     waveIndex: 0,
@@ -242,7 +342,7 @@
     turn: 1,
     actionIndex: 0,
     cutsUsed: 0,
-    playerHp: MAX_HP,
+    playerHp: BASE_MAX_HP,
     monsterCells: new Map(),
     boardCells: new Set(),
     boardCellTypes: new Map(),
@@ -322,6 +422,38 @@
     return monster.actions[state.actionIndex % monster.actions.length];
   }
 
+  function deployedHero() {
+    return getHero(metaState.deployedHeroId) || metaState.heroes.find((hero) => hero.unlocked);
+  }
+
+  function selectedHero() {
+    return getHero(metaState.selectedHeroId) || deployedHero();
+  }
+
+  function getHero(heroId) {
+    return metaState.heroes.find((hero) => hero.id === heroId) || null;
+  }
+
+  function heroMaxHp(hero = deployedHero()) {
+    return BASE_MAX_HP + Math.max(0, (hero?.level || 1) - 1) * 2;
+  }
+
+  function isSpecialLevelUp(hero) {
+    return (hero.level + 1) % 10 === 0;
+  }
+
+  function levelGoldCost(hero) {
+    return isSpecialLevelUp(hero) ? 2000 + hero.level * 120 : 450 + hero.level * 85;
+  }
+
+  function shardCost(hero) {
+    return isSpecialLevelUp(hero) ? 30 + Math.floor(hero.level / 10) * 20 : 0;
+  }
+
+  function canLevelUp(hero) {
+    return metaState.resources.gold >= levelGoldCost(hero) && hero.shards >= shardCost(hero);
+  }
+
   function waveCount() {
     return currentStage().waves.length;
   }
@@ -351,14 +483,17 @@
   }
 
   function startGame() {
+    enterBattleMode();
+    const hero = deployedHero();
+    const maxHp = heroMaxHp(hero);
     state.stageIndex = 0;
     state.waveIndex = 0;
     state.roundIndex = 0;
-    state.playerHp = MAX_HP;
-    state.boardCells = new Set(BASE_BOARD_CELLS.map((cell) => key(cell.x, cell.y)));
+    state.playerHp = maxHp;
+    state.boardCells = new Set(heroBoardCells(hero.level, hero).map((cell) => key(cell.x, cell.y)));
     state.boardCellTypes = new Map();
     state.boardLinks = new Map();
-    state.knifeLoadout = BASE_KNIVES.map((knife) => ({ ...knife }));
+    state.knifeLoadout = heroKnives(hero).map((knife) => ({ ...knife }));
     state.silentRefillUpgrades = 0;
     state.silentRefills = 0;
     state.shield = 0;
@@ -460,6 +595,417 @@
     state.log = state.log.slice(0, 8);
   }
 
+  function enterBattleMode() {
+    els.appShell.classList.remove("meta-mode");
+    els.appShell.classList.add("battle-mode");
+  }
+
+  function enterMetaMode(tab = "main", view = tab) {
+    state.resultMode = null;
+    state.boardEdit = null;
+    hideResult();
+    els.appShell.classList.remove("battle-mode", "reward-edit-mode", "reward-edit-closing");
+    els.appShell.classList.add("meta-mode");
+    metaState.activeTab = tab;
+    metaState.view = view;
+    renderMeta();
+  }
+
+  function renderMeta() {
+    renderMetaResources();
+    renderMetaTabs();
+    if (metaState.activeTab === "main") {
+      renderHomeMeta();
+      return;
+    }
+    if (metaState.activeTab === "heroes") {
+      if (metaState.view === "hero-detail") {
+        renderHeroDetailMeta();
+      } else {
+        renderHeroListMeta();
+      }
+      return;
+    }
+    renderPlaceholderMeta(metaState.activeTab);
+  }
+
+  function renderMetaResources() {
+    els.goldLabel.textContent = formatNumber(metaState.resources.gold);
+    els.gemLabel.textContent = formatNumber(metaState.resources.gems);
+    els.staminaLabel.textContent = `${metaState.resources.stamina}/${metaState.resources.maxStamina}`;
+  }
+
+  function renderMetaTabs() {
+    els.metaTabs.forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.tab === metaState.activeTab);
+    });
+  }
+
+  function renderHomeMeta() {
+    const hero = deployedHero();
+    const stage = metaState.resources.selectedStage;
+    els.metaContent.innerHTML = `
+      <section class="meta-page meta-page-main">
+        ${floatingActionsHtml()}
+        ${heroHomeCardHtml(hero)}
+        <article class="stage-card">
+          <div class="stage-row">
+            <div>
+              <p class="eyebrow">MAIN STAGE</p>
+              <h2>${stage.title}</h2>
+            </div>
+            <button class="meta-small-button" data-action="stage-change" type="button">스테이지 변경</button>
+          </div>
+          <div class="stage-meta">
+            <span>${stage.waves} Waves</span>
+            <span>Recommended Lv. ${stage.recommendedLevel}</span>
+          </div>
+          <div class="stage-row">
+            <div class="monster-icons" aria-label="등장 몬스터">
+              <i class="round-icon">고</i>
+              <i class="round-icon">점</i>
+              <i class="round-icon">오</i>
+            </div>
+            <div class="reward-icons" aria-label="보상">
+              <i class="round-icon">골</i>
+              <i class="round-icon">조</i>
+              <i class="round-icon">상</i>
+            </div>
+          </div>
+        </article>
+        <article class="claim-card">
+          <div>
+            <strong>클리어 보상</strong>
+            <small>${stage.rewardReady ? "받을 보상이 있습니다." : "현재 받을 보상이 없습니다."}</small>
+          </div>
+          <button class="meta-action-button" data-action="claim-stage-reward" type="button" ${stage.rewardReady ? "" : "disabled"}>수령</button>
+        </article>
+        <button class="start-button" data-action="start-battle" type="button">도전 시작</button>
+      </section>
+    `;
+    bindMetaContentActions();
+  }
+
+  function renderHeroListMeta() {
+    const hero = deployedHero();
+    els.metaContent.innerHTML = `
+      <section class="meta-page meta-page-heroes">
+        <div class="meta-section-title">
+          <div>
+            <p class="eyebrow">HERO</p>
+            <h2>영웅</h2>
+          </div>
+          <span class="progress-chip">보유 ${ownedHeroCount()}/${metaState.heroes.length}</span>
+        </div>
+        ${deployedHeroCardHtml(hero)}
+        <section class="hero-roster" aria-label="영웅 목록">
+          ${metaState.heroes.map(heroListCardHtml).join("")}
+        </section>
+      </section>
+    `;
+    bindMetaContentActions();
+  }
+
+  function renderHeroDetailMeta() {
+    const hero = selectedHero();
+    const special = isSpecialLevelUp(hero);
+    const nextLevel = hero.level + 1;
+    const goldCost = levelGoldCost(hero);
+    const neededShards = shardCost(hero);
+    const currentCells = heroBoardCells(hero.level, hero);
+    const nextCells = heroBoardCells(nextLevel, hero);
+    const nextOnly = new Set(nextCells.map((cell) => key(cell.x, cell.y)).filter((cellKey) => !new Set(currentCells.map((cell) => key(cell.x, cell.y))).has(cellKey)));
+    els.metaContent.innerHTML = `
+      <section class="meta-page meta-page-hero-detail">
+        <div class="hero-detail-head">
+          <button class="back-button" data-action="hero-list" type="button">‹</button>
+          <div>
+            <p class="eyebrow">HERO DETAIL</p>
+            <h2>${hero.name}</h2>
+          </div>
+          <span class="tag">${hero.id === metaState.deployedHeroId ? "출전 중" : hero.unlocked ? "대기" : "잠김"}</span>
+        </div>
+        <article class="hero-detail-summary meta-card">
+          <div class="hero-avatar">${hero.icon}</div>
+          <div class="hero-summary">
+            <div class="hero-name-row"><strong>${hero.name}</strong><span class="tag">Lv. ${hero.level}</span>${starsHtml(hero.grade)}</div>
+            <span class="progress-chip">체력 ${heroMaxHp(hero)}</span>
+            <span class="progress-chip">조각 ${hero.shards}/${neededShards || nextShardMilestone(hero)}</span>
+          </div>
+          ${hero.unlocked && hero.id !== metaState.deployedHeroId ? `<button class="deploy-button" data-action="deploy-hero" data-hero-id="${hero.id}" type="button">출전</button>` : ""}
+        </article>
+        <section class="level-panel">
+          <div class="meta-section-title">
+            <div>
+              <p class="eyebrow">${special ? "SPECIAL" : "LEVEL UP"}</p>
+              <h3>${special ? "스페셜 레벨업" : "레벨업"}</h3>
+            </div>
+            <span class="progress-chip">다음 Lv. ${nextLevel}</span>
+          </div>
+          ${special ? growthCompareHtml(currentCells, nextCells, nextOnly) : regularLevelHtml(hero)}
+          <div class="hero-knife-strip">
+            ${heroKnives(hero).map((knife) => knifeMiniCardHtml(knife.type)).join("")}
+          </div>
+          <div class="detail-cost-row">
+            <div class="cost-list">
+              <span class="cost-chip">골드 ${formatNumber(goldCost)}</span>
+              ${neededShards ? `<span class="cost-chip">조각 ${neededShards}</span>` : ""}
+            </div>
+            <button class="level-button" data-action="level-up" data-hero-id="${hero.id}" type="button" ${canLevelUp(hero) ? "" : "disabled"}>${special ? "스페셜 레벨업" : "레벨업"}</button>
+          </div>
+        </section>
+        <p class="detail-note">${special ? "스페셜 레벨업은 판과 체력이 함께 성장합니다." : "일반 레벨업은 체력만 증가합니다."}</p>
+      </section>
+    `;
+    bindMetaContentActions();
+  }
+
+  function renderPlaceholderMeta(tab) {
+    const labels = { summon: "소환", dungeon: "던전", shop: "상점" };
+    const copy = {
+      summon: "영웅 소환과 픽업 배너가 들어갈 자리입니다.",
+      dungeon: "요일 던전, 특수 퍼즐, 보스전이 열릴 자리입니다.",
+      shop: "무료 보상, 성장 재료, 패키지가 들어갈 자리입니다.",
+    };
+    els.metaContent.innerHTML = `
+      <section class="meta-page">
+        <article class="placeholder-panel">
+          <p class="eyebrow">COMING SOON</p>
+          <h2>${labels[tab]}</h2>
+          <p>${copy[tab]}</p>
+        </article>
+      </section>
+    `;
+  }
+
+  function bindMetaContentActions() {
+    els.metaContent.querySelectorAll("[data-action]").forEach((button) => {
+      button.addEventListener("click", handleMetaAction);
+    });
+  }
+
+  function handleMetaAction(event) {
+    const action = event.currentTarget.dataset.action;
+    const heroId = event.currentTarget.dataset.heroId;
+    if (action === "start-battle") {
+      startGame();
+      return;
+    }
+    if (action === "stage-change") {
+      metaState.resources.selectedStage.title = metaState.resources.selectedStage.title === "도시락 숲 1-5" ? "도시락 숲 1-4" : "도시락 숲 1-5";
+      renderMeta();
+      return;
+    }
+    if (action === "claim-stage-reward") {
+      if (!metaState.resources.selectedStage.rewardReady) return;
+      metaState.resources.selectedStage.rewardReady = false;
+      metaState.resources.gold += 1200;
+      const hero = deployedHero();
+      hero.shards += 2;
+      renderMeta();
+      return;
+    }
+    if (action === "hero-detail") {
+      metaState.selectedHeroId = heroId;
+      metaState.activeTab = "heroes";
+      metaState.view = "hero-detail";
+      renderMeta();
+      return;
+    }
+    if (action === "hero-list") {
+      metaState.view = "heroes";
+      renderMeta();
+      return;
+    }
+    if (action === "deploy-hero") {
+      const hero = getHero(heroId);
+      if (!hero?.unlocked) return;
+      metaState.deployedHeroId = heroId;
+      metaState.selectedHeroId = heroId;
+      renderMeta();
+      return;
+    }
+    if (action === "level-up") {
+      levelUpHero(heroId);
+    }
+  }
+
+  function levelUpHero(heroId) {
+    const hero = getHero(heroId);
+    if (!hero || !hero.unlocked || !canLevelUp(hero)) return;
+    const special = isSpecialLevelUp(hero);
+    metaState.resources.gold -= levelGoldCost(hero);
+    if (special) hero.shards -= shardCost(hero);
+    hero.level += 1;
+    renderMeta();
+  }
+
+  function ownedHeroCount() {
+    return metaState.heroes.filter((hero) => hero.unlocked).length;
+  }
+
+  function nextShardMilestone(hero) {
+    return shardCost(hero) || 30;
+  }
+
+  function heroBoardCells(level, hero = selectedHero()) {
+    const cells = hero.baseBoard.map((cell) => ({ ...cell }));
+    hero.growthCells.forEach((growth) => {
+      if (level >= growth.level) growth.cells.forEach((cell) => cells.push({ ...cell }));
+    });
+    return uniqueCells(cells);
+  }
+
+  function uniqueCells(cells) {
+    const result = new Map();
+    cells.forEach((cell) => result.set(key(cell.x, cell.y), cell));
+    return [...result.values()].sort((a, b) => a.y - b.y || a.x - b.x);
+  }
+
+  function heroKnives(hero = selectedHero()) {
+    return hero.knives.map((knife, index) => ({
+      ...BASE_KNIVES[index % BASE_KNIVES.length],
+      ...knife,
+    }));
+  }
+
+  function floatingActionsHtml() {
+    return `
+      <div class="floating-actions" aria-label="빠른 메뉴">
+        <button type="button" title="미션">✓</button>
+        <button type="button" title="우편">✉</button>
+        <button type="button" title="이벤트">★</button>
+        <button type="button" title="보상">▣</button>
+      </div>
+    `;
+  }
+
+  function heroHomeCardHtml(hero) {
+    return `
+      <article class="hero-home-card meta-card">
+        <div class="hero-avatar">${hero.icon}</div>
+        <div class="hero-summary">
+          <div class="hero-name-row"><strong>${hero.name}</strong><span class="tag">Lv. ${hero.level}</span><span class="tag">출전 중</span></div>
+          <div class="mini-loadout-row">
+            ${miniBoardCardHtml("시작 판", heroBoardCells(hero.level, hero))}
+            ${heroKnives(hero).map((knife) => knifeMiniCardHtml(knife.type)).join("")}
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function deployedHeroCardHtml(hero) {
+    return `
+      <article class="hero-home-card meta-card">
+        <div class="hero-avatar">${hero.icon}</div>
+        <div class="hero-summary">
+          <div class="hero-name-row"><strong>${hero.name}</strong><span class="tag">Lv. ${hero.level}</span><span class="tag">출전 중</span></div>
+          <div class="mini-loadout-row">
+            ${miniBoardCardHtml("시작 판", heroBoardCells(hero.level, hero))}
+            ${heroKnives(hero).map((knife) => knifeMiniCardHtml(knife.type)).join("")}
+          </div>
+        </div>
+        <button class="detail-button" data-action="hero-detail" data-hero-id="${hero.id}" type="button">상세</button>
+      </article>
+    `;
+  }
+
+  function heroListCardHtml(hero) {
+    const unlocked = hero.unlocked;
+    const deployed = hero.id === metaState.deployedHeroId;
+    return `
+      <article class="hero-list-card ${deployed ? "selected" : ""} ${unlocked ? "" : "locked"}">
+        <button class="hero-list-main" data-action="hero-detail" data-hero-id="${hero.id}" type="button" ${unlocked ? "" : "disabled"}>
+          <div class="hero-avatar small">${unlocked ? hero.icon : "?"}</div>
+          <div>
+            <strong>${unlocked ? hero.name : "잠김"}</strong>
+            <span>${unlocked ? `Lv. ${hero.level}` : `조각 ${hero.shards}/50`}</span>
+          </div>
+          ${unlocked && canLevelUp(hero) ? `<i class="notice-dot"></i>` : ""}
+        </button>
+        <div class="hero-list-side">
+          <span class="progress-chip">${unlocked ? `조각 ${hero.shards}/${shardCost(hero) || 30}` : "잠김"}</span>
+          ${unlocked ? `<button class="deploy-button" data-action="deploy-hero" data-hero-id="${hero.id}" type="button" ${deployed ? "disabled" : ""}>${deployed ? "출전 중" : "출전"}</button>` : ""}
+        </div>
+      </article>
+    `;
+  }
+
+  function miniBoardCardHtml(label, cells) {
+    return `
+      <div class="mini-loadout-card">
+        <span>${label}</span>
+        ${boardPreviewHtml(cells, "mini-board", "mini-cell")}
+      </div>
+    `;
+  }
+
+  function knifeMiniCardHtml(type) {
+    const knife = KNIFE_TYPES[type];
+    const primary = knife.segments[0]?.orientation || "h";
+    return `
+      <div class="mini-loadout-card">
+        <span>${knife.label}</span>
+        <i class="mini-knife ${primary}" aria-hidden="true"></i>
+      </div>
+    `;
+  }
+
+  function boardPreviewHtml(cells, gridClass, cellClass, nextKeys = new Set()) {
+    const min = minCell(cells);
+    const normalized = normalizeCells(cells);
+    const maxX = Math.max(...normalized.map((cell) => cell.x));
+    const maxY = Math.max(...normalized.map((cell) => cell.y));
+    const occupied = new Set(normalized.map((cell) => key(cell.x, cell.y)));
+    let html = `<div class="${gridClass}" style="grid-template-columns: repeat(${maxX + 1}, auto)">`;
+    for (let y = 0; y <= maxY; y += 1) {
+      for (let x = 0; x <= maxX; x += 1) {
+        const cellKey = key(x, y);
+        const sourceKey = key(x + min.x, y + min.y);
+        const extra = occupied.has(cellKey) ? (nextKeys.has(sourceKey) ? " next" : "") : " empty";
+        html += `<i class="${cellClass}${extra}"></i>`;
+      }
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function growthCompareHtml(currentCells, nextCells, nextOnly) {
+    return `
+      <div class="growth-compare">
+        <div>
+          <span>현재 시작 판</span>
+          ${boardPreviewHtml(currentCells, "growth-board", "growth-cell")}
+        </div>
+        <b>→</b>
+        <div>
+          <span>Lv. ${selectedHero().level + 1} 시작 판</span>
+          ${boardPreviewHtml(nextCells, "growth-board", "growth-cell", nextOnly)}
+        </div>
+      </div>
+      <strong class="growth-copy">판 +${Math.max(0, nextCells.length - currentCells.length)}칸 확장</strong>
+    `;
+  }
+
+  function regularLevelHtml(hero) {
+    return `
+      <div class="regular-level-card">
+        <strong>체력 +2</strong>
+        <span>Lv. ${hero.level} → Lv. ${hero.level + 1}</span>
+        <small>일반 레벨업은 체력만 증가합니다.</small>
+      </div>
+    `;
+  }
+
+  function starsHtml(count) {
+    return `<span class="stars">${"★".repeat(count)}</span>`;
+  }
+
+  function formatNumber(value) {
+    return Number(value).toLocaleString("ko-KR");
+  }
+
   function render() {
     syncSelectedPlacement();
     renderSceneMode();
@@ -482,7 +1028,8 @@
     const total = state.monsterCells.size;
     const shieldText = state.shield ? ` +${state.shield}` : "";
     els.stageLabel.textContent = progressionLabel();
-    els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${MAX_HP}${shieldText}`;
+    const maxHp = heroMaxHp();
+    els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${maxHp}${shieldText}`;
     els.materialLabel.textContent = `${availableMaterialCount()} / ${state.initialMaterialTotal}`;
     els.pieceCountLabel.textContent = `${state.materialPieces.length}개`;
     els.monsterSub.textContent = currentMonster().sub;
@@ -499,7 +1046,7 @@
     els.cutButton.disabled = state.boardEdit ? true : state.cutsUsed >= MAX_CUTS_PER_TURN || Boolean(state.resultMode);
     if (els.newBoardButton) els.newBoardButton.disabled = Boolean(state.resultMode || state.boardEdit);
     if (els.endTurnButton) els.endTurnButton.disabled = Boolean(state.resultMode || state.boardEdit);
-    if (els.hpControlLabel) els.hpControlLabel.textContent = `${Math.max(0, state.playerHp)}/${MAX_HP}${shieldText}`;
+    if (els.hpControlLabel) els.hpControlLabel.textContent = `${Math.max(0, state.playerHp)}/${maxHp}${shieldText}`;
     if (els.cutCountLabel) els.cutCountLabel.textContent = `${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
   }
 
@@ -1079,7 +1626,7 @@
     });
 
     if (linkRewards.heal) {
-      state.playerHp = Math.min(MAX_HP, state.playerHp + linkRewards.heal);
+      state.playerHp = Math.min(heroMaxHp(), state.playerHp + linkRewards.heal);
     }
     if (linkRewards.defense) {
       state.shield += linkRewards.defense;
@@ -2559,7 +3106,7 @@
   }
 
   function advanceAfterReward() {
-    state.playerHp = Math.min(MAX_HP, state.playerHp + 6);
+    state.playerHp = Math.min(heroMaxHp(), state.playerHp + 6);
     if (hasNextWave()) {
       startRound(state.stageIndex, state.waveIndex + 1, 0);
       return;
@@ -2964,7 +3511,7 @@
     els.resultText.textContent = isFinal
       ? "모든 웨이브의 몬스터를 전부 덮어 클리어했다."
       : `${currentWave().name} 클리어. 다음 웨이브를 위해 도시락을 강화하세요.`;
-    els.resultButton.textContent = isFinal ? "다시 시작" : "다음 웨이브";
+    els.resultButton.textContent = isFinal ? "메인으로" : "다음 웨이브";
     els.resultButton.classList.toggle("hidden", !isFinal);
     renderRewardChoices(isFinal ? [] : dealRewardOptions());
     els.overlay.classList.remove("hidden");
@@ -2976,7 +3523,7 @@
     els.resultEyebrow.textContent = "DEFEAT";
     els.resultTitle.textContent = title;
     els.resultText.textContent = text;
-    els.resultButton.textContent = "다시 시작";
+    els.resultButton.textContent = "메인으로";
     els.resultButton.classList.remove("hidden");
     renderRewardChoices([]);
     els.overlay.classList.remove("hidden");
@@ -2994,8 +3541,13 @@
       startRound(state.stageIndex, state.waveIndex, state.roundIndex + 1);
       return;
     }
-    if (state.resultMode === "complete" || state.resultMode === "loss") {
-      startGame();
+    if (state.resultMode === "complete") {
+      metaState.resources.selectedStage.rewardReady = true;
+      enterMetaMode("main", "main");
+      return;
+    }
+    if (state.resultMode === "loss") {
+      enterMetaMode("main", "main");
     }
   }
 
@@ -3053,7 +3605,11 @@
       resizeTimer = null;
       resizeFrame = requestAnimationFrame(() => {
         resizeFrame = null;
+      if (els.appShell.classList.contains("meta-mode")) {
+        renderMeta();
+      } else {
         render();
+      }
       });
     }, 80);
   }
@@ -3067,8 +3623,16 @@
   els.endTurnButton?.addEventListener("click", handleEndTurn);
   els.rewardDoneButton?.addEventListener("click", finishBoardEdit);
   els.resultButton.addEventListener("click", handleResultButton);
+  els.metaTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const nextTab = tab.dataset.tab;
+      metaState.activeTab = nextTab;
+      metaState.view = nextTab === "heroes" ? "heroes" : nextTab;
+      renderMeta();
+    });
+  });
   window.addEventListener("resize", scheduleResponsiveRender);
   window.visualViewport?.addEventListener("resize", scheduleResponsiveRender);
 
-  startGame();
+  enterMetaMode("main", "main");
 })();

@@ -5,10 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Bento Blocks</title>
     <meta name="theme-color" content="#f8e8c8" />
-    <link rel="stylesheet" href="styles.css?v=bento-link-locked-1" />
+    <link rel="stylesheet" href="styles.css?v=bento-meta-1" />
   </head>
   <body>
-    <main class="app-shell">
+    <main class="app-shell meta-mode">
+      <section id="metaScreen" class="meta-screen" aria-label="메타 화면">
+        <header class="meta-resource-bar" aria-label="자원">
+          <div class="resource-pill gold"><span>골드</span><strong id="goldLabel">12,400</strong></div>
+          <div class="resource-pill gem"><span>보석</span><strong id="gemLabel">320</strong></div>
+          <div class="resource-pill heart"><span>하트</span><strong id="staminaLabel">18/20</strong></div>
+          <button id="metaSettingsButton" class="meta-icon-button" type="button" aria-label="설정">⚙</button>
+        </header>
+
+        <section id="metaContent" class="meta-content" aria-live="polite"></section>
+
+        <nav class="meta-bottom-nav" aria-label="메인 메뉴">
+          <button class="meta-tab" data-tab="summon" type="button"><i>✦</i><span>소환</span></button>
+          <button class="meta-tab" data-tab="heroes" type="button"><i>●</i><span>영웅</span></button>
+          <button class="meta-tab active" data-tab="main" type="button"><i>▦</i><span>메인</span></button>
+          <button class="meta-tab" data-tab="dungeon" type="button"><i>◆</i><span>던전</span></button>
+          <button class="meta-tab" data-tab="shop" type="button"><i>▣</i><span>상점</span></button>
+        </nav>
+      </section>
+
       <section class="fill-zone" aria-label="채우는 곳">
         <header class="top-bar">
           <div>
@@ -111,6 +130,6 @@
     </main>
 
     <div id="dragGhost" class="drag-ghost hidden" aria-hidden="true"></div>
-    <script src="app.js?v=bento-link-locked-1"></script>
+    <script src="app.js?v=bento-meta-1"></script>
   </body>
 </html>
