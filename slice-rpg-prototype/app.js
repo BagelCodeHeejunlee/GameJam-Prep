@@ -202,7 +202,7 @@
       name: "Mina",
       icon: "🍱",
       grade: 3,
-      level: 7,
+      level: 1,
       shards: 24,
       unlocked: true,
       tag: "균형",
@@ -218,7 +218,7 @@
       name: "Taro",
       icon: "🥢",
       grade: 2,
-      level: 5,
+      level: 1,
       shards: 18,
       unlocked: true,
       tag: "직선",
@@ -231,7 +231,7 @@
       name: "Luna",
       icon: "🍙",
       grade: 3,
-      level: 9,
+      level: 1,
       shards: 31,
       unlocked: true,
       tag: "링크",
@@ -244,7 +244,7 @@
       name: "Bori",
       icon: "🍚",
       grade: 1,
-      level: 3,
+      level: 1,
       shards: 8,
       unlocked: true,
       tag: "작은 판",
@@ -273,10 +273,10 @@
     stamina: 18,
     maxStamina: 20,
     selectedStage: {
-      title: "도시락 숲 1-5",
+      title: "도시락 숲 1-1",
       waves: 3,
-      recommendedLevel: 6,
-      rewardReady: true,
+      recommendedLevel: 1,
+      rewardReady: false,
     },
   };
 
@@ -792,7 +792,7 @@
       return;
     }
     if (action === "stage-change") {
-      metaState.resources.selectedStage.title = metaState.resources.selectedStage.title === "도시락 숲 1-5" ? "도시락 숲 1-4" : "도시락 숲 1-5";
+      metaState.resources.selectedStage.title = metaState.resources.selectedStage.title === "도시락 숲 1-1" ? "도시락 숲 1-2" : "도시락 숲 1-1";
       renderMeta();
       return;
     }
