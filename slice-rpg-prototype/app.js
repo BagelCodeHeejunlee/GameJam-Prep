@@ -104,8 +104,28 @@
   const COMPACT_HEIGHT = 760;
   const TINY_HEIGHT = 680;
 
-  const monsters = [
+  const HERO_LEVEL_RULES = {
+    default: {
+      maxLevel: 50,
+      specialEvery: 10,
+      hp: { base: BASE_MAX_HP, perLevel: 2 },
+      goldCost: {
+        normalBase: 450,
+        normalPerLevel: 85,
+        specialBase: 2000,
+        specialPerLevel: 120,
+      },
+      shardCost: {
+        specialBase: 30,
+        specialPerTier: 20,
+      },
+      fallbackShardMilestone: 30,
+    },
+  };
+
+  const MONSTER_DEFS = [
     {
+      id: "iron-goblin",
       name: "철갑 고블린",
       sub: "작은 몸통의 주먹부터 막아라",
       cols: 3,
@@ -127,6 +147,7 @@
       },
     },
     {
+      id: "swamp-slime",
       name: "늪지 점액술사",
       sub: "회복 표식을 방치하면 재료가 말린다",
       cols: 4,
@@ -153,6 +174,7 @@
       },
     },
     {
+      id: "stone-ogre",
       name: "돌껍질 오우거",
       sub: "큰 몸이지만 낭비할 재료는 적다",
       cols: 5,
@@ -185,16 +207,57 @@
     },
   ];
 
-  const stages = [
+  const MONSTERS_BY_ID = new Map(MONSTER_DEFS.map((monster) => [monster.id, monster]));
+
+  const STAGE_DEFS = [
     {
+      id: "forest-1-1",
       name: "도시락 숲",
+      title: "도시락 숲 1-1",
+      chapter: 1,
+      stage: 1,
+      recommendedLevel: 1,
+      staminaCost: 1,
+      clearReward: { gold: 1200, heroShards: 2 },
       waves: [
-        { name: "웨이브 1", rounds: [0, 1] },
-        { name: "웨이브 2", rounds: [1, 2] },
-        { name: "웨이브 3", rounds: [0, 2] },
+        { id: "forest-1-1-w1", name: "웨이브 1", monsterIds: ["iron-goblin", "swamp-slime"] },
+        { id: "forest-1-1-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "stone-ogre"] },
+        { id: "forest-1-1-w3", name: "웨이브 3", monsterIds: ["iron-goblin", "stone-ogre"] },
+      ],
+    },
+    {
+      id: "forest-1-2",
+      name: "도시락 숲",
+      title: "도시락 숲 1-2",
+      chapter: 1,
+      stage: 2,
+      recommendedLevel: 2,
+      staminaCost: 1,
+      clearReward: { gold: 1400, heroShards: 2 },
+      waves: [
+        { id: "forest-1-2-w1", name: "웨이브 1", monsterIds: ["swamp-slime", "iron-goblin"] },
+        { id: "forest-1-2-w2", name: "웨이브 2", monsterIds: ["iron-goblin", "stone-ogre"] },
+        { id: "forest-1-2-w3", name: "웨이브 3", monsterIds: ["swamp-slime", "stone-ogre"] },
+      ],
+    },
+    {
+      id: "forest-1-3",
+      name: "도시락 숲",
+      title: "도시락 숲 1-3",
+      chapter: 1,
+      stage: 3,
+      recommendedLevel: 3,
+      staminaCost: 1,
+      clearReward: { gold: 1600, heroShards: 3 },
+      waves: [
+        { id: "forest-1-3-w1", name: "웨이브 1", monsterIds: ["stone-ogre", "iron-goblin"] },
+        { id: "forest-1-3-w2", name: "웨이브 2", monsterIds: ["swamp-slime", "iron-goblin"] },
+        { id: "forest-1-3-w3", name: "웨이브 3", monsterIds: ["stone-ogre", "swamp-slime"] },
       ],
     },
   ];
+
+  const STAGES_BY_ID = new Map(STAGE_DEFS.map((stage) => [stage.id, stage]));
 
   const HERO_DEFS = [
     {
@@ -202,82 +265,92 @@
       name: "Mina",
       icon: "🍱",
       grade: 3,
-      level: 1,
-      shards: 24,
-      unlocked: true,
+      levelRule: "default",
+      unlockShardCost: 50,
       tag: "균형",
-      baseBoard: BASE_BOARD_CELLS,
-      growthCells: [
-        { level: 10, cells: [c(3, 2), c(5, 3)] },
-        { level: 20, cells: [c(1, 2), c(3, 4)] },
-      ],
-      knives: [{ type: "h2" }, { type: "v2" }],
+      board: {
+        baseCells: BASE_BOARD_CELLS,
+        growth: [
+          { level: 10, cells: [c(3, 2), c(5, 3)] },
+          { level: 20, cells: [c(1, 2), c(3, 4)] },
+        ],
+      },
+      knives: { base: [{ type: "h2" }, { type: "v2" }] },
     },
     {
       id: "taro",
       name: "Taro",
       icon: "🥢",
       grade: 2,
-      level: 1,
-      shards: 18,
-      unlocked: true,
+      levelRule: "default",
+      unlockShardCost: 50,
       tag: "직선",
-      baseBoard: [c(2, 1), c(3, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3)],
-      growthCells: [{ level: 10, cells: [c(4, 1), c(3, 3)] }],
-      knives: [{ type: "h2" }, { type: "h2" }],
+      board: {
+        baseCells: [c(2, 1), c(3, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3)],
+        growth: [{ level: 10, cells: [c(4, 1), c(3, 3)] }],
+      },
+      knives: { base: [{ type: "h2" }, { type: "h2" }] },
     },
     {
       id: "luna",
       name: "Luna",
       icon: "🍙",
       grade: 3,
-      level: 1,
-      shards: 31,
-      unlocked: true,
+      levelRule: "default",
+      unlockShardCost: 50,
       tag: "링크",
-      baseBoard: [c(2, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3), c(3, 3)],
-      growthCells: [{ level: 10, cells: [c(3, 1), c(4, 3)] }],
-      knives: [{ type: "v2" }, { type: "l3" }],
+      board: {
+        baseCells: [c(2, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3), c(3, 3)],
+        growth: [{ level: 10, cells: [c(3, 1), c(4, 3)] }],
+      },
+      knives: { base: [{ type: "v2" }, { type: "l3" }] },
     },
     {
       id: "bori",
       name: "Bori",
       icon: "🍚",
       grade: 1,
-      level: 1,
-      shards: 8,
-      unlocked: true,
+      levelRule: "default",
+      unlockShardCost: 50,
       tag: "작은 판",
-      baseBoard: [c(3, 2), c(4, 2), c(3, 3), c(4, 3)],
-      growthCells: [{ level: 10, cells: [c(2, 2), c(5, 3)] }],
-      knives: [{ type: "h2" }, { type: "v2" }],
+      board: {
+        baseCells: [c(3, 2), c(4, 2), c(3, 3), c(4, 3)],
+        growth: [{ level: 10, cells: [c(2, 2), c(5, 3)] }],
+      },
+      knives: { base: [{ type: "h2" }, { type: "v2" }] },
     },
     {
       id: "nori",
       name: "Nori",
       icon: "?",
       grade: 4,
-      level: 1,
-      shards: 12,
-      unlocked: false,
+      levelRule: "default",
+      unlockShardCost: 50,
       tag: "잠김",
-      baseBoard: [c(2, 2), c(3, 2), c(4, 2), c(3, 3)],
-      growthCells: [{ level: 10, cells: [c(2, 3), c(4, 3)] }],
-      knives: [{ type: "h2" }, { type: "v2" }],
+      board: {
+        baseCells: [c(2, 2), c(3, 2), c(4, 2), c(3, 3)],
+        growth: [{ level: 10, cells: [c(2, 3), c(4, 3)] }],
+      },
+      knives: { base: [{ type: "h2" }, { type: "v2" }] },
     },
   ];
+
+  const HERO_PROGRESS_INITIAL = {
+    mina: { level: 1, shards: 24, unlocked: true },
+    taro: { level: 1, shards: 18, unlocked: true },
+    luna: { level: 1, shards: 31, unlocked: true },
+    bori: { level: 1, shards: 8, unlocked: true },
+    nori: { level: 1, shards: 12, unlocked: false },
+  };
 
   const META_INITIAL = {
     gold: 12400,
     gems: 320,
     stamina: 18,
     maxStamina: 20,
-    selectedStage: {
-      title: "도시락 숲 1-1",
-      waves: 3,
-      recommendedLevel: 1,
-      rewardReady: false,
-    },
+    selectedStageId: "forest-1-1",
+    unlockedStageIds: ["forest-1-1", "forest-1-2"],
+    rewardReadyByStageId: {},
   };
 
   const els = {
@@ -329,10 +402,10 @@
   const metaState = {
     activeTab: "main",
     view: "main",
-    heroes: HERO_DEFS.map((hero) => ({ ...hero })),
+    heroes: HERO_DEFS.map(createHeroInstance),
     deployedHeroId: "mina",
     selectedHeroId: "mina",
-    resources: { ...META_INITIAL },
+    resources: createInitialResources(),
   };
 
   const state = {
@@ -399,8 +472,67 @@
     return { x, y };
   }
 
+  function createHeroInstance(def) {
+    const progress = HERO_PROGRESS_INITIAL[def.id] || {};
+    return {
+      ...def,
+      level: progress.level ?? 1,
+      shards: progress.shards ?? 0,
+      unlocked: progress.unlocked ?? false,
+    };
+  }
+
+  function createInitialResources() {
+    return {
+      gold: META_INITIAL.gold,
+      gems: META_INITIAL.gems,
+      stamina: META_INITIAL.stamina,
+      maxStamina: META_INITIAL.maxStamina,
+      selectedStageId: META_INITIAL.selectedStageId,
+      unlockedStageIds: [...META_INITIAL.unlockedStageIds],
+      rewardReadyByStageId: { ...META_INITIAL.rewardReadyByStageId },
+    };
+  }
+
+  function stageIndexById(stageId) {
+    return Math.max(0, STAGE_DEFS.findIndex((stage) => stage.id === stageId));
+  }
+
+  function selectedStageDef() {
+    return STAGES_BY_ID.get(metaState.resources.selectedStageId) || STAGE_DEFS[0];
+  }
+
+  function unlockedStageDefs() {
+    return metaState.resources.unlockedStageIds
+      .map((stageId) => STAGES_BY_ID.get(stageId))
+      .filter(Boolean);
+  }
+
+  function selectNextStage() {
+    const unlockedStages = unlockedStageDefs();
+    if (unlockedStages.length <= 1) return;
+    const currentIndex = Math.max(0, unlockedStages.findIndex((stage) => stage.id === metaState.resources.selectedStageId));
+    metaState.resources.selectedStageId = unlockedStages[(currentIndex + 1) % unlockedStages.length].id;
+  }
+
+  function stageRewardReady(stageId = selectedStageDef().id) {
+    return Boolean(metaState.resources.rewardReadyByStageId[stageId]);
+  }
+
+  function setStageRewardReady(stageId, ready) {
+    if (ready) {
+      metaState.resources.rewardReadyByStageId[stageId] = true;
+      return;
+    }
+    delete metaState.resources.rewardReadyByStageId[stageId];
+  }
+
+  function heroLevelRule(hero = selectedHero()) {
+    return HERO_LEVEL_RULES[hero?.levelRule || "default"] || HERO_LEVEL_RULES.default;
+  }
+
   function currentStage() {
-    return stages[state.stageIndex] || stages[0];
+    return STAGE_DEFS[state.stageIndex] || selectedStageDef() || STAGE_DEFS[0];
   }
 
   function currentWave() {
@@ -408,13 +540,16 @@
     return stage.waves[state.waveIndex] || stage.waves[0];
   }
 
-  function currentMonsterIndex() {
+  function currentMonsterId() {
     const wave = currentWave();
-    return wave.rounds[state.roundIndex] ?? wave.rounds[0];
+    const monsterIds = wave.monsterIds || wave.rounds || [];
+    return monsterIds[state.roundIndex] ?? monsterIds[0];
   }
 
   function currentMonster() {
-    return monsters[currentMonsterIndex()] || monsters[0];
+    const monsterId = currentMonsterId();
+    if (typeof monsterId === "number") return MONSTER_DEFS[monsterId] || MONSTER_DEFS[0];
+    return MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
   }
 
   function currentAction() {
@@ -435,23 +570,30 @@
   }
 
   function heroMaxHp(hero = deployedHero()) {
-    return BASE_MAX_HP + Math.max(0, (hero?.level || 1) - 1) * 2;
+    const rule = heroLevelRule(hero);
+    return rule.hp.base + Math.max(0, (hero?.level || 1) - 1) * rule.hp.perLevel;
   }
 
   function isSpecialLevelUp(hero) {
-    return (hero.level + 1) % 10 === 0;
+    const rule = heroLevelRule(hero);
+    return (hero.level + 1) % rule.specialEvery === 0;
   }
 
   function levelGoldCost(hero) {
-    return isSpecialLevelUp(hero) ? 2000 + hero.level * 120 : 450 + hero.level * 85;
+    const rule = heroLevelRule(hero);
+    const cost = rule.goldCost;
+    return isSpecialLevelUp(hero) ? cost.specialBase + hero.level * cost.specialPerLevel : cost.normalBase + hero.level * cost.normalPerLevel;
   }
 
   function shardCost(hero) {
-    return isSpecialLevelUp(hero) ? 30 + Math.floor(hero.level / 10) * 20 : 0;
+    if (!isSpecialLevelUp(hero)) return 0;
+    const rule = heroLevelRule(hero);
+    const tier = Math.floor(hero.level / rule.specialEvery);
+    return rule.shardCost.specialBase + tier * rule.shardCost.specialPerTier;
   }
 
   function canLevelUp(hero) {
-    return metaState.resources.gold >= levelGoldCost(hero) && hero.shards >= shardCost(hero);
+    return hero.level < heroLevelRule(hero).maxLevel && metaState.resources.gold >= levelGoldCost(hero) && hero.shards >= shardCost(hero);
   }
 
   function waveCount() {
@@ -459,7 +601,8 @@
   }
 
   function roundCount() {
-    return currentWave().rounds.length;
+    const wave = currentWave();
+    return (wave.monsterIds || wave.rounds || []).length;
   }
 
   function hasNextRound() {
@@ -471,7 +614,7 @@
   }
 
   function hasNextStage() {
-    return state.stageIndex < stages.length - 1;
+    return false;
   }
 
   function isRunComplete() {
@@ -486,7 +629,7 @@
     enterBattleMode();
     const hero = deployedHero();
     const maxHp = heroMaxHp(hero);
-    state.stageIndex = 0;
+    state.stageIndex = stageIndexById(metaState.resources.selectedStageId);
     state.waveIndex = 0;
     state.roundIndex = 0;
     state.playerHp = maxHp;
@@ -501,7 +644,7 @@
     state.boardEdit = null;
     state.pendingLogs = [];
     state.boardEffects = [];
-    startStage(0);
+    startStage(state.stageIndex);
   }
 
   function startStage(index) {
@@ -559,7 +702,7 @@
 
     resetMaterialBoard();
 
-    addLog(`${currentWave().name} ${state.roundIndex + 1}/${currentWave().rounds.length}. ${monster.name} 등장.`);
+    addLog(`${currentWave().name} ${state.roundIndex + 1}/${roundCount()}. ${monster.name} 등장.`);
     addLog("칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.");
     pendingLogs.forEach((line) => addLog(line));
     hideResult();
@@ -643,7 +786,8 @@
 
   function renderHomeMeta() {
     const hero = deployedHero();
-    const stage = metaState.resources.selectedStage;
+    const stage = selectedStageDef();
+    const rewardReady = stageRewardReady(stage.id);
     els.metaContent.innerHTML = `
       <section class="meta-page meta-page-main">
         ${floatingActionsHtml()}
@@ -657,7 +801,7 @@
             <button class="meta-small-button" data-action="stage-change" type="button">스테이지 변경</button>
           </div>
           <div class="stage-meta">
-            <span>${stage.waves} Waves</span>
+            <span>${stage.waves.length} Waves</span>
             <span>Recommended Lv. ${stage.recommendedLevel}</span>
           </div>
           <div class="stage-row">
@@ -676,9 +820,9 @@
         <article class="claim-card">
           <div>
             <strong>클리어 보상</strong>
-            <small>${stage.rewardReady ? "받을 보상이 있습니다." : "현재 받을 보상이 없습니다."}</small>
+            <small>${rewardReady ? "받을 보상이 있습니다." : "현재 받을 보상이 없습니다."}</small>
           </div>
-          <button class="meta-action-button" data-action="claim-stage-reward" type="button" ${stage.rewardReady ? "" : "disabled"}>수령</button>
+          <button class="meta-action-button" data-action="claim-stage-reward" type="button" ${rewardReady ? "" : "disabled"}>수령</button>
         </article>
         <button class="start-button" data-action="start-battle" type="button">도전 시작</button>
       </section>
@@ -792,16 +936,17 @@
       return;
     }
     if (action === "stage-change") {
-      metaState.resources.selectedStage.title = metaState.resources.selectedStage.title === "도시락 숲 1-1" ? "도시락 숲 1-2" : "도시락 숲 1-1";
+      selectNextStage();
       renderMeta();
       return;
     }
     if (action === "claim-stage-reward") {
-      if (!metaState.resources.selectedStage.rewardReady) return;
-      metaState.resources.selectedStage.rewardReady = false;
-      metaState.resources.gold += 1200;
+      const stage = selectedStageDef();
+      if (!stageRewardReady(stage.id)) return;
+      setStageRewardReady(stage.id, false);
+      metaState.resources.gold += stage.clearReward?.gold || 0;
       const hero = deployedHero();
-      hero.shards += 2;
+      hero.shards += stage.clearReward?.heroShards || 0;
       renderMeta();
       return;
     }
@@ -845,12 +990,12 @@
   }
 
   function nextShardMilestone(hero) {
-    return shardCost(hero) || 30;
+    return shardCost(hero) || hero.unlockShardCost || heroLevelRule(hero).fallbackShardMilestone;
   }
 
   function heroBoardCells(level, hero = selectedHero()) {
-    const cells = hero.baseBoard.map((cell) => ({ ...cell }));
-    hero.growthCells.forEach((growth) => {
+    const cells = hero.board.baseCells.map((cell) => ({ ...cell }));
+    hero.board.growth.forEach((growth) => {
       if (level >= growth.level) growth.cells.forEach((cell) => cells.push({ ...cell }));
     });
     return uniqueCells(cells);
@@ -863,7 +1008,7 @@
   }
 
   function heroKnives(hero = selectedHero()) {
-    return hero.knives.map((knife, index) => ({
+    return hero.knives.base.map((knife, index) => ({
       ...BASE_KNIVES[index % BASE_KNIVES.length],
       ...knife,
     }));
@@ -925,7 +1070,7 @@
           ${unlocked && canLevelUp(hero) ? `<i class="notice-dot"></i>` : ""}
         </button>
         <div class="hero-list-side">
-          <span class="progress-chip">${unlocked ? `조각 ${hero.shards}/${shardCost(hero) || 30}` : "잠김"}</span>
+          <span class="progress-chip">${unlocked ? `조각 ${hero.shards}/${nextShardMilestone(hero)}` : "잠김"}</span>
           ${unlocked ? `<button class="deploy-button" data-action="deploy-hero" data-hero-id="${hero.id}" type="button" ${deployed ? "disabled" : ""}>${deployed ? "출전 중" : "출전"}</button>` : ""}
         </div>
       </article>
@@ -3542,7 +3687,7 @@
       return;
     }
     if (state.resultMode === "complete") {
-      metaState.resources.selectedStage.rewardReady = true;
+      setStageRewardReady(currentStage().id, true);
       enterMetaMode("main", "main");
       return;
     }
