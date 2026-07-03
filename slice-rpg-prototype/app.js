@@ -1702,21 +1702,23 @@
       return { monster, action: view.action, view };
     });
     const rowsHtml = actionRows.length
-      ? actionRows.map((row) => `
+      ? actionRows.map((row, index) => `
         <span class="action-mini action-${row.action}${row.defeated ? " defeated" : ""} monster-tone-${row.monster.tone}">
-          <i>${row.view.mark}</i>
-          <strong>${row.monster.name}</strong>
-          <em>${row.view.main}</em>
+          <i>${index + 1}</i>
+          <strong>${row.view.label || row.view.main}</strong>
+          <em>${row.defeated ? "행동 없음" : row.view.main}</em>
+          <small>${row.monster.name}</small>
         </span>
       `).join("")
-      : `<span class="action-mini action-attack"><i>${ICONS.attack.mark}</i><strong>완료</strong><em>행동 없음</em></span>`;
-    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가` : "몬스터별 다음 행동";
+      : `<span class="action-mini action-attack"><i>1</i><strong>완료</strong><em>행동 없음</em><small>몬스터 없음</small></span>`;
+    const actionCount = Math.max(1, Math.min(3, actionRows.length || 1));
+    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가` : "색상은 보드 칸과 연결";
 
     els.actionCard.className = "action-card action-multi";
     els.actionCard.innerHTML = `
       <span class="action-kicker">${currentWave().name} · 생존 ${aliveMonsters.length}/${Math.max(1, state.monsterInstances.length)}</span>
       <span class="action-sub">${blockedText}</span>
-      <div class="action-list">${rowsHtml}</div>
+      <div class="action-list" style="--action-count: ${actionCount}">${rowsHtml}</div>
     `;
   }
 
@@ -1856,17 +1858,6 @@
       image.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
       image.style.gridRow = `${monster.boardY + 1} / span ${monster.rows}`;
       els.monsterGrid.append(image);
-    });
-
-    aliveMonsterInstances().forEach((monster) => {
-      const action = plannedMonsterAction(monster);
-      const view = actionViewForMonster(monster, action);
-      const badge = document.createElement("span");
-      badge.className = `monster-action-badge action-${view.action} monster-tone-${monster.tone}`;
-      badge.textContent = view.badge || view.main;
-      badge.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
-      badge.style.gridRow = String(monster.boardY + 1);
-      els.monsterGrid.append(badge);
     });
 
     for (let y = 0; y < MONSTER_BOARD_ROWS; y += 1) {
