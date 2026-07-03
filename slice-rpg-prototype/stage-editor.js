@@ -5,6 +5,7 @@
   const WAVES_PER_STAGE = 5;
   const BOSS_MONSTER_ID = "stone-ogre";
   const MONSTER_ROTATION = ["tiny-berry-imp", "tiny-jelly-block", "iron-goblin", "swamp-slime"];
+  const ADVANCED_MONSTER_ROTATION = ["hook-mantis", "hollow-mask", "spine-serpent", "patchwork-crab", "rune-bulwark"];
 
   const MONSTERS = [
     {
@@ -47,12 +48,54 @@
       rows: 4,
       cells: [c(2, 0), c(1, 1), c(2, 1), c(3, 1), c(0, 2), c(1, 2), c(2, 2), c(3, 2), c(4, 2), c(1, 3), c(2, 3), c(3, 3)],
     },
+    {
+      id: "hook-mantis",
+      name: "갈고리 사마귀",
+      short: "사",
+      cols: 3,
+      rows: 4,
+      cells: [c(0, 0), c(1, 0), c(2, 0), c(2, 1), c(0, 2), c(2, 2), c(1, 3), c(2, 3)],
+    },
+    {
+      id: "hollow-mask",
+      name: "공허 가면",
+      short: "가",
+      cols: 4,
+      rows: 4,
+      cells: [c(1, 0), c(2, 0), c(0, 1), c(3, 1), c(0, 2), c(3, 2), c(1, 3), c(2, 3)],
+    },
+    {
+      id: "spine-serpent",
+      name: "가시 등뼈 뱀",
+      short: "뱀",
+      cols: 5,
+      rows: 5,
+      cells: [c(0, 0), c(1, 0), c(1, 1), c(2, 2), c(3, 2), c(3, 3), c(4, 4)],
+    },
+    {
+      id: "patchwork-crab",
+      name: "조각게",
+      short: "게",
+      cols: 5,
+      rows: 3,
+      cells: [c(1, 0), c(3, 0), c(0, 1), c(1, 1), c(2, 1), c(3, 1), c(4, 1), c(0, 2), c(2, 2), c(4, 2)],
+    },
+    {
+      id: "rune-bulwark",
+      name: "룬 갑피수",
+      short: "룬",
+      cols: 4,
+      rows: 4,
+      cells: [c(1, 0), c(2, 0), c(0, 1), c(1, 1), c(2, 1), c(3, 1), c(0, 2), c(2, 2), c(3, 2), c(1, 3), c(2, 3)],
+    },
   ];
 
   const BASE_STAGES = [
     { id: "forest-1-1", title: "도시락 숲 1-1", rotationOffset: 0 },
     { id: "forest-1-2", title: "도시락 숲 1-2", rotationOffset: 1 },
     { id: "forest-1-3", title: "도시락 숲 1-3", rotationOffset: 2 },
+    { id: "forest-1-4", title: "도시락 숲 1-4", rotationOffset: MONSTER_ROTATION.length },
+    { id: "forest-1-5", title: "도시락 숲 1-5", rotationOffset: MONSTER_ROTATION.length + 1 },
   ];
   const STAGES = BASE_STAGES.map(cloneStageDef);
 
@@ -178,8 +221,11 @@
   function createStageWaves(stageId, rotationOffset = 0, stageIndex = 0) {
     return Array.from({ length: WAVES_PER_STAGE }, (_, waveIndex) => {
       const boss = waveIndex === WAVES_PER_STAGE - 1;
-      const rotationIndex = (rotationOffset + waveIndex) % MONSTER_ROTATION.length;
-      const monsterId = boss ? BOSS_MONSTER_ID : MONSTER_ROTATION[rotationIndex];
+      const usesAdvancedRotation = rotationOffset >= MONSTER_ROTATION.length;
+      const rotation = usesAdvancedRotation ? ADVANCED_MONSTER_ROTATION : MONSTER_ROTATION;
+      const localOffset = usesAdvancedRotation ? rotationOffset - MONSTER_ROTATION.length : rotationOffset;
+      const rotationIndex = (localOffset + waveIndex) % rotation.length;
+      const monsterId = boss ? BOSS_MONSTER_ID : rotation[rotationIndex];
       return {
         id: `${stageId}-w${waveIndex + 1}`,
         name: boss ? `보스 ${waveIndex + 1}` : `웨이브 ${waveIndex + 1}`,
@@ -200,13 +246,32 @@
         { monsterId: "tiny-berry-imp", x: 6, y: 3 },
       ]);
     }
+    if (ADVANCED_MONSTER_ROTATION.includes(monsterId)) {
+      const focused = centeredMonsterEntry(monsterId);
+      const layouts = [
+        [focused],
+        [focused, { monsterId: "tiny-berry-imp", x: 6, y: 0 }],
+        [focused, { monsterId: "tiny-berry-imp", x: 0, y: 4 }],
+        [focused, { monsterId: "tiny-berry-imp", x: 6, y: 0 }, { monsterId: "tiny-berry-imp", x: 0, y: 4 }],
+      ];
+      return withLevels(layouts[waveIndex % layouts.length]);
+    }
     const layouts = [
-      [{ monsterId, x: 3, y: 3 }],
+      [centeredMonsterEntry(monsterId)],
       [{ monsterId, x: 2, y: 3 }, { monsterId: "tiny-jelly-block", x: 5, y: 3 }],
       [{ monsterId, x: 1, y: 2 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
       [{ monsterId, x: 0, y: 2 }, { monsterId: "tiny-jelly-block", x: 4, y: 1 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
     ];
     return withLevels(layouts[waveIndex % layouts.length]);
+  }
+
+  function centeredMonsterEntry(monsterId) {
+    const monster = MONSTERS_BY_ID.get(monsterId) || MONSTERS[0];
+    return {
+      monsterId,
+      x: Math.max(0, Math.floor((BOARD_COLS - monster.cols) / 2)),
+      y: Math.max(0, Math.floor((BOARD_ROWS - monster.rows) / 2)),
+    };
   }
 
   function monsterDefaultLevel(stageIndex, waveIndex, monsterIndex) {

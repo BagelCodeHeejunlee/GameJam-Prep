@@ -107,6 +107,7 @@
   const WAVES_PER_STAGE = 5;
   const BOSS_MONSTER_ID = "stone-ogre";
   const MONSTER_ROTATION = ["tiny-berry-imp", "tiny-jelly-block", "iron-goblin", "swamp-slime"];
+  const ADVANCED_MONSTER_ROTATION = ["hook-mantis", "hollow-mask", "spine-serpent", "patchwork-crab", "rune-bulwark"];
   const MONSTER_EDITOR_STORAGE_KEY = "bento-monster-editor-data-v2";
   const STAGE_EDITOR_STORAGE_KEY = "bento-stage-editor-data-v1";
 
@@ -296,6 +297,181 @@
         }
       },
     },
+    {
+      id: "hook-mantis",
+      name: "갈고리 사마귀",
+      sub: "꺾인 팔과 떨어진 발톱이 작은 조각을 요구한다",
+      image: "assets/monsters/hook-mantis.png",
+      cols: 3,
+      rows: 4,
+      baseAttack: 2,
+      levels: monsterLevelTrack(2, {
+        1: { actions: ["attack"] },
+        3: { note: "갈고리 공격 표식", actions: ["attack", "attack"], boardConditions: { icons: [c(2, 0, "attack")] } },
+        5: { note: "떨어진 발톱 갑피", actions: ["attack", "defense", "attack"], boardConditions: { icons: [c(0, 2, "defense")] } },
+        8: { note: "갈고리 묶기", actions: ["attack", "special", "attack"], boardConditions: { icons: [c(1, 3, "special")] } },
+        12: { note: "공격 표식 추가", boardConditions: { icons: [c(2, 2, "attack")] } },
+      }),
+      actions: ["attack"],
+      cells: [
+        c(0, 0),
+        c(1, 0),
+        c(2, 0),
+        c(2, 1),
+        c(0, 2),
+        c(2, 2),
+        c(1, 3),
+        c(2, 3),
+      ],
+      special(state, count, monster) {
+        const blocks = chooseArmorBlocks(count + 1, monster.instanceId);
+        blocks.forEach((cellKey) => state.blocked.add(cellKey));
+        addLog(`갈고리 사마귀가 ${blocks.length}칸을 걸어 잠갔다.`);
+      },
+    },
+    {
+      id: "hollow-mask",
+      name: "공허 가면",
+      sub: "가운데 빈 고리 몸체가 큰 조각을 낭비하게 만든다",
+      image: "assets/monsters/hollow-mask.png",
+      cols: 4,
+      rows: 4,
+      baseAttack: 2,
+      levels: monsterLevelTrack(2, {
+        1: { actions: ["attack"] },
+        3: { note: "회복 표식 개방", actions: ["attack", "heal"], boardConditions: { icons: [c(0, 1, "heal")] } },
+        5: { note: "고리 공격 표식", actions: ["heal", "attack", "attack"], boardConditions: { icons: [c(3, 2, "attack")] } },
+        8: { note: "공허 되감기", actions: ["attack", "special", "heal"], boardConditions: { icons: [c(2, 3, "special")] } },
+        12: { note: "회복 표식 증가", boardConditions: { icons: [c(1, 0, "heal")] } },
+      }),
+      actions: ["attack"],
+      cells: [
+        c(1, 0),
+        c(2, 0),
+        c(0, 1),
+        c(3, 1),
+        c(0, 2),
+        c(3, 2),
+        c(1, 3),
+        c(2, 3),
+      ],
+      special(state, count, monster) {
+        const targets = chooseHealTargets(count + 1, monster.instanceId);
+        targets.forEach((cellKey) => uncoverMonsterCell(cellKey));
+        state.coverOrder = state.coverOrder.filter((cellKey) => !targets.includes(cellKey));
+        prunePlacedPieces();
+        addLog(`공허 가면이 ${targets.length}칸을 다시 비웠다.`);
+      },
+    },
+    {
+      id: "spine-serpent",
+      name: "가시 등뼈 뱀",
+      sub: "대각으로 이어진 몸통이 길쭉한 조각을 흔든다",
+      image: "assets/monsters/spine-serpent.png",
+      cols: 5,
+      rows: 5,
+      baseAttack: 2,
+      levels: monsterLevelTrack(2, {
+        1: { actions: ["attack"] },
+        3: { note: "머리 공격 표식", actions: ["attack", "attack"], boardConditions: { icons: [c(0, 0, "attack")] } },
+        5: { note: "꼬리 회복 표식", actions: ["attack", "heal", "attack"], boardConditions: { icons: [c(4, 4, "heal")] } },
+        8: { note: "가시 털기", actions: ["attack", "special", "attack"], boardConditions: { icons: [c(2, 2, "special")] } },
+        12: { note: "중앙 갑피 표식", boardConditions: { icons: [c(3, 2, "defense")] } },
+      }),
+      actions: ["attack"],
+      cells: [
+        c(0, 0),
+        c(1, 0),
+        c(1, 1),
+        c(2, 2),
+        c(3, 2),
+        c(3, 3),
+        c(4, 4),
+      ],
+      special(state, count) {
+        const spoiled = spoilMaterial(count + 1);
+        if (spoiled > 0) {
+          addLog(`가시 등뼈 뱀이 재료 ${spoiled}칸을 긁어냈다.`);
+        } else {
+          const damage = takeDamage(count + 2);
+          addLog(`긁을 재료가 없어 가시로 ${damage} 피해를 줬다.`);
+        }
+      },
+    },
+    {
+      id: "patchwork-crab",
+      name: "조각게",
+      sub: "넓게 흩어진 등껍질이 남는 조각을 만든다",
+      image: "assets/monsters/patchwork-crab.png",
+      cols: 5,
+      rows: 3,
+      baseAttack: 2,
+      levels: monsterLevelTrack(2, {
+        1: { actions: ["attack"] },
+        3: { note: "집게 공격 표식", actions: ["attack", "attack"], boardConditions: { icons: [c(0, 1, "attack")] } },
+        5: { note: "껍질 갑피 표식", actions: ["attack", "defense", "attack"], boardConditions: { icons: [c(2, 1, "defense")] } },
+        8: { note: "조각 고정", actions: ["defense", "special", "attack"], boardConditions: { icons: [c(4, 1, "special")] } },
+        12: { note: "회복 표식 추가", boardConditions: { icons: [c(2, 2, "heal")] } },
+      }),
+      actions: ["attack"],
+      cells: [
+        c(1, 0),
+        c(3, 0),
+        c(0, 1),
+        c(1, 1),
+        c(2, 1),
+        c(3, 1),
+        c(4, 1),
+        c(0, 2),
+        c(2, 2),
+        c(4, 2),
+      ],
+      special(state, count, monster) {
+        const blocks = chooseArmorBlocks(count + 2, monster.instanceId);
+        blocks.forEach((cellKey) => state.blocked.add(cellKey));
+        addLog(`조각게가 등껍질을 세워 ${blocks.length}칸을 막았다.`);
+      },
+    },
+    {
+      id: "rune-bulwark",
+      name: "룬 갑피수",
+      sub: "두꺼운 룬 껍질과 빈틈이 회수 타이밍을 압박한다",
+      image: "assets/monsters/rune-bulwark.png",
+      cols: 4,
+      rows: 4,
+      baseAttack: 3,
+      levels: monsterLevelTrack(3, {
+        1: { actions: ["attack"] },
+        3: { note: "갑피 표식 개방", actions: ["attack", "defense"], boardConditions: { icons: [c(2, 1, "defense")] } },
+        5: { note: "룬 공격 표식", actions: ["defense", "attack", "attack"], boardConditions: { icons: [c(0, 2, "attack")] } },
+        8: { note: "룬 봉인", actions: ["attack", "special", "defense"], boardConditions: { icons: [c(1, 3, "special")] } },
+        12: { note: "갑피 표식 증가", boardConditions: { icons: [c(3, 2, "defense")] } },
+      }),
+      actions: ["attack"],
+      cells: [
+        c(1, 0),
+        c(2, 0),
+        c(0, 1),
+        c(1, 1),
+        c(2, 1),
+        c(3, 1),
+        c(0, 2),
+        c(2, 2),
+        c(3, 2),
+        c(1, 3),
+        c(2, 3),
+      ],
+      special(state, count, monster) {
+        const blocks = chooseArmorBlocks(count + 2, monster.instanceId);
+        if (blocks.length) {
+          blocks.forEach((cellKey) => state.blocked.add(cellKey));
+          addLog(`룬 갑피수가 룬으로 ${blocks.length}칸을 봉인했다.`);
+          return;
+        }
+        const damage = takeDamage(count + 2);
+        addLog(`막을 칸이 없어 룬 충격으로 ${damage} 피해를 줬다.`);
+      },
+    },
   ];
 
   applyMonsterEditorOverrides(MONSTER_DEFS);
@@ -335,6 +511,28 @@
       staminaCost: 1,
       clearReward: { gold: 1600, heroShards: 3 },
       waves: createStageWaves("forest-1-3", 2),
+    },
+    {
+      id: "forest-1-4",
+      name: "도시락 숲",
+      title: "도시락 숲 1-4",
+      chapter: 1,
+      stage: 4,
+      recommendedLevel: 4,
+      staminaCost: 1,
+      clearReward: { gold: 1800, heroShards: 3 },
+      waves: createStageWaves("forest-1-4", MONSTER_ROTATION.length),
+    },
+    {
+      id: "forest-1-5",
+      name: "도시락 숲",
+      title: "도시락 숲 1-5",
+      chapter: 1,
+      stage: 5,
+      recommendedLevel: 5,
+      staminaCost: 1,
+      clearReward: { gold: 2000, heroShards: 3 },
+      waves: createStageWaves("forest-1-5", MONSTER_ROTATION.length + 1),
     },
   ];
 
@@ -432,7 +630,7 @@
     stamina: 18,
     maxStamina: 20,
     selectedStageId: "forest-1-1",
-    unlockedStageIds: ["forest-1-1", "forest-1-2"],
+    unlockedStageIds: ["forest-1-1", "forest-1-2", "forest-1-3", "forest-1-4", "forest-1-5"],
     rewardReadyByStageId: {},
   };
 
@@ -740,8 +938,11 @@
   function createStageWaves(stageId, rotationOffset = 0) {
     return Array.from({ length: WAVES_PER_STAGE }, (_, waveIndex) => {
       const boss = waveIndex === WAVES_PER_STAGE - 1;
-      const rotationIndex = (rotationOffset + waveIndex) % MONSTER_ROTATION.length;
-      const monsterId = boss ? BOSS_MONSTER_ID : MONSTER_ROTATION[rotationIndex];
+      const usesAdvancedRotation = rotationOffset >= MONSTER_ROTATION.length;
+      const rotation = usesAdvancedRotation ? ADVANCED_MONSTER_ROTATION : MONSTER_ROTATION;
+      const localOffset = usesAdvancedRotation ? rotationOffset - MONSTER_ROTATION.length : rotationOffset;
+      const rotationIndex = (localOffset + waveIndex) % rotation.length;
+      const monsterId = boss ? BOSS_MONSTER_ID : rotation[rotationIndex];
       return {
         id: `${stageId}-w${waveIndex + 1}`,
         name: boss ? `보스 ${waveIndex + 1}` : `웨이브 ${waveIndex + 1}`,
@@ -757,6 +958,16 @@
         { monsterId: BOSS_MONSTER_ID, x: 1, y: 1 },
         { monsterId: "tiny-berry-imp", x: 6, y: 3 },
       ];
+    }
+    if (ADVANCED_MONSTER_ROTATION.includes(monsterId)) {
+      const focused = centeredMonsterEntry(monsterId);
+      const layouts = [
+        [focused],
+        [focused, { monsterId: "tiny-berry-imp", x: 6, y: 0 }],
+        [focused, { monsterId: "tiny-berry-imp", x: 0, y: 4 }],
+        [focused, { monsterId: "tiny-berry-imp", x: 6, y: 0 }, { monsterId: "tiny-berry-imp", x: 0, y: 4 }],
+      ];
+      return layouts[waveIndex % layouts.length].map((entry) => ({ ...entry }));
     }
     const layouts = [
       [centeredMonsterEntry(monsterId)],
