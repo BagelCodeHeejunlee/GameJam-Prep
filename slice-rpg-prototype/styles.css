@@ -1052,6 +1052,26 @@ button:disabled {
   background: #f1e3c6;
 }
 
+.monster-queue-card.monster-tone-0 {
+  background: #f6dfb3;
+}
+
+.monster-queue-card.monster-tone-1 {
+  background: #d9e7b8;
+}
+
+.monster-queue-card.monster-tone-2 {
+  background: #d9e2ef;
+}
+
+.monster-queue-card.monster-tone-3 {
+  background: #efd6c6;
+}
+
+.monster-queue-card.monster-tone-4 {
+  background: #e6d9ef;
+}
+
 .monster-queue-card.exiting {
   animation: monsterCardFold 340ms ease forwards;
 }
@@ -1315,6 +1335,18 @@ button:disabled {
   overflow: visible;
 }
 
+.monster-board-image {
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  align-self: stretch;
+  justify-self: stretch;
+  object-fit: contain;
+  opacity: 0.32;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 4px rgba(58, 39, 24, 0.18));
+}
+
 .monster-grid.has-monster-art::before {
   content: "";
   position: absolute;
@@ -1353,6 +1385,34 @@ button:disabled {
   font-weight: 900;
 }
 
+.monster-cell.monster-tone-1 {
+  border-color: rgba(79, 118, 69, 0.62);
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(145deg, #a5bb74, #789a56);
+}
+
+.monster-cell.monster-tone-2 {
+  border-color: rgba(57, 91, 132, 0.62);
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(145deg, #7fa5ca, #5f7fa7);
+}
+
+.monster-cell.monster-tone-3 {
+  border-color: rgba(135, 74, 52, 0.62);
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(145deg, #c58367, #a5634e);
+}
+
+.monster-cell.monster-tone-4 {
+  border-color: rgba(103, 74, 136, 0.62);
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(145deg, #a486c2, #8064a6);
+}
+
 .monster-cell.empty {
   visibility: hidden;
 }
@@ -1367,6 +1427,10 @@ button:disabled {
   color: rgba(37, 34, 29, 0.34);
   cursor: grab;
   touch-action: none;
+}
+
+.monster-cell.sealed {
+  filter: saturate(0.85);
 }
 
 .monster-cell.covered:active {
@@ -2351,6 +2415,20 @@ button:disabled {
     0 3px 0 rgba(63, 72, 84, 0.3),
     0 5px 10px rgba(74, 46, 22, 0.18);
   pointer-events: none;
+}
+
+.board-knife {
+  pointer-events: none;
+}
+
+.board-knife .knife-blade {
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.board-knife:active .knife-blade {
+  cursor: grabbing;
 }
 
 .knife-blade::before {

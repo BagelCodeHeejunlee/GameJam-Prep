@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <title>Bento Blocks Stage Editor</title>
+    <meta name="theme-color" content="#f8e8c8" />
+    <link rel="stylesheet" href="stage-editor.css?v=stage-editor-1" />
+  </head>
+  <body>
+    <main class="stage-editor-shell">
+      <header class="editor-top">
+        <div>
+          <p class="eyebrow">BENTO BLOCKS TOOL</p>
+          <h1>스테이지 편집기</h1>
+        </div>
+        <nav class="tool-links" aria-label="도구 링크">
+          <a href="./index.html">게임으로</a>
+          <a href="./monster-editor.html">몬스터 편집</a>
+        </nav>
+      </header>
+
+      <section class="stage-toolbar" aria-label="스테이지 도구">
+        <label>
+          <span>스테이지</span>
+          <select id="stageSelect"></select>
+        </label>
+        <button id="addWaveButton" class="primary-button" type="button">웨이브 추가</button>
+        <button id="saveButton" class="primary-button" type="button">저장</button>
+        <button id="copyButton" class="ghost-button" type="button">JSON 복사</button>
+        <button id="resetButton" class="ghost-button danger" type="button">초기화</button>
+        <strong id="saveStatus" class="save-status" aria-live="polite"></strong>
+      </section>
+
+      <section class="editor-layout">
+        <aside class="wave-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">WAVES</p>
+              <h2>웨이브</h2>
+            </div>
+          </div>
+          <div id="waveList" class="wave-list" aria-label="웨이브 목록"></div>
+        </aside>
+
+        <section class="board-panel">
+          <div class="panel-head board-heading">
+            <div>
+              <p class="eyebrow" id="waveEyebrow">WAVE</p>
+              <h2 id="waveTitle">웨이브 편집</h2>
+            </div>
+            <div class="wave-actions">
+              <button id="deleteWaveButton" class="ghost-button danger" type="button">웨이브 삭제</button>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>
+              <span>이름</span>
+              <input id="waveNameInput" type="text" />
+            </label>
+            <label class="checkbox-label">
+              <input id="bossCheckbox" type="checkbox" />
+              <span>보스 웨이브</span>
+            </label>
+          </div>
+
+          <section class="add-monster-row" aria-label="몬스터 추가">
+            <label>
+              <span>몬스터</span>
+              <select id="monsterSelect"></select>
+            </label>
+            <button id="addMonsterButton" class="primary-button" type="button">몬스터 추가</button>
+          </section>
+
+          <div id="boardGrid" class="stage-board" aria-label="웨이브 보드"></div>
+          <div id="boardSummary" class="board-summary"></div>
+        </section>
+
+        <aside class="monster-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">PLACEMENT</p>
+              <h2>배치 몬스터</h2>
+            </div>
+          </div>
+          <div id="monsterList" class="placed-monster-list" aria-label="배치 몬스터 목록"></div>
+          <textarea id="jsonOutput" spellcheck="false" aria-label="스테이지 JSON"></textarea>
+        </aside>
+      </section>
+    </main>
+
+    <script src="stage-editor.js?v=stage-editor-1"></script>
+  </body>
+</html>

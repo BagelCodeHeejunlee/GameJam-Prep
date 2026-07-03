@@ -59,11 +59,8 @@
   };
 
   const BASE_BOARD_CELLS = [
-    c(2, 1),
-    c(3, 1),
-    c(2, 2),
+    c(3, 2),
     c(4, 2),
-    c(2, 3),
     c(3, 3),
     c(4, 3),
   ];
@@ -94,20 +91,24 @@
 
   const BASE_MAX_HP = 24;
   const BOARD_GAP = 3;
+  const MONSTER_BOARD_COLS = 8;
+  const MONSTER_BOARD_ROWS = 6;
   const CUT_BOARD_COLS = 8;
   const CUT_BOARD_ROWS = 6;
   const DRAG_POINTER_OFFSET = 44;
-  const MAX_CUTS_PER_TURN = 2;
+  const MAX_CUTS_PER_TURN = 1;
+  const MONSTER_HEAL_PER_ACTION = 1;
+  const MONSTER_ARMOR_PER_ACTION = 1;
   const LINK_TRIGGER_LIMIT_PER_CUT = 2;
   const MIN_CELL_SIZE = 22;
   const MAX_CELL_SIZE = 42;
   const COMPACT_HEIGHT = 760;
   const TINY_HEIGHT = 680;
-  const WAVES_PER_STAGE = 10;
-  const MIN_MONSTERS_PER_WAVE = 3;
-  const MAX_MONSTERS_PER_WAVE = 6;
-  const MONSTER_ROTATION = ["tiny-berry-imp", "tiny-jelly-block", "iron-goblin", "swamp-slime", "stone-ogre"];
-  const MONSTER_EDITOR_STORAGE_KEY = "bento-monster-editor-data-v1";
+  const WAVES_PER_STAGE = 5;
+  const BOSS_MONSTER_ID = "stone-ogre";
+  const MONSTER_ROTATION = ["tiny-berry-imp", "tiny-jelly-block", "iron-goblin", "swamp-slime"];
+  const MONSTER_EDITOR_STORAGE_KEY = "bento-monster-editor-data-v2";
+  const STAGE_EDITOR_STORAGE_KEY = "bento-stage-editor-data-v1";
 
   const HERO_LEVEL_RULES = {
     default: {
@@ -137,14 +138,15 @@
       cols: 2,
       rows: 2,
       baseAttack: 1,
-      levels: [
-        { minLevel: 1, attack: 1 },
-        { minLevel: 4, attack: 2, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
-        { minLevel: 8, attack: 3, note: "특수 표식 개방", boardConditions: { icons: [c(1, 0, "special")] } },
-      ],
-      actions: ["attack", "attack", "special"],
+      levels: monsterLevelTrack(1, {
+        1: { actions: ["attack"] },
+        2: { note: "공격 표식 개방", actions: ["attack", "attack"], boardConditions: { icons: [c(1, 0, "attack")] } },
+        5: { note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
+        9: { note: "회복 표식 개방", actions: ["attack", "heal", "attack"], boardConditions: { icons: [c(0, 1, "heal")] } },
+      }),
+      actions: ["attack"],
       cells: [
-        c(1, 0, "attack"),
+        c(1, 0),
         c(0, 1),
         c(1, 1),
       ],
@@ -161,17 +163,18 @@
       cols: 2,
       rows: 2,
       baseAttack: 1,
-      levels: [
-        { minLevel: 1, attack: 1 },
-        { minLevel: 4, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
-        { minLevel: 8, attack: 3, note: "갑피 표식 개방", boardConditions: { icons: [c(1, 0, "defense")] } },
-      ],
-      actions: ["heal", "attack", "defense"],
+      levels: monsterLevelTrack(1, {
+        1: { actions: ["attack"] },
+        2: { note: "회복 표식 개방", actions: ["attack", "heal"], boardConditions: { icons: [c(0, 0, "heal")] } },
+        4: { note: "공격 표식 개방", actions: ["heal", "attack"], boardConditions: { icons: [c(1, 1, "attack")] } },
+        7: { note: "갑피 표식 개방", actions: ["heal", "attack", "defense"], boardConditions: { icons: [c(1, 0, "defense")] } },
+      }),
+      actions: ["attack"],
       cells: [
-        c(0, 0, "heal"),
+        c(0, 0),
         c(1, 0),
         c(0, 1),
-        c(1, 1, "attack"),
+        c(1, 1),
       ],
       special(state, count) {
         const blocks = chooseOpenCells(count);
@@ -187,22 +190,24 @@
       cols: 3,
       rows: 3,
       baseAttack: 2,
-      levels: [
-        { minLevel: 1, attack: 2 },
-        { minLevel: 3, attack: 3, note: "공격 표식 증가", boardConditions: { icons: [c(2, 1, "attack")] } },
-        { minLevel: 5, attack: 4, note: "갑피 표식 증가", boardConditions: { icons: [c(1, 2, "defense")] } },
-        { minLevel: 8, attack: 5, note: "특수 표식 개방", boardConditions: { icons: [c(0, 1, "special")] } },
-        { minLevel: 11, attack: 6, note: "공격 표식 강화", boardConditions: { icons: [c(1, 2, "attack")] } },
-      ],
-      actions: ["attack", "defense", "attack", "heal"],
+      levels: monsterLevelTrack(2, {
+        1: { actions: ["attack"] },
+        2: { note: "공격 표식 개방", actions: ["attack", "attack"], boardConditions: { icons: [c(1, 0, "attack")] } },
+        3: { note: "갑피 표식 개방", actions: ["attack", "defense", "attack"], boardConditions: { icons: [c(1, 1, "defense")] } },
+        5: { note: "회복 표식 개방", actions: ["attack", "defense", "attack", "heal"], boardConditions: { icons: [c(0, 2, "heal")] } },
+        7: { note: "공격 표식 증가", boardConditions: { icons: [c(2, 2, "attack")] } },
+        10: { note: "갑피 표식 증가", boardConditions: { icons: [c(1, 2, "defense")] } },
+        13: { note: "공격 표식 강화", boardConditions: { icons: [c(2, 1, "attack")] } },
+      }),
+      actions: ["attack"],
       cells: [
-        c(1, 0, "attack"),
+        c(1, 0),
         c(0, 1),
-        c(1, 1, "defense"),
+        c(1, 1),
         c(2, 1),
-        c(0, 2, "heal"),
+        c(0, 2),
         c(1, 2),
-        c(2, 2, "attack"),
+        c(2, 2),
       ],
       special(state, count) {
         const damage = takeDamage(count + 1);
@@ -217,26 +222,29 @@
       cols: 4,
       rows: 4,
       baseAttack: 1,
-      levels: [
-        { minLevel: 1, attack: 1 },
-        { minLevel: 3, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
-        { minLevel: 5, attack: 3, note: "갑피 표식 증가", boardConditions: { icons: [c(3, 2, "defense")] } },
-        { minLevel: 8, attack: 4, note: "특수 표식 증가", boardConditions: { icons: [c(1, 3, "special")] } },
-        { minLevel: 11, attack: 5, note: "공격 표식 추가", boardConditions: { icons: [c(0, 2, "attack")] } },
-      ],
-      actions: ["heal", "attack", "defense", "special", "attack"],
+      levels: monsterLevelTrack(1, {
+        1: { actions: ["attack"] },
+        2: { note: "회복 표식 개방", actions: ["attack", "heal"], boardConditions: { icons: [c(2, 0, "heal")] } },
+        3: { note: "공격 표식 개방", actions: ["heal", "attack"], boardConditions: { icons: [c(1, 0, "attack")] } },
+        4: { note: "갑피 표식 개방", actions: ["heal", "attack", "defense"], boardConditions: { icons: [c(1, 1, "defense")] } },
+        6: { note: "공격 표식 증가", boardConditions: { icons: [c(3, 1, "attack")] } },
+        8: { note: "회복 표식 증가", boardConditions: { icons: [c(2, 3, "heal")] } },
+        11: { note: "갑피 표식 증가", boardConditions: { icons: [c(3, 2, "defense")] } },
+        14: { note: "공격 표식 추가", boardConditions: { icons: [c(0, 2, "attack")] } },
+      }),
+      actions: ["attack"],
       cells: [
-        c(1, 0, "attack"),
-        c(2, 0, "heal"),
+        c(1, 0),
+        c(2, 0),
         c(0, 1),
-        c(1, 1, "defense"),
+        c(1, 1),
         c(2, 1),
-        c(3, 1, "attack"),
+        c(3, 1),
         c(1, 2),
-        c(2, 2, "special"),
+        c(2, 2),
         c(3, 2),
         c(1, 3),
-        c(2, 3, "heal"),
+        c(2, 3),
       ],
       special(state, count) {
         const blocks = chooseOpenCells(count + 1);
@@ -252,27 +260,31 @@
       cols: 5,
       rows: 4,
       baseAttack: 3,
-      levels: [
-        { minLevel: 1, attack: 3 },
-        { minLevel: 3, attack: 4, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
-        { minLevel: 5, attack: 5, note: "갑피 표식 증가", boardConditions: { icons: [c(2, 1, "defense")] } },
-        { minLevel: 8, attack: 6, note: "특수 표식 증가", boardConditions: { icons: [c(4, 2, "special")] } },
-        { minLevel: 11, attack: 7, note: "공격 표식 추가", boardConditions: { icons: [c(2, 3, "attack")] } },
-      ],
-      actions: ["attack", "defense", "special", "attack", "heal"],
+      levels: monsterLevelTrack(3, {
+        1: { actions: ["attack"] },
+        2: { note: "갑피 표식 개방", actions: ["attack", "defense"], boardConditions: { icons: [c(2, 0, "defense")] } },
+        3: { note: "공격 표식 개방", actions: ["attack", "defense", "attack"], boardConditions: { icons: [c(0, 2, "attack")] } },
+        4: { note: "회복 표식 개방", actions: ["attack", "defense", "attack", "heal"], boardConditions: { icons: [c(3, 1, "heal")] } },
+        5: { note: "보스 특수 표식 개방", actions: ["attack", "defense", "special", "attack", "heal"], boardConditions: { icons: [c(2, 2, "special")] } },
+        7: { note: "공격 표식 증가", boardConditions: { icons: [c(4, 2, "attack")] } },
+        9: { note: "갑피 표식 증가", boardConditions: { icons: [c(1, 3, "defense")] } },
+        11: { note: "특수 표식 증가", boardConditions: { icons: [c(3, 3, "special")] } },
+        14: { note: "공격 표식 추가", boardConditions: { icons: [c(2, 3, "attack")] } },
+      }),
+      actions: ["attack"],
       cells: [
-        c(2, 0, "defense"),
+        c(2, 0),
         c(1, 1),
         c(2, 1),
-        c(3, 1, "heal"),
-        c(0, 2, "attack"),
+        c(3, 1),
+        c(0, 2),
         c(1, 2),
-        c(2, 2, "special"),
+        c(2, 2),
         c(3, 2),
-        c(4, 2, "attack"),
-        c(1, 3, "defense"),
+        c(4, 2),
+        c(1, 3),
         c(2, 3),
-        c(3, 3, "special"),
+        c(3, 3),
       ],
       special(state, count) {
         const spoiled = spoilMaterial(count + 1);
@@ -326,6 +338,8 @@
     },
   ];
 
+  applyStageEditorOverrides(STAGE_DEFS);
+
   const STAGES_BY_ID = new Map(STAGE_DEFS.map((stage) => [stage.id, stage]));
 
   const HERO_DEFS = [
@@ -340,7 +354,7 @@
       board: {
         baseCells: BASE_BOARD_CELLS,
         growth: [
-          { level: 10, cells: [c(3, 2), c(5, 3)] },
+          { level: 10, cells: [c(2, 2), c(5, 3)] },
           { level: 20, cells: [c(1, 2), c(3, 4)] },
         ],
       },
@@ -355,8 +369,8 @@
       unlockShardCost: 50,
       tag: "직선",
       board: {
-        baseCells: [c(2, 1), c(3, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3)],
-        growth: [{ level: 10, cells: [c(4, 1), c(3, 3)] }],
+        baseCells: [c(2, 2), c(3, 2), c(4, 2), c(3, 3)],
+        growth: [{ level: 10, cells: [c(4, 1), c(3, 4)] }],
       },
       knives: { base: [{ type: "h2" }, { type: "h2" }] },
     },
@@ -369,7 +383,7 @@
       unlockShardCost: 50,
       tag: "링크",
       board: {
-        baseCells: [c(2, 1), c(2, 2), c(3, 2), c(4, 2), c(2, 3), c(3, 3)],
+        baseCells: [c(2, 2), c(3, 2), c(4, 2), c(2, 3)],
         growth: [{ level: 10, cells: [c(3, 1), c(4, 3)] }],
       },
       knives: { base: [{ type: "v2" }, { type: "l3" }] },
@@ -397,8 +411,8 @@
       unlockShardCost: 50,
       tag: "잠김",
       board: {
-        baseCells: [c(2, 2), c(3, 2), c(4, 2), c(3, 3)],
-        growth: [{ level: 10, cells: [c(2, 3), c(4, 3)] }],
+        baseCells: [c(3, 2), c(4, 2), c(3, 3), c(4, 3)],
+        growth: [{ level: 10, cells: [c(2, 3), c(5, 3)] }],
       },
       knives: { base: [{ type: "h2" }, { type: "v2" }] },
     },
@@ -487,6 +501,7 @@
     cutsUsed: 0,
     playerHp: BASE_MAX_HP,
     monsterCells: new Map(),
+    monsterInstances: [],
     boardCells: new Set(),
     boardCellTypes: new Map(),
     boardLinks: new Map(),
@@ -543,6 +558,24 @@
     return { x, y };
   }
 
+  function monsterLevelTrack(baseAttack, events = {}, maxLevel = 16) {
+    const levels = [];
+    let actions = ["attack"];
+    for (let level = 1; level <= maxLevel; level += 1) {
+      const event = events[level] || {};
+      if (Array.isArray(event.actions) && event.actions.length) actions = [...event.actions];
+      const profile = {
+        minLevel: level,
+        attack: Number.isFinite(event.attack) ? event.attack : baseAttack + Math.floor((level - 1) / 3),
+        actions: [...actions],
+      };
+      if (event.note) profile.note = event.note;
+      if (event.boardConditions) profile.boardConditions = event.boardConditions;
+      levels.push(profile);
+    }
+    return levels;
+  }
+
   function applyMonsterEditorOverrides(monsters) {
     let saved;
     try {
@@ -566,6 +599,59 @@
     });
   }
 
+  function applyStageEditorOverrides(stages) {
+    let saved;
+    try {
+      saved = JSON.parse(window.localStorage?.getItem(STAGE_EDITOR_STORAGE_KEY) || "null");
+    } catch {
+      return;
+    }
+    const stageMap = saved?.stages || {};
+    stages.forEach((stage) => {
+      const savedStage = stageMap[stage.id];
+      if (!Array.isArray(savedStage?.waves)) return;
+      const waves = normalizeStageEditorWaves(savedStage.waves, stage.id);
+      if (waves.length) stage.waves = waves;
+    });
+  }
+
+  function normalizeStageEditorWaves(waves, stageId) {
+    return waves.map((wave, index) => {
+      const monsters = normalizeWaveMonsters(wave?.monsters);
+      return {
+        id: String(wave?.id || `${stageId}-w${index + 1}`),
+        name: cleanMonsterText(wave?.name, `웨이브 ${index + 1}`),
+        boss: Boolean(wave?.boss),
+        monsters,
+      };
+    }).filter((wave) => wave.monsters.length);
+  }
+
+  function normalizeWaveMonsters(monsters) {
+    const occupied = new Set();
+    const normalized = [];
+    (Array.isArray(monsters) ? monsters : []).forEach((entry, index) => {
+      const monsterId = typeof entry?.monsterId === "string" && MONSTERS_BY_ID.has(entry.monsterId) ? entry.monsterId : MONSTER_DEFS[0].id;
+      const baseMonster = MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
+      const x = clampInteger(entry?.x, 0, MONSTER_BOARD_COLS - 1, index % MONSTER_BOARD_COLS);
+      const y = clampInteger(entry?.y, 0, MONSTER_BOARD_ROWS - 1, Math.floor(index / MONSTER_BOARD_COLS));
+      const placement = { monsterId, x, y };
+      if (!isWaveMonsterPlacementValid(placement, baseMonster, occupied)) return;
+      baseMonster.cells.forEach((cell) => occupied.add(key(x + cell.x, y + cell.y)));
+      normalized.push(placement);
+    });
+    return normalized;
+  }
+
+  function isWaveMonsterPlacementValid(placement, monster, occupied = new Set()) {
+    return monster.cells.every((cell) => {
+      const x = placement.x + cell.x;
+      const y = placement.y + cell.y;
+      const cellKey = key(x, y);
+      return x >= 0 && y >= 0 && x < MONSTER_BOARD_COLS && y < MONSTER_BOARD_ROWS && !occupied.has(cellKey);
+    });
+  }
+
   function cleanMonsterText(value, fallback) {
     return typeof value === "string" && value.trim() ? value.trim() : fallback;
   }
@@ -575,7 +661,7 @@
     return Number.isFinite(parsed) ? clamp(parsed, min, max) : fallback;
   }
 
-  function normalizeMonsterActions(actions, fallback) {
+  function normalizeMonsterActions(actions, fallback = []) {
     const allowed = new Set(Object.keys(ICONS));
     const normalized = Array.isArray(actions) ? actions.filter((action) => allowed.has(action)) : [];
     return normalized.length ? normalized : [...fallback];
@@ -602,7 +688,8 @@
     const normalized = (Array.isArray(levels) ? levels : []).map((level) => {
       const minLevel = clampInteger(level?.minLevel, 1, 99, 1);
       const boardConditions = level?.boardConditions || {};
-      return {
+      const actions = normalizeMonsterActions(level?.actions);
+      const normalizedLevel = {
         minLevel,
         attack: clampInteger(level?.attack, 0, 99, fallbackAttack),
         note: cleanMonsterText(level?.note, ""),
@@ -612,27 +699,40 @@
           removeCells: normalizeMonsterCells(boardConditions.removeCells, cols, rows).map((cell) => ({ x: cell.x, y: cell.y })),
         },
       };
+      if (actions.length) normalizedLevel.actions = actions;
+      return normalizedLevel;
     });
     return normalized.length ? normalized.sort((a, b) => a.minLevel - b.minLevel) : [{ minLevel: 1, attack: fallbackAttack }];
   }
 
   function createStageWaves(stageId, rotationOffset = 0) {
     return Array.from({ length: WAVES_PER_STAGE }, (_, waveIndex) => {
-      const monsterCount = monsterCountForWave(waveIndex);
-      const monsterIds = Array.from({ length: monsterCount }, (_, roundIndex) => {
-        const rotationIndex = (rotationOffset + waveIndex + roundIndex) % MONSTER_ROTATION.length;
-        return MONSTER_ROTATION[rotationIndex];
-      });
+      const boss = waveIndex === WAVES_PER_STAGE - 1;
+      const rotationIndex = (rotationOffset + waveIndex) % MONSTER_ROTATION.length;
+      const monsterId = boss ? BOSS_MONSTER_ID : MONSTER_ROTATION[rotationIndex];
       return {
         id: `${stageId}-w${waveIndex + 1}`,
-        name: `웨이브 ${waveIndex + 1}`,
-        monsterIds,
+        name: boss ? `보스 ${waveIndex + 1}` : `웨이브 ${waveIndex + 1}`,
+        boss,
+        monsters: defaultWaveMonsters(waveIndex, monsterId, boss),
       };
     });
   }
 
-  function monsterCountForWave(waveIndex) {
-    return clamp(MIN_MONSTERS_PER_WAVE + Math.floor(waveIndex / 3), MIN_MONSTERS_PER_WAVE, MAX_MONSTERS_PER_WAVE);
+  function defaultWaveMonsters(waveIndex, monsterId, boss) {
+    if (boss) {
+      return [
+        { monsterId: BOSS_MONSTER_ID, x: 1, y: 1 },
+        { monsterId: "tiny-berry-imp", x: 6, y: 3 },
+      ];
+    }
+    const layouts = [
+      [{ monsterId, x: 3, y: 3 }],
+      [{ monsterId, x: 2, y: 3 }, { monsterId: "tiny-jelly-block", x: 5, y: 3 }],
+      [{ monsterId, x: 1, y: 2 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
+      [{ monsterId, x: 0, y: 2 }, { monsterId: "tiny-jelly-block", x: 4, y: 1 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
+    ];
+    return layouts[waveIndex % layouts.length].map((entry) => ({ ...entry }));
   }
 
   function createHeroInstance(def) {
@@ -703,26 +803,28 @@
     return stage.waves[state.waveIndex] || stage.waves[0];
   }
 
-  function currentMonsterId() {
-    const wave = currentWave();
-    const monsterIds = wave.monsterIds || wave.rounds || [];
-    return monsterIds[state.roundIndex] ?? monsterIds[0];
+  function currentMonster() {
+    return aliveMonsterInstances()[0] || state.monsterInstances[0] || monsterInstanceForWaveEntry({ monsterId: MONSTER_DEFS[0].id, x: 0, y: 0 }, 0);
   }
 
-  function currentMonster() {
-    return monsterForRound(state.roundIndex);
+  function aliveMonsterInstances() {
+    return state.monsterInstances.filter((monster) => !isMonsterInstanceSealed(monster));
+  }
+
+  function monsterInstanceById(instanceId) {
+    return state.monsterInstances.find((monster) => monster.instanceId === instanceId) || null;
+  }
+
+  function isMonsterInstanceSealed(monster) {
+    return Boolean(monster?.cellKeys?.length) && monster.cellKeys.every((cellKey) => state.monsterCells.get(cellKey)?.covered);
   }
 
   function monsterForRound(roundIndex) {
-    const wave = currentWave();
-    const monsterIds = wave.monsterIds || wave.rounds || [];
-    const monsterId = monsterIds[roundIndex] ?? monsterIds[0];
-    const baseMonster = typeof monsterId === "number" ? MONSTER_DEFS[monsterId] || MONSTER_DEFS[0] : MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
-    return scaledMonster(baseMonster, roundIndex);
+    const entry = waveMonsterEntries(currentWave())[roundIndex] || waveMonsterEntries(currentWave())[0];
+    return monsterInstanceForWaveEntry(entry || { monsterId: MONSTER_DEFS[0].id, x: 0, y: 0 }, roundIndex);
   }
 
-  function scaledMonster(monster, roundIndex = state.roundIndex) {
-    const level = monsterPowerLevel(roundIndex);
+  function scaledMonster(monster, roundIndex = state.roundIndex, level = monsterPowerLevel(roundIndex)) {
     const profile = monsterLevelProfile(monster, level);
     const cells = monsterCellsForLevel(monster, level);
     const note = profile.note ? ` · ${profile.note}` : level > 1 ? ` · 위험도 ${level}` : "";
@@ -730,10 +832,41 @@
       ...monster,
       level,
       cells,
+      actions: profile.actions?.length ? profile.actions : monster.actions,
       levelProfile: profile,
       baseAttack: profile.attack ?? monster.baseAttack,
       displayName: `${monster.name} Lv.${level}`,
       sub: `${monster.sub}${note}`,
+    };
+  }
+
+  function waveMonsterEntries(wave = currentWave()) {
+    if (Array.isArray(wave?.monsters) && wave.monsters.length) return wave.monsters;
+    const monsterIds = wave?.monsterIds || wave?.rounds || [];
+    return monsterIds.map((monsterId, index) => {
+      const baseMonster = typeof monsterId === "number" ? MONSTER_DEFS[monsterId] || MONSTER_DEFS[0] : MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
+      const x = index === 0 ? Math.max(0, Math.floor((MONSTER_BOARD_COLS - baseMonster.cols) / 2)) : (index * 3) % MONSTER_BOARD_COLS;
+      const y = index === 0 ? Math.max(0, MONSTER_BOARD_ROWS - baseMonster.rows - 1) : Math.floor(index / 2) * 2;
+      return { monsterId: baseMonster.id, x, y };
+    });
+  }
+
+  function monsterInstanceForWaveEntry(entry, index) {
+    const baseMonster = MONSTERS_BY_ID.get(entry?.monsterId) || MONSTER_DEFS[0];
+    const level = monsterPowerLevel(index);
+    const monster = scaledMonster(baseMonster, index, level);
+    const maxX = Math.max(0, MONSTER_BOARD_COLS - monster.cols);
+    const maxY = Math.max(0, MONSTER_BOARD_ROWS - monster.rows);
+    return {
+      ...monster,
+      id: `m${index + 1}`,
+      instanceId: `m${index + 1}`,
+      monsterId: baseMonster.id,
+      boardX: clampInteger(entry?.x, 0, maxX, 0),
+      boardY: clampInteger(entry?.y, 0, maxY, 0),
+      order: index,
+      tone: index % 5,
+      cellKeys: [],
     };
   }
 
@@ -777,7 +910,12 @@
 
   function currentAction() {
     const monster = currentMonster();
-    return monster.actions[state.actionIndex % monster.actions.length];
+    return monsterAction(monster);
+  }
+
+  function monsterAction(monster) {
+    const actions = monster?.actions?.length ? monster.actions : ["attack"];
+    return actions[state.actionIndex % actions.length];
   }
 
   function deployedHero() {
@@ -824,12 +962,11 @@
   }
 
   function roundCount() {
-    const wave = currentWave();
-    return (wave.monsterIds || wave.rounds || []).length;
+    return waveMonsterEntries(currentWave()).length;
   }
 
   function hasNextRound() {
-    return state.roundIndex < roundCount() - 1;
+    return false;
   }
 
   function hasNextWave() {
@@ -845,7 +982,9 @@
   }
 
   function progressionLabel() {
-    return `W${state.waveIndex + 1}/${waveCount()} M${state.roundIndex + 1}/${roundCount()}`;
+    const total = Math.max(1, state.monsterInstances.length || roundCount());
+    const alive = state.monsterInstances.length ? aliveMonsterInstances().length : total;
+    return `W${state.waveIndex + 1}/${waveCount()} · ${alive}/${total}`;
   }
 
   function startGame() {
@@ -884,7 +1023,8 @@
     state.stageIndex = stageIndex;
     state.waveIndex = waveIndex;
     state.roundIndex = roundIndex;
-    const monster = currentMonster();
+    const monsterEntries = waveMonsterEntries(currentWave());
+    state.monsterInstances = monsterEntries.map((entry, index) => monsterInstanceForWaveEntry(entry, index));
     state.turn = 1;
     state.actionIndex = 0;
     state.cutsUsed = 0;
@@ -919,18 +1059,35 @@
     state.knifePreview = null;
     state.drag = null;
 
-    monster.cells.forEach((cell) => {
-      state.monsterCells.set(key(cell.x, cell.y), {
-        x: cell.x,
-        y: cell.y,
-        icon: cell.icon,
-        covered: false,
+    state.monsterInstances.forEach((monster) => {
+      monster.cellKeys = [];
+      monster.cells.forEach((cell) => {
+        const x = monster.boardX + cell.x;
+        const y = monster.boardY + cell.y;
+        const cellKey = key(x, y);
+        if (x < 0 || y < 0 || x >= MONSTER_BOARD_COLS || y >= MONSTER_BOARD_ROWS || state.monsterCells.has(cellKey)) return;
+        state.monsterCells.set(cellKey, {
+          x,
+          y,
+          localX: cell.x,
+          localY: cell.y,
+          icon: cell.icon,
+          sourceIcon: cell.icon,
+          covered: false,
+          monsterInstanceId: monster.instanceId,
+          monsterId: monster.monsterId,
+          monsterName: monster.name,
+          monsterOrder: monster.order,
+          tone: monster.tone,
+        });
+        monster.cellKeys.push(cellKey);
       });
     });
+    state.monsterInstances = state.monsterInstances.filter((monster) => monster.cellKeys.length);
 
     if (resetMaterial) resetMaterialBoard();
 
-    addLog(`${currentWave().name} ${state.roundIndex + 1}/${roundCount()}. ${monster.name} 등장.`);
+    addLog(`${currentWave().name}. 몬스터 ${state.monsterInstances.length}마리가 보드에 등장했다.`);
     if (!resetMaterial) addLog("이전 몬스터에서 남긴 재료판을 그대로 이어간다.");
     addLog("칼을 움직여 절단선을 만들고 분리된 재료를 옮겨라.");
     pendingLogs.forEach((line) => addLog(line));
@@ -1409,11 +1566,12 @@
     els.hpLabel.textContent = `${Math.max(0, state.playerHp)} / ${maxHp}${shieldText}`;
     els.materialLabel.textContent = `${availableMaterialCount()} / ${state.initialMaterialTotal}`;
     els.pieceCountLabel.textContent = `${state.materialPieces.length}개`;
-    const monster = currentMonster();
-    els.monsterSub.textContent = monster.sub;
-    els.monsterName.textContent = monster.displayName || monster.name;
+    const totalMonsters = Math.max(1, state.monsterInstances.length);
+    const aliveMonsters = aliveMonsterInstances().length;
+    els.monsterSub.textContent = currentWave().boss ? `보스 웨이브 · ${aliveMonsters}/${totalMonsters} 남음` : `몬스터 ${aliveMonsters}/${totalMonsters} 남음`;
+    els.monsterName.textContent = currentWave().name;
     els.completionLabel.textContent = `${covered} / ${total}`;
-    els.completionFill.style.width = `${(covered / total) * 100}%`;
+    els.completionFill.style.width = `${total ? (covered / total) * 100 : 0}%`;
     const selectedPlacement = getPlacement(state.selectedPlacementId);
     if (state.boardEdit) {
       els.cutButton.textContent = "보상";
@@ -1428,16 +1586,16 @@
     if (els.cutCountLabel) els.cutCountLabel.textContent = `${remainingCuts()}/${MAX_CUTS_PER_TURN}`;
   }
 
-  function renderActionCard() {
-    const action = currentAction();
-    const attackIcons = uncoveredIconCount("attack");
-    const healIcons = uncoveredIconCount("heal");
-    const defenseIcons = uncoveredIconCount("defense");
-    const specialIcons = uncoveredIconCount("special");
-    const armorBlocks = action === "defense" ? chooseArmorBlocks() : [];
-    const healTargets = action === "heal" ? chooseHealTargets(healIcons) : [];
-    const monster = currentMonster();
-    const actionView = {
+  function actionViewForMonster(monster, action) {
+    const attackIcons = uncoveredIconCount("attack", monster.instanceId);
+    const healIcons = uncoveredIconCount("heal", monster.instanceId);
+    const defenseIcons = uncoveredIconCount("defense", monster.instanceId);
+    const specialIcons = uncoveredIconCount("special", monster.instanceId);
+    const healable = coveredMonsterCellKeys(null, monster.instanceId).length;
+    const armorTargets = openMonsterCellCount(monster.instanceId);
+    const healReady = healIcons > 0 && healable > 0;
+    const defenseReady = defenseIcons > 0 && armorTargets > 0;
+    return {
       attack: {
         mark: ICONS.attack.mark,
         label: "공격",
@@ -1447,29 +1605,48 @@
       heal: {
         mark: ICONS.heal.mark,
         label: "회복",
-        main: `회복 ${healTargets.length}칸`,
-        sub: `회복 표식 ${healIcons}`,
+        main: healReady ? `회복 ${MONSTER_HEAL_PER_ACTION}칸` : `피해 ${monster.baseAttack + attackIcons}`,
+        sub: healReady ? "덮인 회복칸, 특수칸 우선" : healIcons > 0 ? "회복 대상 없음 · 기본 공격" : "회복 표식 막힘 · 기본 공격",
       },
       defense: {
         mark: ICONS.defense.mark,
         label: "방어",
-        main: `갑피 ${armorBlocks.length}칸`,
-        sub: `방어 표식 ${defenseIcons}`,
+        main: defenseReady ? `갑피 ${MONSTER_ARMOR_PER_ACTION}칸` : `피해 ${monster.baseAttack + attackIcons}`,
+        sub: defenseReady ? `무작위 빈 칸 · 방어 표식 ${defenseIcons}` : defenseIcons > 0 ? "갑피 대상 없음 · 기본 공격" : "방어 표식 막힘 · 기본 공격",
       },
       special: {
         mark: ICONS.special.mark,
         label: "특수",
-        main: specialIcons ? "고유 행동" : "행동 실패",
-        sub: `특수 표식 ${specialIcons}`,
+        main: specialIcons ? "고유 행동" : `피해 ${monster.baseAttack + attackIcons}`,
+        sub: specialIcons ? `특수 표식 ${specialIcons}` : "특수 표식 막힘 · 기본 공격",
       },
-    }[action];
-    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가` : actionView.sub;
+    }[action] || {
+      mark: ICONS.attack.mark,
+      label: "공격",
+      main: `피해 ${monster.baseAttack + attackIcons}`,
+      sub: `기본 ${monster.baseAttack} + 공격 표식 ${attackIcons}`,
+    };
+  }
 
-    els.actionCard.className = `action-card action-${action}`;
+  function renderActionCard() {
+    const aliveMonsters = aliveMonsterInstances();
+    const actionRows = aliveMonsters.map((monster) => {
+      const action = monsterAction(monster);
+      return { monster, action, view: actionViewForMonster(monster, action) };
+    });
+    const firstRow = actionRows[0];
+    const firstAction = firstRow?.action || "attack";
+    const mainText = actionRows.length <= 1 ? firstRow?.view.main || "행동 없음" : `${actionRows.length}마리 행동`;
+    const detailText = actionRows.length
+      ? actionRows.map((row) => `${row.monster.name} ${row.view.label} ${row.view.main}`).join(" · ")
+      : "모든 몬스터를 덮었다";
+    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가 · ${detailText}` : detailText;
+
+    els.actionCard.className = `action-card action-${firstAction}`;
     els.actionCard.innerHTML = `
-      <span class="action-kicker">${currentWave().name} · 몬스터 ${state.roundIndex + 1}/${roundCount()}</span>
-      <span class="action-chip"><i>${actionView.mark}</i>${actionView.label}</span>
-      <strong class="action-main">${actionView.main}</strong>
+      <span class="action-kicker">${currentWave().name} · 생존 ${aliveMonsters.length}/${Math.max(1, state.monsterInstances.length)}</span>
+      <span class="action-chip"><i>${firstRow?.view.mark || ICONS.attack.mark}</i>${firstRow?.view.label || "행동"}</span>
+      <strong class="action-main">${mainText}</strong>
       <span class="action-sub">${blockedText}</span>
     `;
   }
@@ -1477,9 +1654,11 @@
   function renderWaveTracker() {
     if (!els.waveTracker) return;
     const transition = state.roundTransition;
-    const cards = (currentWave().monsterIds || currentWave().rounds || []).map((monsterId, index) => {
-      const monster = monsterForRound(index);
-      const stateClass = index < state.roundIndex ? "done" : index === state.roundIndex ? "active" : "waiting";
+    const monsters = state.monsterInstances.length
+      ? state.monsterInstances
+      : waveMonsterEntries(currentWave()).map((entry, index) => monsterInstanceForWaveEntry(entry, index));
+    const cards = monsters.map((monster, index) => {
+      const stateClass = isMonsterInstanceSealed(monster) ? "done" : "active";
       const transitionClass = transition && index === transition.fromIndex && transition.phase === "out"
         ? " exiting"
         : transition && index === transition.toIndex
@@ -1487,8 +1666,8 @@
           : "";
       const label = monster?.displayName || monster?.name || "몬스터";
       return `
-        <div class="monster-queue-card ${stateClass}${transitionClass}" aria-label="${index + 1}번째 ${label}">
-          <span>${index + 1}</span>
+        <div class="monster-queue-card monster-tone-${monster.tone} ${stateClass}${transitionClass}" aria-label="${index + 1}번째 ${label}">
+          <span>${monsterQueueLabel(monster)}</span>
         </div>
       `;
     }).join("");
@@ -1500,6 +1679,10 @@
       </div>
       <div class="monster-queue" aria-label="웨이브 몬스터 순서">${cards}</div>
     `;
+  }
+
+  function monsterQueueLabel(monster) {
+    return (monster?.name || "몬").replace(/\s/g, "").slice(0, 1) || "몬";
   }
 
   function updateLayoutMode() {
@@ -1518,7 +1701,6 @@
   }
 
   function calculateAdaptiveCellSize() {
-    const monster = currentMonster();
     const shellWidth = Math.min(viewportWidth(), 440);
     const preferredSize = shellWidth <= 370 ? 31 : clamp(shellWidth * 0.09, 34, MAX_CELL_SIZE);
     const limits = [preferredSize];
@@ -1528,8 +1710,8 @@
     const monsterSectionStyle = getComputedStyle(els.monsterSection);
     const monsterInnerWidth = monsterSectionRect.width - horizontalPadding(monsterSectionStyle) - 2;
     const monsterGridHeight = monsterAvailableHeight(monsterSectionRect, monsterSectionStyle);
-    limits.push(cellLimit(monsterInnerWidth, monster.cols));
-    limits.push(cellLimit(monsterGridHeight, monster.rows));
+    limits.push(cellLimit(monsterInnerWidth, MONSTER_BOARD_COLS));
+    limits.push(cellLimit(monsterGridHeight, MONSTER_BOARD_ROWS));
 
     const workbenchRect = els.workbench.getBoundingClientRect();
     const workbenchStyle = getComputedStyle(els.workbench);
@@ -1586,34 +1768,50 @@
   }
 
   function renderMonster() {
-    const monster = currentMonster();
-    const armorPreview = new Set(currentAction() === "defense" ? chooseArmorBlocks() : []);
-    const healPreview = new Set(currentAction() === "heal" ? chooseHealTargets(uncoveredIconCount("heal")) : []);
     const dropPreview = state.dropPreview?.zone === "monster" ? state.dropPreview : null;
     const dropPreviewCells = new Set(dropPreview?.cells || []);
     const draggingPlacedCells = getDraggingPlacedCells();
-    els.monsterGrid.style.gridTemplateColumns = `repeat(${monster.cols}, var(--cell))`;
-    els.monsterGrid.style.setProperty("--monster-art", monster.image ? `url("${monster.image}")` : "none");
-    els.monsterGrid.classList.toggle("has-monster-art", Boolean(monster.image));
+    els.monsterGrid.style.gridTemplateColumns = `repeat(${MONSTER_BOARD_COLS}, var(--cell))`;
+    els.monsterGrid.style.gridTemplateRows = `repeat(${MONSTER_BOARD_ROWS}, var(--cell))`;
+    els.monsterGrid.style.setProperty("--monster-art", "none");
+    els.monsterGrid.classList.remove("has-monster-art");
     els.monsterGrid.innerHTML = "";
 
-    for (let y = 0; y < monster.rows; y += 1) {
-      for (let x = 0; x < monster.cols; x += 1) {
+    state.monsterInstances.forEach((monster) => {
+      if (!monster.image) return;
+      const image = document.createElement("img");
+      image.className = "monster-board-image";
+      image.src = monster.image;
+      image.alt = "";
+      image.setAttribute("aria-hidden", "true");
+      image.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
+      image.style.gridRow = `${monster.boardY + 1} / span ${monster.rows}`;
+      els.monsterGrid.append(image);
+    });
+
+    for (let y = 0; y < MONSTER_BOARD_ROWS; y += 1) {
+      for (let x = 0; x < MONSTER_BOARD_COLS; x += 1) {
         const cellKey = key(x, y);
         const monsterCell = state.monsterCells.get(cellKey);
         if (!monsterCell) {
           const empty = document.createElement("div");
           empty.className = "monster-cell empty";
+          empty.style.gridColumn = String(x + 1);
+          empty.style.gridRow = String(y + 1);
           els.monsterGrid.append(empty);
           continue;
         }
 
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "monster-cell";
+        button.className = `monster-cell monster-tone-${monsterCell.tone}`;
         button.dataset.key = cellKey;
+        button.style.gridColumn = String(x + 1);
+        button.style.gridRow = String(y + 1);
+        const owner = monsterInstanceById(monsterCell.monsterInstanceId);
         const isDraggingPlacedCell = draggingPlacedCells.has(cellKey);
         const isSelectedPlacement = monsterCell.placementId && monsterCell.placementId === state.selectedPlacementId;
+        if (owner && isMonsterInstanceSealed(owner)) button.classList.add("sealed");
         if (monsterCell.covered && !isDraggingPlacedCell) {
           button.classList.add("covered");
           if (monsterCell.placementId) {
@@ -1630,8 +1828,6 @@
         }
         if (isSelectedPlacement) button.classList.add("selected-recall");
         if (state.blocked.has(cellKey)) button.classList.add("blocked");
-        if (armorPreview.has(cellKey)) button.classList.add("preview-block");
-        if (healPreview.has(cellKey)) button.classList.add("heal-target");
         if (dropPreviewCells.has(cellKey)) {
           button.classList.add(dropPreview.valid ? "preview-place" : "preview-invalid");
         }
@@ -2505,43 +2701,72 @@
   }
 
   function executeMonsterAction() {
-    const action = currentAction();
-    const monster = currentMonster();
+    const monsters = aliveMonsterInstances();
+    if (!monsters.length) return;
+    monsters.forEach((monster) => {
+      if (state.playerHp <= 0) return;
+      executeMonsterInstanceAction(monster, monsterAction(monster));
+    });
+  }
 
+  function executeMonsterInstanceAction(monster, action) {
     if (action === "attack") {
-      const attackIcons = uncoveredIconCount("attack");
-      const damage = monster.baseAttack + attackIcons;
-      const taken = takeDamage(damage);
-      const shielded = damage - taken;
-      addLog(`공격 실행. 기본 ${monster.baseAttack} + 공격 표식 ${attackIcons} = ${taken} 피해${shielded ? `, 쉴드 ${shielded} 흡수` : ""}.`);
+      executeBasicMonsterAttack(`${monsterActionName(monster)} 공격 실행`, monster);
       return;
     }
 
     if (action === "heal") {
-      const healIcons = uncoveredIconCount("heal");
-      const targets = chooseHealTargets(healIcons);
+      if (!uncoveredIconCount("heal", monster.instanceId)) {
+        executeBasicMonsterAttack(`${monsterActionName(monster)} 회복 표식 막힘. 기본 공격`, monster);
+        return;
+      }
+      const targets = chooseHealTargets(MONSTER_HEAL_PER_ACTION, monster.instanceId);
+      if (!targets.length) {
+        executeBasicMonsterAttack(`${monsterActionName(monster)} 회복 대상 없음. 기본 공격`, monster);
+        return;
+      }
       targets.forEach((cellKey) => uncoverMonsterCell(cellKey));
       state.coverOrder = state.coverOrder.filter((cellKey) => !targets.includes(cellKey));
       prunePlacedPieces();
-      addLog(targets.length ? `회복 실행. 일반 칸 ${targets.length}개가 다시 비었다.` : "회복 표식이 막혀 아무 칸도 되돌리지 못했다.");
+      addLog(`${monsterActionName(monster)} 회복 실행. 무작위 ${targets.length}칸이 다시 비었다.`);
       return;
     }
 
     if (action === "defense") {
-      const blocks = chooseArmorBlocks();
-      state.blocked = new Set(blocks);
-      addLog(blocks.length ? `갑피 전개. 다음 턴 ${blocks.length}칸은 배치할 수 없다.` : "방어 표식이 막혀 갑피가 생기지 않았다.");
+      if (!uncoveredIconCount("defense", monster.instanceId)) {
+        executeBasicMonsterAttack(`${monsterActionName(monster)} 방어 표식 막힘. 기본 공격`, monster);
+        return;
+      }
+      const blocks = chooseArmorBlocks(MONSTER_ARMOR_PER_ACTION, monster.instanceId);
+      if (!blocks.length) {
+        executeBasicMonsterAttack(`${monsterActionName(monster)} 갑피 대상 없음. 기본 공격`, monster);
+        return;
+      }
+      blocks.forEach((cellKey) => state.blocked.add(cellKey));
+      addLog(`${monsterActionName(monster)} 갑피 전개. 다음 턴 무작위 ${blocks.length}칸은 배치할 수 없다.`);
       return;
     }
 
     if (action === "special") {
-      const specialIcons = uncoveredIconCount("special");
+      const specialIcons = uncoveredIconCount("special", monster.instanceId);
       if (!specialIcons) {
-        addLog("특수 표식이 모두 막혀 특수 공격이 실패했다.");
+        executeBasicMonsterAttack(`${monsterActionName(monster)} 특수 표식 막힘. 기본 공격`, monster);
         return;
       }
-      monster.special(state, specialIcons);
+      monster.special(state, specialIcons, monster);
     }
+  }
+
+  function executeBasicMonsterAttack(prefix, monster = currentMonster()) {
+    const attackIcons = uncoveredIconCount("attack", monster.instanceId);
+    const damage = monster.baseAttack + attackIcons;
+    const taken = takeDamage(damage);
+    const shielded = damage - taken;
+    addLog(`${prefix}. 기본 ${monster.baseAttack} + 공격 표식 ${attackIcons} = ${taken} 피해${shielded ? `, 쉴드 ${shielded} 흡수` : ""}.`);
+  }
+
+  function monsterActionName(monster) {
+    return `${monster.order + 1}번 ${monster.name}`;
   }
 
   function takeDamage(amount) {
@@ -2843,8 +3068,7 @@
 
   function getMonsterCellFromAnchorPoint(point) {
     const cellSize = getMonsterCellSize();
-    const monster = currentMonster();
-    return getGridCellFromAnchorPoint(point, els.monsterGrid, monster.cols, monster.rows, cellSize);
+    return getGridCellFromAnchorPoint(point, els.monsterGrid, MONSTER_BOARD_COLS, MONSTER_BOARD_ROWS, cellSize);
   }
 
   function getGridCellFromAnchorPoint(point, gridEl, cols, rows, cellSize) {
@@ -3159,48 +3383,60 @@
     });
   }
 
-  function chooseArmorBlocks() {
-    const blocks = [];
-    const used = new Set();
-    const defenseCells = [...state.monsterCells.values()].filter((cell) => cell.icon === "defense" && !cell.covered);
-
-    defenseCells.forEach((cell) => {
-      const ordinary = monsterNeighbors(cell.x, cell.y).find((cellKey) => {
-        const target = state.monsterCells.get(cellKey);
-        return target && !target.covered && !target.icon && !used.has(cellKey);
-      });
-      const fallback = monsterNeighbors(cell.x, cell.y).find((cellKey) => {
-        const target = state.monsterCells.get(cellKey);
-        return target && !target.covered && !used.has(cellKey);
-      });
-      const chosen = ordinary || fallback;
-      if (chosen) {
-        used.add(chosen);
-        blocks.push(chosen);
-      }
-    });
-
-    return blocks;
+  function chooseArmorBlocks(amount = 1, monsterInstanceId = null) {
+    return takeRandomCellKeys(openMonsterCellKeys(monsterInstanceId), amount);
   }
 
-  function chooseHealTargets(amount) {
+  function chooseHealTargets(amount = 1, monsterInstanceId = null) {
     if (!amount) return [];
     const targets = [];
-    [...state.coverOrder].reverse().forEach((cellKey) => {
-      const cell = state.monsterCells.get(cellKey);
-      if (targets.length < amount && cell && cell.covered && !cell.icon) targets.push(cellKey);
-    });
-    if (targets.length < amount) {
-      [...state.monsterCells.entries()].forEach(([cellKey, cell]) => {
-        if (targets.length < amount && cell.covered && !cell.icon && !targets.includes(cellKey)) targets.push(cellKey);
+    const used = new Set();
+    const priorityGroups = [
+      coveredMonsterCellKeys("heal", monsterInstanceId),
+      coveredMonsterCellKeys("special", monsterInstanceId),
+      coveredMonsterCellKeys(null, monsterInstanceId),
+    ];
+
+    priorityGroups.forEach((group) => {
+      const candidates = group.filter((cellKey) => !used.has(cellKey));
+      takeRandomCellKeys(candidates, amount - targets.length).forEach((cellKey) => {
+        used.add(cellKey);
+        targets.push(cellKey);
       });
+    });
+
+    return targets.slice(0, amount);
+  }
+
+  function openMonsterCellKeys(monsterInstanceId = null) {
+    return [...state.monsterCells.entries()]
+      .filter(([cellKey, cell]) => monsterCellInScope(cell, monsterInstanceId) && !cell.covered && !state.blocked.has(cellKey))
+      .map(([cellKey]) => cellKey);
+  }
+
+  function openMonsterCellCount(monsterInstanceId = null) {
+    return openMonsterCellKeys(monsterInstanceId).length;
+  }
+
+  function coveredMonsterCellKeys(icon = null, monsterInstanceId = null) {
+    return [...state.monsterCells.entries()]
+      .filter(([, cell]) => monsterCellInScope(cell, monsterInstanceId) && cell.covered && (!icon || cell.icon === icon))
+      .map(([cellKey]) => cellKey);
+  }
+
+  function takeRandomCellKeys(cellKeys, amount) {
+    const pool = [...cellKeys];
+    const picked = [];
+    while (picked.length < amount && pool.length) {
+      const index = Math.floor(Math.random() * pool.length);
+      picked.push(pool.splice(index, 1)[0]);
     }
-    return targets;
+    return picked;
   }
 
   function chooseOpenCells(amount) {
     return [...state.monsterCells.entries()]
-      .filter(([cellKey, cell]) => !cell.covered && !state.blocked.has(cellKey))
+      .filter(([cellKey, cell]) => monsterCellInScope(cell) && !cell.covered && !state.blocked.has(cellKey))
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, amount)
       .map(([cellKey]) => cellKey);
@@ -3229,8 +3465,14 @@
     return [key(x, y - 1), key(x + 1, y), key(x, y + 1), key(x - 1, y)];
   }
 
-  function uncoveredIconCount(icon) {
-    return [...state.monsterCells.values()].filter((cell) => cell.icon === icon && !cell.covered).length;
+  function uncoveredIconCount(icon, monsterInstanceId = null) {
+    return [...state.monsterCells.values()].filter((cell) => monsterCellInScope(cell, monsterInstanceId) && cell.icon === icon && !cell.covered).length;
+  }
+
+  function monsterCellInScope(cell, monsterInstanceId = null) {
+    if (monsterInstanceId) return cell.monsterInstanceId === monsterInstanceId;
+    const owner = monsterInstanceById(cell.monsterInstanceId);
+    return !owner || !isMonsterInstanceSealed(owner);
   }
 
   function coveredCount() {

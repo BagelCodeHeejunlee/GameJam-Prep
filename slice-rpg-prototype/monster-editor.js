@@ -1,5 +1,5 @@
 (() => {
-  const STORAGE_KEY = "bento-monster-editor-data-v1";
+  const STORAGE_KEY = "bento-monster-editor-data-v2";
   const ICONS = {
     attack: { label: "공격", mark: "공" },
     heal: { label: "회복", mark: "회" },
@@ -8,6 +8,24 @@
   };
 
   const c = (x, y, icon = undefined) => (icon ? { x, y, icon } : { x, y });
+
+  function monsterLevelTrack(baseAttack, events = {}, maxLevel = 16) {
+    const levels = [];
+    let actions = ["attack"];
+    for (let level = 1; level <= maxLevel; level += 1) {
+      const event = events[level] || {};
+      if (Array.isArray(event.actions) && event.actions.length) actions = [...event.actions];
+      const profile = {
+        minLevel: level,
+        attack: Number.isFinite(event.attack) ? event.attack : baseAttack + Math.floor((level - 1) / 3),
+        actions: [...actions],
+      };
+      if (event.note) profile.note = event.note;
+      if (event.boardConditions) profile.boardConditions = event.boardConditions;
+      levels.push(profile);
+    }
+    return levels;
+  }
 
   const DEFAULT_MONSTERS = [
     {
@@ -18,13 +36,14 @@
       cols: 2,
       rows: 2,
       baseAttack: 1,
-      actions: ["attack", "attack", "special"],
-      levels: [
-        { minLevel: 1, attack: 1 },
-        { minLevel: 4, attack: 2, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
-        { minLevel: 8, attack: 3, note: "특수 표식 개방", boardConditions: { icons: [c(1, 0, "special")] } },
-      ],
-      cells: [c(1, 0, "attack"), c(0, 1), c(1, 1)],
+      actions: ["attack"],
+      levels: monsterLevelTrack(1, {
+        1: { actions: ["attack"] },
+        2: { note: "공격 표식 개방", actions: ["attack", "attack"], boardConditions: { icons: [c(1, 0, "attack")] } },
+        5: { note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
+        9: { note: "회복 표식 개방", actions: ["attack", "heal", "attack"], boardConditions: { icons: [c(0, 1, "heal")] } },
+      }),
+      cells: [c(1, 0), c(0, 1), c(1, 1)],
     },
     {
       id: "tiny-jelly-block",
@@ -34,13 +53,14 @@
       cols: 2,
       rows: 2,
       baseAttack: 1,
-      actions: ["heal", "attack", "defense"],
-      levels: [
-        { minLevel: 1, attack: 1 },
-        { minLevel: 4, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
-        { minLevel: 8, attack: 3, note: "갑피 표식 개방", boardConditions: { icons: [c(1, 0, "defense")] } },
-      ],
-      cells: [c(0, 0, "heal"), c(1, 0), c(0, 1), c(1, 1, "attack")],
+      actions: ["attack"],
+      levels: monsterLevelTrack(1, {
+        1: { actions: ["attack"] },
+        2: { note: "회복 표식 개방", actions: ["attack", "heal"], boardConditions: { icons: [c(0, 0, "heal")] } },
+        4: { note: "공격 표식 개방", actions: ["heal", "attack"], boardConditions: { icons: [c(1, 1, "attack")] } },
+        7: { note: "갑피 표식 개방", actions: ["heal", "attack", "defense"], boardConditions: { icons: [c(1, 0, "defense")] } },
+      }),
+      cells: [c(0, 0), c(1, 0), c(0, 1), c(1, 1)],
     },
     {
       id: "iron-goblin",
@@ -50,15 +70,17 @@
       cols: 3,
       rows: 3,
       baseAttack: 2,
-      actions: ["attack", "defense", "attack", "heal"],
-      levels: [
-        { minLevel: 1, attack: 2 },
-        { minLevel: 3, attack: 3, note: "공격 표식 증가", boardConditions: { icons: [c(2, 1, "attack")] } },
-        { minLevel: 5, attack: 4, note: "갑피 표식 증가", boardConditions: { icons: [c(1, 2, "defense")] } },
-        { minLevel: 8, attack: 5, note: "특수 표식 개방", boardConditions: { icons: [c(0, 1, "special")] } },
-        { minLevel: 11, attack: 6, note: "공격 표식 강화", boardConditions: { icons: [c(1, 2, "attack")] } },
-      ],
-      cells: [c(1, 0, "attack"), c(0, 1), c(1, 1, "defense"), c(2, 1), c(0, 2, "heal"), c(1, 2), c(2, 2, "attack")],
+      actions: ["attack"],
+      levels: monsterLevelTrack(2, {
+        1: { actions: ["attack"] },
+        2: { note: "공격 표식 개방", actions: ["attack", "attack"], boardConditions: { icons: [c(1, 0, "attack")] } },
+        3: { note: "갑피 표식 개방", actions: ["attack", "defense", "attack"], boardConditions: { icons: [c(1, 1, "defense")] } },
+        5: { note: "회복 표식 개방", actions: ["attack", "defense", "attack", "heal"], boardConditions: { icons: [c(0, 2, "heal")] } },
+        7: { note: "공격 표식 증가", boardConditions: { icons: [c(2, 2, "attack")] } },
+        10: { note: "갑피 표식 증가", boardConditions: { icons: [c(1, 2, "defense")] } },
+        13: { note: "공격 표식 강화", boardConditions: { icons: [c(2, 1, "attack")] } },
+      }),
+      cells: [c(1, 0), c(0, 1), c(1, 1), c(2, 1), c(0, 2), c(1, 2), c(2, 2)],
     },
     {
       id: "swamp-slime",
@@ -68,15 +90,18 @@
       cols: 4,
       rows: 4,
       baseAttack: 1,
-      actions: ["heal", "attack", "defense", "special", "attack"],
-      levels: [
-        { minLevel: 1, attack: 1 },
-        { minLevel: 3, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
-        { minLevel: 5, attack: 3, note: "갑피 표식 증가", boardConditions: { icons: [c(3, 2, "defense")] } },
-        { minLevel: 8, attack: 4, note: "특수 표식 증가", boardConditions: { icons: [c(1, 3, "special")] } },
-        { minLevel: 11, attack: 5, note: "공격 표식 추가", boardConditions: { icons: [c(0, 2, "attack")] } },
-      ],
-      cells: [c(1, 0, "attack"), c(2, 0, "heal"), c(0, 1), c(1, 1, "defense"), c(2, 1), c(3, 1, "attack"), c(1, 2), c(2, 2, "special"), c(3, 2), c(1, 3), c(2, 3, "heal")],
+      actions: ["attack"],
+      levels: monsterLevelTrack(1, {
+        1: { actions: ["attack"] },
+        2: { note: "회복 표식 개방", actions: ["attack", "heal"], boardConditions: { icons: [c(2, 0, "heal")] } },
+        3: { note: "공격 표식 개방", actions: ["heal", "attack"], boardConditions: { icons: [c(1, 0, "attack")] } },
+        4: { note: "갑피 표식 개방", actions: ["heal", "attack", "defense"], boardConditions: { icons: [c(1, 1, "defense")] } },
+        6: { note: "공격 표식 증가", boardConditions: { icons: [c(3, 1, "attack")] } },
+        8: { note: "회복 표식 증가", boardConditions: { icons: [c(2, 3, "heal")] } },
+        11: { note: "갑피 표식 증가", boardConditions: { icons: [c(3, 2, "defense")] } },
+        14: { note: "공격 표식 추가", boardConditions: { icons: [c(0, 2, "attack")] } },
+      }),
+      cells: [c(1, 0), c(2, 0), c(0, 1), c(1, 1), c(2, 1), c(3, 1), c(1, 2), c(2, 2), c(3, 2), c(1, 3), c(2, 3)],
     },
     {
       id: "stone-ogre",
@@ -86,15 +111,19 @@
       cols: 5,
       rows: 4,
       baseAttack: 3,
-      actions: ["attack", "defense", "special", "attack", "heal"],
-      levels: [
-        { minLevel: 1, attack: 3 },
-        { minLevel: 3, attack: 4, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
-        { minLevel: 5, attack: 5, note: "갑피 표식 증가", boardConditions: { icons: [c(2, 1, "defense")] } },
-        { minLevel: 8, attack: 6, note: "특수 표식 증가", boardConditions: { icons: [c(4, 2, "special")] } },
-        { minLevel: 11, attack: 7, note: "공격 표식 추가", boardConditions: { icons: [c(2, 3, "attack")] } },
-      ],
-      cells: [c(2, 0, "defense"), c(1, 1), c(2, 1), c(3, 1, "heal"), c(0, 2, "attack"), c(1, 2), c(2, 2, "special"), c(3, 2), c(4, 2, "attack"), c(1, 3, "defense"), c(2, 3), c(3, 3, "special")],
+      actions: ["attack"],
+      levels: monsterLevelTrack(3, {
+        1: { actions: ["attack"] },
+        2: { note: "갑피 표식 개방", actions: ["attack", "defense"], boardConditions: { icons: [c(2, 0, "defense")] } },
+        3: { note: "공격 표식 개방", actions: ["attack", "defense", "attack"], boardConditions: { icons: [c(0, 2, "attack")] } },
+        4: { note: "회복 표식 개방", actions: ["attack", "defense", "attack", "heal"], boardConditions: { icons: [c(3, 1, "heal")] } },
+        5: { note: "보스 특수 표식 개방", actions: ["attack", "defense", "special", "attack", "heal"], boardConditions: { icons: [c(2, 2, "special")] } },
+        7: { note: "공격 표식 증가", boardConditions: { icons: [c(4, 2, "attack")] } },
+        9: { note: "갑피 표식 증가", boardConditions: { icons: [c(1, 3, "defense")] } },
+        11: { note: "특수 표식 증가", boardConditions: { icons: [c(3, 3, "special")] } },
+        14: { note: "공격 표식 추가", boardConditions: { icons: [c(2, 3, "attack")] } },
+      }),
+      cells: [c(2, 0), c(1, 1), c(2, 1), c(3, 1), c(0, 2), c(1, 2), c(2, 2), c(3, 2), c(4, 2), c(1, 3), c(2, 3), c(3, 3)],
     },
   ];
 
@@ -428,6 +457,7 @@
       return cleanLevel({
         minLevel: clampNumber(level.minLevel, 1, 99, 1),
         attack: clampNumber(level.attack, 0, 99, fallbackAttack || 1),
+        actions: normalizeActions(level.actions, []),
         note: String(level.note || "").trim(),
         boardConditions: {
           icons: normalizeCells(conditions.icons, cols, rows),
@@ -446,6 +476,7 @@
     if (conditions.extraCells.length) cleanConditions.extraCells = conditions.extraCells;
     if (conditions.removeCells.length) cleanConditions.removeCells = conditions.removeCells;
     const clean = { minLevel: level.minLevel, attack: level.attack };
+    if (level.actions.length) clean.actions = level.actions;
     if (level.note) clean.note = level.note;
     if (Object.keys(cleanConditions).length) clean.boardConditions = cleanConditions;
     return clean;
@@ -464,10 +495,10 @@
     return [...map.values()].sort(sortCells);
   }
 
-  function normalizeActions(actions) {
+  function normalizeActions(actions, fallback = ["attack"]) {
     const allowed = new Set(Object.keys(ICONS));
     const clean = (Array.isArray(actions) ? actions : []).filter((action) => allowed.has(action));
-    return clean.length ? clean : ["attack"];
+    return clean.length ? clean : [...fallback];
   }
 
   function trimMonster(monster) {

@@ -57,6 +57,11 @@ button {
   margin-bottom: 14px;
 }
 
+.tool-links {
+  display: flex;
+  gap: 8px;
+}
+
 .editor-top h1,
 .panel-head h2 {
   margin: 0;
