@@ -518,6 +518,7 @@
     knives: [],
     placedPieces: [],
     blocked: new Set(),
+    turnActions: new Map(),
     coverOrder: [],
     log: [],
     pendingLogs: [],
@@ -943,12 +944,24 @@
 
   function currentAction() {
     const monster = currentMonster();
-    return monsterAction(monster);
+    return plannedMonsterAction(monster);
   }
 
   function monsterAction(monster) {
     const actions = monster?.actions?.length ? monster.actions : ["attack"];
     return actions[state.actionIndex % actions.length];
+  }
+
+  function plannedMonsterAction(monster) {
+    if (!monster) return "attack";
+    return state.turnActions.get(monster.instanceId) || monsterAction(monster);
+  }
+
+  function lockTurnActions() {
+    state.turnActions = new Map();
+    aliveMonsterInstances().forEach((monster) => {
+      state.turnActions.set(monster.instanceId, monsterAction(monster));
+    });
   }
 
   function deployedHero() {
@@ -1117,6 +1130,7 @@
       });
     });
     state.monsterInstances = state.monsterInstances.filter((monster) => monster.cellKeys.length);
+    lockTurnActions();
 
     if (resetMaterial) resetMaterialBoard();
 
@@ -1620,56 +1634,76 @@
   }
 
   function actionViewForMonster(monster, action) {
+    const plannedAction = action || plannedMonsterAction(monster);
     const attackIcons = uncoveredIconCount("attack", monster.instanceId);
     const healIcons = uncoveredIconCount("heal", monster.instanceId);
     const defenseIcons = uncoveredIconCount("defense", monster.instanceId);
     const specialIcons = uncoveredIconCount("special", monster.instanceId);
-    const healable = coveredMonsterCellKeys(null, monster.instanceId).length;
-    const armorTargets = openMonsterCellCount(monster.instanceId);
-    const healReady = healIcons > 0 && healable > 0;
-    const defenseReady = defenseIcons > 0 && armorTargets > 0;
-    return {
+    const views = {
       attack: {
+        action: "attack",
         mark: ICONS.attack.mark,
         label: "공격",
         main: `피해 ${monster.baseAttack + attackIcons}`,
+        badge: `공격 피해 ${monster.baseAttack + attackIcons}`,
         sub: `기본 ${monster.baseAttack} + 공격 표식 ${attackIcons}`,
       },
       heal: {
+        action: "heal",
         mark: ICONS.heal.mark,
         label: "회복",
-        main: healReady ? `회복 ${MONSTER_HEAL_PER_ACTION}칸` : `피해 ${monster.baseAttack + attackIcons}`,
-        sub: healReady ? "덮인 회복칸, 특수칸 우선" : healIcons > 0 ? "회복 대상 없음 · 기본 공격" : "회복 표식 막힘 · 기본 공격",
+        main: healIcons ? `회복 ${MONSTER_HEAL_PER_ACTION}칸` : "막힘",
+        badge: healIcons ? `회복 ${MONSTER_HEAL_PER_ACTION}칸` : "회복 막힘",
+        sub: healIcons ? `턴 종료 시 덮인 칸 회복 · 회복 표식 ${healIcons}` : "회복 표식이 막혀 행동하지 않음",
       },
       defense: {
+        action: "defense",
         mark: ICONS.defense.mark,
         label: "방어",
-        main: defenseReady ? `갑피 ${MONSTER_ARMOR_PER_ACTION}칸` : `피해 ${monster.baseAttack + attackIcons}`,
-        sub: defenseReady ? `무작위 빈 칸 · 방어 표식 ${defenseIcons}` : defenseIcons > 0 ? "갑피 대상 없음 · 기본 공격" : "방어 표식 막힘 · 기본 공격",
+        main: defenseIcons ? `갑피 ${MONSTER_ARMOR_PER_ACTION}칸` : "막힘",
+        badge: defenseIcons ? `갑피 ${MONSTER_ARMOR_PER_ACTION}칸` : "갑피 막힘",
+        sub: defenseIcons ? `무작위 빈 칸 · 방어 표식 ${defenseIcons}` : "방어 표식이 막혀 행동하지 않음",
       },
       special: {
+        action: "special",
         mark: ICONS.special.mark,
         label: "특수",
-        main: specialIcons ? "고유 행동" : `피해 ${monster.baseAttack + attackIcons}`,
-        sub: specialIcons ? `특수 표식 ${specialIcons}` : "특수 표식 막힘 · 기본 공격",
+        main: specialIcons ? "고유 행동" : "막힘",
+        badge: specialIcons ? "특수 행동" : "특수 막힘",
+        sub: specialIcons ? `특수 표식 ${specialIcons}` : "특수 표식이 막혀 행동하지 않음",
       },
-    }[action] || {
+    };
+    return views[plannedAction] || {
+      action: "attack",
       mark: ICONS.attack.mark,
       label: "공격",
       main: `피해 ${monster.baseAttack + attackIcons}`,
+      badge: `공격 피해 ${monster.baseAttack + attackIcons}`,
       sub: `기본 ${monster.baseAttack} + 공격 표식 ${attackIcons}`,
     };
   }
 
   function renderActionCard() {
     const aliveMonsters = aliveMonsterInstances();
-    const actionRows = aliveMonsters.map((monster) => {
-      const action = monsterAction(monster);
-      return { monster, action, view: actionViewForMonster(monster, action) };
+    const actionRows = state.monsterInstances.map((monster) => {
+      if (isMonsterInstanceSealed(monster)) {
+        return {
+          monster,
+          action: "defeated",
+          defeated: true,
+          view: {
+            mark: "✓",
+            main: "처치",
+          },
+        };
+      }
+      const action = plannedMonsterAction(monster);
+      const view = actionViewForMonster(monster, action);
+      return { monster, action: view.action, view };
     });
     const rowsHtml = actionRows.length
       ? actionRows.map((row) => `
-        <span class="action-mini action-${row.action} monster-tone-${row.monster.tone}">
+        <span class="action-mini action-${row.action}${row.defeated ? " defeated" : ""} monster-tone-${row.monster.tone}">
           <i>${row.view.mark}</i>
           <strong>${row.monster.name}</strong>
           <em>${row.view.main}</em>
@@ -1825,11 +1859,11 @@
     });
 
     aliveMonsterInstances().forEach((monster) => {
-      const action = monsterAction(monster);
+      const action = plannedMonsterAction(monster);
       const view = actionViewForMonster(monster, action);
       const badge = document.createElement("span");
-      badge.className = `monster-action-badge action-${action} monster-tone-${monster.tone}`;
-      badge.textContent = `${view.label} ${view.main}`;
+      badge.className = `monster-action-badge action-${view.action} monster-tone-${monster.tone}`;
+      badge.textContent = view.badge || view.main;
       badge.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
       badge.style.gridRow = String(monster.boardY + 1);
       els.monsterGrid.append(badge);
@@ -2743,6 +2777,7 @@
       addLog("새 재료판을 받았다.");
     }
 
+    lockTurnActions();
     render();
   }
 
@@ -2751,7 +2786,7 @@
     if (!monsters.length) return;
     monsters.forEach((monster) => {
       if (state.playerHp <= 0) return;
-      executeMonsterInstanceAction(monster, monsterAction(monster));
+      executeMonsterInstanceAction(monster, plannedMonsterAction(monster));
     });
   }
 
@@ -2763,12 +2798,12 @@
 
     if (action === "heal") {
       if (!uncoveredIconCount("heal", monster.instanceId)) {
-        executeBasicMonsterAttack(`${monsterActionName(monster)} 회복 표식 막힘. 기본 공격`, monster);
+        addLog(`${monsterActionName(monster)} 회복 표식이 막혀 행동하지 않았다.`);
         return;
       }
       const targets = chooseHealTargets(MONSTER_HEAL_PER_ACTION, monster.instanceId);
       if (!targets.length) {
-        executeBasicMonsterAttack(`${monsterActionName(monster)} 회복 대상 없음. 기본 공격`, monster);
+        addLog(`${monsterActionName(monster)} 회복할 칸이 없어 행동하지 않았다.`);
         return;
       }
       targets.forEach((cellKey) => uncoverMonsterCell(cellKey));
@@ -2780,12 +2815,12 @@
 
     if (action === "defense") {
       if (!uncoveredIconCount("defense", monster.instanceId)) {
-        executeBasicMonsterAttack(`${monsterActionName(monster)} 방어 표식 막힘. 기본 공격`, monster);
+        addLog(`${monsterActionName(monster)} 방어 표식이 막혀 행동하지 않았다.`);
         return;
       }
       const blocks = chooseArmorBlocks(MONSTER_ARMOR_PER_ACTION, monster.instanceId);
       if (!blocks.length) {
-        executeBasicMonsterAttack(`${monsterActionName(monster)} 갑피 대상 없음. 기본 공격`, monster);
+        addLog(`${monsterActionName(monster)} 갑피를 놓을 칸이 없어 행동하지 않았다.`);
         return;
       }
       blocks.forEach((cellKey) => state.blocked.add(cellKey));
@@ -2796,7 +2831,7 @@
     if (action === "special") {
       const specialIcons = uncoveredIconCount("special", monster.instanceId);
       if (!specialIcons) {
-        executeBasicMonsterAttack(`${monsterActionName(monster)} 특수 표식 막힘. 기본 공격`, monster);
+        addLog(`${monsterActionName(monster)} 특수 표식이 막혀 행동하지 않았다.`);
         return;
       }
       monster.special(state, specialIcons, monster);

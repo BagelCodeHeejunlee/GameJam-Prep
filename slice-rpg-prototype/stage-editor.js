@@ -49,11 +49,12 @@
     },
   ];
 
-  const STAGES = [
+  const BASE_STAGES = [
     { id: "forest-1-1", title: "도시락 숲 1-1", rotationOffset: 0 },
     { id: "forest-1-2", title: "도시락 숲 1-2", rotationOffset: 1 },
     { id: "forest-1-3", title: "도시락 숲 1-3", rotationOffset: 2 },
   ];
+  const STAGES = BASE_STAGES.map(cloneStageDef);
 
   const MONSTERS_BY_ID = new Map(MONSTERS.map((monster) => [monster.id, monster]));
   const STAGES_BY_ID = new Map(STAGES.map((stage) => [stage.id, stage]));
@@ -107,6 +108,16 @@
     return typeof value === "string" && value.trim() ? value.trim() : fallback;
   }
 
+  function cloneStageDef(stage) {
+    return { ...stage };
+  }
+
+  function resetStageRegistry() {
+    STAGES.splice(0, STAGES.length, ...BASE_STAGES.map(cloneStageDef));
+    STAGES_BY_ID.clear();
+    STAGES.forEach((stage) => STAGES_BY_ID.set(stage.id, stage));
+  }
+
   function loadData() {
     const defaults = createDefaultData();
     let saved = null;
@@ -147,7 +158,7 @@
   function createDefaultData() {
     return {
       version: 1,
-      stages: Object.fromEntries(STAGES.map((stage) => [
+      stages: Object.fromEntries(STAGES.map((stage, stageIndex) => [
         stage.id,
         {
           title: stage.title,
@@ -515,7 +526,7 @@
 
   function nextWaveId(index, stageId = editorState.stageId) {
     const base = `${stageId}-w${index + 1}`;
-    const existing = new Set(currentStageData().waves.map((wave) => wave.id));
+    const existing = new Set((data.stages[stageId]?.waves || []).map((wave) => wave.id));
     if (!existing.has(base)) return base;
     let suffix = 2;
     while (existing.has(`${base}-${suffix}`)) suffix += 1;
@@ -737,6 +748,7 @@
   }
 
   function resetData() {
+    resetStageRegistry();
     data = createDefaultData();
     window.localStorage.removeItem(STORAGE_KEY);
     editorState.stageId = STAGES[0].id;
