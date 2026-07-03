@@ -11,9 +11,42 @@
 
   const DEFAULT_MONSTERS = [
     {
+      id: "tiny-berry-imp",
+      name: "외눈 베리 임프",
+      sub: "작은 몸이지만 공격 표식은 먼저 막아라",
+      image: "assets/monsters/tiny-berry-imp-3cell.png",
+      cols: 2,
+      rows: 2,
+      baseAttack: 1,
+      actions: ["attack", "attack", "special"],
+      levels: [
+        { minLevel: 1, attack: 1 },
+        { minLevel: 4, attack: 2, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
+        { minLevel: 8, attack: 3, note: "특수 표식 개방", boardConditions: { icons: [c(1, 0, "special")] } },
+      ],
+      cells: [c(1, 0, "attack"), c(0, 1), c(1, 1)],
+    },
+    {
+      id: "tiny-jelly-block",
+      name: "젤리 블록",
+      sub: "작은 사각 몸통을 깔끔하게 채워라",
+      image: "assets/monsters/tiny-jelly-block-4cell.png",
+      cols: 2,
+      rows: 2,
+      baseAttack: 1,
+      actions: ["heal", "attack", "defense"],
+      levels: [
+        { minLevel: 1, attack: 1 },
+        { minLevel: 4, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
+        { minLevel: 8, attack: 3, note: "갑피 표식 개방", boardConditions: { icons: [c(1, 0, "defense")] } },
+      ],
+      cells: [c(0, 0, "heal"), c(1, 0), c(0, 1), c(1, 1, "attack")],
+    },
+    {
       id: "iron-goblin",
       name: "철갑 고블린",
       sub: "작은 몸통의 주먹부터 막아라",
+      image: "assets/monsters/iron-goblin.png",
       cols: 3,
       rows: 3,
       baseAttack: 2,
@@ -31,6 +64,7 @@
       id: "swamp-slime",
       name: "늪지 점액술사",
       sub: "회복 표식을 방치하면 재료가 말린다",
+      image: "assets/monsters/swamp-slime.png",
       cols: 4,
       rows: 4,
       baseAttack: 1,
@@ -48,6 +82,7 @@
       id: "stone-ogre",
       name: "돌껍질 오우거",
       sub: "큰 몸이지만 낭비할 재료는 적다",
+      image: "assets/monsters/stone-ogre.png",
       cols: 5,
       rows: 4,
       baseAttack: 3,
@@ -97,11 +132,25 @@
   function loadMonsters() {
     try {
       const saved = JSON.parse(storageGet(STORAGE_KEY) || "null");
-      if (Array.isArray(saved?.monsters)) return normalizeMonsters(saved.monsters);
+      if (Array.isArray(saved?.monsters)) return mergeWithDefaultMonsters(saved.monsters);
     } catch {
       return clone(DEFAULT_MONSTERS);
     }
     return clone(DEFAULT_MONSTERS);
+  }
+
+  function mergeWithDefaultMonsters(savedMonsters) {
+    const saved = normalizeMonsters(savedMonsters);
+    const savedById = new Map(saved.map((monster) => [monster.id, monster]));
+    const merged = DEFAULT_MONSTERS.map((defaultMonster) => {
+      const savedMonster = savedById.get(defaultMonster.id);
+      if (!savedMonster) return clone(defaultMonster);
+      return { ...clone(defaultMonster), ...savedMonster, image: savedMonster.image || defaultMonster.image };
+    });
+    saved.forEach((monster) => {
+      if (!DEFAULT_MONSTERS.some((defaultMonster) => defaultMonster.id === monster.id)) merged.push(monster);
+    });
+    return normalizeMonsters(merged);
   }
 
   function clone(value) {
@@ -134,6 +183,7 @@
       button.type = "button";
       button.className = monster.id === activeMonster.id ? "active" : "";
       button.innerHTML = `
+        <i class="monster-thumb" style="${monster.image ? `background-image: url('${escapeAttr(monster.image)}')` : ""}"></i>
         <span><strong>${monster.name}</strong><small>${monster.id}</small></span>
         <small>${monster.cols}x${monster.rows} · ${monster.cells.length}칸</small>
       `;
@@ -226,6 +276,8 @@
     const effective = effectiveCellMap(monster, state.levelIndex);
     const current = activeLevel ? levelConditionMap(activeLevel) : new Map();
     els.board.style.gridTemplateColumns = `repeat(${monster.cols}, var(--editor-cell))`;
+    els.board.style.setProperty("--monster-art", monster.image ? `url("${monster.image}")` : "none");
+    els.board.classList.toggle("has-monster-art", Boolean(monster.image));
     els.board.innerHTML = "";
 
     for (let y = 0; y < monster.rows; y += 1) {
@@ -238,7 +290,13 @@
         button.dataset.x = String(x);
         button.dataset.y = String(y);
         button.className = cellClass(cell, currentCell);
-        button.textContent = cell?.icon ? ICONS[cell.icon].mark : currentCell?.removed ? "x" : "";
+        const mark = cell?.icon ? ICONS[cell.icon].mark : currentCell?.removed ? "x" : "";
+        if (mark) {
+          const markEl = document.createElement("span");
+          markEl.className = "board-cell-mark";
+          markEl.textContent = mark;
+          button.append(markEl);
+        }
         button.title = `${x},${y}`;
         button.addEventListener("click", () => editCell(monster, x, y));
         els.board.append(button);
@@ -353,6 +411,7 @@
         id: String(monster.id || "monster").trim(),
         name: String(monster.name || monster.id || "Monster").trim(),
         sub: String(monster.sub || "").trim(),
+        image: String(monster.image || "").trim(),
         cols,
         rows,
         baseAttack: clampNumber(monster.baseAttack, 0, 99, 1),
@@ -436,7 +495,7 @@
   }
 
   function escapeAttr(value) {
-    return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
   }
 
   function storageGet(keyName) {

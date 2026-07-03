@@ -106,7 +106,7 @@
   const WAVES_PER_STAGE = 10;
   const MIN_MONSTERS_PER_WAVE = 3;
   const MAX_MONSTERS_PER_WAVE = 6;
-  const MONSTER_ROTATION = ["iron-goblin", "swamp-slime", "stone-ogre"];
+  const MONSTER_ROTATION = ["tiny-berry-imp", "tiny-jelly-block", "iron-goblin", "swamp-slime", "stone-ogre"];
   const MONSTER_EDITOR_STORAGE_KEY = "bento-monster-editor-data-v1";
 
   const HERO_LEVEL_RULES = {
@@ -129,6 +129,56 @@
   };
 
   const MONSTER_DEFS = [
+    {
+      id: "tiny-berry-imp",
+      name: "외눈 베리 임프",
+      sub: "작은 몸이지만 공격 표식은 먼저 막아라",
+      image: "assets/monsters/tiny-berry-imp-3cell.png",
+      cols: 2,
+      rows: 2,
+      baseAttack: 1,
+      levels: [
+        { minLevel: 1, attack: 1 },
+        { minLevel: 4, attack: 2, note: "공격 표식 증가", boardConditions: { icons: [c(1, 1, "attack")] } },
+        { minLevel: 8, attack: 3, note: "특수 표식 개방", boardConditions: { icons: [c(1, 0, "special")] } },
+      ],
+      actions: ["attack", "attack", "special"],
+      cells: [
+        c(1, 0, "attack"),
+        c(0, 1),
+        c(1, 1),
+      ],
+      special(state, count) {
+        const damage = takeDamage(count + 1);
+        addLog(`베리 임프가 눈빛으로 ${damage} 피해를 줬다.`);
+      },
+    },
+    {
+      id: "tiny-jelly-block",
+      name: "젤리 블록",
+      sub: "작은 사각 몸통을 깔끔하게 채워라",
+      image: "assets/monsters/tiny-jelly-block-4cell.png",
+      cols: 2,
+      rows: 2,
+      baseAttack: 1,
+      levels: [
+        { minLevel: 1, attack: 1 },
+        { minLevel: 4, attack: 2, note: "회복 표식 증가", boardConditions: { icons: [c(0, 1, "heal")] } },
+        { minLevel: 8, attack: 3, note: "갑피 표식 개방", boardConditions: { icons: [c(1, 0, "defense")] } },
+      ],
+      actions: ["heal", "attack", "defense"],
+      cells: [
+        c(0, 0, "heal"),
+        c(1, 0),
+        c(0, 1),
+        c(1, 1, "attack"),
+      ],
+      special(state, count) {
+        const blocks = chooseOpenCells(count);
+        blocks.forEach((cellKey) => state.blocked.add(cellKey));
+        addLog(`젤리 블록이 ${blocks.length}칸을 말랑하게 막았다.`);
+      },
+    },
     {
       id: "iron-goblin",
       name: "철갑 고블린",

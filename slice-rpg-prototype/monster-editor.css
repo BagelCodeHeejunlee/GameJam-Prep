@@ -144,7 +144,8 @@ button {
 
 .monster-list button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 6px;
   width: 100%;
   min-height: 58px;
@@ -154,6 +155,18 @@ button {
   background: #fffdf2;
   color: var(--ink);
   text-align: left;
+}
+
+.monster-thumb {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(104, 71, 40, 0.18);
+  border-radius: 8px;
+  background-color: #f4db9b;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .monster-list button.active {
@@ -264,6 +277,7 @@ input {
 
 .board-grid {
   --editor-cell: 54px;
+  position: relative;
   display: grid;
   width: max-content;
   max-width: 100%;
@@ -275,8 +289,22 @@ input {
   background: #e9cc8d;
 }
 
+.board-grid.has-monster-art::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 4px;
+  pointer-events: none;
+  background-image: var(--monster-art);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.3;
+}
+
 .board-cell {
   position: relative;
+  z-index: 1;
   display: grid;
   width: var(--editor-cell);
   height: var(--editor-cell);
@@ -300,6 +328,7 @@ input {
 }
 
 .board-cell.current {
+  z-index: 4;
   outline: 3px solid rgba(255, 190, 74, 0.95);
   outline-offset: -5px;
 }
@@ -323,6 +352,11 @@ input {
 
 .board-cell.special {
   color: var(--special);
+}
+
+.board-cell-mark {
+  position: relative;
+  z-index: 5;
 }
 
 .board-help {
