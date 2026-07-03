@@ -1855,8 +1855,10 @@
       image.src = monster.image;
       image.alt = "";
       image.setAttribute("aria-hidden", "true");
-      image.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
-      image.style.gridRow = `${monster.boardY + 1} / span ${monster.rows}`;
+      image.style.left = monsterBoardPos(monster.boardX);
+      image.style.top = monsterBoardPos(monster.boardY);
+      image.style.width = monsterBoardSpan(monster.cols);
+      image.style.height = monsterBoardSpan(monster.rows);
       els.monsterGrid.append(image);
     });
 
@@ -1906,15 +1908,27 @@
         if (monsterCell.icon && (!monsterCell.covered || isDraggingPlacedCell)) {
           const icon = document.createElement("span");
           const iconMeta = ICONS[monsterCell.icon];
-          icon.className = `cell-icon ${iconMeta.className}`;
+          icon.className = `cell-icon monster-cell-icon ${iconMeta.className}`;
           icon.textContent = iconMeta.mark;
           icon.title = iconMeta.label;
-          button.append(icon);
+          icon.style.left = monsterBoardPos(x + 0.5);
+          icon.style.top = monsterBoardPos(y + 0.5);
+          els.monsterGrid.append(icon);
         }
 
         els.monsterGrid.append(button);
       }
     }
+  }
+
+  function monsterBoardPos(value) {
+    const cell = state.cellSize || getMonsterCellSize();
+    return `${value * (cell + BOARD_GAP)}px`;
+  }
+
+  function monsterBoardSpan(count) {
+    const cell = state.cellSize || getMonsterCellSize();
+    return `${count * cell + Math.max(0, count - 1) * BOARD_GAP}px`;
   }
 
   function renderMaterialBoard() {
