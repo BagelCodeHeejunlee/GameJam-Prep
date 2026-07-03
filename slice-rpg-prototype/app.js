@@ -1903,7 +1903,7 @@
           button.classList.add(dropPreview.valid ? "preview-place" : "preview-invalid");
         }
 
-        if (monsterCell.icon) {
+        if (monsterCell.icon && (!monsterCell.covered || isDraggingPlacedCell)) {
           const icon = document.createElement("span");
           const iconMeta = ICONS[monsterCell.icon];
           icon.className = `cell-icon ${iconMeta.className}`;

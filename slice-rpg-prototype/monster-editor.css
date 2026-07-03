@@ -309,7 +309,6 @@ input {
 
 .board-cell {
   position: relative;
-  z-index: 1;
   display: grid;
   width: var(--editor-cell);
   height: var(--editor-cell);
