@@ -542,6 +542,7 @@
 
   let resizeFrame = null;
   let resizeTimer = null;
+  let layoutStabilizeFrame = null;
   let inputActive = false;
   let pendingResponsiveRender = false;
   let lastViewportSize = { width: 0, height: 0 };
@@ -1595,6 +1596,7 @@
     renderMonster();
     renderMaterialBoard();
     renderLog();
+    scheduleLayoutStabilization();
   }
 
   function renderSceneMode() {
@@ -1765,10 +1767,25 @@
   function updateAdaptiveCellSize() {
     lastViewportSize = { width: viewportWidth(), height: viewportHeight() };
     const nextSize = calculateAdaptiveCellSize();
-    if (!Number.isFinite(nextSize) || Math.abs(nextSize - state.cellSize) < 0.1) return;
+    if (!applyAdaptiveCellSize(nextSize)) return;
+  }
+
+  function applyAdaptiveCellSize(nextSize) {
+    if (!Number.isFinite(nextSize) || Math.abs(nextSize - state.cellSize) < 0.1) return false;
     state.cellSize = nextSize;
     document.documentElement.style.setProperty("--small-cell", `${nextSize}px`);
     document.documentElement.style.setProperty("--cell", `${nextSize}px`);
+    return true;
+  }
+
+  function scheduleLayoutStabilization() {
+    if (els.appShell.classList.contains("meta-mode") || layoutStabilizeFrame) return;
+    layoutStabilizeFrame = requestAnimationFrame(() => {
+      layoutStabilizeFrame = null;
+      const nextSize = calculateAdaptiveCellSize();
+      if (!applyAdaptiveCellSize(nextSize)) return;
+      render();
+    });
   }
 
   function calculateAdaptiveCellSize() {
