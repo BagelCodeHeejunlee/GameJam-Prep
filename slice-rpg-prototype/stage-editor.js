@@ -60,6 +60,8 @@
 
   const els = {
     stageSelect: document.querySelector("#stageSelect"),
+    stageTitleInput: document.querySelector("#stageTitleInput"),
+    addStageButton: document.querySelector("#addStageButton"),
     addWaveButton: document.querySelector("#addWaveButton"),
     saveButton: document.querySelector("#saveButton"),
     copyButton: document.querySelector("#copyButton"),
@@ -86,6 +88,8 @@
   };
 
   let data = loadData();
+  let dragState = null;
+  let suppressBoardClick = false;
 
   fillSelects();
   bindEvents();
@@ -99,6 +103,10 @@
     return `${x},${y}`;
   }
 
+  function cleanText(value, fallback) {
+    return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  }
+
   function loadData() {
     const defaults = createDefaultData();
     let saved = null;
@@ -109,11 +117,29 @@
     }
     if (!saved?.stages) return defaults;
 
+    Object.entries(saved.stages).forEach(([stageId, savedStage]) => {
+      if (!STAGES_BY_ID.has(stageId)) {
+        registerStage({
+          id: stageId,
+          title: cleanText(savedStage?.title, `커스텀 스테이지 ${STAGES.length + 1}`),
+          rotationOffset: STAGES.length,
+          custom: true,
+        });
+        defaults.stages[stageId] = {
+          title: STAGES_BY_ID.get(stageId).title,
+          waves: createStageWaves(stageId, STAGES_BY_ID.get(stageId).rotationOffset, STAGES.length - 1),
+        };
+      }
+    });
+
     STAGES.forEach((stage) => {
-      const savedWaves = saved.stages?.[stage.id]?.waves;
+      const savedStage = saved.stages?.[stage.id];
+      const savedWaves = savedStage?.waves;
       if (!Array.isArray(savedWaves)) return;
       const waves = normalizeWaves(savedWaves, stage.id);
-      if (waves.length) defaults.stages[stage.id].waves = waves;
+      const title = cleanText(savedStage?.title, stage.title);
+      stage.title = title;
+      if (waves.length) defaults.stages[stage.id] = { title, waves };
     });
     return defaults;
   }
@@ -125,13 +151,20 @@
         stage.id,
         {
           title: stage.title,
-          waves: createStageWaves(stage.id, stage.rotationOffset),
+          waves: createStageWaves(stage.id, stage.rotationOffset, stageIndex),
         },
       ])),
     };
   }
 
-  function createStageWaves(stageId, rotationOffset = 0) {
+  function registerStage(stage) {
+    if (STAGES_BY_ID.has(stage.id)) return STAGES_BY_ID.get(stage.id);
+    STAGES.push(stage);
+    STAGES_BY_ID.set(stage.id, stage);
+    return stage;
+  }
+
+  function createStageWaves(stageId, rotationOffset = 0, stageIndex = 0) {
     return Array.from({ length: WAVES_PER_STAGE }, (_, waveIndex) => {
       const boss = waveIndex === WAVES_PER_STAGE - 1;
       const rotationIndex = (rotationOffset + waveIndex) % MONSTER_ROTATION.length;
@@ -140,17 +173,21 @@
         id: `${stageId}-w${waveIndex + 1}`,
         name: boss ? `보스 ${waveIndex + 1}` : `웨이브 ${waveIndex + 1}`,
         boss,
-        monsters: defaultWaveMonsters(waveIndex, monsterId, boss),
+        monsters: defaultWaveMonsters(waveIndex, monsterId, boss, stageIndex),
       };
     });
   }
 
-  function defaultWaveMonsters(waveIndex, monsterId, boss) {
+  function defaultWaveMonsters(waveIndex, monsterId, boss, stageIndex = 0) {
+    const withLevels = (monsters) => monsters.map((entry, index) => ({
+      ...entry,
+      level: monsterDefaultLevel(stageIndex, waveIndex, index),
+    }));
     if (boss) {
-      return [
+      return withLevels([
         { monsterId: BOSS_MONSTER_ID, x: 1, y: 1 },
         { monsterId: "tiny-berry-imp", x: 6, y: 3 },
-      ];
+      ]);
     }
     const layouts = [
       [{ monsterId, x: 3, y: 3 }],
@@ -158,10 +195,15 @@
       [{ monsterId, x: 1, y: 2 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
       [{ monsterId, x: 0, y: 2 }, { monsterId: "tiny-jelly-block", x: 4, y: 1 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
     ];
-    return layouts[waveIndex % layouts.length].map((entry) => ({ ...entry }));
+    return withLevels(layouts[waveIndex % layouts.length]);
+  }
+
+  function monsterDefaultLevel(stageIndex, waveIndex, monsterIndex) {
+    return 1 + stageIndex * 3 + waveIndex + Math.floor(monsterIndex / 2);
   }
 
   function normalizeWaves(waves, stageId) {
+    const stageIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === stageId));
     return waves.map((wave, index) => {
       const normalized = {
         id: typeof wave?.id === "string" && wave.id ? wave.id : `${stageId}-w${index + 1}`,
@@ -169,20 +211,21 @@
         boss: Boolean(wave?.boss),
         monsters: [],
       };
-      normalized.monsters = normalizeMonsters(wave?.monsters);
+      normalized.monsters = normalizeMonsters(wave?.monsters, stageIndex, index);
       return normalized;
     }).filter((wave) => wave.monsters.length);
   }
 
-  function normalizeMonsters(monsters) {
+  function normalizeMonsters(monsters, stageIndex = 0, waveIndex = 0) {
     const normalized = [];
-    (Array.isArray(monsters) ? monsters : []).forEach((entry) => {
+    (Array.isArray(monsters) ? monsters : []).forEach((entry, index) => {
       const monsterId = MONSTERS_BY_ID.has(entry?.monsterId) ? entry.monsterId : MONSTERS[0].id;
       const monster = MONSTERS_BY_ID.get(monsterId);
       const x = clampInteger(entry?.x, 0, BOARD_COLS - monster.cols, 0);
       const y = clampInteger(entry?.y, 0, BOARD_ROWS - monster.rows, 0);
+      const level = clampInteger(entry?.level, 1, 99, monsterDefaultLevel(stageIndex, waveIndex, index));
       if (!isPlacementValidInList(normalized, monsterId, x, y, -1)) return;
-      normalized.push({ monsterId, x, y });
+      normalized.push({ monsterId, level, x, y });
     });
     return normalized;
   }
@@ -212,6 +255,16 @@
       editorState.monsterIndex = 0;
       render();
     });
+    els.stageTitleInput.addEventListener("input", () => {
+      const title = els.stageTitleInput.value.trim() || "스테이지";
+      const stage = STAGES_BY_ID.get(editorState.stageId);
+      if (stage) stage.title = title;
+      currentStageData().title = title;
+      fillSelects();
+      els.stageSelect.value = editorState.stageId;
+      renderJson();
+    });
+    els.addStageButton.addEventListener("click", addStage);
     els.addWaveButton.addEventListener("click", addWave);
     els.saveButton.addEventListener("click", saveData);
     els.copyButton.addEventListener("click", copyJson);
@@ -232,7 +285,9 @@
 
   function render() {
     ensureCurrentWave();
+    fillSelects();
     els.stageSelect.value = editorState.stageId;
+    els.stageTitleInput.value = currentStageData().title || STAGES_BY_ID.get(editorState.stageId)?.title || editorState.stageId;
     renderWaveList();
     renderWaveFields();
     renderBoard();
@@ -245,12 +300,21 @@
     if (!stage.waves.length) stage.waves.push(createEmptyWave(0));
     editorState.waveIndex = clamp(editorState.waveIndex, 0, stage.waves.length - 1);
     const wave = currentWave();
-    if (!wave.monsters.length) wave.monsters.push({ monsterId: MONSTERS[0].id, x: 3, y: 3 });
+    if (!wave.monsters.length) wave.monsters.push({
+      monsterId: MONSTERS[0].id,
+      level: monsterDefaultLevel(currentStageIndex(), editorState.waveIndex, 0),
+      x: 3,
+      y: 3,
+    });
     editorState.monsterIndex = clamp(editorState.monsterIndex, 0, wave.monsters.length - 1);
   }
 
   function currentStageData() {
     return data.stages[editorState.stageId] || data.stages[STAGES[0].id];
+  }
+
+  function currentStageIndex() {
+    return Math.max(0, STAGES.findIndex((stage) => stage.id === editorState.stageId));
   }
 
   function currentWave() {
@@ -309,6 +373,7 @@
           number.textContent = String(occupant.index + 1);
           button.append(number);
           button.append(document.createTextNode(occupant.monster.short));
+          button.addEventListener("pointerdown", (event) => startMonsterDrag(event, x, y, occupant));
         }
 
         button.addEventListener("click", () => handleBoardCellClick(x, y, occupant));
@@ -346,8 +411,9 @@
 
       const coords = document.createElement("div");
       coords.className = "coord-row";
-      coords.append(createCoordInput("X", entry.x, (value) => moveMonster(index, value, entry.y)));
-      coords.append(createCoordInput("Y", entry.y, (value) => moveMonster(index, entry.x, value)));
+      coords.append(createNumberInput("X", entry.x, 0, BOARD_COLS - monster.cols, (value) => moveMonster(index, value, entry.y)));
+      coords.append(createNumberInput("Y", entry.y, 0, BOARD_ROWS - monster.rows, (value) => moveMonster(index, entry.x, value)));
+      coords.append(createNumberInput("Lv", entry.level || 1, 1, 99, (value) => changeMonsterLevel(index, value)));
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -366,14 +432,14 @@
     });
   }
 
-  function createCoordInput(labelText, value, onChange) {
+  function createNumberInput(labelText, value, min, max, onChange) {
     const label = document.createElement("label");
     const span = document.createElement("span");
     span.textContent = labelText;
     const input = document.createElement("input");
     input.type = "number";
-    input.min = "0";
-    input.max = labelText === "X" ? String(BOARD_COLS - 1) : String(BOARD_ROWS - 1);
+    input.min = String(min);
+    input.max = String(max);
     input.value = String(value);
     input.addEventListener("change", () => onChange(Number.parseInt(input.value, 10)));
     label.append(span, input);
@@ -385,12 +451,42 @@
   }
 
   function handleBoardCellClick(x, y, occupant) {
+    if (suppressBoardClick) {
+      suppressBoardClick = false;
+      return;
+    }
     if (occupant) {
       editorState.monsterIndex = occupant.index;
       render();
       return;
     }
     moveMonster(editorState.monsterIndex, x, y);
+  }
+
+  function addStage() {
+    const stageIndex = STAGES.length;
+    const stageId = nextStageId();
+    const title = `커스텀 스테이지 ${stageIndex + 1}`;
+    registerStage({ id: stageId, title, rotationOffset: stageIndex, custom: true });
+    data.stages[stageId] = {
+      title,
+      waves: [createEmptyWave(0, stageId, stageIndex)],
+    };
+    editorState.stageId = stageId;
+    editorState.waveIndex = 0;
+    editorState.monsterIndex = 0;
+    setStatus("스테이지 추가됨");
+    render();
+  }
+
+  function nextStageId() {
+    let index = STAGES.length + 1;
+    let stageId = `custom-stage-${index}`;
+    while (STAGES_BY_ID.has(stageId) || data.stages[stageId]) {
+      index += 1;
+      stageId = `custom-stage-${index}`;
+    }
+    return stageId;
   }
 
   function addWave() {
@@ -402,18 +498,23 @@
     render();
   }
 
-  function createEmptyWave(index) {
-    const id = nextWaveId(index);
+  function createEmptyWave(index, stageId = editorState.stageId, stageIndex = currentStageIndex()) {
+    const id = nextWaveId(index, stageId);
     return {
       id,
       name: `웨이브 ${index + 1}`,
       boss: false,
-      monsters: [{ monsterId: MONSTERS[0].id, x: 3, y: 3 }],
+      monsters: [{
+        monsterId: MONSTERS[0].id,
+        level: monsterDefaultLevel(stageIndex, index, 0),
+        x: 3,
+        y: 3,
+      }],
     };
   }
 
-  function nextWaveId(index) {
-    const base = `${editorState.stageId}-w${index + 1}`;
+  function nextWaveId(index, stageId = editorState.stageId) {
+    const base = `${stageId}-w${index + 1}`;
     const existing = new Set(currentStageData().waves.map((wave) => wave.id));
     if (!existing.has(base)) return base;
     let suffix = 2;
@@ -439,7 +540,12 @@
       setStatus("빈 공간 없음", true);
       return;
     }
-    wave.monsters.push({ monsterId, x: spot.x, y: spot.y });
+    wave.monsters.push({
+      monsterId,
+      level: monsterDefaultLevel(currentStageIndex(), editorState.waveIndex, wave.monsters.length),
+      x: spot.x,
+      y: spot.y,
+    });
     editorState.monsterIndex = wave.monsters.length - 1;
     setStatus("몬스터 추가됨");
     render();
@@ -476,6 +582,15 @@
     render();
   }
 
+  function changeMonsterLevel(index, level) {
+    const entry = currentWave().monsters[index];
+    if (!entry) return;
+    entry.level = clampInteger(level, 1, 99, entry.level || 1);
+    editorState.monsterIndex = index;
+    setStatus("레벨 변경됨");
+    render();
+  }
+
   function moveMonster(index, x, y) {
     const wave = currentWave();
     const entry = wave.monsters[index];
@@ -493,6 +608,67 @@
     editorState.monsterIndex = index;
     setStatus("배치 이동됨");
     render();
+  }
+
+  function startMonsterDrag(event, x, y, occupant) {
+    const entry = currentWave().monsters[occupant.index];
+    if (!entry) return;
+    event.preventDefault();
+    editorState.monsterIndex = occupant.index;
+    dragState = {
+      index: occupant.index,
+      offsetX: x - entry.x,
+      offsetY: y - entry.y,
+      moved: false,
+    };
+    els.boardGrid.classList.add("dragging");
+    document.addEventListener("pointermove", handleMonsterDragMove);
+    document.addEventListener("pointerup", finishMonsterDrag, { once: true });
+    renderBoard();
+    renderMonsterList();
+  }
+
+  function handleMonsterDragMove(event) {
+    if (!dragState) return;
+    const cell = boardCellFromPoint(event.clientX, event.clientY);
+    if (!cell) return;
+    const wave = currentWave();
+    const entry = wave.monsters[dragState.index];
+    if (!entry) return;
+    const monster = MONSTERS_BY_ID.get(entry.monsterId) || MONSTERS[0];
+    const nextX = clamp(cell.x - dragState.offsetX, 0, BOARD_COLS - monster.cols);
+    const nextY = clamp(cell.y - dragState.offsetY, 0, BOARD_ROWS - monster.rows);
+    if (entry.x === nextX && entry.y === nextY) return;
+    if (!isPlacementValid(wave, entry.monsterId, nextX, nextY, dragState.index)) return;
+    entry.x = nextX;
+    entry.y = nextY;
+    dragState.moved = true;
+    renderBoard();
+    renderMonsterList();
+    renderJson();
+  }
+
+  function finishMonsterDrag() {
+    if (!dragState) return;
+    const moved = dragState.moved;
+    dragState = null;
+    els.boardGrid.classList.remove("dragging");
+    document.removeEventListener("pointermove", handleMonsterDragMove);
+    suppressBoardClick = moved;
+    if (moved) setStatus("배치 이동됨");
+    window.setTimeout(() => {
+      suppressBoardClick = false;
+    }, 0);
+  }
+
+  function boardCellFromPoint(clientX, clientY) {
+    const element = document.elementFromPoint(clientX, clientY);
+    const cell = element?.closest?.(".stage-cell");
+    if (!cell || !els.boardGrid.contains(cell)) return null;
+    return {
+      x: Number.parseInt(cell.dataset.x, 10),
+      y: Number.parseInt(cell.dataset.y, 10),
+    };
   }
 
   function findFreeSpot(monsters, monsterId, exceptIndex = -1) {
@@ -576,13 +752,14 @@
       stages: Object.fromEntries(STAGES.map((stage) => {
         const stageData = data.stages[stage.id];
         return [stage.id, {
-          title: STAGES_BY_ID.get(stage.id)?.title || stage.id,
+          title: stageData.title || STAGES_BY_ID.get(stage.id)?.title || stage.id,
           waves: stageData.waves.map((wave, index) => ({
             id: wave.id || `${stage.id}-w${index + 1}`,
             name: wave.name,
             boss: Boolean(wave.boss),
             monsters: wave.monsters.map((entry) => ({
               monsterId: entry.monsterId,
+              level: clampInteger(entry.level, 1, 99, 1),
               x: entry.x,
               y: entry.y,
             })),

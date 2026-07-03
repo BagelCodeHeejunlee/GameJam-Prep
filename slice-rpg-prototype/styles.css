@@ -1320,6 +1320,98 @@ button:disabled {
   background: var(--special);
 }
 
+.action-card.action-multi {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "kicker sub"
+    "list list";
+  min-height: 70px;
+  align-items: center;
+}
+
+.action-list {
+  grid-area: list;
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.action-list::-webkit-scrollbar {
+  display: none;
+}
+
+.action-mini {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "mark name"
+    "mark value";
+  flex: 0 0 auto;
+  min-width: 122px;
+  max-width: 150px;
+  align-items: center;
+  gap: 1px 6px;
+  padding: 5px 7px;
+  border: 2px solid rgba(104, 71, 40, 0.3);
+  border-radius: 8px;
+  background: #fffdf2;
+  box-shadow: inset 0 -2px 0 rgba(104, 71, 40, 0.12);
+}
+
+.action-mini i {
+  grid-area: mark;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--attack);
+  color: #fffdf0;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 950;
+}
+
+.action-mini strong,
+.action-mini em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-mini strong {
+  grid-area: name;
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 950;
+}
+
+.action-mini em {
+  grid-area: value;
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.action-mini.action-heal i,
+.monster-action-badge.action-heal {
+  background: var(--heal);
+}
+
+.action-mini.action-defense i,
+.monster-action-badge.action-defense {
+  background: var(--defense);
+}
+
+.action-mini.action-special i,
+.monster-action-badge.action-special {
+  background: var(--special);
+}
+
 .monster-grid,
 .material-grid {
   display: grid;
@@ -1345,6 +1437,29 @@ button:disabled {
   opacity: 0.32;
   pointer-events: none;
   filter: drop-shadow(0 6px 4px rgba(58, 39, 24, 0.18));
+}
+
+.monster-action-badge {
+  z-index: 5;
+  align-self: start;
+  justify-self: center;
+  max-width: calc(100% - 6px);
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 253, 240, 0.72);
+  border-radius: 999px;
+  background: var(--attack);
+  box-shadow:
+    0 2px 0 rgba(58, 39, 24, 0.22),
+    0 5px 10px rgba(58, 39, 24, 0.12);
+  color: #fffdf0;
+  font-size: 0.54rem;
+  font-weight: 950;
+  line-height: 1;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  transform: translateY(-6px);
+  white-space: nowrap;
 }
 
 .monster-grid.has-monster-art::before {
@@ -1710,6 +1825,28 @@ button:disabled {
 
 .app-shell.tiny-layout .action-sub {
   font-size: 0.64rem;
+}
+
+.app-shell.tiny-layout .action-card.action-multi {
+  min-height: 48px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "list";
+  padding: 5px 7px;
+}
+
+.app-shell.tiny-layout .action-card.action-multi .action-sub {
+  display: none;
+}
+
+.app-shell.tiny-layout .action-mini {
+  min-width: 104px;
+  padding: 4px 6px;
+}
+
+.app-shell.tiny-layout .action-mini i {
+  width: 21px;
+  height: 21px;
 }
 
 .material-cell {

@@ -558,6 +558,10 @@
     return { x, y };
   }
 
+  function uniqueValues(values) {
+    return [...new Set(values.filter(Boolean))];
+  }
+
   function monsterLevelTrack(baseAttack, events = {}, maxLevel = 16) {
     const levels = [];
     let actions = ["attack"];
@@ -612,6 +616,28 @@
       if (!Array.isArray(savedStage?.waves)) return;
       const waves = normalizeStageEditorWaves(savedStage.waves, stage.id);
       if (waves.length) stage.waves = waves;
+      stage.title = cleanMonsterText(savedStage.title, stage.title);
+    });
+    Object.entries(stageMap).forEach(([stageId, savedStage]) => {
+      if (stages.some((stage) => stage.id === stageId) || !Array.isArray(savedStage?.waves)) return;
+      const waves = normalizeStageEditorWaves(savedStage.waves, stageId);
+      if (!waves.length) return;
+      const stageNumber = stages.length + 1;
+      stages.push({
+        id: stageId,
+        name: cleanMonsterText(savedStage.name, "커스텀 스테이지"),
+        title: cleanMonsterText(savedStage.title, `커스텀 스테이지 ${stageNumber}`),
+        chapter: 1,
+        stage: stageNumber,
+        recommendedLevel: clampInteger(savedStage.recommendedLevel, 1, 99, stageNumber),
+        staminaCost: clampInteger(savedStage.staminaCost, 0, 99, 1),
+        clearReward: {
+          gold: clampInteger(savedStage.clearReward?.gold, 0, 999999, 1200),
+          heroShards: clampInteger(savedStage.clearReward?.heroShards, 0, 999, 2),
+        },
+        custom: true,
+        waves,
+      });
     });
   }
 
@@ -633,11 +659,14 @@
     (Array.isArray(monsters) ? monsters : []).forEach((entry, index) => {
       const monsterId = typeof entry?.monsterId === "string" && MONSTERS_BY_ID.has(entry.monsterId) ? entry.monsterId : MONSTER_DEFS[0].id;
       const baseMonster = MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
+      const level = Number.isFinite(Number.parseInt(entry?.level, 10)) ? clampInteger(entry.level, 1, 99, 1) : null;
+      const levelCells = level ? monsterCellsForLevel(baseMonster, level) : baseMonster.cells;
       const x = clampInteger(entry?.x, 0, MONSTER_BOARD_COLS - 1, index % MONSTER_BOARD_COLS);
       const y = clampInteger(entry?.y, 0, MONSTER_BOARD_ROWS - 1, Math.floor(index / MONSTER_BOARD_COLS));
       const placement = { monsterId, x, y };
-      if (!isWaveMonsterPlacementValid(placement, baseMonster, occupied)) return;
-      baseMonster.cells.forEach((cell) => occupied.add(key(x + cell.x, y + cell.y)));
+      if (level) placement.level = level;
+      if (!isWaveMonsterPlacementValid(placement, { ...baseMonster, cells: levelCells }, occupied)) return;
+      levelCells.forEach((cell) => occupied.add(key(x + cell.x, y + cell.y)));
       normalized.push(placement);
     });
     return normalized;
@@ -746,13 +775,17 @@
   }
 
   function createInitialResources() {
+    const unlockedStageIds = uniqueValues([
+      ...META_INITIAL.unlockedStageIds,
+      ...STAGE_DEFS.filter((stage) => stage.custom).map((stage) => stage.id),
+    ]);
     return {
       gold: META_INITIAL.gold,
       gems: META_INITIAL.gems,
       stamina: META_INITIAL.stamina,
       maxStamina: META_INITIAL.maxStamina,
-      selectedStageId: META_INITIAL.selectedStageId,
-      unlockedStageIds: [...META_INITIAL.unlockedStageIds],
+      selectedStageId: STAGES_BY_ID.has(META_INITIAL.selectedStageId) ? META_INITIAL.selectedStageId : unlockedStageIds[0],
+      unlockedStageIds,
       rewardReadyByStageId: { ...META_INITIAL.rewardReadyByStageId },
     };
   }
@@ -853,7 +886,7 @@
 
   function monsterInstanceForWaveEntry(entry, index) {
     const baseMonster = MONSTERS_BY_ID.get(entry?.monsterId) || MONSTER_DEFS[0];
-    const level = monsterPowerLevel(index);
+    const level = clampInteger(entry?.level, 1, 99, monsterPowerLevel(index));
     const monster = scaledMonster(baseMonster, index, level);
     const maxX = Math.max(0, MONSTER_BOARD_COLS - monster.cols);
     const maxY = Math.max(0, MONSTER_BOARD_ROWS - monster.rows);
@@ -1634,20 +1667,22 @@
       const action = monsterAction(monster);
       return { monster, action, view: actionViewForMonster(monster, action) };
     });
-    const firstRow = actionRows[0];
-    const firstAction = firstRow?.action || "attack";
-    const mainText = actionRows.length <= 1 ? firstRow?.view.main || "행동 없음" : `${actionRows.length}마리 행동`;
-    const detailText = actionRows.length
-      ? actionRows.map((row) => `${row.monster.name} ${row.view.label} ${row.view.main}`).join(" · ")
-      : "모든 몬스터를 덮었다";
-    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가 · ${detailText}` : detailText;
+    const rowsHtml = actionRows.length
+      ? actionRows.map((row) => `
+        <span class="action-mini action-${row.action} monster-tone-${row.monster.tone}">
+          <i>${row.view.mark}</i>
+          <strong>${row.monster.name}</strong>
+          <em>${row.view.main}</em>
+        </span>
+      `).join("")
+      : `<span class="action-mini action-attack"><i>${ICONS.attack.mark}</i><strong>완료</strong><em>행동 없음</em></span>`;
+    const blockedText = state.blocked.size ? `갑피 ${state.blocked.size}칸 배치 불가` : "몬스터별 다음 행동";
 
-    els.actionCard.className = `action-card action-${firstAction}`;
+    els.actionCard.className = "action-card action-multi";
     els.actionCard.innerHTML = `
       <span class="action-kicker">${currentWave().name} · 생존 ${aliveMonsters.length}/${Math.max(1, state.monsterInstances.length)}</span>
-      <span class="action-chip"><i>${firstRow?.view.mark || ICONS.attack.mark}</i>${firstRow?.view.label || "행동"}</span>
-      <strong class="action-main">${mainText}</strong>
       <span class="action-sub">${blockedText}</span>
+      <div class="action-list">${rowsHtml}</div>
     `;
   }
 
@@ -1787,6 +1822,17 @@
       image.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
       image.style.gridRow = `${monster.boardY + 1} / span ${monster.rows}`;
       els.monsterGrid.append(image);
+    });
+
+    aliveMonsterInstances().forEach((monster) => {
+      const action = monsterAction(monster);
+      const view = actionViewForMonster(monster, action);
+      const badge = document.createElement("span");
+      badge.className = `monster-action-badge action-${action} monster-tone-${monster.tone}`;
+      badge.textContent = `${view.label} ${view.main}`;
+      badge.style.gridColumn = `${monster.boardX + 1} / span ${monster.cols}`;
+      badge.style.gridRow = String(monster.boardY + 1);
+      els.monsterGrid.append(badge);
     });
 
     for (let y = 0; y < MONSTER_BOARD_ROWS; y += 1) {

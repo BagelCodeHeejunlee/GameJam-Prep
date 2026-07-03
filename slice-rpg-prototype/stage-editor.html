@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <title>Bento Blocks Stage Editor</title>
     <meta name="theme-color" content="#f8e8c8" />
-    <link rel="stylesheet" href="stage-editor.css?v=stage-editor-1" />
+    <link rel="stylesheet" href="stage-editor.css?v=stage-editor-2" />
   </head>
   <body>
     <main class="stage-editor-shell">
@@ -25,6 +25,11 @@
           <span>스테이지</span>
           <select id="stageSelect"></select>
         </label>
+        <label>
+          <span>스테이지 이름</span>
+          <input id="stageTitleInput" type="text" />
+        </label>
+        <button id="addStageButton" class="primary-button" type="button">스테이지 추가</button>
         <button id="addWaveButton" class="primary-button" type="button">웨이브 추가</button>
         <button id="saveButton" class="primary-button" type="button">저장</button>
         <button id="copyButton" class="ghost-button" type="button">JSON 복사</button>
@@ -90,6 +95,6 @@
       </section>
     </main>
 
-    <script src="stage-editor.js?v=stage-editor-1"></script>
+    <script src="stage-editor.js?v=stage-editor-2"></script>
   </body>
 </html>
