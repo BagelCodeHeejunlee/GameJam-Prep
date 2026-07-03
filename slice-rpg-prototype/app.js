@@ -543,6 +543,7 @@
   let resizeFrame = null;
   let resizeTimer = null;
   let layoutStabilizeFrame = null;
+  let layoutStabilizePasses = 0;
   let inputActive = false;
   let pendingResponsiveRender = false;
   let lastViewportSize = { width: 0, height: 0 };
@@ -758,12 +759,21 @@
       ];
     }
     const layouts = [
-      [{ monsterId, x: 3, y: 3 }],
+      [centeredMonsterEntry(monsterId)],
       [{ monsterId, x: 2, y: 3 }, { monsterId: "tiny-jelly-block", x: 5, y: 3 }],
       [{ monsterId, x: 1, y: 2 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
       [{ monsterId, x: 0, y: 2 }, { monsterId: "tiny-jelly-block", x: 4, y: 1 }, { monsterId: "tiny-berry-imp", x: 6, y: 4 }],
     ];
     return layouts[waveIndex % layouts.length].map((entry) => ({ ...entry }));
+  }
+
+  function centeredMonsterEntry(monsterId) {
+    const monster = MONSTERS_BY_ID.get(monsterId) || MONSTER_DEFS[0];
+    return {
+      monsterId,
+      x: Math.max(0, Math.floor((MONSTER_BOARD_COLS - monster.cols) / 2)),
+      y: Math.max(0, Math.floor((MONSTER_BOARD_ROWS - monster.rows) / 2)),
+    };
   }
 
   function createHeroInstance(def) {
@@ -1779,13 +1789,27 @@
   }
 
   function scheduleLayoutStabilization() {
-    if (els.appShell.classList.contains("meta-mode") || layoutStabilizeFrame) return;
-    layoutStabilizeFrame = requestAnimationFrame(() => {
-      layoutStabilizeFrame = null;
-      const nextSize = calculateAdaptiveCellSize();
-      if (!applyAdaptiveCellSize(nextSize)) return;
+    if (els.appShell.classList.contains("meta-mode")) return;
+    layoutStabilizePasses = Math.max(layoutStabilizePasses, 8);
+    if (layoutStabilizeFrame) return;
+    layoutStabilizeFrame = requestAnimationFrame(runLayoutStabilization);
+  }
+
+  function runLayoutStabilization() {
+    layoutStabilizeFrame = null;
+    if (els.appShell.classList.contains("meta-mode")) {
+      layoutStabilizePasses = 0;
+      return;
+    }
+    layoutStabilizePasses = Math.max(0, layoutStabilizePasses - 1);
+    const nextSize = calculateAdaptiveCellSize();
+    if (applyAdaptiveCellSize(nextSize)) {
       render();
-    });
+      return;
+    }
+    if (layoutStabilizePasses > 0) {
+      layoutStabilizeFrame = requestAnimationFrame(runLayoutStabilization);
+    }
   }
 
   function calculateAdaptiveCellSize() {
