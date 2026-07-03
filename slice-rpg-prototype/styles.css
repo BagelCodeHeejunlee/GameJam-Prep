@@ -1309,9 +1309,23 @@ button:disabled {
 }
 
 .monster-grid {
+  position: relative;
   min-height: 0;
   align-content: center;
   overflow: visible;
+}
+
+.monster-grid.has-monster-art::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: -4px;
+  pointer-events: none;
+  background-image: var(--monster-art);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.3;
 }
 
 .monster-cell,
@@ -1326,6 +1340,7 @@ button:disabled {
 }
 
 .monster-cell {
+  z-index: 1;
   border: 2px solid rgba(96, 67, 38, 0.58);
   background:
     radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.18), transparent 34%),
@@ -1343,6 +1358,7 @@ button:disabled {
 }
 
 .monster-cell.covered {
+  z-index: 3;
   border-color: #c99544;
   background:
     radial-gradient(circle at 35% 28%, #fffdf0 0 18%, transparent 19%),
@@ -1371,6 +1387,7 @@ button:disabled {
 }
 
 .monster-cell.blocked {
+  z-index: 3;
   border-color: #344052;
   background:
     linear-gradient(145deg, #76889d, var(--blocked));
@@ -1402,6 +1419,7 @@ button:disabled {
 
 .monster-cell.preview-place,
 .material-cell.preview-place {
+  z-index: 4;
   outline: 3px solid #ffd33c;
   outline-offset: -2px;
   box-shadow:
@@ -1411,6 +1429,7 @@ button:disabled {
 
 .monster-cell.preview-invalid,
 .material-cell.preview-invalid {
+  z-index: 4;
   outline: 3px solid #d9493d;
   outline-offset: -2px;
   box-shadow:
@@ -1419,6 +1438,8 @@ button:disabled {
 }
 
 .cell-icon {
+  position: relative;
+  z-index: 5;
   display: grid;
   width: 23px;
   height: 23px;

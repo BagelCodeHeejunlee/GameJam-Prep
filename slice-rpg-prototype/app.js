@@ -133,6 +133,7 @@
       id: "iron-goblin",
       name: "철갑 고블린",
       sub: "작은 몸통의 주먹부터 막아라",
+      image: "assets/monsters/iron-goblin.png",
       cols: 3,
       rows: 3,
       baseAttack: 2,
@@ -162,6 +163,7 @@
       id: "swamp-slime",
       name: "늪지 점액술사",
       sub: "회복 표식을 방치하면 재료가 말린다",
+      image: "assets/monsters/swamp-slime.png",
       cols: 4,
       rows: 4,
       baseAttack: 1,
@@ -196,6 +198,7 @@
       id: "stone-ogre",
       name: "돌껍질 오우거",
       sub: "큰 몸이지만 낭비할 재료는 적다",
+      image: "assets/monsters/stone-ogre.png",
       cols: 5,
       rows: 4,
       baseAttack: 3,
@@ -1540,6 +1543,8 @@
     const dropPreviewCells = new Set(dropPreview?.cells || []);
     const draggingPlacedCells = getDraggingPlacedCells();
     els.monsterGrid.style.gridTemplateColumns = `repeat(${monster.cols}, var(--cell))`;
+    els.monsterGrid.style.setProperty("--monster-art", monster.image ? `url("${monster.image}")` : "none");
+    els.monsterGrid.classList.toggle("has-monster-art", Boolean(monster.image));
     els.monsterGrid.innerHTML = "";
 
     for (let y = 0; y < monster.rows; y += 1) {
