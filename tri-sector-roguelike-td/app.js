@@ -27,7 +27,6 @@ const ui = {
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
 const HERO_ANGLES = [-90, 30, 150];
-const POSITION_SECTOR_ANGLE = 120;
 const ENEMY_SCALE = 0.72;
 const VERSION_LABEL = "TRI-KEEPERS";
 
@@ -720,13 +719,12 @@ function attackWithHero(hero) {
 }
 
 function attackArcher(hero) {
-  const targets = findSectorTargets(hero, 1);
+  const targets = findTargets(hero, 1);
   if (!targets.length) return false;
 
   const aim = heroAim(hero);
   const target = targets[0];
   const baseAngle = Math.atan2(target.y - aim.y, target.x - aim.x);
-  const attackAngle = baseAngle / DEG;
   const count = Math.max(1, hero.projectileCount);
   const spread = count > 1 ? 7 * DEG : 0;
   const damage = prepareHeroDamage(hero);
@@ -740,13 +738,13 @@ function attackArcher(hero) {
     type: "muzzle",
     x: aim.x,
     y: aim.y,
-    angle: attackAngle,
+    angle: aim.angle,
     color: hero.color,
     life: 0.16,
     maxLife: 0.16,
   });
 
-  chargeUltimate(hero, () => triggerArrowRain(hero, attackAngle));
+  chargeUltimate(hero, () => triggerArrowRain(hero));
   return true;
 }
 
@@ -762,7 +760,7 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
     damage,
     pierceLeft: pierce,
     rangeLeft: hero.range,
-    radius: clamp(3.4 + hero.angle * 0.028, 3.8, 7.2),
+    radius: 4,
     color: hero.breakthrough ? "#9ee7ff" : hero.color,
     hitIds: [],
   });
@@ -771,15 +769,10 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
 function attackWarrior(hero) {
   const range = hero.range + (hero.breakthrough ? 12 : 0);
   const angle = hero.angle + (hero.breakthrough ? 8 : 0);
-  const primaryTargets = findSectorTargets(hero, 1, range);
-  if (!primaryTargets.length) return false;
-
-  const aim = heroAim(hero);
-  const primary = primaryTargets[0];
-  const attackAngle = Math.atan2(primary.y - aim.y, primary.x - aim.x) / DEG;
-  const targets = findArcTargets(aim.x, aim.y, range, attackAngle, angle, hero.targets);
+  const targets = findTargets(hero, hero.targets, range, angle);
   if (!targets.length) return false;
 
+  const aim = heroAim(hero);
   const baseDamage = prepareHeroDamage(hero);
   for (const enemy of targets) {
     let amount = baseDamage;
@@ -792,7 +785,7 @@ function attackWarrior(hero) {
     type: "slash",
     x: aim.x,
     y: aim.y,
-    angle: attackAngle,
+    angle: aim.angle,
     arc: angle,
     range,
     color: hero.color,
@@ -801,17 +794,16 @@ function attackWarrior(hero) {
     maxLife: 0.18,
   });
 
-  chargeUltimate(hero, () => triggerWarriorUltimate(hero, attackAngle));
+  chargeUltimate(hero, () => triggerWarriorUltimate(hero));
   return true;
 }
 
 function attackMage(hero) {
-  const targets = findSectorTargets(hero, 1);
+  const targets = findTargets(hero, 1);
   if (!targets.length) return false;
 
   const target = targets[0];
   const aim = heroAim(hero);
-  const attackAngle = Math.atan2(target.y - aim.y, target.x - aim.x) / DEG;
   const damage = prepareHeroDamage(hero);
   addMagicCircle({
     x: target.x,
@@ -821,8 +813,7 @@ function attackMage(hero) {
     damage,
     color: hero.breakthrough ? "#dcb6ff" : hero.color,
     heroId: hero.id,
-    angle: attackAngle,
-    arc: hero.angle,
+    angle: aim.angle,
     range: hero.range,
     chainCount: hero.chainCount,
     zoneDuration: hero.zoneDuration,
@@ -830,7 +821,7 @@ function attackMage(hero) {
     big: false,
   });
 
-  chargeUltimate(hero, () => triggerMageUltimate(hero, target, attackAngle));
+  chargeUltimate(hero, () => triggerMageUltimate(hero, target));
   return true;
 }
 
@@ -851,11 +842,11 @@ function chargeUltimate(hero, trigger) {
   trigger();
 }
 
-function triggerArrowRain(hero, attackAngle = heroAim(hero).angle) {
+function triggerArrowRain(hero) {
   const aim = heroAim(hero);
   state.skyStrikes.push({
     heroId: hero.id,
-    angle: attackAngle,
+    angle: aim.angle,
     range: hero.range,
     arc: hero.angle + 18,
     delay: 0.38,
@@ -867,7 +858,7 @@ function triggerArrowRain(hero, attackAngle = heroAim(hero).angle) {
     type: "mark",
     x: aim.x,
     y: aim.y,
-    angle: attackAngle,
+    angle: aim.angle,
     arc: hero.angle + 18,
     range: hero.range,
     color: hero.color,
@@ -876,7 +867,8 @@ function triggerArrowRain(hero, attackAngle = heroAim(hero).angle) {
   });
 }
 
-function triggerWarriorUltimate(hero, attackAngle = heroAim(hero).angle) {
+function triggerWarriorUltimate(hero) {
+  const aim = heroAim(hero);
   const t = tower();
   const radius = t.r + 122;
   const targets = state.enemies.filter((enemy) => {
@@ -885,7 +877,7 @@ function triggerWarriorUltimate(hero, attackAngle = heroAim(hero).angle) {
     const dist = Math.hypot(dx, dy);
     if (dist > radius) return false;
     const enemyAngle = Math.atan2(dy, dx) / DEG;
-    return Math.abs(angleDiff(enemyAngle, attackAngle)) <= hero.angle / 2;
+    return Math.abs(angleDiff(enemyAngle, aim.angle)) <= hero.angle / 2;
   });
 
   for (const enemy of targets) {
@@ -899,7 +891,7 @@ function triggerWarriorUltimate(hero, attackAngle = heroAim(hero).angle) {
     type: "shield",
     x: t.x,
     y: t.y,
-    angle: attackAngle,
+    angle: aim.angle,
     arc: hero.angle,
     range: radius,
     color: hero.color,
@@ -909,11 +901,12 @@ function triggerWarriorUltimate(hero, attackAngle = heroAim(hero).angle) {
   addBurst(t.x, t.y, hero.color, 24);
 }
 
-function triggerMageUltimate(hero, target, attackAngle = heroAim(hero).angle) {
+function triggerMageUltimate(hero, target) {
+  const aim = heroAim(hero);
   const t = tower();
   const fallbackDistance = Math.min(hero.range * 0.68, Math.min(cssWidth, cssHeight) * 0.31);
-  const x = target ? target.x : t.x + Math.cos(attackAngle * DEG) * fallbackDistance;
-  const y = target ? target.y : t.y + Math.sin(attackAngle * DEG) * fallbackDistance;
+  const x = target ? target.x : t.x + Math.cos(aim.angle * DEG) * fallbackDistance;
+  const y = target ? target.y : t.y + Math.sin(aim.angle * DEG) * fallbackDistance;
 
   addMagicCircle({
     x,
@@ -923,8 +916,7 @@ function triggerMageUltimate(hero, target, attackAngle = heroAim(hero).angle) {
     damage: Math.round(hero.damage * 3.3),
     color: "#e6c8ff",
     heroId: hero.id,
-    angle: attackAngle,
-    arc: hero.angle,
+    angle: aim.angle,
     range: hero.range,
     chainCount: 0,
     zoneDuration: Math.max(2.1, hero.zoneDuration + 0.8),
@@ -943,9 +935,10 @@ function triggerMageUltimate(hero, target, attackAngle = heroAim(hero).angle) {
   });
 }
 
-function findSectorTargets(hero, limit, rangeOverride) {
+function findTargets(hero, limit, rangeOverride, angleOverride) {
   const aim = heroAim(hero);
   const range = rangeOverride ?? hero.range;
+  const angle = angleOverride ?? hero.angle;
   const candidates = [];
   const t = tower();
 
@@ -957,29 +950,7 @@ function findSectorTargets(hero, limit, rangeOverride) {
     if (dist > range) continue;
     const enemyAngle = Math.atan2(dy, dx) / DEG;
     const diff = Math.abs(angleDiff(enemyAngle, aim.angle));
-    if (diff <= POSITION_SECTOR_ANGLE / 2) {
-      candidates.push({
-        enemy,
-        danger: Math.hypot(enemy.x - t.x, enemy.y - t.y),
-      });
-    }
-  }
-
-  candidates.sort((a, b) => a.danger - b.danger);
-  return candidates.slice(0, limit).map((item) => item.enemy);
-}
-
-function findArcTargets(x, y, range, centerAngle, arc, limit) {
-  const t = tower();
-  const candidates = [];
-  for (const enemy of state.enemies) {
-    if (enemy.dead) continue;
-    const dx = enemy.x - x;
-    const dy = enemy.y - y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > range) continue;
-    const enemyAngle = Math.atan2(dy, dx) / DEG;
-    if (Math.abs(angleDiff(enemyAngle, centerAngle)) <= arc / 2) {
+    if (diff <= angle / 2) {
       candidates.push({
         enemy,
         danger: Math.hypot(enemy.x - t.x, enemy.y - t.y),
@@ -998,7 +969,7 @@ function enemyInCastCone(circle, enemy) {
   const dist = Math.hypot(dx, dy);
   if (dist > circle.range) return false;
   const enemyAngle = Math.atan2(dy, dx) / DEG;
-  return Math.abs(angleDiff(enemyAngle, circle.angle)) <= (circle.arc ?? POSITION_SECTOR_ANGLE) / 2;
+  return Math.abs(angleDiff(enemyAngle, circle.angle)) <= 55;
 }
 
 function updateProjectiles(dt) {
@@ -1104,7 +1075,6 @@ function explodeMagicCircle(circle) {
         color: circle.color,
         heroId: circle.heroId,
         angle: circle.angle,
-        arc: circle.arc,
         range: circle.range,
         chainCount: 0,
         zoneDuration: Math.min(0.7, circle.zoneDuration * 0.45),
@@ -1483,24 +1453,11 @@ function drawMap() {
 function drawAttackCones() {
   for (const hero of state.heroes) {
     const p = heroAim(hero);
-    const sectorStart = (p.angle - POSITION_SECTOR_ANGLE / 2) * DEG;
-    const sectorEnd = (p.angle + POSITION_SECTOR_ANGLE / 2) * DEG;
     const start = (p.angle - hero.angle / 2) * DEG;
     const end = (p.angle + hero.angle / 2) * DEG;
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const sectorGrad = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, hero.range);
-    sectorGrad.addColorStop(0, rgba(hero.color, 0.08));
-    sectorGrad.addColorStop(0.78, rgba(hero.color, 0.035));
-    sectorGrad.addColorStop(1, rgba(hero.color, 0));
-    ctx.fillStyle = sectorGrad;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.arc(p.x, p.y, hero.range, sectorStart, sectorEnd);
-    ctx.closePath();
-    ctx.fill();
-
     const grad = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, hero.range);
     grad.addColorStop(0, rgba(hero.color, 0.2));
     grad.addColorStop(0.7, rgba(hero.color, hero.rotateT < 1 ? 0.1 : 0.07));
@@ -1516,12 +1473,6 @@ function drawAttackCones() {
     ctx.globalAlpha = hero.rotateT < 1 ? 0.18 : 0.36;
     ctx.strokeStyle = hero.color;
     ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, hero.range, sectorStart, sectorEnd);
-    ctx.stroke();
-
-    ctx.globalAlpha = hero.rotateT < 1 ? 0.34 : 0.68;
-    ctx.lineWidth = 2.2;
     ctx.beginPath();
     ctx.arc(p.x, p.y, hero.range, start, end);
     ctx.stroke();
