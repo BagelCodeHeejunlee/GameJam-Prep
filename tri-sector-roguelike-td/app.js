@@ -50,15 +50,15 @@ const HERO_BLUEPRINTS = [
   {
     id: "warrior",
     name: "전사",
-    role: "근접 제압",
+    role: "초근접 강타",
     glyph: "전",
     color: "#ff8d62",
     glow: "rgba(255, 141, 98, 0.42)",
-    damage: 18,
-    range: 170,
-    angle: 105,
-    cooldown: 0.95,
-    targets: 2,
+    damage: 34,
+    range: 118,
+    angle: 95,
+    cooldown: 0.92,
+    targets: 1,
     towerBonus: 0,
     push: 0,
     ultimateEvery: 6,
@@ -165,10 +165,10 @@ const WAVES = [
 ];
 
 const TYPES = {
-  grunt: { hp: 46, speed: 29, radius: 11, damage: 5, attackInterval: 1.05, xp: 6, color: "#dc765e", core: "#ffcf7d" },
-  runner: { hp: 30, speed: 48, radius: 9, damage: 4, attackInterval: 0.82, xp: 7, color: "#72d8ff", core: "#e7fbff" },
-  tank: { hp: 118, speed: 19, radius: 14, damage: 11, attackInterval: 1.38, xp: 15, color: "#a88cff", core: "#f0d9ff" },
-  brute: { hp: 180, speed: 16, radius: 16, damage: 16, attackInterval: 1.52, xp: 24, color: "#ff5f85", core: "#ffd6e0" },
+  grunt: { hp: 52, speed: 18, radius: 11, damage: 6, attackInterval: 1.05, xp: 6, color: "#dc765e", core: "#ffcf7d" },
+  runner: { hp: 34, speed: 31, radius: 9, damage: 5, attackInterval: 0.82, xp: 7, color: "#72d8ff", core: "#e7fbff" },
+  tank: { hp: 132, speed: 12, radius: 14, damage: 13, attackInterval: 1.38, xp: 15, color: "#a88cff", core: "#f0d9ff" },
+  brute: { hp: 205, speed: 10, radius: 16, damage: 18, attackInterval: 1.52, xp: 24, color: "#ff5f85", core: "#ffd6e0" },
 };
 
 const commonUpgrades = [
@@ -322,13 +322,13 @@ const heroUpgrades = [
     heroId: "warrior",
     tier: "돌파",
     title: "철벽 돌진",
-    text: "전사 베기가 짧은 충격파로 변해 더 많은 적을 밀어냄",
+    text: "전사 베기가 짧은 근접 충격파로 변해 적을 밀어냄",
     canOffer: (hero) => hero.basicPicks >= 2 && !hero.breakthrough,
     apply: (hero) => {
       hero.breakthrough = true;
-      hero.targets += 2;
+      hero.targets += 1;
       hero.push += 14;
-      hero.range += 24;
+      hero.range += 12;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
@@ -643,7 +643,7 @@ function createEnemy(plan) {
     y,
     hp,
     maxHp: hp,
-    speed: type.speed + state.waveIndex * 1.5,
+    speed: type.speed + state.waveIndex * 0.8,
     radius: type.radius * ENEMY_SCALE,
     damage: type.damage,
     attackInterval: type.attackInterval,
@@ -767,7 +767,7 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
 }
 
 function attackWarrior(hero) {
-  const range = hero.range + (hero.breakthrough ? 26 : 0);
+  const range = hero.range + (hero.breakthrough ? 12 : 0);
   const angle = hero.angle + (hero.breakthrough ? 8 : 0);
   const targets = findTargets(hero, hero.targets, range, angle);
   if (!targets.length) return false;
@@ -870,7 +870,7 @@ function triggerArrowRain(hero) {
 function triggerWarriorUltimate(hero) {
   const aim = heroAim(hero);
   const t = tower();
-  const radius = t.r + 150;
+  const radius = t.r + 122;
   const targets = state.enemies.filter((enemy) => {
     const dx = enemy.x - t.x;
     const dy = enemy.y - t.y;
