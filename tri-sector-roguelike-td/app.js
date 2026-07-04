@@ -83,9 +83,9 @@ const WAVES = [
 ];
 
 const TYPES = {
-  grunt: { hp: 34, speed: 34, radius: 11, damage: 8, xp: 6, color: "#dc765e", core: "#ffcf7d" },
-  runner: { hp: 22, speed: 56, radius: 9, damage: 7, xp: 7, color: "#72d8ff", core: "#e7fbff" },
-  tank: { hp: 78, speed: 22, radius: 14, damage: 16, xp: 15, color: "#a88cff", core: "#f0d9ff" },
+  grunt: { hp: 34, speed: 34, radius: 11, damage: 8, attackInterval: 0.95, xp: 6, color: "#dc765e", core: "#ffcf7d" },
+  runner: { hp: 22, speed: 56, radius: 9, damage: 7, attackInterval: 0.72, xp: 7, color: "#72d8ff", core: "#e7fbff" },
+  tank: { hp: 78, speed: 22, radius: 14, damage: 16, attackInterval: 1.28, xp: 15, color: "#a88cff", core: "#f0d9ff" },
 };
 
 const upgradePool = [
@@ -353,6 +353,10 @@ function createEnemy(plan) {
     speed: type.speed + state.waveIndex * 2,
     radius: type.radius * ENEMY_SCALE,
     damage: type.damage,
+    attackInterval: type.attackInterval,
+    attackTimer: type.attackInterval * 0.45,
+    attackFlash: 0,
+    attacking: false,
     xp: type.xp,
     color: type.color,
     core: type.core,
@@ -368,17 +372,34 @@ function updateEnemies(dt) {
     const dx = t.x - e.x;
     const dy = t.y - e.y;
     const dist = Math.hypot(dx, dy) || 1;
-    e.x += (dx / dist) * e.speed * dt;
-    e.y += (dy / dist) * e.speed * dt;
     e.hit = Math.max(0, e.hit - dt * 6);
+    e.attackFlash = Math.max(0, e.attackFlash - dt * 5);
+    const stopDist = t.r + e.radius * 1.05;
 
-    if (dist < t.r + e.radius * 0.88) {
-      state.enemies.splice(i, 1);
+    if (dist > stopDist) {
+      e.attacking = false;
+      const step = Math.min(e.speed * dt, dist - stopDist);
+      e.x += (dx / dist) * step;
+      e.y += (dy / dist) * step;
+      continue;
+    }
+
+    e.attacking = true;
+    e.x = t.x - (dx / dist) * stopDist;
+    e.y = t.y - (dy / dist) * stopDist;
+    e.attackTimer -= dt;
+
+    if (e.attackTimer <= 0) {
+      e.attackTimer += e.attackInterval;
+      e.attackFlash = 1;
       state.hp = Math.max(0, state.hp - e.damage);
-      state.shake = 1;
-      addBurst(e.x, e.y, "#ff6b6b", 16);
+      state.shake = 0.75;
+      addBurst(e.x, e.y, "#ff6b6b", 9);
       addFloat(t.x, t.y - t.r - 8, "-" + e.damage, "#ff8d8d");
-      if (state.hp <= 0) finish(false);
+      if (state.hp <= 0) {
+        finish(false);
+        return;
+      }
     }
   }
 }
@@ -693,6 +714,22 @@ function drawSlots() {
   }
 }
 
+function drawEnemyAttackLine(enemy) {
+  if (!enemy.attacking) return;
+  const t = tower();
+  const pulse = 0.32 + enemy.attackFlash * 0.68;
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = "#ff6b6b";
+  ctx.lineWidth = 2 + enemy.attackFlash * 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(enemy.x, enemy.y);
+  ctx.lineTo(t.x, t.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawTower() {
   const t = tower();
   ctx.save();
@@ -819,6 +856,7 @@ function drawEnemies() {
     ctx.fillStyle = "#79e28e";
     ctx.fillRect(-bw / 2, -e.radius - 10, bw * Math.max(0, e.hp / e.maxHp), 4);
     ctx.restore();
+    drawEnemyAttackLine(e);
   }
 }
 
