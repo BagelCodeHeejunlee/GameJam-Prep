@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Rotation Keepers</title>
+    <meta name="theme-color" content="#101522" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Rotation Keepers">
+      <header class="hud hud-top">
+        <section class="hud-cluster" aria-label="전투 상태">
+          <div class="stat">
+            <span>WAVE</span>
+            <strong id="waveLabel">1/5</strong>
+          </div>
+          <div class="stat wide">
+            <span>TOWER</span>
+            <strong id="hpLabel">100/100</strong>
+            <i class="bar"><b id="hpFill"></b></i>
+          </div>
+          <div class="stat wide">
+            <span>EXP</span>
+            <strong id="xpLabel">0/18</strong>
+            <i class="bar xp"><b id="xpFill"></b></i>
+          </div>
+        </section>
+      </header>
+
+      <section id="battleFrame" class="battle-frame" aria-label="전장">
+        <canvas id="gameCanvas"></canvas>
+        <div id="toast" class="toast hidden" aria-live="polite"></div>
+      </section>
+
+      <footer class="hud hud-bottom">
+        <section class="hero-panel" aria-label="캐릭터">
+          <div class="portrait" aria-hidden="true">
+            <span></span>
+          </div>
+          <div class="hero-copy">
+            <p>기본 수호자</p>
+            <h1 id="heroLevelLabel">Lv.1 / 120도</h1>
+          </div>
+          <div class="hero-stats">
+            <div><span>ATK</span><strong id="damageLabel">18</strong></div>
+            <div><span>SPD</span><strong id="speedLabel">1.0</strong></div>
+            <div><span>RNG</span><strong id="rangeLabel">210</strong></div>
+          </div>
+          <button id="restartButton" class="icon-button" type="button" aria-label="재시작" title="재시작">↻</button>
+        </section>
+      </footer>
+
+      <section id="upgradeOverlay" class="overlay hidden" aria-label="레벨 업">
+        <div class="modal">
+          <p class="eyebrow">LEVEL UP</p>
+          <h2>강화 선택</h2>
+          <div id="upgradeChoices" class="upgrade-choices"></div>
+        </div>
+      </section>
+
+      <section id="resultOverlay" class="overlay hidden" aria-label="결과">
+        <div class="modal compact">
+          <p id="resultEyebrow" class="eyebrow">RESULT</p>
+          <h2 id="resultTitle">전투 종료</h2>
+          <p id="resultText">결과를 확인합니다.</p>
+          <button id="resultButton" class="primary-button" type="button">다시 시작</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
