@@ -27,7 +27,8 @@ const ui = {
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
 const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
-const ENEMY_SCALE = 0.72;
+const ENEMY_SCALE = 0.48;
+const HERO_SCALE = 0.64;
 const VERSION_LABEL = "TRI-KEEPERS";
 
 const HERO_BLUEPRINTS = [
@@ -51,12 +52,12 @@ const HERO_BLUEPRINTS = [
   {
     id: "warrior",
     name: "전사",
-    role: "초근접 강타",
+    role: "고화력 베기",
     glyph: "전",
     color: "#ff8d62",
     glow: "rgba(255, 141, 98, 0.42)",
     damage: 34,
-    range: 118,
+    range: 310,
     angle: 95,
     cooldown: 0.92,
     targets: 1,
@@ -168,10 +169,10 @@ const WAVES = [
 ];
 
 const TYPES = {
-  grunt: { hp: 52, speed: 18, radius: 11, damage: 6, attackInterval: 1.05, xp: 6, color: "#dc765e", core: "#ffcf7d" },
-  runner: { hp: 34, speed: 31, radius: 9, damage: 5, attackInterval: 0.82, xp: 7, color: "#72d8ff", core: "#e7fbff" },
-  tank: { hp: 132, speed: 12, radius: 14, damage: 13, attackInterval: 1.38, xp: 15, color: "#a88cff", core: "#f0d9ff" },
-  brute: { hp: 205, speed: 10, radius: 16, damage: 18, attackInterval: 1.52, xp: 24, color: "#ff5f85", core: "#ffd6e0" },
+  grunt: { hp: 52, speed: 8, radius: 11, damage: 6, attackInterval: 1.05, xp: 6, color: "#dc765e", core: "#ffcf7d" },
+  runner: { hp: 34, speed: 14, radius: 9, damage: 5, attackInterval: 0.82, xp: 7, color: "#72d8ff", core: "#e7fbff" },
+  tank: { hp: 132, speed: 5.5, radius: 14, damage: 13, attackInterval: 1.38, xp: 15, color: "#a88cff", core: "#f0d9ff" },
+  brute: { hp: 205, speed: 4.5, radius: 16, damage: 18, attackInterval: 1.52, xp: 24, color: "#ff5f85", core: "#ffd6e0" },
 };
 
 const commonUpgrades = [
@@ -325,7 +326,7 @@ const heroUpgrades = [
     heroId: "warrior",
     tier: "돌파",
     title: "철벽 돌진",
-    text: "전사 베기가 짧은 근접 충격파로 변해 적을 밀어냄",
+    text: "전사 베기가 전방 충격파로 변해 적을 밀어냄",
     canOffer: (hero) => hero.basicPicks >= 2 && !hero.breakthrough,
     apply: (hero) => {
       hero.breakthrough = true;
@@ -496,7 +497,7 @@ function tower() {
   return {
     x: cssWidth * 0.5,
     y: cssHeight * 0.49,
-    r: Math.min(cssWidth, cssHeight) * 0.045,
+    r: Math.min(cssWidth, cssHeight) * 0.034,
   };
 }
 
@@ -520,7 +521,7 @@ function heroVisualPosition(hero, distance = 0) {
   const t = tower();
   const aim = heroAim(hero);
   const angle = aim.angle * DEG;
-  const radius = t.r * 0.78 + distance;
+  const radius = t.r * 0.95 + distance;
   return {
     x: t.x + Math.cos(angle) * radius,
     y: t.y + Math.sin(angle) * radius,
@@ -622,7 +623,7 @@ function spawnWaveEnemies() {
 
 function createEnemy(plan) {
   const type = TYPES[plan.type];
-  const pad = 9;
+  const pad = 6;
   let x = cssWidth * 0.5;
   let y = cssHeight * 0.5;
 
@@ -647,7 +648,7 @@ function createEnemy(plan) {
     y,
     hp,
     maxHp: hp,
-    speed: type.speed + state.waveIndex * 0.8,
+    speed: type.speed + state.waveIndex * 0.35,
     radius: type.radius * ENEMY_SCALE,
     damage: type.damage,
     attackInterval: type.attackInterval,
@@ -1308,7 +1309,7 @@ function addBurst(x, y, color, count) {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       color,
-      size: 2 + Math.random() * 3,
+      size: 1.2 + Math.random() * 2,
       life: 0.35 + Math.random() * 0.35,
       maxLife: 0.7,
     });
@@ -1488,8 +1489,8 @@ function drawSlots() {
   const t = tower();
   for (let i = 0; i < HERO_ANGLES.length; i += 1) {
     const angle = HERO_ANGLES[i] * DEG;
-    const inner = t.r + 6;
-    const outer = t.r + 24;
+    const inner = t.r + 4;
+    const outer = t.r + 17;
     ctx.save();
     ctx.globalAlpha = 0.22;
     ctx.strokeStyle = "rgba(247, 241, 220, 0.78)";
@@ -1503,14 +1504,14 @@ function drawSlots() {
   }
 
   for (const hero of state.heroes) {
-    const p = heroVisualPosition(hero, 8);
+    const p = heroVisualPosition(hero, 5);
     const angle = p.angle * DEG;
-    const inner = t.r + 7;
-    const outer = t.r + 30;
+    const inner = t.r + 5;
+    const outer = t.r + 22;
     ctx.save();
     ctx.globalAlpha = hero.rotateT < 1 ? 0.38 : 0.82;
     ctx.strokeStyle = hero.color;
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(t.x + Math.cos(angle) * inner, t.y + Math.sin(angle) * inner);
@@ -1518,7 +1519,7 @@ function drawSlots() {
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3.2, 0, TWO_PI);
+    ctx.arc(p.x, p.y, 2.4, 0, TWO_PI);
     ctx.fillStyle = hero.color;
     ctx.fill();
     ctx.restore();
@@ -1532,7 +1533,7 @@ function drawEnemyAttackLine(enemy) {
   ctx.save();
   ctx.globalAlpha = pulse;
   ctx.strokeStyle = "#ff6b6b";
-  ctx.lineWidth = 2 + enemy.attackFlash * 2;
+  ctx.lineWidth = 1.2 + enemy.attackFlash * 1.4;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(enemy.x, enemy.y);
@@ -1545,7 +1546,7 @@ function drawTower() {
   const t = tower();
   ctx.save();
   ctx.shadowColor = "rgba(247, 200, 95, 0.55)";
-  ctx.shadowBlur = 22;
+  ctx.shadowBlur = 16;
   ctx.fillStyle = "#38445e";
   roundPoly(t.x, t.y, t.r * 1.42, 8, -Math.PI / 8);
   ctx.fill();
@@ -1556,7 +1557,7 @@ function drawTower() {
   ctx.fill();
 
   ctx.strokeStyle = "rgba(255,255,255,0.65)";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(t.x, t.y - t.r * 1.15);
   ctx.lineTo(t.x, t.y + t.r * 1.05);
@@ -1570,7 +1571,7 @@ function drawHeroes() {
   for (const hero of state.heroes) {
     const p = heroVisualPosition(hero);
     const rotating = hero.rotateT < 1;
-    const unit = Math.max(9, Math.min(cssWidth, cssHeight) * 0.029);
+    const unit = Math.max(6, Math.min(cssWidth, cssHeight) * 0.029 * HERO_SCALE);
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle * DEG + Math.PI / 2);
@@ -1582,7 +1583,7 @@ function drawHeroes() {
 
     ctx.fillStyle = "#151d2c";
     ctx.strokeStyle = hero.color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.roundRect(-unit * 0.68, -unit * 0.5, unit * 1.36, unit * 1.28, 5);
     ctx.fill();
@@ -1594,7 +1595,7 @@ function drawHeroes() {
     ctx.fill();
 
     ctx.strokeStyle = hero.color;
-    ctx.lineWidth = hero.breakthrough ? 4 : 3;
+    ctx.lineWidth = hero.breakthrough ? 2.8 : 2.1;
     ctx.lineCap = "round";
     ctx.beginPath();
     if (hero.id === "archer") {
@@ -1618,7 +1619,7 @@ function drawEnemies() {
     ctx.scale(1 + e.hit * 0.08, 1 + e.hit * 0.08);
     ctx.fillStyle = e.color;
     ctx.shadowColor = e.color;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 8;
     if (e.type === "runner") {
       ctx.beginPath();
       ctx.moveTo(0, -e.radius * 1.35);
@@ -1640,11 +1641,11 @@ function drawEnemies() {
     ctx.arc(0, 0, e.radius * 0.36, 0, TWO_PI);
     ctx.fill();
 
-    const bw = e.radius * 2.2;
+    const bw = Math.max(10, e.radius * 2.3);
     ctx.fillStyle = "rgba(0,0,0,0.42)";
-    ctx.fillRect(-bw / 2, -e.radius - 10, bw, 4);
+    ctx.fillRect(-bw / 2, -e.radius - 7, bw, 3);
     ctx.fillStyle = "#79e28e";
-    ctx.fillRect(-bw / 2, -e.radius - 10, bw * Math.max(0, e.hp / e.maxHp), 4);
+    ctx.fillRect(-bw / 2, -e.radius - 7, bw * Math.max(0, e.hp / e.maxHp), 3);
     ctx.restore();
     drawEnemyAttackLine(e);
   }
@@ -1655,14 +1656,14 @@ function drawProjectiles() {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.strokeStyle = p.color;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2.6;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(p.prevX, p.prevY);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 0.9;
     ctx.stroke();
     ctx.restore();
   }
@@ -1675,7 +1676,7 @@ function drawMagicCircles() {
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = 0.32 + progress * 0.42;
     ctx.strokeStyle = circle.color;
-    ctx.lineWidth = circle.big ? 3 : 2;
+    ctx.lineWidth = circle.big ? 2.2 : 1.5;
     ctx.beginPath();
     ctx.arc(circle.x, circle.y, circle.radius * (0.42 + progress * 0.58), 0, TWO_PI);
     ctx.stroke();
@@ -1700,7 +1701,7 @@ function drawZones() {
     ctx.fill();
     ctx.globalAlpha = 0.2 + a * 0.26;
     ctx.strokeStyle = zone.color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(zone.x, zone.y, zone.radius * (0.94 + Math.sin(state.time * 7) * 0.03), 0, TWO_PI);
     ctx.stroke();
@@ -1739,20 +1740,20 @@ function drawEffects() {
     if (effect.type === "slash") {
       const start = (effect.angle - effect.arc / 2) * DEG;
       const end = (effect.angle + effect.arc / 2) * DEG;
-      ctx.lineWidth = effect.heavy ? 9 : 6;
+      ctx.lineWidth = effect.heavy ? 6 : 4;
       ctx.lineCap = "round";
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.range * (0.55 + (1 - a) * 0.45), start, end);
       ctx.stroke();
     } else if (effect.type === "shock") {
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.radius * (0.48 + (1 - a) * 0.58), 0, TWO_PI);
       ctx.stroke();
     } else if (effect.type === "shield") {
       const start = (effect.angle - effect.arc / 2) * DEG;
       const end = (effect.angle + effect.arc / 2) * DEG;
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 5;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.range * (0.45 + (1 - a) * 0.55), start, end);
       ctx.stroke();
@@ -1774,7 +1775,7 @@ function drawEffects() {
       ctx.closePath();
       ctx.fill();
     } else if (effect.type === "rune") {
-      ctx.lineWidth = 2.4;
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.radius * (0.72 + (1 - a) * 0.28), 0, TWO_PI);
       ctx.stroke();
@@ -1782,7 +1783,7 @@ function drawEffects() {
       ctx.arc(effect.x, effect.y, effect.radius * 0.44, 0, TWO_PI);
       ctx.stroke();
     } else if (effect.type === "muzzle") {
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(effect.x, effect.y);
       ctx.lineTo(effect.x + Math.cos(effect.angle * DEG) * 34, effect.y + Math.sin(effect.angle * DEG) * 34);
@@ -1802,7 +1803,7 @@ function drawRainEffect(effect, alpha) {
     const x = t.x + Math.cos(base + spread) * dist;
     const y = t.y + Math.sin(base + spread) * dist;
     ctx.globalAlpha = alpha * (0.48 + (i % 2) * 0.28);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x - 18, y - 26);
     ctx.lineTo(x + 8, y + 14);
@@ -1815,10 +1816,10 @@ function drawXpOrbs() {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.shadowColor = "#7fe2ff";
-    ctx.shadowBlur = 14;
+    ctx.shadowBlur = 10;
     ctx.fillStyle = "#85eeff";
     ctx.beginPath();
-    ctx.arc(orb.x, orb.y, 4.5, 0, TWO_PI);
+    ctx.arc(orb.x, orb.y, 3.2, 0, TWO_PI);
     ctx.fill();
     ctx.restore();
   }
