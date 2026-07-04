@@ -26,7 +26,7 @@ const ui = {
 
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
-const HERO_ANGLES = [-90, 30, 150];
+const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
 const ENEMY_SCALE = 0.72;
 const VERSION_LABEL = "TRI-KEEPERS";
 
@@ -46,6 +46,7 @@ const HERO_BLUEPRINTS = [
     pierce: 0,
     projectileCount: 1,
     ultimateEvery: 8,
+    initialSlot: 0,
   },
   {
     id: "warrior",
@@ -62,6 +63,7 @@ const HERO_BLUEPRINTS = [
     towerBonus: 0,
     push: 0,
     ultimateEvery: 6,
+    initialSlot: 2,
   },
   {
     id: "mage",
@@ -80,6 +82,7 @@ const HERO_BLUEPRINTS = [
     zoneDps: 7,
     chainCount: 0,
     ultimateEvery: 5,
+    initialSlot: 4,
   },
 ];
 
@@ -461,11 +464,12 @@ function createState() {
 }
 
 function createHero(blueprint, index) {
+  const slot = blueprint.initialSlot ?? index;
   return {
     ...blueprint,
-    slot: index,
-    fromSlot: index,
-    toSlot: index,
+    slot,
+    fromSlot: slot,
+    toSlot: slot,
     rotateT: 1,
     rotateDuration: 0.14,
     attackTimer: index * 0.18,
@@ -541,7 +545,7 @@ function queueRotation() {
 function startRotation() {
   for (const hero of state.heroes) {
     hero.fromSlot = hero.slot;
-    hero.toSlot = (hero.slot + 1) % 3;
+    hero.toSlot = (hero.slot + 1) % HERO_ANGLES.length;
     hero.slot = hero.toSlot;
     hero.rotateT = 0;
     hero.attackTimer = Math.max(hero.attackTimer, hero.rotateDuration);
@@ -551,7 +555,7 @@ function startRotation() {
   state.rotationCount += 1;
   const t = tower();
   addRing(t.x, t.y, "#ffd166", 8, 0.34);
-  if (state.rotationPulse > 0 && state.rotationCount % 3 === 0) triggerRotationPulse();
+  if (state.rotationPulse > 0 && state.rotationCount % HERO_ANGLES.length === 0) triggerRotationPulse();
 }
 
 function triggerRotationPulse() {
@@ -1482,6 +1486,22 @@ function drawAttackCones() {
 
 function drawSlots() {
   const t = tower();
+  for (let i = 0; i < HERO_ANGLES.length; i += 1) {
+    const angle = HERO_ANGLES[i] * DEG;
+    const inner = t.r + 6;
+    const outer = t.r + 24;
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = "rgba(247, 241, 220, 0.78)";
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(t.x + Math.cos(angle) * inner, t.y + Math.sin(angle) * inner);
+    ctx.lineTo(t.x + Math.cos(angle) * outer, t.y + Math.sin(angle) * outer);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   for (const hero of state.heroes) {
     const p = heroVisualPosition(hero, 8);
     const angle = p.angle * DEG;
