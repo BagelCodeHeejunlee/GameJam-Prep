@@ -26,6 +26,7 @@ const ui = {
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
 const HERO_ANGLES = [-90, 30, 150];
+const ENEMY_SCALE = 0.72;
 const WAVES = [
   [
     spawn(0.4, "top", 0.5, "grunt"),
@@ -220,17 +221,26 @@ function tower() {
   return {
     x: cssWidth * 0.5,
     y: cssHeight * 0.49,
-    r: Math.min(cssWidth, cssHeight) * 0.062,
+    r: Math.min(cssWidth, cssHeight) * 0.045,
   };
 }
 
-function slotPosition(slot, extraRadius = 0) {
+function slotPosition(slot) {
+  const t = tower();
+  return {
+    x: t.x,
+    y: t.y,
+    angle: HERO_ANGLES[slot],
+  };
+}
+
+function directionMarker(slot, distance = 0) {
   const t = tower();
   const angle = HERO_ANGLES[slot] * DEG;
-  const orbit = Math.min(cssWidth, cssHeight) * 0.18 + extraRadius;
+  const radius = t.r + Math.min(cssWidth, cssHeight) * 0.065 + distance;
   return {
-    x: t.x + Math.cos(angle) * orbit,
-    y: t.y + Math.sin(angle) * orbit,
+    x: t.x + Math.cos(angle) * radius,
+    y: t.y + Math.sin(angle) * radius,
     angle: HERO_ANGLES[slot],
   };
 }
@@ -317,21 +327,21 @@ function spawnWaveEnemies() {
 
 function createEnemy(plan) {
   const type = TYPES[plan.type];
-  const pad = 24;
+  const pad = 9;
   let x = cssWidth * 0.5;
   let y = cssHeight * 0.5;
 
   if (plan.edge === "top") {
     x = cssWidth * plan.pos;
-    y = -pad;
+    y = pad;
   } else if (plan.edge === "bottom") {
     x = cssWidth * plan.pos;
-    y = cssHeight + pad;
+    y = cssHeight - pad;
   } else if (plan.edge === "left") {
-    x = -pad;
+    x = pad;
     y = cssHeight * plan.pos;
   } else {
-    x = cssWidth + pad;
+    x = cssWidth - pad;
     y = cssHeight * plan.pos;
   }
 
@@ -341,7 +351,7 @@ function createEnemy(plan) {
     hp: type.hp + state.waveIndex * 4,
     maxHp: type.hp + state.waveIndex * 4,
     speed: type.speed + state.waveIndex * 2,
-    radius: type.radius,
+    radius: type.radius * ENEMY_SCALE,
     damage: type.damage,
     xp: type.xp,
     color: type.color,
@@ -625,7 +635,7 @@ function draw() {
 function drawMap() {
   const w = cssWidth;
   const h = cssHeight;
-  const grid = Math.max(28, Math.min(w, h) * 0.09);
+  const grid = Math.max(22, Math.min(w, h) * 0.068);
 
   ctx.save();
   const grd = ctx.createLinearGradient(0, 0, 0, h);
@@ -658,16 +668,27 @@ function drawMap() {
 }
 
 function drawSlots() {
+  const t = tower();
   for (let i = 0; i < 3; i += 1) {
-    const p = slotPosition(i);
+    const active = i === state.hero.slot && state.hero.rotateT >= 1;
+    const angle = HERO_ANGLES[i] * DEG;
+    const inner = t.r + 8;
+    const outer = t.r + (active ? 32 : 25);
     ctx.save();
-    ctx.globalAlpha = i === state.hero.slot && state.hero.rotateT >= 1 ? 0.55 : 0.24;
-    ctx.strokeStyle = "#f7c85f";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 6]);
+    ctx.globalAlpha = active ? 0.8 : 0.24;
+    ctx.strokeStyle = active ? "#f7c85f" : "#f7f1dc";
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 18, 0, TWO_PI);
+    ctx.moveTo(t.x + Math.cos(angle) * inner, t.y + Math.sin(angle) * inner);
+    ctx.lineTo(t.x + Math.cos(angle) * outer, t.y + Math.sin(angle) * outer);
     ctx.stroke();
+
+    const p = directionMarker(i, active ? 9 : 3);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, active ? 3.4 : 2.4, 0, TWO_PI);
+    ctx.fillStyle = active ? "#f7c85f" : "rgba(247, 241, 220, 0.7)";
+    ctx.fill();
     ctx.restore();
   }
 }
@@ -729,34 +750,35 @@ function drawAttackCone() {
 function drawHero() {
   const p = heroPosition();
   const rotating = state.hero.rotateT < 1;
+  const unit = Math.max(10, Math.min(cssWidth, cssHeight) * 0.035);
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.angle * DEG + Math.PI / 2);
 
   ctx.fillStyle = rotating ? "rgba(255, 209, 102, 0.24)" : "rgba(255, 209, 102, 0.16)";
   ctx.beginPath();
-  ctx.arc(0, 0, 24, 0, TWO_PI);
+  ctx.arc(0, 0, unit * 1.32, 0, TWO_PI);
   ctx.fill();
 
   ctx.fillStyle = "#1a2233";
   ctx.strokeStyle = "#f7f1dc";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(-13, -9, 26, 28, 7);
+  ctx.roundRect(-unit * 0.72, -unit * 0.52, unit * 1.44, unit * 1.48, 6);
   ctx.fill();
   ctx.stroke();
 
   ctx.fillStyle = "#f7c85f";
   ctx.beginPath();
-  ctx.arc(0, -15, 9, 0, TWO_PI);
+  ctx.arc(0, -unit * 1.02, unit * 0.52, 0, TWO_PI);
   ctx.fill();
 
   ctx.strokeStyle = rotating ? "#ffdf8a" : "#9fe7ad";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3.2;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(0, -4);
-  ctx.lineTo(0, -30);
+  ctx.moveTo(0, -unit * 0.2);
+  ctx.lineTo(0, -unit * 1.85);
   ctx.stroke();
 
   ctx.restore();
@@ -954,6 +976,33 @@ canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   queueRotation();
 });
+
+function preventZoomGesture(event) {
+  event.preventDefault();
+}
+
+let lastTouchEnd = 0;
+document.addEventListener("gesturestart", preventZoomGesture, { passive: false });
+document.addEventListener("gesturechange", preventZoomGesture, { passive: false });
+document.addEventListener("gestureend", preventZoomGesture, { passive: false });
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    if (event.touches.length > 1) event.preventDefault();
+  },
+  { passive: false },
+);
+document.addEventListener(
+  "touchend",
+  (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 320) event.preventDefault();
+    lastTouchEnd = now;
+  },
+  { passive: false },
+);
+document.addEventListener("dblclick", preventZoomGesture, { passive: false });
+document.addEventListener("contextmenu", preventZoomGesture);
 
 ui.restart.addEventListener("click", (event) => {
   event.stopPropagation();
