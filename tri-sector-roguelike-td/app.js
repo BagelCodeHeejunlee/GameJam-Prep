@@ -183,7 +183,7 @@ const heroUpgrades = [
     id: "archer_growth_volley",
     heroId: "archer",
     tier: "성장",
-    title: "쌍시위 사격",
+    title: "연발 시위",
     text: "궁수 기본 화살 수 +1",
     apply: (hero) => {
       hero.projectileCount += 1;
@@ -203,7 +203,7 @@ const heroUpgrades = [
     id: "archer_growth_burst",
     heroId: "archer",
     tier: "성장",
-    title: "폭렬 화살",
+    title: "폭렬 촉",
     text: "궁수 화살 적중 시 주변 적에게 작은 폭발 피해",
     apply: (hero) => {
       hero.splashRadius = Math.max(hero.splashRadius, 22);
@@ -247,12 +247,14 @@ const heroUpgrades = [
     id: "archer_break",
     heroId: "archer",
     tier: "돌파",
-    title: "천공 연사",
-    text: "궁수가 3발을 빠르게 연사하고, 각 화살이 추가 관통",
+    title: "천공 포화",
+    text: "화살 수, 관통, 폭발이 한 단계 강화된 천공 화살로 전환",
     apply: (hero) => {
       hero.breakthrough = true;
-      hero.projectileCount = 3;
+      hero.projectileCount = Math.max(hero.projectileCount + 1, 3);
       hero.pierce += 1;
+      hero.splashRadius = Math.max(hero.splashRadius + 8, 30);
+      hero.splashRatio = Math.max(hero.splashRatio, 0.42);
       hero.damage += 4;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
@@ -275,7 +277,7 @@ const heroUpgrades = [
     id: "warrior_growth_wall",
     heroId: "warrior",
     tier: "성장",
-    title: "성벽 베기",
+    title: "성벽 처형",
     text: "타워를 공격 중인 적에게 주는 전사 피해 증가",
     apply: (hero) => {
       hero.towerBonus += 0.45;
@@ -339,11 +341,12 @@ const heroUpgrades = [
     heroId: "warrior",
     tier: "돌파",
     title: "철벽 돌진",
-    text: "전사 베기가 전방 충격파로 변해 적을 밀어냄",
+    text: "다수 베기, 밀침, 성벽 처형이 강화된 전방 충격파로 전환",
     apply: (hero) => {
       hero.breakthrough = true;
       hero.targets += 1;
       hero.push += 14;
+      hero.towerBonus += 0.25;
       hero.range += 8;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
@@ -431,10 +434,13 @@ const heroUpgrades = [
     heroId: "mage",
     tier: "돌파",
     title: "균열 마법진",
-    text: "폭발 후 가까운 적 최대 2명에게 보조 마법진 연쇄 생성",
+    text: "잔류, 연쇄, 메아리가 강화된 균열 마법진으로 전환",
     apply: (hero) => {
       hero.breakthrough = true;
       hero.chainCount = Math.max(hero.chainCount + 1, 2);
+      hero.echoCount += 1;
+      hero.zoneDuration += 0.45;
+      hero.zoneDps += 2;
       hero.blastRadius += 6;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
