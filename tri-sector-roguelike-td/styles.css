@@ -400,6 +400,10 @@ button {
   pointer-events: none;
 }
 
+.upgrade-overlay.upgrade-locked .primary-button {
+  pointer-events: none;
+}
+
 .modal {
   width: min(100%, 390px);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -429,6 +433,10 @@ button {
 .upgrade-choices {
   display: grid;
   gap: 9px;
+}
+
+.upgrade-choices.hidden {
+  display: none;
 }
 
 .upgrade-card {
@@ -474,6 +482,66 @@ button {
 
 .upgrade-card .card-meta {
   color: var(--choice-color, var(--muted));
+}
+
+.reward-reveal {
+  display: grid;
+  gap: 9px;
+}
+
+.reward-reveal.hidden,
+.primary-button.hidden {
+  display: none;
+}
+
+.reward-count {
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  place-items: center;
+  padding: 12px;
+  border: 1px solid rgba(255, 209, 102, 0.45);
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255, 209, 102, 0.16), rgba(255, 255, 255, 0.06));
+  text-align: center;
+}
+
+.reward-count strong {
+  color: var(--text);
+  font-size: 20px;
+}
+
+.reward-count span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.reward-row {
+  display: grid;
+  gap: 4px;
+  min-height: 66px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--choice-color, #ffffff), transparent 42%);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--choice-color, #ffffff), transparent 82%), transparent 64%),
+    rgba(255, 255, 255, 0.07);
+  animation: rewardRowIn 320ms cubic-bezier(0.18, 0.86, 0.24, 1) both;
+}
+
+.reward-row .card-meta {
+  color: var(--choice-color, var(--muted));
+}
+
+.reward-row strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.reward-row span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 @keyframes upgradeFadeIn {
@@ -534,6 +602,18 @@ button {
   100% {
     opacity: 0;
     transform: translate(-50%, -8px) scale(0.98);
+  }
+}
+
+@keyframes rewardRowIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

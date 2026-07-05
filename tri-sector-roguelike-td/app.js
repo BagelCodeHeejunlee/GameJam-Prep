@@ -18,6 +18,8 @@ const ui = {
   choiceEyebrow: document.getElementById("choiceEyebrow"),
   choiceTitle: document.getElementById("choiceTitle"),
   upgradeChoices: document.getElementById("upgradeChoices"),
+  rewardReveal: document.getElementById("rewardReveal"),
+  rewardContinue: document.getElementById("rewardContinueButton"),
   bossBanner: document.getElementById("bossBanner"),
   bossBannerKicker: document.getElementById("bossBannerKicker"),
   bossBannerTitle: document.getElementById("bossBannerTitle"),
@@ -875,86 +877,22 @@ const heroUpgrades = [
   },
 ];
 
-const BOSS_REWARD_SETS = {
+const BOSS_REWARD_CONFIG = {
   mid: {
     eyebrow: "MID BOSS DOWN",
-    title: "중간 보스 보상",
-    choices: [
-      {
-        id: "mid_repair",
-        meta: "타워 보상",
-        title: "긴급 수리",
-        text: "타워 체력 60 회복",
-        color: "#79e28e",
-        apply: () => {
-          state.hp = Math.min(state.maxHp, state.hp + 60);
-          addRing(tower().x, tower().y, "#79e28e", 16, 0.5);
-        },
-      },
-      {
-        id: "mid_xp",
-        meta: "성장 보상",
-        title: "전투 숙련",
-        text: "경험치 70 즉시 획득",
-        color: "#ffd166",
-        apply: () => {
-          state.xp += 70;
-          addFloat(tower().x, tower().y - 28, "+70 EXP", "#ffd166");
-        },
-      },
-      {
-        id: "mid_focus",
-        meta: "영웅 보상",
-        title: "집중 정비",
-        text: "무작위 출전 영웅 1명의 공격력과 공격 간격 개선",
-        color: "#6fd6ff",
-        apply: () => {
-          boostRandomHero({ damage: 9, cooldown: 0.94, range: 4, color: "#6fd6ff" });
-        },
-      },
+    title: "랜덤 강화 보상",
+    countWeights: [
+      { count: 1, weight: 78 },
+      { count: 2, weight: 22 },
     ],
   },
   boss: {
     eyebrow: "BOSS DOWN",
-    title: "보스 보상",
-    choices: [
-      {
-        id: "boss_rebuild",
-        meta: "타워 보상",
-        title: "성벽 재건",
-        text: "타워 최대 체력 +20, 체력 전부 회복",
-        color: "#79e28e",
-        apply: () => {
-          state.maxHp += 20;
-          state.hp = state.maxHp;
-          addRing(tower().x, tower().y, "#79e28e", 22, 0.65);
-        },
-      },
-      {
-        id: "boss_party",
-        meta: "파티 보상",
-        title: "승전의 깃발",
-        text: "모든 출전 영웅 공격력 +8, 사거리 +5",
-        color: "#b984ff",
-        apply: () => {
-          for (const hero of state.heroes) {
-            hero.damage += 8;
-            hero.range += 5;
-          }
-          addRing(tower().x, tower().y, "#b984ff", 24, 0.65);
-        },
-      },
-      {
-        id: "boss_xp",
-        meta: "성장 보상",
-        title: "균열의 지식",
-        text: "경험치 130 즉시 획득",
-        color: "#ffd166",
-        apply: () => {
-          state.xp += 130;
-          addFloat(tower().x, tower().y - 28, "+130 EXP", "#ffd166");
-        },
-      },
+    title: "랜덤 강화 보상",
+    countWeights: [
+      { count: 1, weight: 30 },
+      { count: 2, weight: 50 },
+      { count: 3, weight: 20 },
     ],
   },
 };
@@ -966,6 +904,7 @@ let cssWidth = 0;
 let cssHeight = 0;
 let toastTimer = 0;
 let bossBannerTimer = 0;
+let rewardRevealTimers = [];
 let upgradeUnlockTimer = 0;
 let upgradeUnlockNeedsRelease = false;
 let enemyId = 1;
@@ -1872,6 +1811,7 @@ function tryOpenLevelUp() {
 }
 
 function openUpgrade() {
+  clearRewardRevealTimers();
   const activePointerId = state.rotationPointerId;
   const needsPointerRelease = activePointerId !== null;
   if (activePointerId !== null) canvas.releasePointerCapture?.(activePointerId);
@@ -1881,6 +1821,10 @@ function openUpgrade() {
   ui.choiceEyebrow.textContent = "LEVEL UP";
   ui.choiceTitle.textContent = "강화 선택";
   ui.upgradeChoices.innerHTML = "";
+  ui.upgradeChoices.classList.remove("hidden");
+  ui.rewardReveal.innerHTML = "";
+  ui.rewardReveal.classList.add("hidden");
+  ui.rewardContinue.classList.add("hidden");
   const choices = drawChoices(3);
   if (!choices.length) {
     clearUpgradeChoiceLock();
@@ -1917,44 +1861,92 @@ function openUpgrade() {
 }
 
 function openBossReward(rewardId) {
-  const rewardSet = BOSS_REWARD_SETS[rewardId];
-  if (!rewardSet || state.phase === "result") return;
+  const rewardConfig = BOSS_REWARD_CONFIG[rewardId];
+  if (!rewardConfig || state.phase === "result") return;
+  clearRewardRevealTimers();
   const activePointerId = state.rotationPointerId;
   const needsPointerRelease = activePointerId !== null;
   if (activePointerId !== null) canvas.releasePointerCapture?.(activePointerId);
   clearRotationInput();
   lockUpgradeChoices(needsPointerRelease);
   state.phase = "reward";
-  ui.choiceEyebrow.textContent = rewardSet.eyebrow;
-  ui.choiceTitle.textContent = rewardSet.title;
+  ui.choiceEyebrow.textContent = rewardConfig.eyebrow;
+  ui.choiceTitle.textContent = rewardConfig.title;
   ui.upgradeChoices.innerHTML = "";
+  ui.upgradeChoices.classList.add("hidden");
+  ui.rewardReveal.innerHTML = "";
+  ui.rewardReveal.classList.remove("hidden");
+  ui.rewardContinue.classList.add("hidden");
 
-  rewardSet.choices.forEach((choice, index) => {
-    const button = document.createElement("button");
-    button.className = "upgrade-card";
-    button.type = "button";
-    button.disabled = true;
-    button.style.setProperty("--choice-color", choice.color);
-    button.style.setProperty("--choice-delay", `${140 + index * 80}ms`);
-    button.innerHTML = `<span class="card-meta">${choice.meta}</span><strong>${choice.title}</strong><span>${choice.text}</span>`;
-    button.addEventListener("click", (event) => {
-      if (isUpgradeChoiceLocked()) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-      clearUpgradeChoiceLock();
-      choice.apply();
-      ui.upgradeOverlay.classList.add("hidden");
-      state.phase = "playing";
-      pulseToast(choice.title);
-      if (!tryOpenLevelUp()) syncUi();
-    });
-    ui.upgradeChoices.appendChild(button);
+  const rewards = rollBossRewards(rewardConfig);
+  const countRow = document.createElement("div");
+  countRow.className = "reward-count";
+  countRow.innerHTML = rewards.length
+    ? `<strong>${rewards.length}명 강화</strong><span>랜덤 캐릭터와 업그레이드를 추첨합니다</span>`
+    : `<strong>강화 없음</strong><span>선택 가능한 캐릭터 업그레이드가 없습니다</span>`;
+  ui.rewardReveal.appendChild(countRow);
+
+  rewards.forEach((reward, index) => {
+    const timer = setTimeout(() => revealBossReward(reward), 520 + index * 560);
+    rewardRevealTimers.push(timer);
   });
+  const doneTimer = setTimeout(() => {
+    ui.rewardContinue.classList.remove("hidden");
+    tryUnlockUpgradeChoices();
+  }, 820 + rewards.length * 560);
+  rewardRevealTimers.push(doneTimer);
 
   ui.upgradeOverlay.classList.remove("hidden");
   syncUi();
+}
+
+function rollBossRewards(rewardConfig) {
+  const count = pickWeightedCount(rewardConfig.countWeights);
+  const rewards = [];
+  const usedIds = new Set();
+  const usedHeroIds = new Set();
+
+  for (let i = 0; i < count; i += 1) {
+    const reward = drawRandomUpgradeReward(usedIds, usedHeroIds);
+    if (!reward) break;
+    usedIds.add(reward.choice.id);
+    usedHeroIds.add(reward.hero.id);
+    rewards.push(reward);
+  }
+
+  return rewards;
+}
+
+function drawRandomUpgradeReward(usedIds, usedHeroIds) {
+  const heroes = shuffle(state.heroes.filter((hero) => !usedHeroIds.has(hero.id) && hasAvailableUpgrade(hero, usedIds)));
+  for (const hero of heroes) {
+    const choice = selectUpgradeForHero(hero, usedIds);
+    if (choice) return { hero, choice };
+  }
+  return null;
+}
+
+function revealBossReward(reward) {
+  reward.choice.apply();
+  const row = document.createElement("div");
+  row.className = "reward-row";
+  row.style.setProperty("--choice-color", reward.choice.color);
+  row.innerHTML = `<span class="card-meta">${reward.hero.name} ${reward.choice.tier}</span><strong>${reward.choice.title}</strong><span>${reward.choice.text}</span>`;
+  ui.rewardReveal.appendChild(row);
+  addFloat(tower().x, tower().y - 28, `${reward.hero.name} 강화`, reward.choice.color);
+  addRing(tower().x, tower().y, reward.choice.color, 16, 0.5);
+  state.shake = Math.max(state.shake, 0.28);
+  syncUi();
+}
+
+function pickWeightedCount(entries) {
+  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.count;
+  }
+  return entries[0]?.count || 1;
 }
 
 function lockUpgradeChoices(needsPointerRelease) {
@@ -1973,6 +1965,22 @@ function clearUpgradeChoiceLock() {
   upgradeUnlockTimer = 0;
   upgradeUnlockNeedsRelease = false;
   ui.upgradeOverlay.classList.remove("upgrade-locked");
+}
+
+function clearRewardRevealTimers() {
+  for (const timer of rewardRevealTimers) clearTimeout(timer);
+  rewardRevealTimers = [];
+}
+
+function closeBossReward() {
+  if (!state || state.phase !== "reward" || isUpgradeChoiceLocked()) return;
+  clearRewardRevealTimers();
+  clearUpgradeChoiceLock();
+  ui.upgradeOverlay.classList.add("hidden");
+  ui.rewardContinue.classList.add("hidden");
+  ui.rewardReveal.classList.add("hidden");
+  state.phase = "playing";
+  if (!tryOpenLevelUp()) syncUi();
 }
 
 function markUpgradePointerReleased() {
@@ -2121,15 +2129,6 @@ function heroById(id) {
   return state.heroes.find((hero) => hero.id === id);
 }
 
-function boostRandomHero({ damage, cooldown, range, color }) {
-  const hero = pick(state.heroes);
-  hero.damage += damage;
-  hero.cooldown = Math.max(0.34, hero.cooldown * cooldown);
-  hero.range += range;
-  addFloat(tower().x, tower().y - 28, `${hero.name} 강화`, color);
-  addRing(tower().x, tower().y, color, 18, 0.55);
-}
-
 function updateEffects(dt) {
   for (let i = state.effects.length - 1; i >= 0; i -= 1) {
     const effect = state.effects[i];
@@ -2213,6 +2212,7 @@ function checkWaveClear() {
 function finish(won) {
   if (state.phase === "result") return;
   clearRotationInput();
+  clearRewardRevealTimers();
   clearTimeout(bossBannerTimer);
   bossBannerTimer = 0;
   ui.bossBanner.classList.add("hidden");
@@ -2805,12 +2805,15 @@ function showBossBanner(type) {
 
 function restart() {
   clearUpgradeChoiceLock();
+  clearRewardRevealTimers();
   clearTimeout(bossBannerTimer);
   bossBannerTimer = 0;
   state = createState();
   ui.upgradeOverlay.classList.add("hidden");
   ui.resultOverlay.classList.add("hidden");
   ui.bossBanner.classList.add("hidden");
+  ui.rewardReveal.classList.add("hidden");
+  ui.rewardContinue.classList.add("hidden");
   pulseToast("WAVE 1");
   syncUi();
 }
@@ -2978,6 +2981,7 @@ ui.restart.addEventListener("click", (event) => {
 });
 
 ui.resultButton.addEventListener("click", restart);
+ui.rewardContinue.addEventListener("click", closeBossReward);
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("orientationchange", resizeCanvas);
 
