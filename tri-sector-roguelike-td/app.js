@@ -29,6 +29,10 @@ const DEG = Math.PI / 180;
 const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
 const ENEMY_SCALE = 0.48;
 const HERO_SCALE = 0.64;
+const ROTATION_SPEED = 240;
+const ROTATION_ACCEL = 1600;
+const ROTATION_DECEL = 2200;
+const ROTATION_ATTACK_LOCK = 0.08;
 const VERSION_LABEL = "TRI-KEEPERS";
 const TIER_COLORS = {
   기본: "#aeb6c2",
@@ -594,7 +598,9 @@ function createState() {
     killCount: 0,
     shake: 0,
     waveBanner: 0,
-    rotationQueue: 0,
+    rotationInput: 0,
+    rotationVelocity: 0,
+    rotationPointerId: null,
     rotationCount: 0,
     enemies: [],
     projectiles: [],
@@ -614,10 +620,8 @@ function createHero(blueprint, index) {
   return {
     ...blueprint,
     slot,
-    fromSlot: slot,
-    toSlot: slot,
+    aimAngle: HERO_ANGLES[slot],
     rotateT: 1,
-    rotateDuration: 0.14,
     attackTimer: index * 0.18,
     growthPicked: {},
     basicRanks: {},
@@ -652,17 +656,10 @@ function tower() {
 
 function heroAim(hero) {
   const t = tower();
-  if (hero.rotateT >= 1) {
-    return { x: t.x, y: t.y, angle: HERO_ANGLES[hero.slot] };
-  }
-
-  const eased = easeInOut(hero.rotateT);
-  const from = HERO_ANGLES[hero.fromSlot];
-  const to = HERO_ANGLES[hero.toSlot];
   return {
     x: t.x,
     y: t.y,
-    angle: lerpAngle(from, to, eased),
+    angle: hero.aimAngle,
   };
 }
 
@@ -679,31 +676,7 @@ function heroVisualPosition(hero, distance = 0) {
 }
 
 function isRotating() {
-  return state.heroes.some((hero) => hero.rotateT < 1);
-}
-
-function queueRotation() {
-  if (state.phase !== "playing") return;
-  if (isRotating()) {
-    state.rotationQueue += 1;
-    pulseToast("ROTATION x" + (state.rotationQueue + 1));
-    return;
-  }
-  startRotation();
-}
-
-function startRotation() {
-  for (const hero of state.heroes) {
-    hero.fromSlot = hero.slot;
-    hero.toSlot = (hero.slot + 1) % HERO_ANGLES.length;
-    hero.slot = hero.toSlot;
-    hero.rotateT = 0;
-    hero.attackTimer = Math.max(hero.attackTimer, hero.rotateDuration);
-  }
-
-  state.rotationCount += 1;
-  const t = tower();
-  addRing(t.x, t.y, "#ffd166", 8, 0.34);
+  return Math.abs(state.rotationVelocity) > 0.5 || state.rotationInput !== 0;
 }
 
 function update(dt) {
@@ -735,18 +708,24 @@ function update(dt) {
 }
 
 function updateRotation(dt) {
-  let wasRotating = false;
-  for (const hero of state.heroes) {
-    if (hero.rotateT >= 1) continue;
-    wasRotating = true;
-    hero.rotateT += dt / hero.rotateDuration;
-    if (hero.rotateT >= 1) hero.rotateT = 1;
+  const targetVelocity = state.rotationInput * ROTATION_SPEED;
+  const rate = state.rotationInput === 0 ? ROTATION_DECEL : ROTATION_ACCEL;
+  state.rotationVelocity = approach(state.rotationVelocity, targetVelocity, rate * dt);
+  if (state.rotationInput === 0 && Math.abs(state.rotationVelocity) < 0.5) state.rotationVelocity = 0;
+
+  const rotating = Math.abs(state.rotationVelocity) > 0;
+  if (rotating) {
+    const delta = state.rotationVelocity * dt;
+    for (const hero of state.heroes) {
+      hero.aimAngle = normalizeAngle(hero.aimAngle + delta);
+      hero.rotateT = 0;
+      hero.attackTimer = Math.max(hero.attackTimer, ROTATION_ATTACK_LOCK);
+    }
+    state.rotationCount += Math.abs(delta) / 360;
+    return;
   }
 
-  if (wasRotating && !isRotating() && state.rotationQueue > 0) {
-    state.rotationQueue -= 1;
-    startRotation();
-  }
+  for (const hero of state.heroes) hero.rotateT = 1;
 }
 
 function spawnWaveEnemies() {
@@ -1404,6 +1383,7 @@ function gainXp(amount) {
 }
 
 function openUpgrade() {
+  clearRotationInput();
   state.phase = "upgrade";
   ui.upgradeChoices.innerHTML = "";
   const choices = drawChoices(3);
@@ -1638,6 +1618,7 @@ function checkWaveClear() {
 
 function finish(won) {
   if (state.phase === "result") return;
+  clearRotationInput();
   state.phase = "result";
   ui.resultEyebrow.textContent = won ? "KEEP CLEAR" : "TOWER DOWN";
   ui.resultTitle.textContent = won ? "방어 성공" : "방어 실패";
@@ -2146,7 +2127,7 @@ function syncUi() {
   ui.xpFill.style.width = `${clamp((state.xp / state.xpNeeded) * 100, 0, 100)}%`;
   ui.heroLevel.textContent = `Lv.${state.level} / ${VERSION_LABEL}`;
   ui.damage.textContent = String(teamPower());
-  ui.speed.textContent = state.rotationQueue > 0 ? String(state.rotationQueue + 1) : "0";
+  ui.speed.textContent = rotationLabel();
   ui.range.textContent = String(state.killCount);
   renderTeamList();
 }
@@ -2216,17 +2197,18 @@ function mix(a, b, t) {
   return a + (b - a) * t;
 }
 
-function easeInOut(t) {
-  const v = clamp(t, 0, 1);
-  return v * v * (3 - 2 * v);
-}
-
 function angleDiff(a, b) {
   return ((((a - b) % 360) + 540) % 360) - 180;
 }
 
-function lerpAngle(a, b, t) {
-  return a + angleDiff(b, a) * t;
+function normalizeAngle(angle) {
+  return angleDiff(angle, 0);
+}
+
+function approach(value, target, step) {
+  if (value < target) return Math.min(value + step, target);
+  if (value > target) return Math.max(value - step, target);
+  return target;
 }
 
 function clamp(value, min, max) {
@@ -2258,8 +2240,64 @@ function rgba(hex, alpha) {
 
 canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
-  queueRotation();
+  if (state.phase !== "playing") return;
+  state.rotationPointerId = event.pointerId;
+  canvas.setPointerCapture?.(event.pointerId);
+  setRotationInput(pointerRotationDirection(event));
 });
+
+canvas.addEventListener("pointermove", (event) => {
+  if (state.rotationPointerId !== event.pointerId) return;
+  event.preventDefault();
+  setRotationInput(pointerRotationDirection(event));
+});
+
+canvas.addEventListener("pointerup", stopPointerRotation);
+canvas.addEventListener("pointercancel", stopPointerRotation);
+canvas.addEventListener("pointerleave", stopPointerRotation);
+
+function pointerRotationDirection(event) {
+  const rect = canvas.getBoundingClientRect();
+  return event.clientX - rect.left >= rect.width / 2 ? 1 : -1;
+}
+
+function setRotationInput(direction) {
+  if (!state || state.phase !== "playing") {
+    if (state) state.rotationInput = 0;
+    return;
+  }
+
+  const next = Math.sign(direction);
+  if (state.rotationInput === next) return;
+  state.rotationInput = next;
+
+  if (next !== 0) {
+    const t = tower();
+    addRing(t.x, t.y, next > 0 ? "#ffd166" : "#6fd6ff", 8, 0.28);
+    pulseToast(next > 0 ? "CLOCKWISE" : "COUNTER");
+  }
+}
+
+function clearRotationInput() {
+  state.rotationInput = 0;
+  state.rotationVelocity = 0;
+  state.rotationPointerId = null;
+  for (const hero of state.heroes) hero.rotateT = 1;
+}
+
+function stopPointerRotation(event) {
+  if (state.rotationPointerId !== event.pointerId) return;
+  event.preventDefault();
+  canvas.releasePointerCapture?.(event.pointerId);
+  state.rotationPointerId = null;
+  setRotationInput(0);
+}
+
+function rotationLabel() {
+  if (state.rotationInput > 0 || state.rotationVelocity > 3) return "CW";
+  if (state.rotationInput < 0 || state.rotationVelocity < -3) return "CCW";
+  return "0";
+}
 
 function preventZoomGesture(event) {
   event.preventDefault();
