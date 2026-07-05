@@ -805,7 +805,7 @@ button {
 }
 
 .deployed-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
 }
 
 .standby-grid {
@@ -825,6 +825,16 @@ button {
     radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.36), transparent 28%),
     linear-gradient(145deg, color-mix(in srgb, var(--hero-color), #ffffff 12%), color-mix(in srgb, var(--hero-color), #111722 54%));
   box-shadow: inset 0 -16px 26px rgba(0, 0, 0, 0.22);
+}
+
+.roster-hero-card.locked {
+  filter: grayscale(0.65);
+  opacity: 0.58;
+}
+
+.roster-hero-card.locked .roster-hero-main,
+.roster-hero-card.locked .lineup-toggle {
+  cursor: default;
 }
 
 .roster-hero-card.ready::after {
@@ -947,7 +957,7 @@ button {
 
 .formation-slots {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--slot-count, 3), minmax(0, 1fr));
   gap: 8px;
 }
 

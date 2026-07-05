@@ -41,7 +41,7 @@ const ui = {
 
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
-const META_STORAGE_KEY = "rotation-keepers-meta-v1";
+const META_STORAGE_KEY = "rotation-keepers-meta-v2";
 const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
 const ENEMY_SCALE = 0.48;
 const HERO_SCALE = 0.64;
@@ -65,7 +65,7 @@ const TIER_COLORS = {
   궁극: "#ffd166",
 };
 
-const STARTING_HERO_IDS = ["sniper", "warrior", "mage"];
+const STARTING_HERO_IDS = ["archer"];
 
 const TALENTS = [
   {
@@ -197,7 +197,7 @@ const HERO_BLUEPRINTS = [
   },
 ];
 
-const WAVES = [
+const ADVANCED_WAVES = [
   [
     spawn(0.35, "top", 0.5, "grunt"),
     spawn(0.9, "left", 0.38, "swarm"),
@@ -391,6 +391,265 @@ const WAVES = [
     spawn(6.9, "left", 0.34, "runner"),
     spawn(7.08, "right", 0.66, "runner"),
   ],
+];
+
+const STAGE_1_WAVES = [
+  [
+    spawn(0.4, "top", 0.5, "swarm"),
+    spawn(1.05, "top", 0.45, "swarm"),
+    spawn(1.7, "top", 0.55, "swarm"),
+    spawn(2.55, "right", 0.5, "swarm"),
+    spawn(3.4, "right", 0.58, "swarm"),
+  ],
+  [
+    spawn(0.35, "left", 0.42, "swarm"),
+    spawn(0.95, "left", 0.52, "swarm"),
+    spawn(1.7, "bottom", 0.48, "swarm"),
+    spawn(2.45, "bottom", 0.58, "swarm"),
+    spawn(3.25, "left", 0.6, "grunt"),
+  ],
+  [
+    spawn(0.35, "right", 0.34, "swarm"),
+    spawn(0.8, "right", 0.5, "swarm"),
+    spawn(1.25, "right", 0.66, "swarm"),
+    spawn(2.15, "top", 0.5, "grunt"),
+    spawn(3.0, "bottom", 0.5, "swarm"),
+    spawn(3.55, "bottom", 0.62, "swarm"),
+  ],
+  [
+    spawn(0.35, "top", 0.32, "swarm"),
+    spawn(0.72, "top", 0.5, "swarm"),
+    spawn(1.09, "top", 0.68, "swarm"),
+    spawn(1.95, "left", 0.45, "grunt"),
+    spawn(2.8, "right", 0.55, "grunt"),
+    spawn(3.65, "bottom", 0.5, "runner"),
+  ],
+  [
+    spawn(0.35, "top", 0.5, "grunt"),
+    spawn(0.9, "left", 0.45, "swarm"),
+    spawn(1.15, "left", 0.55, "swarm"),
+    spawn(1.8, "right", 0.45, "swarm"),
+    spawn(2.05, "right", 0.55, "swarm"),
+    spawn(3.1, "bottom", 0.5, "tank"),
+  ],
+];
+
+const STAGE_2_WAVES = [
+  [
+    spawn(0.3, "top", 0.48, "swarm"),
+    spawn(0.75, "top", 0.58, "swarm"),
+    spawn(1.35, "right", 0.45, "swarm"),
+    spawn(1.8, "right", 0.55, "swarm"),
+    spawn(2.55, "left", 0.5, "grunt"),
+  ],
+  [
+    spawn(0.25, "left", 0.36, "swarm"),
+    spawn(0.52, "left", 0.48, "swarm"),
+    spawn(0.79, "left", 0.6, "swarm"),
+    spawn(1.55, "bottom", 0.4, "grunt"),
+    spawn(1.95, "bottom", 0.6, "grunt"),
+    spawn(2.9, "right", 0.5, "runner"),
+  ],
+  [
+    spawn(0.3, "right", 0.34, "runner"),
+    spawn(0.9, "right", 0.66, "runner"),
+    spawn(1.65, "top", 0.35, "swarm"),
+    spawn(1.9, "top", 0.5, "swarm"),
+    spawn(2.15, "top", 0.65, "swarm"),
+    spawn(3.0, "left", 0.5, "tank"),
+  ],
+  [
+    spawn(0.25, "bottom", 0.3, "swarm"),
+    spawn(0.45, "bottom", 0.42, "swarm"),
+    spawn(0.65, "bottom", 0.54, "swarm"),
+    spawn(0.85, "bottom", 0.66, "swarm"),
+    spawn(1.7, "left", 0.4, "grunt"),
+    spawn(2.05, "right", 0.6, "grunt"),
+    spawn(3.0, "top", 0.5, "runner"),
+  ],
+  [
+    spawn(0.25, "top", 0.5, "tank"),
+    spawn(0.9, "left", 0.35, "swarm"),
+    spawn(1.1, "left", 0.5, "swarm"),
+    spawn(1.3, "left", 0.65, "swarm"),
+    spawn(2.1, "right", 0.42, "runner"),
+    spawn(2.55, "right", 0.58, "runner"),
+    spawn(3.4, "bottom", 0.5, "grunt"),
+  ],
+  [
+    spawn(0.25, "left", 0.24, "swarm"),
+    spawn(0.42, "left", 0.36, "swarm"),
+    spawn(0.59, "left", 0.48, "swarm"),
+    spawn(0.76, "left", 0.6, "swarm"),
+    spawn(0.93, "left", 0.72, "swarm"),
+    spawn(1.8, "right", 0.5, "brute"),
+    spawn(2.75, "bottom", 0.4, "grunt"),
+    spawn(3.05, "bottom", 0.6, "grunt"),
+  ],
+  [
+    spawn(0.3, "top", 0.5, "midboss"),
+    spawn(1.1, "left", 0.42, "swarm"),
+    spawn(1.3, "left", 0.55, "swarm"),
+    spawn(1.9, "right", 0.45, "runner"),
+    spawn(2.25, "right", 0.62, "runner"),
+    spawn(3.05, "bottom", 0.5, "grunt"),
+  ],
+  [
+    spawn(0.25, "bottom", 0.28, "swarm"),
+    spawn(0.45, "bottom", 0.4, "swarm"),
+    spawn(0.65, "bottom", 0.52, "swarm"),
+    spawn(0.85, "bottom", 0.64, "swarm"),
+    spawn(1.55, "top", 0.35, "tank"),
+    spawn(1.95, "top", 0.65, "tank"),
+    spawn(2.9, "left", 0.5, "runner"),
+    spawn(3.2, "right", 0.5, "runner"),
+  ],
+  [
+    spawn(0.2, "left", 0.5, "brute"),
+    spawn(0.8, "right", 0.36, "swarm"),
+    spawn(0.98, "right", 0.48, "swarm"),
+    spawn(1.16, "right", 0.6, "swarm"),
+    spawn(2.0, "top", 0.4, "runner"),
+    spawn(2.25, "top", 0.6, "runner"),
+    spawn(3.1, "bottom", 0.5, "tank"),
+  ],
+  [
+    spawn(0.3, "bottom", 0.5, "boss"),
+    spawn(1.1, "top", 0.36, "swarm"),
+    spawn(1.3, "top", 0.5, "swarm"),
+    spawn(1.5, "top", 0.64, "swarm"),
+    spawn(2.2, "left", 0.4, "runner"),
+    spawn(2.55, "right", 0.6, "runner"),
+    spawn(3.35, "left", 0.55, "grunt"),
+    spawn(3.65, "right", 0.45, "grunt"),
+  ],
+];
+
+const STAGE_3_WAVES = [
+  ...ADVANCED_WAVES.slice(0, 7),
+  [
+    spawn(0.2, "bottom", 0.25, "swarm"),
+    spawn(0.34, "bottom", 0.38, "swarm"),
+    spawn(0.48, "bottom", 0.51, "swarm"),
+    spawn(0.62, "bottom", 0.64, "swarm"),
+    spawn(1.3, "left", 0.3, "runner"),
+    spawn(1.55, "right", 0.7, "runner"),
+    spawn(2.25, "top", 0.5, "brute"),
+    spawn(3.2, "left", 0.5, "grunt"),
+    spawn(3.45, "right", 0.5, "grunt"),
+  ],
+  [
+    spawn(0.25, "left", 0.22, "tank"),
+    spawn(0.55, "right", 0.78, "tank"),
+    spawn(1.25, "top", 0.24, "swarm"),
+    spawn(1.4, "top", 0.38, "swarm"),
+    spawn(1.55, "top", 0.52, "swarm"),
+    spawn(1.7, "top", 0.66, "swarm"),
+    spawn(2.4, "bottom", 0.35, "runner"),
+    spawn(2.65, "bottom", 0.65, "runner"),
+    spawn(3.45, "right", 0.5, "brute"),
+  ],
+  [
+    spawn(0.3, "top", 0.5, "midboss"),
+    spawn(1.05, "left", 0.34, "swarm"),
+    spawn(1.2, "left", 0.5, "swarm"),
+    spawn(1.35, "left", 0.66, "swarm"),
+    spawn(2.0, "right", 0.4, "runner"),
+    spawn(2.25, "right", 0.6, "runner"),
+    spawn(3.0, "bottom", 0.34, "tank"),
+    spawn(3.35, "bottom", 0.66, "tank"),
+  ],
+  [
+    spawn(0.2, "left", 0.26, "runner"),
+    spawn(0.38, "right", 0.74, "runner"),
+    spawn(0.9, "top", 0.25, "swarm"),
+    spawn(1.05, "top", 0.38, "swarm"),
+    spawn(1.2, "top", 0.51, "swarm"),
+    spawn(1.35, "top", 0.64, "swarm"),
+    spawn(2.15, "bottom", 0.5, "brute"),
+    spawn(3.15, "left", 0.5, "tank"),
+    spawn(3.45, "right", 0.5, "tank"),
+  ],
+  [
+    spawn(0.25, "bottom", 0.2, "swarm"),
+    spawn(0.38, "bottom", 0.32, "swarm"),
+    spawn(0.51, "bottom", 0.44, "swarm"),
+    spawn(0.64, "bottom", 0.56, "swarm"),
+    spawn(0.77, "bottom", 0.68, "swarm"),
+    spawn(0.9, "bottom", 0.8, "swarm"),
+    spawn(1.65, "top", 0.36, "runner"),
+    spawn(1.9, "top", 0.64, "runner"),
+    spawn(2.65, "left", 0.42, "brute"),
+    spawn(3.0, "right", 0.58, "brute"),
+  ],
+  [
+    spawn(0.25, "left", 0.22, "swarm"),
+    spawn(0.38, "left", 0.34, "swarm"),
+    spawn(0.51, "left", 0.46, "swarm"),
+    spawn(0.64, "right", 0.54, "swarm"),
+    spawn(0.77, "right", 0.66, "swarm"),
+    spawn(0.9, "right", 0.78, "swarm"),
+    spawn(1.65, "top", 0.5, "tank"),
+    spawn(2.2, "bottom", 0.35, "runner"),
+    spawn(2.45, "bottom", 0.65, "runner"),
+    spawn(3.2, "top", 0.5, "brute"),
+  ],
+  [
+    spawn(0.25, "top", 0.5, "brute"),
+    spawn(0.95, "bottom", 0.5, "brute"),
+    spawn(1.75, "left", 0.36, "swarm"),
+    spawn(1.9, "left", 0.5, "swarm"),
+    spawn(2.05, "left", 0.64, "swarm"),
+    spawn(2.6, "right", 0.36, "runner"),
+    spawn(2.85, "right", 0.64, "runner"),
+    spawn(3.55, "bottom", 0.35, "tank"),
+    spawn(3.85, "top", 0.65, "tank"),
+  ],
+  [
+    spawn(0.3, "bottom", 0.5, "boss"),
+    spawn(1.05, "top", 0.2, "swarm"),
+    spawn(1.18, "top", 0.34, "swarm"),
+    spawn(1.31, "top", 0.48, "swarm"),
+    spawn(1.44, "top", 0.62, "swarm"),
+    spawn(1.57, "top", 0.76, "swarm"),
+    spawn(2.25, "left", 0.34, "runner"),
+    spawn(2.45, "right", 0.66, "runner"),
+    spawn(3.2, "left", 0.5, "brute"),
+    spawn(3.55, "right", 0.5, "brute"),
+  ],
+];
+
+const STAGE_CONFIGS = [
+  {
+    number: 1,
+    name: "회전 입문",
+    waveCount: 5,
+    heroLimit: 1,
+    availableHeroIds: ["archer"],
+    recommendedLineup: ["archer"],
+    unlockHeroId: "warrior",
+    waves: STAGE_1_WAVES,
+  },
+  {
+    number: 2,
+    name: "전사 합류",
+    waveCount: 10,
+    heroLimit: 2,
+    availableHeroIds: ["archer", "warrior"],
+    recommendedLineup: ["archer", "warrior"],
+    unlockHeroId: "mage",
+    waves: STAGE_2_WAVES,
+  },
+  {
+    number: 3,
+    name: "삼인 방어",
+    waveCount: 15,
+    heroLimit: 3,
+    availableHeroIds: ["archer", "warrior", "mage"],
+    recommendedLineup: ["archer", "warrior", "mage"],
+    unlockHeroId: null,
+    waves: STAGE_3_WAVES,
+  },
 ];
 
 const TYPES = {
@@ -963,7 +1222,7 @@ let state;
 let metaState;
 let metaTab = "battle";
 let metaHeroView = "list";
-let selectedMetaHeroId = "sniper";
+let selectedMetaHeroId = "archer";
 let selectedHeroDetailTab = "level";
 let lastStageRewards = null;
 let lastPulledTalentId = null;
@@ -993,7 +1252,7 @@ function createDefaultMetaState() {
   }
 
   return {
-    version: 1,
+    version: 2,
     resources: {
       gold: 1400,
       heroXp: 720,
@@ -1056,14 +1315,61 @@ function getHeroMeta(heroId) {
   return metaState.heroes[heroId];
 }
 
+function currentStageIndex() {
+  return clamp(metaState?.stageClears || 0, 0, STAGE_CONFIGS.length - 1);
+}
+
+function currentStageConfig() {
+  return STAGE_CONFIGS[currentStageIndex()];
+}
+
+function stageConfigForState() {
+  return currentStageConfig();
+}
+
+function availableHeroIds() {
+  return stageConfigForState().availableHeroIds;
+}
+
+function maxLineupSize() {
+  return stageConfigForState().heroLimit;
+}
+
+function recommendedLineupIds() {
+  const stage = stageConfigForState();
+  return stage.recommendedLineup.filter((id) => heroBlueprintById(id)).slice(0, stage.heroLimit);
+}
+
+function isHeroUnlocked(heroId) {
+  return availableHeroIds().includes(heroId);
+}
+
+function unlockLabelForHero(heroId) {
+  const unlockIndex = STAGE_CONFIGS.findIndex((stage) => stage.unlockHeroId === heroId);
+  if (unlockIndex < 0) return "추후 해금";
+  return `STAGE ${STAGE_CONFIGS[unlockIndex].number} 클리어`;
+}
+
+function heroRosterOrder(hero) {
+  const order = ["archer", "warrior", "mage", "sniper"];
+  const index = order.indexOf(hero.id);
+  return index < 0 ? order.length : index;
+}
+
+function stageBossCount(stage) {
+  return stage.waves.filter((wave) => wave.some((plan) => TYPES[plan.type]?.reward)).length;
+}
+
 function lineupHeroIds() {
-  if (!metaState?.lineup?.length) return [...STARTING_HERO_IDS];
-  const validIds = metaState.lineup.filter((id) => heroBlueprintById(id)).slice(0, 3);
-  return validIds.length ? validIds : [...STARTING_HERO_IDS];
+  const allowed = availableHeroIds();
+  const limit = maxLineupSize();
+  if (!metaState?.lineup?.length) return recommendedLineupIds();
+  const validIds = metaState.lineup.filter((id) => allowed.includes(id) && heroBlueprintById(id)).slice(0, limit);
+  return validIds.length ? validIds : recommendedLineupIds();
 }
 
 function setRecommendedLineup() {
-  metaState.lineup = [...STARTING_HERO_IDS];
+  metaState.lineup = recommendedLineupIds();
   saveMetaState();
   refreshMetaPreviewState();
   renderMeta();
@@ -1071,7 +1377,7 @@ function setRecommendedLineup() {
 
 function addLineupHero(heroId) {
   const lineup = lineupHeroIds();
-  if (lineup.includes(heroId) || lineup.length >= 3) return;
+  if (!isHeroUnlocked(heroId) || lineup.includes(heroId) || lineup.length >= maxLineupSize()) return;
   lineup.push(heroId);
   metaState.lineup = lineup;
   saveMetaState();
@@ -1103,13 +1409,14 @@ function moveLineupHero(heroId, direction) {
 }
 
 function toggleLineupHero(heroId) {
+  if (!isHeroUnlocked(heroId)) return;
   const lineup = lineupHeroIds();
   const index = lineup.indexOf(heroId);
 
   if (index >= 0) {
     if (lineup.length <= 1) return;
     lineup.splice(index, 1);
-  } else if (lineup.length < 3) {
+  } else if (lineup.length < maxLineupSize()) {
     lineup.push(heroId);
   } else {
     lineup[lineup.length - 1] = heroId;
@@ -1267,8 +1574,11 @@ function createState() {
   enemyId = 1;
   const towerHp = 180 + getTalentLevel("tower_fortify") * 18 + getGearLevel("armor") * 8;
   const startingXp = getTalentLevel("start_xp") * 4;
+  const stage = currentStageConfig();
   return {
     phase: "playing",
+    stage,
+    waves: stage.waves,
     time: 0,
     waveIndex: 0,
     waveTime: 0,
@@ -1418,7 +1728,7 @@ function updateRotation(dt) {
 }
 
 function spawnWaveEnemies() {
-  const wave = WAVES[state.waveIndex];
+  const wave = state.waves[state.waveIndex];
   while (wave && state.nextSpawn < wave.length && state.waveTime >= wave[state.nextSpawn].time) {
     createEnemy(wave[state.nextSpawn]);
     state.nextSpawn += 1;
@@ -2548,11 +2858,11 @@ function updateFloatingTexts(dt) {
 }
 
 function checkWaveClear() {
-  const wave = WAVES[state.waveIndex];
+  const wave = state.waves[state.waveIndex];
   if (!wave) return;
   if (state.nextSpawn >= wave.length && state.enemies.length === 0) {
     state.waveIndex += 1;
-    if (state.waveIndex >= WAVES.length) {
+    if (state.waveIndex >= state.waves.length) {
       finish(true);
       return;
     }
@@ -2564,13 +2874,15 @@ function checkWaveClear() {
 }
 
 function calculateStageRewards(won) {
-  const reachedWave = Math.min(state.waveIndex + 1, WAVES.length);
-  const progress = won ? 1 : clamp(reachedWave / WAVES.length, 0.2, 0.82);
+  const reachedWave = Math.min(state.waveIndex + 1, state.waves.length);
+  const progress = won ? 1 : clamp(reachedWave / state.waves.length, 0.2, 0.82);
   const goldMultiplier = 1 + getTalentLevel("spoils") * 0.08;
   const shardHeroId = pick(lineupHeroIds());
 
   return {
     won,
+    stageNumber: state.stage.number,
+    unlockedHeroId: won ? state.stage.unlockHeroId : null,
     gold: Math.round(((won ? 560 : 260) * progress + state.killCount * 3) * goldMultiplier),
     heroXp: Math.round((won ? 380 : 170) * progress + state.level * 12),
     stones: won ? 1 + (state.level >= 7 ? 1 : 0) : 0,
@@ -2586,13 +2898,18 @@ function applyStageRewards(rewards) {
   metaState.resources.stones += rewards.stones;
   metaState.resources.essence += rewards.essence;
   getHeroMeta(rewards.shardHeroId).shards += rewards.shards;
-  if (rewards.won) metaState.stageClears += 1;
+  if (rewards.won) {
+    const previousStageIndex = currentStageIndex();
+    metaState.stageClears += 1;
+    if (previousStageIndex < STAGE_CONFIGS.length - 1) metaState.lineup = recommendedLineupIds();
+  }
   saveMetaState();
 }
 
 function formatStageRewards(rewards) {
   const shardHero = heroBlueprintById(rewards.shardHeroId);
-  return `보상: 골드 ${rewards.gold}, 영웅EXP ${rewards.heroXp}, 승급석 ${rewards.stones}, 정수 ${rewards.essence}, ${shardHero.name} 조각 ${rewards.shards}`;
+  const unlockText = rewards.unlockedHeroId ? `, ${heroBlueprintById(rewards.unlockedHeroId).name} 합류` : "";
+  return `보상: 골드 ${rewards.gold}, 영웅EXP ${rewards.heroXp}, 승급석 ${rewards.stones}, 정수 ${rewards.essence}, ${shardHero.name} 조각 ${rewards.shards}${unlockText}`;
 }
 
 function finish(won) {
@@ -2609,7 +2926,7 @@ function finish(won) {
   ui.resultTitle.textContent = won ? "방어 성공" : "방어 실패";
   const resultSummary = won
     ? `레벨 ${state.level}, 처치 ${state.killCount}.`
-    : `웨이브 ${Math.min(state.waveIndex + 1, WAVES.length)}, 처치 ${state.killCount}.`;
+    : `웨이브 ${Math.min(state.waveIndex + 1, state.waves.length)}, 처치 ${state.killCount}.`;
   ui.resultText.innerHTML = `${resultSummary}<span class="reward-text">${formatStageRewards(lastStageRewards)}</span>`;
   ui.resultButton.textContent = "로비로";
   ui.resultOverlay.classList.remove("hidden");
@@ -3138,7 +3455,7 @@ function drawWaveBanner() {
 }
 
 function syncUi() {
-  ui.wave.textContent = `${Math.min(state.waveIndex + 1, WAVES.length)}/${WAVES.length}`;
+  ui.wave.textContent = `${Math.min(state.waveIndex + 1, state.waves.length)}/${state.waves.length}`;
   ui.hp.textContent = `${Math.ceil(state.hp)}/${state.maxHp}`;
   ui.hpFill.style.width = `${clamp((state.hp / state.maxHp) * 100, 0, 100)}%`;
   ui.xp.textContent = `${state.xp}/${state.xpNeeded}`;
@@ -3260,25 +3577,27 @@ function updateMetaNav() {
 }
 
 function isMetaTabReady(tab) {
-  if (tab === "heroes") return HERO_BLUEPRINTS.some((hero) => canHeroLevelUp(hero.id) || canHeroStarUp(hero.id));
+  if (tab === "heroes") return HERO_BLUEPRINTS.some((hero) => isHeroUnlocked(hero.id) && (canHeroLevelUp(hero.id) || canHeroStarUp(hero.id)));
   if (tab === "growth") return canDrawTalent();
   if (tab === "bag") return GEAR_SLOTS.some((slot) => canUpgradeGear(slot.id));
   return false;
 }
 
 function renderBattleMeta() {
+  const stage = currentStageConfig();
   const lineup = lineupHeroIds();
+  const bossCount = stageBossCount(stage);
 
   ui.metaContent.innerHTML = `
     <div class="meta-page battle-page">
       <section class="meta-stage">
-        <span class="meta-kicker">STAGE 1</span>
-        <h1>균열 초소</h1>
-        <p>8웨이브, 7웨이브 중간 보스, 8웨이브 보스가 등장합니다.</p>
+        <span class="meta-kicker">STAGE ${stage.number}</span>
+        <h1>${stage.name}</h1>
+        <p>${stage.waveCount}웨이브 동안 현재 출전 파티로 방어합니다.</p>
         <div class="meta-stage-grid">
-          <div class="meta-stat"><span class="meta-small-label">WAVES</span><strong>${WAVES.length}</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${lineup.length}/3</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">BOSS</span><strong>2회</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">WAVES</span><strong>${stage.waveCount}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${lineup.length}/${stage.heroLimit}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">BOSS</span><strong>${bossCount}회</strong></div>
         </div>
       </section>
 
@@ -3317,7 +3636,8 @@ function renderHeroesMeta() {
 
 function renderHeroRosterMeta() {
   const lineup = lineupHeroIds();
-  const standby = HERO_BLUEPRINTS.filter((hero) => !lineup.includes(hero.id));
+  const rosterHeroes = [...HERO_BLUEPRINTS].sort((a, b) => heroRosterOrder(a) - heroRosterOrder(b));
+  const standby = rosterHeroes.filter((hero) => !lineup.includes(hero.id));
 
   ui.metaContent.innerHTML = `
     <div class="meta-page hero-roster-page">
@@ -3336,7 +3656,7 @@ function renderHeroRosterMeta() {
           <button class="lineup-recommend" type="button" data-action="formation-view">출전 세팅</button>
         </div>
         <div class="hero-card-grid deployed-grid">
-          ${lineup.map((id) => renderRosterHeroCard(id, true)).join("")}
+          ${lineup.map((id) => renderRosterHeroCard(id, true, false)).join("")}
         </div>
       </section>
 
@@ -3345,7 +3665,7 @@ function renderHeroRosterMeta() {
           <strong>영웅 미출전</strong>
         </div>
         <div class="hero-card-grid standby-grid">
-          ${standby.length ? standby.map((hero) => renderRosterHeroCard(hero.id, false)).join("") : `<div class="meta-empty compact">모든 영웅이 출전 중입니다.</div>`}
+          ${standby.length ? standby.map((hero) => renderRosterHeroCard(hero.id, false, !isHeroUnlocked(hero.id))).join("") : `<div class="meta-empty compact">모든 영웅이 출전 중입니다.</div>`}
         </div>
       </section>
     </div>
@@ -3354,8 +3674,9 @@ function renderHeroRosterMeta() {
 
 function renderHeroFormationMeta() {
   const lineup = lineupHeroIds();
-  const standby = HERO_BLUEPRINTS.filter((hero) => !lineup.includes(hero.id));
-  const emptySlots = Math.max(0, 3 - lineup.length);
+  const standby = HERO_BLUEPRINTS.filter((hero) => isHeroUnlocked(hero.id) && !lineup.includes(hero.id));
+  const limit = maxLineupSize();
+  const emptySlots = Math.max(0, limit - lineup.length);
 
   ui.metaContent.innerHTML = `
     <div class="meta-page formation-page">
@@ -3368,7 +3689,7 @@ function renderHeroFormationMeta() {
         <button class="lineup-recommend" type="button" data-action="recommended-lineup">권장</button>
       </section>
 
-      <section class="formation-slots" aria-label="출전 슬롯">
+      <section class="formation-slots" style="--slot-count: ${limit}" aria-label="출전 슬롯">
         ${lineup.map((id, index) => renderFormationSlot(id, index, lineup.length)).join("")}
         ${Array.from({ length: emptySlots }, (_, index) => renderEmptyFormationSlot(lineup.length + index)).join("")}
       </section>
@@ -3378,13 +3699,13 @@ function renderHeroFormationMeta() {
           <strong>대기 영웅</strong>
         </div>
         <div class="formation-bench-grid">
-          ${standby.length ? standby.map((hero) => renderBenchHeroCard(hero.id, lineup.length < 3)).join("") : `<div class="meta-empty compact">대기 중인 영웅이 없습니다.</div>`}
+          ${standby.length ? standby.map((hero) => renderBenchHeroCard(hero.id, lineup.length < limit, limit)).join("") : `<div class="meta-empty compact">현재 스테이지의 대기 영웅이 없습니다.</div>`}
         </div>
       </section>
 
       <section class="formation-note">
         <strong>슬롯 순서</strong>
-        <span>1번/2번/3번 슬롯은 전투 시작 조준 방향과 레벨업 카드 풀에 그대로 반영됩니다.</span>
+        <span>현재 스테이지는 ${limit}명까지 출전하며, 슬롯 순서는 전투 시작 조준 방향과 레벨업 카드 풀에 반영됩니다.</span>
       </section>
     </div>
   `;
@@ -3424,7 +3745,7 @@ function renderEmptyFormationSlot(index) {
   `;
 }
 
-function renderBenchHeroCard(heroId, canAdd) {
+function renderBenchHeroCard(heroId, canAdd, limit) {
   const hero = heroBlueprintById(heroId);
   const meta = getHeroMeta(heroId);
   return `
@@ -3434,13 +3755,14 @@ function renderBenchHeroCard(heroId, canAdd) {
         <span>${hero.name}</span>
         <em>Lv.${meta.level}</em>
       </button>
-      <button class="bench-add-button" type="button" data-action="lineup-add" data-lineup-hero-id="${hero.id}" ${canAdd ? "" : "disabled"}>${canAdd ? "추가" : "3명 출전중"}</button>
+      <button class="bench-add-button" type="button" data-action="lineup-add" data-lineup-hero-id="${hero.id}" ${canAdd ? "" : "disabled"}>${canAdd ? "추가" : `${limit}명 출전중`}</button>
     </div>
   `;
 }
 
 function renderHeroDetailMeta() {
-  const selected = heroBlueprintById(selectedMetaHeroId) || heroBlueprintById("sniper");
+  if (!isHeroUnlocked(selectedMetaHeroId)) selectedMetaHeroId = recommendedLineupIds()[0] || "archer";
+  const selected = heroBlueprintById(selectedMetaHeroId) || heroBlueprintById("archer");
   selectedMetaHeroId = selected.id;
   const heroMeta = getHeroMeta(selected.id);
   const stats = combatStatsForBlueprint(selected);
@@ -3484,19 +3806,20 @@ function renderHeroDetailMeta() {
   `;
 }
 
-function renderRosterHeroCard(heroId, deployed) {
+function renderRosterHeroCard(heroId, deployed, locked = false) {
   const hero = heroBlueprintById(heroId);
   const meta = getHeroMeta(heroId);
-  const ready = canHeroLevelUp(heroId) || canHeroStarUp(heroId);
+  const ready = !locked && (canHeroLevelUp(heroId) || canHeroStarUp(heroId));
+  const toggleText = locked ? "잠김" : deployed ? "해제" : lineupHeroIds().length >= maxLineupSize() ? "교체" : "출전";
   return `
-    <div class="roster-hero-card ${deployed ? "deployed" : "standby"} ${ready ? "ready" : ""}" style="--hero-color: ${hero.color}">
-      <button class="roster-hero-main" type="button" data-hero-id="${hero.id}">
-        <span class="roster-level">${meta.level}레벨</span>
+    <div class="roster-hero-card ${deployed ? "deployed" : "standby"} ${locked ? "locked" : ""} ${ready ? "ready" : ""}" style="--hero-color: ${hero.color}">
+      <button class="roster-hero-main" type="button" ${locked ? "disabled" : `data-hero-id="${hero.id}"`}>
+        <span class="roster-level">${locked ? "잠김" : `${meta.level}레벨`}</span>
         <strong>${hero.glyph}</strong>
         <em>${hero.name}</em>
-        <i>${renderStars(Math.min(meta.stars, 2)).replaceAll("☆", "")}</i>
+        <i>${locked ? unlockLabelForHero(hero.id) : renderStars(Math.min(meta.stars, 2)).replaceAll("☆", "")}</i>
       </button>
-      <button class="lineup-toggle" type="button" data-action="toggle-lineup" data-lineup-hero-id="${hero.id}">${deployed ? "해제" : lineupHeroIds().length >= 3 ? "교체" : "출전"}</button>
+      <button class="lineup-toggle" type="button" data-action="toggle-lineup" data-lineup-hero-id="${hero.id}" ${locked ? "disabled" : ""}>${toggleText}</button>
     </div>
   `;
 }
@@ -3776,9 +4099,10 @@ function renderStars(count) {
 }
 
 function selectAdjacentHero(direction) {
-  const index = HERO_BLUEPRINTS.findIndex((hero) => hero.id === selectedMetaHeroId);
-  const nextIndex = (index + direction + HERO_BLUEPRINTS.length) % HERO_BLUEPRINTS.length;
-  selectedMetaHeroId = HERO_BLUEPRINTS[nextIndex].id;
+  const heroes = HERO_BLUEPRINTS.filter((hero) => isHeroUnlocked(hero.id));
+  const index = Math.max(0, heroes.findIndex((hero) => hero.id === selectedMetaHeroId));
+  const nextIndex = (index + direction + heroes.length) % heroes.length;
+  selectedMetaHeroId = heroes[nextIndex].id;
   selectedHeroDetailTab = "level";
   renderMeta();
 }
