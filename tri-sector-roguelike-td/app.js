@@ -962,6 +962,7 @@ const BOSS_REWARD_CONFIG = {
 let state;
 let metaState;
 let metaTab = "battle";
+let metaHeroView = "list";
 let selectedMetaHeroId = "sniper";
 let selectedHeroDetailTab = "level";
 let lastStageRewards = null;
@@ -999,6 +1000,7 @@ function createDefaultMetaState() {
       stones: 3,
       essence: 160,
     },
+    lineup: [...STARTING_HERO_IDS],
     heroes,
     talents: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])),
     gear: Object.fromEntries(GEAR_SLOTS.map((slot) => [slot.id, 0])),
@@ -1024,10 +1026,13 @@ function mergeMetaState(defaults, saved) {
     ...defaults,
     ...saved,
     resources: { ...defaults.resources, ...(saved.resources || {}) },
+    lineup: Array.isArray(saved.lineup) ? saved.lineup.filter((id) => heroBlueprintById(id)).slice(0, 3) : [...defaults.lineup],
     heroes: { ...defaults.heroes },
     talents: { ...defaults.talents, ...(saved.talents || {}) },
     gear: { ...defaults.gear, ...(saved.gear || {}) },
   };
+
+  if (!merged.lineup.length) merged.lineup = [...defaults.lineup];
 
   for (const blueprint of HERO_BLUEPRINTS) {
     merged.heroes[blueprint.id] = {
@@ -1049,6 +1054,38 @@ function getHeroMeta(heroId) {
     metaState.heroes[heroId] = { level: 1, stars: 1, shards: 0 };
   }
   return metaState.heroes[heroId];
+}
+
+function lineupHeroIds() {
+  if (!metaState?.lineup?.length) return [...STARTING_HERO_IDS];
+  const validIds = metaState.lineup.filter((id) => heroBlueprintById(id)).slice(0, 3);
+  return validIds.length ? validIds : [...STARTING_HERO_IDS];
+}
+
+function setRecommendedLineup() {
+  metaState.lineup = [...STARTING_HERO_IDS];
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function toggleLineupHero(heroId) {
+  const lineup = lineupHeroIds();
+  const index = lineup.indexOf(heroId);
+
+  if (index >= 0) {
+    if (lineup.length <= 1) return;
+    lineup.splice(index, 1);
+  } else if (lineup.length < 3) {
+    lineup.push(heroId);
+  } else {
+    lineup[lineup.length - 1] = heroId;
+  }
+
+  metaState.lineup = lineup;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
 }
 
 function getTalentLevel(talentId) {
@@ -1224,7 +1261,7 @@ function createState() {
     particles: [],
     xpOrbs: [],
     floatingTexts: [],
-    heroes: STARTING_HERO_IDS.map((id, index) => createHero(heroBlueprintById(id), index)),
+    heroes: lineupHeroIds().map((id, index) => createHero(heroBlueprintById(id), index)),
   };
 }
 
@@ -1233,7 +1270,7 @@ function heroBlueprintById(id) {
 }
 
 function createHero(blueprint, index) {
-  const slot = blueprint.initialSlot ?? index;
+  const slot = index * 2;
   const metaStats = combatStatsForBlueprint(blueprint);
   return {
     ...blueprint,
@@ -2497,7 +2534,7 @@ function calculateStageRewards(won) {
   const reachedWave = Math.min(state.waveIndex + 1, WAVES.length);
   const progress = won ? 1 : clamp(reachedWave / WAVES.length, 0.2, 0.82);
   const goldMultiplier = 1 + getTalentLevel("spoils") * 0.08;
-  const shardHeroId = pick(STARTING_HERO_IDS);
+  const shardHeroId = pick(lineupHeroIds());
 
   return {
     won,
@@ -3161,6 +3198,7 @@ function startBattle() {
 function renderMeta() {
   syncMetaTopbar();
   updateMetaNav();
+  ui.metaScreen.classList.toggle("hero-detail-mode", metaTab === "heroes" && metaHeroView === "detail");
 
   if (metaTab === "heroes") {
     renderHeroesMeta();
@@ -3196,6 +3234,7 @@ function isMetaTabReady(tab) {
 }
 
 function renderBattleMeta() {
+  const lineup = lineupHeroIds();
   const lastReward = lastStageRewards
     ? `<section class="meta-panel"><div class="meta-section-title"><div><span>LAST REWARD</span><h2>최근 전투 보상</h2></div></div><p class="meta-copy">${escapeHtml(formatStageRewards(lastStageRewards))}</p></section>`
     : "";
@@ -3208,7 +3247,7 @@ function renderBattleMeta() {
         <p>8웨이브, 7웨이브 중간 보스, 8웨이브 보스. 보스 보상은 런 안의 랜덤 캐릭터 강화, 클리어 보상은 메타 성장 재화입니다.</p>
         <div class="meta-stage-grid">
           <div class="meta-stat"><span class="meta-small-label">WAVES</span><strong>${WAVES.length}</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${STARTING_HERO_IDS.length}명</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${lineup.length}/3</strong></div>
           <div class="meta-stat"><span class="meta-small-label">BOSS</span><strong>2회</strong></div>
         </div>
         <div class="meta-action">
@@ -3225,7 +3264,7 @@ function renderBattleMeta() {
           <button class="meta-secondary" type="button" data-tab-link="heroes">영웅 보기</button>
         </div>
         <div class="meta-hero-list">
-          ${STARTING_HERO_IDS.map((id) => renderHeroButton(id, false)).join("")}
+          ${lineup.map((id) => renderHeroButton(id, false)).join("")}
         </div>
       </section>
 
@@ -3259,52 +3298,126 @@ function renderBattleMeta() {
 }
 
 function renderHeroesMeta() {
+  if (metaHeroView === "detail") {
+    renderHeroDetailMeta();
+    return;
+  }
+
+  renderHeroRosterMeta();
+}
+
+function renderHeroRosterMeta() {
+  const lineup = lineupHeroIds();
+  const standby = HERO_BLUEPRINTS.filter((hero) => !lineup.includes(hero.id));
+
+  ui.metaContent.innerHTML = `
+    <div class="meta-page hero-roster-page">
+      <section class="hero-roster-header">
+        <div>
+          <span class="meta-kicker">HERO</span>
+          <h2>영웅</h2>
+        </div>
+        <button class="meta-info-button" type="button" aria-label="영웅 정보">i</button>
+      </section>
+
+      <section class="hero-roster-section deployed">
+        <div class="hero-section-title">
+          <span class="hero-orb"></span>
+          <strong>출전 영웅</strong>
+          <button class="lineup-recommend" type="button" data-action="recommended-lineup">권장 라인업</button>
+        </div>
+        <div class="hero-card-grid deployed-grid">
+          ${lineup.map((id) => renderRosterHeroCard(id, true)).join("")}
+        </div>
+      </section>
+
+      <section class="hero-roster-section standby">
+        <div class="hero-section-title simple">
+          <strong>영웅 미출전</strong>
+        </div>
+        <div class="hero-card-grid standby-grid">
+          ${standby.length ? standby.map((hero) => renderRosterHeroCard(hero.id, false)).join("") : `<div class="meta-empty compact">모든 영웅이 출전 중입니다.</div>`}
+        </div>
+      </section>
+
+      <section class="hero-filter-strip" aria-label="영웅 필터">
+        <button type="button" class="filter-chip active">ALL</button>
+        <button type="button" class="filter-chip fire">화</button>
+        <button type="button" class="filter-chip lightning">번</button>
+        <button type="button" class="filter-chip wind">풍</button>
+        <button type="button" class="filter-chip frost">빙</button>
+      </section>
+
+      <section class="hero-quick-actions">
+        <button type="button" class="hero-book-button">도감</button>
+        <button type="button" class="hero-book-button">포진</button>
+      </section>
+    </div>
+  `;
+}
+
+function renderHeroDetailMeta() {
   const selected = heroBlueprintById(selectedMetaHeroId) || heroBlueprintById("sniper");
   selectedMetaHeroId = selected.id;
   const heroMeta = getHeroMeta(selected.id);
   const stats = combatStatsForBlueprint(selected);
+  const element = heroElement(selected.id);
 
   ui.metaContent.innerHTML = `
-    <div class="meta-page">
-      <section class="meta-panel">
-        <div class="meta-section-title">
-          <div>
-            <span>HERO ROSTER</span>
-            <h2>영웅</h2>
-          </div>
+    <div class="meta-page hero-detail-page" style="--hero-color: ${selected.color}; --element-color: ${element.color}">
+      <section class="hero-showcase">
+        <button class="hero-detail-back top" type="button" data-action="hero-list" aria-label="영웅 목록으로">‹</button>
+        <div class="hero-detail-title">
+          <h2>${selected.name}</h2>
+          <p>${selected.role}</p>
+          <span class="hero-role-badge">${element.icon} ${element.name}</span>
         </div>
-        <div class="meta-hero-list">
-          ${HERO_BLUEPRINTS.map((hero) => renderHeroButton(hero.id, hero.id === selected.id)).join("")}
+        <button class="hero-switch prev" type="button" data-action="hero-prev" aria-label="이전 영웅">‹</button>
+        <div class="hero-figure">${selected.glyph}</div>
+        <button class="hero-switch next" type="button" data-action="hero-next" aria-label="다음 영웅">›</button>
+        <div class="hero-power-pill">
+          <span>전투력</span>
+          <strong>${heroMetaPower(selected.id)}</strong>
         </div>
       </section>
 
-      <section class="meta-panel" style="--hero-color: ${selected.color}">
-        <div class="meta-hero-head">
-          <div class="meta-portrait-large">${selected.glyph}</div>
-          <div class="meta-hero-name">
-            <h2>${selected.name}</h2>
-            <p>${selected.role}</p>
-            <div class="meta-stars">${renderStars(heroMeta.stars)}</div>
-          </div>
+      <section class="hero-detail-panel">
+        <div class="hero-detail-tabs">
+          ${["level", "star", "gear", "rune", "badge"].map((tab) => renderHeroDetailTab(tab)).join("")}
+        </div>
+        <div class="hero-stat-ribbon">
+          <div><span>레벨</span><strong>${heroMeta.level}</strong></div>
+          <div><span>공격</span><strong>${stats.damage}</strong></div>
+          <div><span>체력</span><strong>${Math.round(430 + heroMeta.level * 12 + heroMeta.stars * 28)}</strong></div>
+          <div><span>방어</span><strong>${Math.round(42 + heroMeta.stars * 8)}</strong></div>
+          <button class="meta-info-button small" type="button" aria-label="상세 정보">i</button>
         </div>
 
-        <div class="meta-stat-grid" style="margin-top: 12px">
-          <div class="meta-stat"><span class="meta-small-label">LEVEL</span><strong>Lv.${heroMeta.level}</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">POWER</span><strong>${heroMetaPower(selected.id)}</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">ANGLE</span><strong>${selected.angle}도</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">DMG</span><strong>${stats.damage}</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">RANGE</span><strong>${stats.range}</strong></div>
-          <div class="meta-stat"><span class="meta-small-label">INTERVAL</span><strong>${stats.cooldown.toFixed(2)}s</strong></div>
-        </div>
-
-        <div class="meta-tabs">
-          ${["level", "star", "skill", "gear"].map((tab) => renderHeroDetailTab(tab)).join("")}
-        </div>
-
-        <div class="meta-detail-body">
+        <div class="meta-detail-body compact">
           ${renderHeroDetailBody(selected)}
         </div>
+
+        <button class="hero-detail-back bottom" type="button" data-action="hero-list" aria-label="영웅 목록으로">↩</button>
       </section>
+    </div>
+  `;
+}
+
+function renderRosterHeroCard(heroId, deployed) {
+  const hero = heroBlueprintById(heroId);
+  const meta = getHeroMeta(heroId);
+  const ready = canHeroLevelUp(heroId) || canHeroStarUp(heroId);
+  const element = heroElement(heroId);
+  return `
+    <div class="roster-hero-card ${deployed ? "deployed" : "standby"} ${ready ? "ready" : ""}" style="--hero-color: ${hero.color}; --element-color: ${element.color}">
+      <button class="roster-hero-main" type="button" data-hero-id="${hero.id}">
+        <span class="roster-level">${meta.level}레벨</span>
+        <span class="roster-element">${element.icon}</span>
+        <strong>${hero.glyph}</strong>
+        <em>${hero.name}</em>
+        <i>${renderStars(Math.min(meta.stars, 2)).replaceAll("☆", "")}</i>
+      </button>
+      <button class="lineup-toggle" type="button" data-action="toggle-lineup" data-lineup-hero-id="${hero.id}">${deployed ? "해제" : lineupHeroIds().length >= 3 ? "교체" : "출전"}</button>
     </div>
   `;
 }
@@ -3324,18 +3437,20 @@ function renderHeroButton(heroId, active) {
 
 function renderHeroDetailTab(tab) {
   const labels = {
-    level: "레벨",
-    star: "별",
-    skill: "스킬",
+    level: "레벨업",
+    star: "진화",
     gear: "장비",
+    rune: "룬",
+    badge: "배지",
   };
   return `<button class="meta-tab-button ${selectedHeroDetailTab === tab ? "active" : ""}" type="button" data-hero-tab="${tab}">${labels[tab]}</button>`;
 }
 
 function renderHeroDetailBody(hero) {
   if (selectedHeroDetailTab === "star") return renderHeroStarPanel(hero);
-  if (selectedHeroDetailTab === "skill") return renderHeroSkillPanel(hero);
   if (selectedHeroDetailTab === "gear") return renderHeroGearPanel();
+  if (selectedHeroDetailTab === "rune") return renderHeroRunePanel(hero);
+  if (selectedHeroDetailTab === "badge") return renderHeroBadgePanel(hero);
   return renderHeroLevelPanel(hero);
 }
 
@@ -3346,29 +3461,30 @@ function renderHeroLevelPanel(hero) {
   const isMax = meta.level >= MAX_HERO_LEVEL;
   const canUpgrade = canHeroLevelUp(hero.id);
   const buttonText = stoneCost > 0 ? "승급" : "레벨업";
+  const growthSkills = heroUpgrades.filter((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "성장").slice(0, 3);
   return `
-    <div class="meta-resource-line">
-      <div>
-        <strong>다음 레벨 성장</strong>
-        <span>공격력, 일부 10레벨 구간 사거리, 궁극 해금 조건에 반영됩니다.</span>
-      </div>
-      <span class="${isHeroUltimateUnlocked(hero.id) ? "enough" : "missing"}">${isHeroUltimateUnlocked(hero.id) ? "궁극 해금" : "궁극 잠김"}</span>
+    <div class="hero-skill-icons">
+      ${growthSkills.map((skill, index) => `
+        <div class="hero-skill-icon ${index === 0 ? "open" : "locked"}" style="--skill-color: ${tierColor(skill.tier)}">
+          <strong>${skill.title.slice(0, 2)}</strong>
+          <span>${index === 0 ? "1" : "🔒"}</span>
+        </div>
+      `).join("")}
     </div>
-    <div class="meta-resource-line">
-      <div>
-        <strong>필요 영웅EXP</strong>
-        <span>${formatNumber(metaState.resources.heroXp)} / ${formatNumber(cost)}</span>
-      </div>
-      <span class="${metaState.resources.heroXp >= cost ? "enough" : "missing"}">${metaState.resources.heroXp >= cost ? "충분" : "부족"}</span>
+
+    <div class="hero-cost-pill">
+      <span>영웅EXP</span>
+      <strong class="${metaState.resources.heroXp >= cost ? "enough" : "missing"}">${formatNumber(metaState.resources.heroXp)} / ${formatNumber(cost)}</strong>
     </div>
-    <div class="meta-resource-line">
-      <div>
-        <strong>필요 승급석</strong>
-        <span>${formatNumber(metaState.resources.stones)} / ${formatNumber(stoneCost)}</span>
+
+    ${stoneCost ? `
+      <div class="hero-cost-pill secondary">
+        <span>승급석</span>
+        <strong class="${metaState.resources.stones >= stoneCost ? "enough" : "missing"}">${formatNumber(metaState.resources.stones)} / ${formatNumber(stoneCost)}</strong>
       </div>
-      <span class="${metaState.resources.stones >= stoneCost ? "enough" : "missing"}">${stoneCost ? "10레벨 단위" : "필요 없음"}</span>
-    </div>
-    <button class="meta-primary" type="button" data-action="hero-level" ${canUpgrade && !isMax ? "" : "disabled"}>${isMax ? "최대 레벨" : buttonText}</button>
+    ` : ""}
+
+    <button class="meta-primary hero-main-upgrade" type="button" data-action="hero-level" ${canUpgrade && !isMax ? "" : "disabled"}>${isMax ? "최대 레벨" : buttonText}</button>
   `;
 }
 
@@ -3378,22 +3494,16 @@ function renderHeroStarPanel(hero) {
   const isMax = meta.stars >= MAX_HERO_STAR;
   const canUpgrade = canHeroStarUp(hero.id);
   return `
-    <div class="meta-resource-line">
-      <div>
-        <strong>별 성장</strong>
-        <span>3성부터 궁극 선택지가 전투 카드 풀에 들어갈 수 있습니다.</span>
-      </div>
-      <span class="${isHeroUltimateUnlocked(hero.id) ? "enough" : "missing"}">${isHeroUltimateUnlocked(hero.id) ? "궁극 해금" : "3성 필요"}</span>
+    <div class="hero-evolve-stars">${renderStars(meta.stars)}</div>
+    <div class="hero-cost-pill">
+      <span>${hero.name} 조각</span>
+      <strong class="${canUpgrade || isMax ? "enough" : "missing"}">${isMax ? "최대 별 달성" : `${formatNumber(meta.shards)} / ${formatNumber(cost)}`}</strong>
     </div>
-    <div class="meta-resource-line">
-      <div>
-        <strong>${hero.name} 조각</strong>
-        <span>${isMax ? "최대 별 달성" : `${formatNumber(meta.shards)} / ${formatNumber(cost)}`}</span>
-      </div>
-      <span class="${canUpgrade || isMax ? "enough" : "missing"}">${isMax ? "최대" : canUpgrade ? "충분" : "부족"}</span>
+    <div class="hero-passive-box">
+      <strong>${isHeroUltimateUnlocked(hero.id) ? "궁극 선택지 해금" : "3성 또는 Lv.10 달성 시 궁극 해금"}</strong>
+      <span>조건부 피해, 시작 보너스 같은 고유 패시브는 이 진화 영역에 배치합니다.</span>
     </div>
-    <div class="meta-empty">조건부 추가 피해나 전투 시작 보너스 같은 캐릭터별 패시브는 이 별 성장 영역에 배치하는 방향입니다.</div>
-    <button class="meta-primary" type="button" data-action="hero-star" ${canUpgrade && !isMax ? "" : "disabled"}>${isMax ? "최대 별" : "별 상승"}</button>
+    <button class="meta-primary hero-main-upgrade" type="button" data-action="hero-star" ${canUpgrade && !isMax ? "" : "disabled"}>${isMax ? "최대 진화" : "진화"}</button>
   `;
 }
 
@@ -3440,8 +3550,34 @@ function renderSkillRow(upgrade, hero) {
 
 function renderHeroGearPanel() {
   return `
-    <div class="meta-empty">장비는 캐릭터 귀속이 아니라 슬롯 성장으로 처리합니다. 영웅을 교체해도 투자한 슬롯 레벨이 유지됩니다.</div>
-    <div class="meta-gear-grid">${GEAR_SLOTS.map((slot) => renderGearSlot(slot)).join("")}</div>
+    <div class="hero-compact-gear">${GEAR_SLOTS.map((slot) => renderGearSlot(slot)).join("")}</div>
+  `;
+}
+
+function renderHeroRunePanel(hero) {
+  return `
+    <div class="hero-passive-box locked">
+      <strong>룬 시스템 잠김</strong>
+      <span>${hero.name}의 전투 빌드를 바꾸는 장기 성장 슬롯입니다. 영웅 레벨/진화 검증 후 추가합니다.</span>
+    </div>
+    <div class="hero-skill-icons">
+      <div class="hero-skill-icon locked"><strong>룬</strong><span>🔒</span></div>
+      <div class="hero-skill-icon locked"><strong>셋</strong><span>🔒</span></div>
+      <div class="hero-skill-icon locked"><strong>각</strong><span>🔒</span></div>
+    </div>
+  `;
+}
+
+function renderHeroBadgePanel(hero) {
+  return `
+    <div class="hero-passive-box locked">
+      <strong>배지 시스템 잠김</strong>
+      <span>${hero.name}의 별 레벨 패시브와 겹치지 않는 수집형 보너스로 보류합니다.</span>
+    </div>
+    <div class="hero-cost-pill secondary">
+      <span>해금 조건</span>
+      <strong>추후 결정</strong>
+    </div>
   `;
 }
 
@@ -3490,7 +3626,7 @@ function renderTalentCard(talent) {
 
 function renderBagMeta() {
   ui.metaContent.innerHTML = `
-    <div class="meta-page">
+    <div class="meta-page bag-page">
       <section class="meta-panel">
         <div class="meta-section-title">
           <div>
@@ -3514,16 +3650,6 @@ function renderBagMeta() {
           </div>
         </div>
         <div class="meta-gear-grid">${GEAR_SLOTS.map((slot) => renderGearSlot(slot)).join("")}</div>
-      </section>
-
-      <section class="meta-panel">
-        <div class="meta-section-title">
-          <div>
-            <span>LOCKED</span>
-            <h2>보물/룬</h2>
-          </div>
-        </div>
-        <div class="meta-empty">보물, 룬, 컬렉션은 장기 메타 레이어로 보류합니다. 먼저 영웅 레벨/별/재능/장비 슬롯의 핵심 루프를 검증합니다.</div>
       </section>
     </div>
   `;
@@ -3568,6 +3694,24 @@ function heroMetaPower(heroId) {
 
 function renderStars(count) {
   return "★".repeat(count) + "☆".repeat(MAX_HERO_STAR - count);
+}
+
+function heroElement(heroId) {
+  const elements = {
+    archer: { name: "바람", icon: "풍", color: "#74dc8d" },
+    sniper: { name: "번개", icon: "번", color: "#ffd166" },
+    warrior: { name: "화염", icon: "화", color: "#ff6b6b" },
+    mage: { name: "마법", icon: "마", color: "#c89bff" },
+  };
+  return elements[heroId] || { name: "일반", icon: "ALL", color: "#aeb6c2" };
+}
+
+function selectAdjacentHero(direction) {
+  const index = HERO_BLUEPRINTS.findIndex((hero) => hero.id === selectedMetaHeroId);
+  const nextIndex = (index + direction + HERO_BLUEPRINTS.length) % HERO_BLUEPRINTS.length;
+  selectedMetaHeroId = HERO_BLUEPRINTS[nextIndex].id;
+  selectedHeroDetailTab = "level";
+  renderMeta();
 }
 
 function restart() {
@@ -3754,6 +3898,7 @@ ui.metaContent.addEventListener("click", (event) => {
   const tabLink = button.dataset.tabLink;
   if (tabLink) {
     metaTab = tabLink;
+    if (tabLink === "heroes") metaHeroView = "list";
     renderMeta();
     return;
   }
@@ -3761,6 +3906,9 @@ ui.metaContent.addEventListener("click", (event) => {
   const heroId = button.dataset.heroId;
   if (heroId) {
     selectedMetaHeroId = heroId;
+    selectedHeroDetailTab = "level";
+    metaTab = "heroes";
+    metaHeroView = "detail";
     renderMeta();
     return;
   }
@@ -3774,6 +3922,17 @@ ui.metaContent.addEventListener("click", (event) => {
 
   if (button.dataset.action === "start-battle") {
     startBattle();
+  } else if (button.dataset.action === "hero-list") {
+    metaHeroView = "list";
+    renderMeta();
+  } else if (button.dataset.action === "hero-prev") {
+    selectAdjacentHero(-1);
+  } else if (button.dataset.action === "hero-next") {
+    selectAdjacentHero(1);
+  } else if (button.dataset.action === "recommended-lineup") {
+    setRecommendedLineup();
+  } else if (button.dataset.action === "toggle-lineup") {
+    toggleLineupHero(button.dataset.lineupHeroId);
   } else if (button.dataset.action === "hero-level") {
     upgradeSelectedHeroLevel();
   } else if (button.dataset.action === "hero-star") {
@@ -3788,6 +3947,7 @@ ui.metaContent.addEventListener("click", (event) => {
 for (const button of ui.metaNavButtons) {
   button.addEventListener("click", () => {
     metaTab = button.dataset.metaTab || "battle";
+    if (metaTab === "heroes") metaHeroView = "list";
     renderMeta();
   });
 }
