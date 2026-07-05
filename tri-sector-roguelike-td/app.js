@@ -52,12 +52,12 @@ const HERO_BLUEPRINTS = [
   {
     id: "warrior",
     name: "전사",
-    role: "고화력 베기",
+    role: "근거리 강타",
     glyph: "전",
     color: "#ff8d62",
     glow: "rgba(255, 141, 98, 0.42)",
     damage: 34,
-    range: 82,
+    range: 58,
     angle: 95,
     cooldown: 0.92,
     targets: 1,
@@ -332,7 +332,7 @@ const heroUpgrades = [
       hero.breakthrough = true;
       hero.targets += 1;
       hero.push += 14;
-      hero.range += 12;
+      hero.range += 8;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
