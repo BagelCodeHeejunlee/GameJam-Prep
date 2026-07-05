@@ -3268,16 +3268,13 @@ function isMetaTabReady(tab) {
 
 function renderBattleMeta() {
   const lineup = lineupHeroIds();
-  const lastReward = lastStageRewards
-    ? `<section class="meta-panel"><div class="meta-section-title"><div><span>LAST REWARD</span><h2>최근 전투 보상</h2></div></div><p class="meta-copy">${escapeHtml(formatStageRewards(lastStageRewards))}</p></section>`
-    : "";
 
   ui.metaContent.innerHTML = `
     <div class="meta-page battle-page">
       <section class="meta-stage">
         <span class="meta-kicker">STAGE 1</span>
         <h1>균열 초소</h1>
-        <p>8웨이브, 7웨이브 중간 보스, 8웨이브 보스. 보스 보상은 런 안의 랜덤 캐릭터 강화, 클리어 보상은 메타 성장 재화입니다.</p>
+        <p>8웨이브, 7웨이브 중간 보스, 8웨이브 보스가 등장합니다.</p>
         <div class="meta-stage-grid">
           <div class="meta-stat"><span class="meta-small-label">WAVES</span><strong>${WAVES.length}</strong></div>
           <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${lineup.length}/3</strong></div>
@@ -3297,35 +3294,9 @@ function renderBattleMeta() {
           ${lineup.map((id) => renderHeroButton(id, false)).join("")}
         </div>
       </section>
-
-      <section class="meta-panel">
-        <div class="meta-section-title">
-          <div>
-            <span>GROWTH PATH</span>
-            <h2>다음 목표</h2>
-          </div>
-        </div>
-        ${renderNextGoal()}
-      </section>
-
-      <section class="meta-panel">
-        <div class="meta-section-title">
-          <div>
-            <span>EXPECTED</span>
-            <h2>클리어 보상</h2>
-          </div>
-        </div>
-        <div class="meta-reward-grid">
-          <div class="meta-reward"><span>GOLD</span><strong>560+</strong></div>
-          <div class="meta-reward"><span>HERO EXP</span><strong>380+</strong></div>
-          <div class="meta-reward"><span>STONE</span><strong>1~2</strong></div>
-          <div class="meta-reward"><span>SHARD</span><strong>랜덤 4</strong></div>
-        </div>
-      </section>
       <section class="battle-start-action">
         <button class="meta-primary" type="button" data-action="start-battle">전투 시작</button>
       </section>
-      ${lastReward}
     </div>
   `;
 }

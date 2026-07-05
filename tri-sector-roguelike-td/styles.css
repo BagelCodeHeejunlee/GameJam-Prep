@@ -162,7 +162,7 @@ button {
 }
 
 .battle-page {
-  grid-template-rows: minmax(0, 1.15fr) minmax(86px, 0.75fr) minmax(68px, 0.55fr) minmax(82px, 0.7fr) 54px;
+  grid-template-rows: minmax(0, 1fr) minmax(118px, 0.72fr) 54px;
   gap: 8px;
 }
 
@@ -2113,7 +2113,7 @@ button {
   }
 
   .battle-page {
-    grid-template-rows: minmax(0, 1fr) minmax(80px, 0.72fr) minmax(64px, 0.5fr) minmax(76px, 0.62fr) 50px;
+    grid-template-rows: minmax(0, 1fr) minmax(112px, 0.72fr) 50px;
     gap: 7px;
   }
 
