@@ -46,6 +46,8 @@ const HERO_BLUEPRINTS = [
     projectileSpeed: 560,
     pierce: 0,
     projectileCount: 1,
+    splashRadius: 0,
+    splashRatio: 0,
     ultimateEvery: 8,
     initialSlot: 0,
   },
@@ -82,6 +84,7 @@ const HERO_BLUEPRINTS = [
     zoneDuration: 0,
     zoneDps: 7,
     chainCount: 0,
+    echoCount: 0,
     ultimateEvery: 5,
     initialSlot: 4,
   },
@@ -177,13 +180,13 @@ const TYPES = {
 
 const heroUpgrades = [
   {
-    id: "archer_growth_marksman",
+    id: "archer_growth_volley",
     heroId: "archer",
     tier: "성장",
-    title: "정밀 조준",
-    text: "궁수 공격력 +7",
+    title: "쌍시위 사격",
+    text: "궁수 기본 화살 수 +1",
     apply: (hero) => {
-      hero.damage += 7;
+      hero.projectileCount += 1;
     },
   },
   {
@@ -197,24 +200,25 @@ const heroUpgrades = [
     },
   },
   {
-    id: "archer_growth_redeploy",
+    id: "archer_growth_burst",
     heroId: "archer",
     tier: "성장",
-    title: "재배치 조준",
-    text: "로테이션 직후 궁수의 첫 공격 피해 +45%",
+    title: "폭렬 화살",
+    text: "궁수 화살 적중 시 주변 적에게 작은 폭발 피해",
     apply: (hero) => {
-      hero.firstStrike += 0.45;
+      hero.splashRadius = Math.max(hero.splashRadius, 22);
+      hero.splashRatio = Math.max(hero.splashRatio, 0.34);
     },
   },
   {
-    id: "archer_basic_range",
+    id: "archer_basic_damage",
     heroId: "archer",
     tier: "기본",
-    maxRank: 4,
-    title: "장궁 숙련",
-    text: "궁수 사거리 +12",
+    maxRank: 5,
+    title: "정밀 조준",
+    text: "궁수 공격력 +5",
     apply: (hero) => {
-      hero.range += 12;
+      hero.damage += 5;
     },
   },
   {
@@ -229,15 +233,14 @@ const heroUpgrades = [
     },
   },
   {
-    id: "archer_basic_bowstring",
+    id: "archer_basic_range",
     heroId: "archer",
     tier: "기본",
-    maxRank: 3,
-    title: "강화 활시위",
-    text: "궁수 공격력 +3, 투사체 속도 +50",
+    maxRank: 4,
+    title: "장궁 숙련",
+    text: "궁수 사거리 +12",
     apply: (hero) => {
-      hero.damage += 3;
-      hero.projectileSpeed += 50;
+      hero.range += 12;
     },
   },
   {
@@ -289,14 +292,13 @@ const heroUpgrades = [
     },
   },
   {
-    id: "warrior_growth_entry",
+    id: "warrior_growth_sweep",
     heroId: "warrior",
     tier: "성장",
-    title: "결전 진입",
-    text: "전사 공격력 +4, 로테이션 직후 첫 공격 피해 +45%",
+    title: "연속 베기",
+    text: "전사 기본 공격 타격 수 +1",
     apply: (hero) => {
-      hero.damage += 4;
-      hero.firstStrike += 0.45;
+      hero.targets += 1;
     },
   },
   {
@@ -311,14 +313,14 @@ const heroUpgrades = [
     },
   },
   {
-    id: "warrior_basic_sweep",
+    id: "warrior_basic_tempo",
     heroId: "warrior",
     tier: "기본",
-    maxRank: 2,
-    title: "좁은 휩쓸기",
-    text: "전사 기본 공격 타격 수 +1",
+    maxRank: 4,
+    title: "검술 호흡",
+    text: "전사 공격 간격 -6%",
     apply: (hero) => {
-      hero.targets += 1;
+      hero.cooldown = Math.max(0.62, hero.cooldown * 0.94);
     },
   },
   {
@@ -372,25 +374,34 @@ const heroUpgrades = [
     },
   },
   {
-    id: "mage_growth_condense",
+    id: "mage_growth_chain",
     heroId: "mage",
     tier: "성장",
-    title: "응축 폭발",
-    text: "마법사 공격력 +3, 폭발 반경 +8",
+    title: "연쇄 룬",
+    text: "마법진 폭발 후 가까운 적 1명에게 보조 마법진 생성",
     apply: (hero) => {
-      hero.damage += 3;
-      hero.blastRadius += 8;
+      hero.chainCount += 1;
     },
   },
   {
-    id: "mage_growth_timing",
+    id: "mage_growth_echo",
     heroId: "mage",
     tier: "성장",
-    title: "예비 영창",
-    text: "마법진 예고 시간 감소, 공격 간격 -6%",
+    title: "메아리 룬",
+    text: "마법진 폭발 후 같은 위치에 작은 2차 폭발",
     apply: (hero) => {
-      hero.castDelay = Math.max(0.18, hero.castDelay - 0.1);
-      hero.cooldown = Math.max(0.55, hero.cooldown * 0.94);
+      hero.echoCount += 1;
+    },
+  },
+  {
+    id: "mage_basic_damage",
+    heroId: "mage",
+    tier: "기본",
+    maxRank: 5,
+    title: "응축 마력",
+    text: "마법사 공격력 +3",
+    apply: (hero) => {
+      hero.damage += 3;
     },
   },
   {
@@ -416,18 +427,6 @@ const heroUpgrades = [
     },
   },
   {
-    id: "mage_basic_echo",
-    heroId: "mage",
-    tier: "기본",
-    maxRank: 3,
-    title: "마력 잔향",
-    text: "장판 지속시간 +0.35초, 장판 피해 +1",
-    apply: (hero) => {
-      hero.zoneDuration += 0.35;
-      hero.zoneDps += 1;
-    },
-  },
-  {
     id: "mage_break",
     heroId: "mage",
     tier: "돌파",
@@ -435,7 +434,7 @@ const heroUpgrades = [
     text: "폭발 후 가까운 적 최대 2명에게 보조 마법진 연쇄 생성",
     apply: (hero) => {
       hero.breakthrough = true;
-      hero.chainCount = 2;
+      hero.chainCount = Math.max(hero.chainCount + 1, 2);
       hero.blastRadius += 6;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
@@ -517,8 +516,6 @@ function createHero(blueprint, index) {
     breakthrough: false,
     ultimate: false,
     ultimateCharge: 0,
-    firstStrike: 0,
-    firstStrikeReady: false,
   };
 }
 
@@ -589,7 +586,6 @@ function startRotation() {
     hero.slot = hero.toSlot;
     hero.rotateT = 0;
     hero.attackTimer = Math.max(hero.attackTimer, hero.rotateDuration);
-    hero.firstStrikeReady = hero.firstStrike > 0;
   }
 
   state.rotationCount += 1;
@@ -794,6 +790,8 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
     rangeLeft: hero.range,
     radius: 4,
     color: hero.breakthrough ? "#9ee7ff" : hero.color,
+    splashRadius: hero.splashRadius || 0,
+    splashRatio: hero.splashRatio || 0,
     hitIds: [],
   });
 }
@@ -850,6 +848,7 @@ function attackMage(hero) {
     chainCount: hero.chainCount,
     zoneDuration: hero.zoneDuration,
     zoneDps: hero.zoneDps,
+    echoCount: hero.echoCount,
     big: false,
   });
 
@@ -858,12 +857,7 @@ function attackMage(hero) {
 }
 
 function prepareHeroDamage(hero) {
-  let damage = hero.damage;
-  if (hero.firstStrikeReady) {
-    damage = Math.round(damage * (1 + hero.firstStrike));
-    hero.firstStrikeReady = false;
-  }
-  return damage;
+  return hero.damage;
 }
 
 function chargeUltimate(hero, trigger) {
@@ -1022,6 +1016,7 @@ function updateProjectiles(dt) {
 
       p.hitIds.push(enemy.id);
       hitEnemy(enemy, p.damage, { x: p.prevX, y: p.prevY, color: p.color });
+      if (p.splashRadius > 0 && p.splashRatio > 0) triggerProjectileSplash(p, enemy);
       addBurst(enemy.x, enemy.y, p.color, 5);
       if (p.pierceLeft <= 0) {
         consumed = true;
@@ -1033,6 +1028,31 @@ function updateProjectiles(dt) {
     if (consumed || p.rangeLeft <= 0 || p.x < -20 || p.y < -20 || p.x > cssWidth + 20 || p.y > cssHeight + 20) {
       state.projectiles.splice(i, 1);
     }
+  }
+}
+
+function triggerProjectileSplash(projectile, origin) {
+  const damage = Math.max(1, Math.round(projectile.damage * projectile.splashRatio));
+  let hitCount = 0;
+  for (const enemy of [...state.enemies]) {
+    if (enemy.dead || enemy.id === origin.id || projectile.hitIds.includes(enemy.id)) continue;
+    const dist = Math.hypot(enemy.x - origin.x, enemy.y - origin.y);
+    if (dist > projectile.splashRadius + enemy.radius) continue;
+    projectile.hitIds.push(enemy.id);
+    hitEnemy(enemy, damage, { x: origin.x, y: origin.y, color: projectile.color }, { quiet: true });
+    hitCount += 1;
+  }
+
+  if (hitCount > 0) {
+    state.effects.push({
+      type: "shock",
+      x: origin.x,
+      y: origin.y,
+      radius: projectile.splashRadius,
+      color: projectile.color,
+      life: 0.18,
+      maxLife: 0.18,
+    });
   }
 }
 
@@ -1091,6 +1111,25 @@ function explodeMagicCircle(circle) {
     });
   }
 
+  if (circle.echoCount > 0) {
+    addMagicCircle({
+      x: circle.x,
+      y: circle.y,
+      radius: Math.max(28, circle.radius * 0.68),
+      delay: 0.2,
+      damage: Math.max(1, Math.round(circle.damage * 0.48)),
+      color: circle.color,
+      heroId: circle.heroId,
+      angle: circle.angle,
+      range: circle.range,
+      chainCount: 0,
+      zoneDuration: 0,
+      zoneDps: circle.zoneDps,
+      echoCount: circle.echoCount - 1,
+      big: false,
+    });
+  }
+
   if (circle.chainCount > 0) {
     const candidates = state.enemies
       .filter((enemy) => !enemy.dead && !hits.includes(enemy) && enemyInCastCone(circle, enemy))
@@ -1111,6 +1150,7 @@ function explodeMagicCircle(circle) {
         chainCount: 0,
         zoneDuration: Math.min(0.7, circle.zoneDuration * 0.45),
         zoneDps: circle.zoneDps,
+        echoCount: 0,
         big: false,
       });
     }
