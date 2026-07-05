@@ -40,7 +40,7 @@ const HERO_BLUEPRINTS = [
     color: "#6fd6ff",
     glow: "rgba(111, 214, 255, 0.42)",
     damage: 26,
-    range: 320,
+    range: 135,
     angle: 55,
     cooldown: 0.82,
     projectileSpeed: 560,
@@ -57,7 +57,7 @@ const HERO_BLUEPRINTS = [
     color: "#ff8d62",
     glow: "rgba(255, 141, 98, 0.42)",
     damage: 34,
-    range: 310,
+    range: 82,
     angle: 95,
     cooldown: 0.92,
     targets: 1,
@@ -74,10 +74,10 @@ const HERO_BLUEPRINTS = [
     color: "#c89bff",
     glow: "rgba(200, 155, 255, 0.42)",
     damage: 16,
-    range: 260,
+    range: 118,
     angle: 80,
     cooldown: 1.15,
-    blastRadius: 52,
+    blastRadius: 34,
     castDelay: 0.35,
     zoneDuration: 0,
     zoneDps: 7,
@@ -225,10 +225,10 @@ const heroUpgrades = [
     heroId: "archer",
     tier: "기본",
     title: "장궁 숙련",
-    text: "궁수 사거리 +36",
+    text: "궁수 사거리 +18",
     canOffer: () => true,
     apply: (hero) => {
-      hero.range += 36;
+      hero.range += 18;
       hero.basicPicks += 1;
     },
   },
@@ -356,10 +356,10 @@ const heroUpgrades = [
     heroId: "mage",
     tier: "기본",
     title: "확산 마법진",
-    text: "마법사 폭발 반경 +15",
+    text: "마법사 폭발 반경 +10",
     canOffer: () => true,
     apply: (hero) => {
-      hero.blastRadius += 15;
+      hero.blastRadius += 10;
       hero.basicPicks += 1;
     },
   },
