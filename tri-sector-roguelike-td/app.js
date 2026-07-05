@@ -33,6 +33,9 @@ const ROTATION_SPEED = 240;
 const ROTATION_ACCEL = 1600;
 const ROTATION_DECEL = 2200;
 const ROTATION_ATTACK_LOCK = 0.08;
+const XP_BASE_REQUIREMENT = 24;
+const XP_LINEAR_GROWTH = 7;
+const XP_QUADRATIC_GROWTH = 0.6;
 const VERSION_LABEL = "TRI-KEEPERS";
 const TIER_COLORS = {
   기본: "#aeb6c2",
@@ -742,7 +745,7 @@ function createState() {
     hp: 180,
     maxHp: 180,
     xp: 0,
-    xpNeeded: 20,
+    xpNeeded: xpRequirementForLevel(1),
     level: 1,
     killCount: 0,
     shake: 0,
@@ -1602,14 +1605,27 @@ function updateXpOrbs(dt) {
   }
 }
 
+function xpRequirementForLevel(level) {
+  const completedLevelUps = Math.max(0, level - 1);
+  return Math.round(
+    XP_BASE_REQUIREMENT +
+      completedLevelUps * XP_LINEAR_GROWTH +
+      completedLevelUps * completedLevelUps * XP_QUADRATIC_GROWTH
+  );
+}
+
 function gainXp(amount) {
   state.xp += amount;
-  if (state.xp >= state.xpNeeded && state.phase === "playing") {
-    state.xp -= state.xpNeeded;
-    state.level += 1;
-    state.xpNeeded = Math.round(state.xpNeeded * 1.28 + 10);
-    openUpgrade();
-  }
+  tryOpenLevelUp();
+}
+
+function tryOpenLevelUp() {
+  if (state.phase !== "playing" || state.xp < state.xpNeeded) return false;
+  state.xp -= state.xpNeeded;
+  state.level += 1;
+  state.xpNeeded = xpRequirementForLevel(state.level);
+  openUpgrade();
+  return true;
 }
 
 function openUpgrade() {
@@ -1634,7 +1650,7 @@ function openUpgrade() {
       ui.upgradeOverlay.classList.add("hidden");
       state.phase = "playing";
       pulseToast(choice.title);
-      syncUi();
+      if (!tryOpenLevelUp()) syncUi();
     });
     ui.upgradeChoices.appendChild(button);
   }
