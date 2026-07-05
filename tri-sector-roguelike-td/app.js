@@ -175,85 +175,69 @@ const TYPES = {
   brute: { hp: 205, speed: 4.5, radius: 16, damage: 18, attackInterval: 1.52, xp: 24, color: "#ff5f85", core: "#ffd6e0" },
 };
 
-const commonUpgrades = [
-  {
-    id: "tower_guard",
-    meta: "공용",
-    title: "석심 보강",
-    text: "타워 최대 체력 +22, 즉시 22 회복",
-    color: "#f7c85f",
-    apply: () => {
-      state.maxHp += 22;
-      state.hp = Math.min(state.maxHp, state.hp + 22);
-    },
-  },
-  {
-    id: "combat_sense",
-    meta: "공용",
-    title: "전투 감각",
-    text: "획득 경험치 +16%",
-    color: "#87e6ff",
-    apply: () => {
-      state.xpBonus += 0.16;
-    },
-  },
-  {
-    id: "first_strike",
-    meta: "공용",
-    title: "재배치 일격",
-    text: "로테이션 직후 각 캐릭터의 첫 공격 +35%",
-    color: "#b4f17a",
-    apply: () => {
-      for (const hero of state.heroes) hero.firstStrike += 0.35;
-    },
-  },
-  {
-    id: "tower_pulse",
-    meta: "공용",
-    title: "수호 파동",
-    text: "로테이션 한 바퀴마다 타워 주변에 작은 피해",
-    color: "#ffe19a",
-    apply: () => {
-      state.rotationPulse += 1;
-    },
-  },
-];
-
 const heroUpgrades = [
   {
-    id: "archer_range",
+    id: "archer_growth_marksman",
     heroId: "archer",
-    tier: "기본",
-    title: "장궁 숙련",
-    text: "궁수 사거리 +18",
-    canOffer: () => true,
+    tier: "성장",
+    title: "정밀 조준",
+    text: "궁수 공격력 +7",
     apply: (hero) => {
-      hero.range += 18;
-      hero.basicPicks += 1;
+      hero.damage += 7;
     },
   },
   {
-    id: "archer_speed",
+    id: "archer_growth_pierce",
     heroId: "archer",
-    tier: "기본",
-    title: "빠른 장전",
-    text: "궁수 공격 간격 -12%",
-    canOffer: () => true,
-    apply: (hero) => {
-      hero.cooldown = Math.max(0.34, hero.cooldown * 0.88);
-      hero.basicPicks += 1;
-    },
-  },
-  {
-    id: "archer_pierce",
-    heroId: "archer",
-    tier: "기본",
-    title: "관통 화살",
+    tier: "성장",
+    title: "관통 시위",
     text: "궁수 화살 관통 +1",
-    canOffer: () => true,
     apply: (hero) => {
       hero.pierce += 1;
-      hero.basicPicks += 1;
+    },
+  },
+  {
+    id: "archer_growth_redeploy",
+    heroId: "archer",
+    tier: "성장",
+    title: "재배치 조준",
+    text: "로테이션 직후 궁수의 첫 공격 피해 +45%",
+    apply: (hero) => {
+      hero.firstStrike += 0.45;
+    },
+  },
+  {
+    id: "archer_basic_range",
+    heroId: "archer",
+    tier: "기본",
+    maxRank: 4,
+    title: "장궁 숙련",
+    text: "궁수 사거리 +12",
+    apply: (hero) => {
+      hero.range += 12;
+    },
+  },
+  {
+    id: "archer_basic_reload",
+    heroId: "archer",
+    tier: "기본",
+    maxRank: 4,
+    title: "빠른 장전",
+    text: "궁수 공격 간격 -8%",
+    apply: (hero) => {
+      hero.cooldown = Math.max(0.42, hero.cooldown * 0.92);
+    },
+  },
+  {
+    id: "archer_basic_bowstring",
+    heroId: "archer",
+    tier: "기본",
+    maxRank: 3,
+    title: "강화 활시위",
+    text: "궁수 공격력 +3, 투사체 속도 +50",
+    apply: (hero) => {
+      hero.damage += 3;
+      hero.projectileSpeed += 50;
     },
   },
   {
@@ -262,11 +246,11 @@ const heroUpgrades = [
     tier: "돌파",
     title: "천공 연사",
     text: "궁수가 3발을 빠르게 연사하고, 각 화살이 추가 관통",
-    canOffer: (hero) => hero.basicPicks >= 2 && !hero.breakthrough,
     apply: (hero) => {
       hero.breakthrough = true;
       hero.projectileCount = 3;
       hero.pierce += 1;
+      hero.damage += 4;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
@@ -277,7 +261,6 @@ const heroUpgrades = [
     tier: "궁극",
     title: "별비 사격",
     text: "일정 공격마다 현재 방향에 화살비를 예고 후 투하",
-    canOffer: (hero) => hero.breakthrough && !hero.ultimate && state.level >= 5,
     apply: (hero) => {
       hero.ultimate = true;
       hero.ultimateCharge = hero.ultimateEvery - 2;
@@ -286,39 +269,67 @@ const heroUpgrades = [
     },
   },
   {
-    id: "warrior_sweep",
+    id: "warrior_growth_wall",
     heroId: "warrior",
-    tier: "기본",
-    title: "넓은 휩쓸기",
-    text: "전사 기본 공격 타격 수 +1",
-    canOffer: () => true,
-    apply: (hero) => {
-      hero.targets += 1;
-      hero.basicPicks += 1;
-    },
-  },
-  {
-    id: "warrior_wall",
-    heroId: "warrior",
-    tier: "기본",
+    tier: "성장",
     title: "성벽 베기",
-    text: "타워를 공격 중인 적에게 주는 피해 증가",
-    canOffer: () => true,
+    text: "타워를 공격 중인 적에게 주는 전사 피해 증가",
     apply: (hero) => {
-      hero.towerBonus += 0.38;
-      hero.basicPicks += 1;
+      hero.towerBonus += 0.45;
     },
   },
   {
-    id: "warrior_push",
+    id: "warrior_growth_push",
     heroId: "warrior",
-    tier: "기본",
+    tier: "성장",
     title: "방패 밀치기",
     text: "전사 기본 공격이 적을 바깥으로 밀어냄",
-    canOffer: () => true,
     apply: (hero) => {
-      hero.push += 16;
-      hero.basicPicks += 1;
+      hero.push += 14;
+    },
+  },
+  {
+    id: "warrior_growth_entry",
+    heroId: "warrior",
+    tier: "성장",
+    title: "결전 진입",
+    text: "전사 공격력 +4, 로테이션 직후 첫 공격 피해 +45%",
+    apply: (hero) => {
+      hero.damage += 4;
+      hero.firstStrike += 0.45;
+    },
+  },
+  {
+    id: "warrior_basic_power",
+    heroId: "warrior",
+    tier: "기본",
+    maxRank: 5,
+    title: "강철 완력",
+    text: "전사 공격력 +5",
+    apply: (hero) => {
+      hero.damage += 5;
+    },
+  },
+  {
+    id: "warrior_basic_sweep",
+    heroId: "warrior",
+    tier: "기본",
+    maxRank: 2,
+    title: "좁은 휩쓸기",
+    text: "전사 기본 공격 타격 수 +1",
+    apply: (hero) => {
+      hero.targets += 1;
+    },
+  },
+  {
+    id: "warrior_basic_lunge",
+    heroId: "warrior",
+    tier: "기본",
+    maxRank: 3,
+    title: "짧은 전진",
+    text: "전사 사거리 +4",
+    apply: (hero) => {
+      hero.range += 4;
     },
   },
   {
@@ -327,7 +338,6 @@ const heroUpgrades = [
     tier: "돌파",
     title: "철벽 돌진",
     text: "전사 베기가 전방 충격파로 변해 적을 밀어냄",
-    canOffer: (hero) => hero.basicPicks >= 2 && !hero.breakthrough,
     apply: (hero) => {
       hero.breakthrough = true;
       hero.targets += 1;
@@ -343,7 +353,6 @@ const heroUpgrades = [
     tier: "궁극",
     title: "성벽 분쇄",
     text: "일정 공격마다 현재 방향의 타워 근처 적에게 거대 충격파",
-    canOffer: (hero) => hero.breakthrough && !hero.ultimate && state.level >= 5,
     apply: (hero) => {
       hero.ultimate = true;
       hero.ultimateCharge = hero.ultimateEvery - 2;
@@ -352,40 +361,70 @@ const heroUpgrades = [
     },
   },
   {
-    id: "mage_radius",
+    id: "mage_growth_residue",
     heroId: "mage",
-    tier: "기본",
-    title: "확산 마법진",
-    text: "마법사 폭발 반경 +10",
-    canOffer: () => true,
-    apply: (hero) => {
-      hero.blastRadius += 10;
-      hero.basicPicks += 1;
-    },
-  },
-  {
-    id: "mage_speed",
-    heroId: "mage",
-    tier: "기본",
-    title: "빠른 영창",
-    text: "마법사 공격 간격 -13%",
-    canOffer: () => true,
-    apply: (hero) => {
-      hero.cooldown = Math.max(0.48, hero.cooldown * 0.87);
-      hero.basicPicks += 1;
-    },
-  },
-  {
-    id: "mage_zone",
-    heroId: "mage",
-    tier: "기본",
+    tier: "성장",
     title: "잔류 마력",
-    text: "폭발 후 짧은 지속 피해 장판 생성",
-    canOffer: () => true,
+    text: "마법진 폭발 후 짧은 지속 피해 장판 생성",
     apply: (hero) => {
       hero.zoneDuration += 0.9;
       hero.zoneDps += 2;
-      hero.basicPicks += 1;
+    },
+  },
+  {
+    id: "mage_growth_condense",
+    heroId: "mage",
+    tier: "성장",
+    title: "응축 폭발",
+    text: "마법사 공격력 +3, 폭발 반경 +8",
+    apply: (hero) => {
+      hero.damage += 3;
+      hero.blastRadius += 8;
+    },
+  },
+  {
+    id: "mage_growth_timing",
+    heroId: "mage",
+    tier: "성장",
+    title: "예비 영창",
+    text: "마법진 예고 시간 감소, 공격 간격 -6%",
+    apply: (hero) => {
+      hero.castDelay = Math.max(0.18, hero.castDelay - 0.1);
+      hero.cooldown = Math.max(0.55, hero.cooldown * 0.94);
+    },
+  },
+  {
+    id: "mage_basic_radius",
+    heroId: "mage",
+    tier: "기본",
+    maxRank: 4,
+    title: "확산 마법진",
+    text: "마법사 폭발 반경 +6",
+    apply: (hero) => {
+      hero.blastRadius += 6;
+    },
+  },
+  {
+    id: "mage_basic_chant",
+    heroId: "mage",
+    tier: "기본",
+    maxRank: 4,
+    title: "빠른 영창",
+    text: "마법사 공격 간격 -7%",
+    apply: (hero) => {
+      hero.cooldown = Math.max(0.55, hero.cooldown * 0.93);
+    },
+  },
+  {
+    id: "mage_basic_echo",
+    heroId: "mage",
+    tier: "기본",
+    maxRank: 3,
+    title: "마력 잔향",
+    text: "장판 지속시간 +0.35초, 장판 피해 +1",
+    apply: (hero) => {
+      hero.zoneDuration += 0.35;
+      hero.zoneDps += 1;
     },
   },
   {
@@ -394,11 +433,10 @@ const heroUpgrades = [
     tier: "돌파",
     title: "균열 마법진",
     text: "폭발 후 가까운 적 최대 2명에게 보조 마법진 연쇄 생성",
-    canOffer: (hero) => hero.basicPicks >= 2 && !hero.breakthrough,
     apply: (hero) => {
       hero.breakthrough = true;
       hero.chainCount = 2;
-      hero.blastRadius += 8;
+      hero.blastRadius += 6;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
@@ -409,7 +447,6 @@ const heroUpgrades = [
     tier: "궁극",
     title: "대마법진 붕괴",
     text: "일정 공격마다 거대 마법진으로 큰 피해와 균열 장판 생성",
-    canOffer: (hero) => hero.breakthrough && !hero.ultimate && state.level >= 5,
     apply: (hero) => {
       hero.ultimate = true;
       hero.ultimateCharge = hero.ultimateEvery - 2;
@@ -443,14 +480,12 @@ function createState() {
     maxHp: 180,
     xp: 0,
     xpNeeded: 20,
-    xpBonus: 0,
     level: 1,
     killCount: 0,
     shake: 0,
     waveBanner: 0,
     rotationQueue: 0,
     rotationCount: 0,
-    rotationPulse: 0,
     enemies: [],
     projectiles: [],
     magicCircles: [],
@@ -474,7 +509,11 @@ function createHero(blueprint, index) {
     rotateT: 1,
     rotateDuration: 0.14,
     attackTimer: index * 0.18,
+    growthPicked: {},
+    basicRanks: {},
+    growthPicks: 0,
     basicPicks: 0,
+    totalPicks: 0,
     breakthrough: false,
     ultimate: false,
     ultimateCharge: 0,
@@ -556,18 +595,6 @@ function startRotation() {
   state.rotationCount += 1;
   const t = tower();
   addRing(t.x, t.y, "#ffd166", 8, 0.34);
-  if (state.rotationPulse > 0 && state.rotationCount % HERO_ANGLES.length === 0) triggerRotationPulse();
-}
-
-function triggerRotationPulse() {
-  const t = tower();
-  const radius = t.r + 92;
-  const damage = 10 + state.rotationPulse * 4;
-  for (const enemy of [...state.enemies]) {
-    const dist = Math.hypot(enemy.x - t.x, enemy.y - t.y);
-    if (dist <= radius) hitEnemy(enemy, damage, { x: t.x, y: t.y, color: "#ffe19a" });
-  }
-  state.effects.push({ type: "shock", x: t.x, y: t.y, radius, color: "#ffe19a", life: 0.32, maxLife: 0.32 });
 }
 
 function update(dt) {
@@ -772,7 +799,7 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
 }
 
 function attackWarrior(hero) {
-  const range = hero.range + (hero.breakthrough ? 12 : 0);
+  const range = hero.range + (hero.breakthrough ? 8 : 0);
   const angle = hero.angle + (hero.breakthrough ? 8 : 0);
   const targets = findTargets(hero, hero.targets, range, angle);
   if (!targets.length) return false;
@@ -1189,7 +1216,7 @@ function addXpOrb(x, y, amount) {
   state.xpOrbs.push({
     x,
     y,
-    amount: Math.round(amount * (1 + state.xpBonus)),
+    amount,
     life: 0,
   });
 }
@@ -1227,6 +1254,12 @@ function openUpgrade() {
   state.phase = "upgrade";
   ui.upgradeChoices.innerHTML = "";
   const choices = drawChoices(3);
+  if (!choices.length) {
+    state.phase = "playing";
+    pulseToast("선택 가능한 강화 없음");
+    syncUi();
+    return;
+  }
   for (const choice of choices) {
     const button = document.createElement("button");
     button.className = "upgrade-card";
@@ -1248,43 +1281,94 @@ function openUpgrade() {
 
 function drawChoices(count) {
   const out = [];
-  const heroCandidates = heroUpgrades
-    .map((upgrade) => {
-      const hero = heroById(upgrade.heroId);
-      return {
-        ...upgrade,
-        hero,
-        meta: `${hero.name} ${upgrade.tier}`,
-        color: hero.color,
-        apply: () => upgrade.apply(hero),
-      };
-    })
-    .filter((upgrade) => upgrade.canOffer(upgrade.hero));
+  const usedIds = new Set();
 
-  const highTier = heroCandidates.filter((upgrade) => upgrade.tier !== "기본");
-  if (highTier.length) out.push(pick(highTier));
-
-  while (out.length < Math.min(2, count) && heroCandidates.length) {
-    const candidate = pick(heroCandidates);
-    if (!out.some((choice) => choice.id === candidate.id)) out.push(candidate);
+  while (out.length < count) {
+    const choice = drawOneHeroChoice(usedIds);
+    if (!choice) break;
+    usedIds.add(choice.id);
+    out.push(choice);
   }
 
-  const common = commonUpgrades.filter((upgrade) => !out.some((choice) => choice.id === upgrade.id));
-  if (out.length < count && common.length) {
-    const selected = pick(common);
-    out.push({
-      ...selected,
-      apply: selected.apply,
-    });
-  }
+  return out;
+}
 
-  while (out.length < count && heroCandidates.length) {
-    const candidate = pick(heroCandidates);
-    if (!out.some((choice) => choice.id === candidate.id)) out.push(candidate);
-    else break;
+function drawOneHeroChoice(usedIds) {
+  const heroes = shuffle(state.heroes.filter((hero) => hasAvailableUpgrade(hero, usedIds)));
+  for (const hero of heroes) {
+    const choice = selectUpgradeForHero(hero, usedIds);
+    if (choice) return choice;
   }
+  return null;
+}
 
-  return shuffle(out).slice(0, count);
+function hasAvailableUpgrade(hero, usedIds) {
+  return heroUpgrades.some((upgrade) => upgrade.heroId === hero.id && canOfferUpgrade(upgrade, hero, usedIds));
+}
+
+function selectUpgradeForHero(hero, usedIds) {
+  const breakthrough = heroUpgrades.find((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "돌파" && canOfferUpgrade(upgrade, hero, usedIds));
+  if (breakthrough) return buildChoice(breakthrough, hero);
+
+  const ultimate = heroUpgrades.find((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "궁극" && canOfferUpgrade(upgrade, hero, usedIds));
+  if (ultimate) return buildChoice(ultimate, hero);
+
+  const growth = availableUpgrades(hero, "성장", usedIds);
+  const basic = availableUpgrades(hero, "기본", usedIds);
+  let pool = Math.random() < 0.7 ? growth : basic;
+  if (!pool.length) pool = pool === growth ? basic : growth;
+  if (!pool.length) return null;
+  return buildChoice(pick(pool), hero);
+}
+
+function availableUpgrades(hero, tier, usedIds) {
+  return heroUpgrades.filter((upgrade) => upgrade.heroId === hero.id && upgrade.tier === tier && canOfferUpgrade(upgrade, hero, usedIds));
+}
+
+function canOfferUpgrade(upgrade, hero, usedIds) {
+  if (!hero || usedIds.has(upgrade.id)) return false;
+  if (upgrade.tier === "성장") return !hero.growthPicked[upgrade.id];
+  if (upgrade.tier === "기본") return getBasicRank(hero, upgrade.id) < upgrade.maxRank;
+  if (upgrade.tier === "돌파") return !hero.breakthrough && hasAllGrowthChoices(hero);
+  if (upgrade.tier === "궁극") return canOfferUltimate(hero);
+  return false;
+}
+
+function canOfferUltimate(hero) {
+  return hero.breakthrough && !hero.ultimate && state.level >= 6 && hero.basicPicks >= 1 && hero.totalPicks >= 5;
+}
+
+function hasAllGrowthChoices(hero) {
+  return heroUpgrades
+    .filter((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "성장")
+    .every((upgrade) => hero.growthPicked[upgrade.id]);
+}
+
+function getBasicRank(hero, upgradeId) {
+  return hero.basicRanks[upgradeId] || 0;
+}
+
+function buildChoice(upgrade, hero) {
+  const nextRank = upgrade.tier === "기본" ? getBasicRank(hero, upgrade.id) + 1 : null;
+  return {
+    ...upgrade,
+    hero,
+    color: hero.color,
+    meta: upgrade.tier === "기본" ? `${hero.name} 기본 ${nextRank}/${upgrade.maxRank}` : `${hero.name} ${upgrade.tier}`,
+    apply: () => applyHeroUpgrade(upgrade, hero),
+  };
+}
+
+function applyHeroUpgrade(upgrade, hero) {
+  upgrade.apply(hero);
+  if (upgrade.tier === "성장") {
+    hero.growthPicked[upgrade.id] = true;
+    hero.growthPicks += 1;
+  } else if (upgrade.tier === "기본") {
+    hero.basicRanks[upgrade.id] = getBasicRank(hero, upgrade.id) + 1;
+    hero.basicPicks += 1;
+  }
+  hero.totalPicks += 1;
 }
 
 function heroById(id) {
@@ -1887,7 +1971,10 @@ function syncUi() {
 }
 
 function teamPower() {
-  return state.heroes.reduce((sum, hero) => sum + hero.damage + hero.basicPicks * 3 + (hero.breakthrough ? 12 : 0) + (hero.ultimate ? 18 : 0), 0);
+  return state.heroes.reduce(
+    (sum, hero) => sum + hero.damage + hero.growthPicks * 5 + hero.basicPicks * 2 + (hero.breakthrough ? 14 : 0) + (hero.ultimate ? 20 : 0),
+    0,
+  );
 }
 
 function renderTeamList() {
@@ -1900,7 +1987,7 @@ function renderTeamList() {
         <div class="team-card" style="--hero-color: ${hero.color}">
           <b>${hero.glyph}</b>
           <span>${hero.name}</span>
-          <em>${aim}도 ${badges}</em>
+          <em>${aim}도 G${hero.growthPicks}/3 B${hero.basicPicks} ${badges}</em>
         </div>
       `;
     })
