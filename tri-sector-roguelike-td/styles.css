@@ -161,6 +161,41 @@ button {
   gap: 10px;
 }
 
+.battle-page {
+  grid-template-rows: minmax(0, 1.15fr) minmax(86px, 0.75fr) minmax(68px, 0.55fr) minmax(82px, 0.7fr) 54px;
+  gap: 8px;
+}
+
+.battle-page .meta-stage,
+.battle-page .meta-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.battle-page .meta-stage p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.battle-page .meta-stage-grid {
+  margin-top: 8px;
+}
+
+.battle-page .meta-section-title {
+  margin-bottom: 8px;
+}
+
+.battle-start-action {
+  display: grid;
+  min-height: 0;
+}
+
+.battle-start-action .meta-primary {
+  min-height: 0;
+}
+
 .meta-screen.hero-detail-mode {
   grid-template-rows: minmax(0, 1fr);
 }
@@ -2075,6 +2110,19 @@ button {
 
   .meta-content {
     padding-inline: 10px;
+  }
+
+  .battle-page {
+    grid-template-rows: minmax(0, 1fr) minmax(80px, 0.72fr) minmax(64px, 0.5fr) minmax(76px, 0.62fr) 50px;
+    gap: 7px;
+  }
+
+  .battle-page .meta-stage p {
+    -webkit-line-clamp: 1;
+  }
+
+  .battle-page .meta-stage-grid {
+    margin-top: 6px;
   }
 
   .hero-roster-page {

@@ -3273,7 +3273,7 @@ function renderBattleMeta() {
     : "";
 
   ui.metaContent.innerHTML = `
-    <div class="meta-page">
+    <div class="meta-page battle-page">
       <section class="meta-stage">
         <span class="meta-kicker">STAGE 1</span>
         <h1>균열 초소</h1>
@@ -3282,9 +3282,6 @@ function renderBattleMeta() {
           <div class="meta-stat"><span class="meta-small-label">WAVES</span><strong>${WAVES.length}</strong></div>
           <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${lineup.length}/3</strong></div>
           <div class="meta-stat"><span class="meta-small-label">BOSS</span><strong>2회</strong></div>
-        </div>
-        <div class="meta-action">
-          <button class="meta-primary" type="button" data-action="start-battle">전투 시작</button>
         </div>
       </section>
 
@@ -3324,6 +3321,9 @@ function renderBattleMeta() {
           <div class="meta-reward"><span>STONE</span><strong>1~2</strong></div>
           <div class="meta-reward"><span>SHARD</span><strong>랜덤 4</strong></div>
         </div>
+      </section>
+      <section class="battle-start-action">
+        <button class="meta-primary" type="button" data-action="start-battle">전투 시작</button>
       </section>
       ${lastReward}
     </div>
