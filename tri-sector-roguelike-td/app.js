@@ -42,6 +42,8 @@ const TIER_COLORS = {
   궁극: "#ffd166",
 };
 
+const STARTING_HERO_IDS = ["sniper", "warrior", "mage"];
+
 const HERO_BLUEPRINTS = [
   {
     id: "archer",
@@ -60,6 +62,27 @@ const HERO_BLUEPRINTS = [
     splashRadius: 0,
     splashRatio: 0,
     ultimateEvery: 8,
+    initialSlot: 0,
+  },
+  {
+    id: "sniper",
+    name: "저격수",
+    role: "15도 정밀 관통",
+    glyph: "저",
+    color: "#f7e36a",
+    glow: "rgba(247, 227, 106, 0.42)",
+    damage: 46,
+    range: 166,
+    angle: 15,
+    cooldown: 1.08,
+    projectileSpeed: 760,
+    pierce: 1,
+    projectileCount: 1,
+    splashRadius: 0,
+    splashRatio: 0,
+    executeThreshold: 0.35,
+    executeBonus: 0.35,
+    ultimateEvery: 7,
     initialSlot: 0,
   },
   {
@@ -310,6 +333,133 @@ const heroUpgrades = [
     tier: "궁극",
     title: "별비 사격",
     text: "일정 공격마다 현재 방향에 화살비를 예고 후 투하",
+    apply: (hero) => {
+      hero.ultimate = true;
+      hero.ultimateCharge = hero.ultimateEvery - 2;
+      state.shake = 0.7;
+      addRing(tower().x, tower().y, hero.color, 18, 0.56);
+    },
+  },
+  {
+    id: "sniper_growth_pierce",
+    heroId: "sniper",
+    tier: "성장",
+    title: "철갑탄",
+    text: "저격수 탄환 관통 +1",
+    apply: (hero) => {
+      hero.pierce += 1;
+    },
+  },
+  {
+    id: "sniper_growth_execute",
+    heroId: "sniper",
+    tier: "성장",
+    title: "약점 조준",
+    text: "체력이 낮은 적에게 저격수 피해 증가",
+    apply: (hero) => {
+      hero.executeThreshold = Math.max(hero.executeThreshold, 0.45);
+      hero.executeBonus += 0.45;
+    },
+  },
+  {
+    id: "sniper_growth_double",
+    heroId: "sniper",
+    tier: "성장",
+    title: "쌍발 장전",
+    text: "저격수 탄환 수 +1, 아주 좁은 각도로 동시 발사",
+    apply: (hero) => {
+      hero.projectileCount += 1;
+    },
+  },
+  {
+    id: "sniper_basic_damage",
+    heroId: "sniper",
+    tier: "기본",
+    maxRank: 5,
+    title: "영점 조정",
+    text: "저격수 공격력 +8",
+    apply: (hero) => {
+      hero.damage += 8;
+    },
+  },
+  {
+    id: "sniper_basic_breath",
+    heroId: "sniper",
+    tier: "기본",
+    maxRank: 4,
+    title: "호흡 정리",
+    text: "저격수 공격 간격 -7%",
+    apply: (hero) => {
+      hero.cooldown = Math.max(0.68, hero.cooldown * 0.93);
+    },
+  },
+  {
+    id: "sniper_basic_range",
+    heroId: "sniper",
+    tier: "기본",
+    maxRank: 4,
+    title: "장총열",
+    text: "저격수 사거리 +14",
+    apply: (hero) => {
+      hero.range += 14;
+    },
+  },
+  {
+    id: "sniper_break",
+    heroId: "sniper",
+    tier: "돌파",
+    title: "사선 개방",
+    text: "관통, 처형 피해, 탄속이 강화된 정밀 저격으로 전환",
+    apply: (hero) => {
+      hero.breakthrough = true;
+      hero.pierce += 2;
+      hero.damage += 10;
+      hero.projectileSpeed += 80;
+      hero.executeBonus += 0.25;
+      state.shake = 0.5;
+      addRing(tower().x, tower().y, hero.color, 14, 0.48);
+    },
+  },
+  {
+    id: "sniper_advanced_line",
+    heroId: "sniper",
+    tier: "고급",
+    title: "관통선 확장",
+    text: "저격수 탄환 관통 +1, 피해 증가",
+    apply: (hero) => {
+      hero.pierce += 1;
+      hero.damage += 7;
+    },
+  },
+  {
+    id: "sniper_advanced_execute",
+    heroId: "sniper",
+    tier: "고급",
+    title: "사형 표식",
+    text: "처형 기준 체력과 처형 피해 증가",
+    apply: (hero) => {
+      hero.executeThreshold = Math.max(hero.executeThreshold, 0.55);
+      hero.executeBonus += 0.35;
+    },
+  },
+  {
+    id: "sniper_advanced_longshot",
+    heroId: "sniper",
+    tier: "고급",
+    title: "초장거리 탄",
+    text: "저격수 사거리, 탄속, 피해 증가",
+    apply: (hero) => {
+      hero.range += 18;
+      hero.projectileSpeed += 90;
+      hero.damage += 4;
+    },
+  },
+  {
+    id: "sniper_ultimate",
+    heroId: "sniper",
+    tier: "궁극",
+    title: "궤도 저격",
+    text: "일정 공격마다 현재 조준 방향에 얇고 긴 저격선을 발사",
     apply: (hero) => {
       hero.ultimate = true;
       hero.ultimateCharge = hero.ultimateEvery - 2;
@@ -611,8 +761,12 @@ function createState() {
     particles: [],
     xpOrbs: [],
     floatingTexts: [],
-    heroes: HERO_BLUEPRINTS.map(createHero),
+    heroes: STARTING_HERO_IDS.map((id, index) => createHero(heroBlueprintById(id), index)),
   };
+}
+
+function heroBlueprintById(id) {
+  return HERO_BLUEPRINTS.find((hero) => hero.id === id);
 }
 
 function createHero(blueprint, index) {
@@ -832,10 +986,41 @@ function updateHeroes(dt) {
 }
 
 function attackWithHero(hero) {
+  if (hero.id === "sniper") return attackSniper(hero);
   if (hero.id === "archer") return attackArcher(hero);
   if (hero.id === "warrior") return attackWarrior(hero);
   if (hero.id === "mage") return attackMage(hero);
   return false;
+}
+
+function attackSniper(hero) {
+  const targets = findTargets(hero, 1);
+  if (!targets.length) return false;
+
+  const aim = heroAim(hero);
+  const target = targets[0];
+  const baseAngle = Math.atan2(target.y - aim.y, target.x - aim.x);
+  const count = Math.max(1, hero.projectileCount);
+  const spread = count > 1 ? 3 * DEG : 0;
+  const damage = prepareHeroDamage(hero);
+
+  for (let i = 0; i < count; i += 1) {
+    const offset = (i - (count - 1) / 2) * spread;
+    fireProjectile(hero, aim.x, aim.y, baseAngle + offset, damage, hero.pierce);
+  }
+
+  state.effects.push({
+    type: "muzzle",
+    x: aim.x,
+    y: aim.y,
+    angle: aim.angle,
+    color: hero.breakthrough ? "#fff4a8" : hero.color,
+    life: 0.12,
+    maxLife: 0.12,
+  });
+
+  chargeUltimate(hero, () => triggerSniperUltimate(hero));
+  return true;
 }
 
 function attackArcher(hero) {
@@ -884,6 +1069,8 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
     color: hero.breakthrough ? "#9ee7ff" : hero.color,
     splashRadius: hero.splashRadius || 0,
     splashRatio: hero.splashRatio || 0,
+    executeThreshold: hero.executeThreshold || 0,
+    executeBonus: hero.executeBonus || 0,
     hitIds: [],
   });
 }
@@ -983,6 +1170,34 @@ function triggerArrowRain(hero) {
     life: 0.38,
     maxLife: 0.38,
   });
+}
+
+function triggerSniperUltimate(hero) {
+  const aim = heroAim(hero);
+  const t = tower();
+  const lineWidth = hero.breakthrough ? 9 : 7;
+  const damage = Math.round(hero.damage * 2.85);
+  let hits = 0;
+
+  for (const enemy of [...state.enemies]) {
+    if (enemy.dead || !enemyInLine(enemy, aim.x, aim.y, aim.angle, hero.range + 34, lineWidth)) continue;
+    const amount = sniperDamageForEnemy(damage, hero, enemy);
+    hitEnemy(enemy, amount, { x: t.x, y: t.y, color: hero.color });
+    hits += 1;
+  }
+
+  state.effects.push({
+    type: "laser",
+    x: aim.x,
+    y: aim.y,
+    angle: aim.angle,
+    range: hero.range + 34,
+    width: lineWidth,
+    color: hero.color,
+    life: 0.22,
+    maxLife: 0.22,
+  });
+  state.shake = Math.max(state.shake, hits > 0 ? 0.85 : 0.45);
 }
 
 function triggerWarriorUltimate(hero) {
@@ -1107,7 +1322,7 @@ function updateProjectiles(dt) {
       if (dist > enemy.radius + p.radius) continue;
 
       p.hitIds.push(enemy.id);
-      hitEnemy(enemy, p.damage, { x: p.prevX, y: p.prevY, color: p.color });
+      hitEnemy(enemy, projectileDamageForEnemy(p, enemy), { x: p.prevX, y: p.prevY, color: p.color });
       if (p.splashRadius > 0 && p.splashRatio > 0) triggerProjectileSplash(p, enemy);
       addBurst(enemy.x, enemy.y, p.color, 5);
       if (p.pierceLeft <= 0) {
@@ -1121,6 +1336,34 @@ function updateProjectiles(dt) {
       state.projectiles.splice(i, 1);
     }
   }
+}
+
+function projectileDamageForEnemy(projectile, enemy) {
+  let amount = projectile.damage;
+  if (projectile.executeBonus > 0 && enemy.hp / enemy.maxHp <= projectile.executeThreshold) {
+    amount += Math.round(projectile.damage * projectile.executeBonus);
+  }
+  return amount;
+}
+
+function sniperDamageForEnemy(baseDamage, hero, enemy) {
+  let amount = baseDamage;
+  if (hero.executeBonus > 0 && enemy.hp / enemy.maxHp <= hero.executeThreshold) {
+    amount += Math.round(baseDamage * hero.executeBonus);
+  }
+  return amount;
+}
+
+function enemyInLine(enemy, x, y, angleDeg, range, width) {
+  const angle = angleDeg * DEG;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const dx = enemy.x - x;
+  const dy = enemy.y - y;
+  const forward = dx * ux + dy * uy;
+  if (forward < 0 || forward > range) return false;
+  const side = Math.abs(dx * uy - dy * ux);
+  return side <= width + enemy.radius;
 }
 
 function triggerProjectileSplash(projectile, origin) {
@@ -2027,6 +2270,23 @@ function drawEffects() {
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.radius * 0.44, 0, TWO_PI);
+      ctx.stroke();
+    } else if (effect.type === "laser") {
+      const angle = effect.angle * DEG;
+      const endX = effect.x + Math.cos(angle) * effect.range;
+      const endY = effect.y + Math.sin(angle) * effect.range;
+      ctx.lineCap = "round";
+      ctx.lineWidth = effect.width * (0.8 + a * 0.8);
+      ctx.beginPath();
+      ctx.moveTo(effect.x, effect.y);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      ctx.strokeStyle = "#ffffff";
+      ctx.globalAlpha = a * 0.75;
+      ctx.lineWidth = Math.max(1.2, effect.width * 0.26);
+      ctx.beginPath();
+      ctx.moveTo(effect.x, effect.y);
+      ctx.lineTo(endX, endY);
       ctx.stroke();
     } else if (effect.type === "muzzle") {
       ctx.lineWidth = 2;
