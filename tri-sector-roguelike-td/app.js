@@ -30,10 +30,18 @@ const ui = {
   resultText: document.getElementById("resultText"),
   resultButton: document.getElementById("resultButton"),
   restart: document.getElementById("restartButton"),
+  metaScreen: document.getElementById("metaScreen"),
+  metaContent: document.getElementById("metaContent"),
+  metaAccountLevel: document.getElementById("metaAccountLevel"),
+  metaGold: document.getElementById("metaGold"),
+  metaHeroXp: document.getElementById("metaHeroXp"),
+  metaStone: document.getElementById("metaStone"),
+  metaNavButtons: [...document.querySelectorAll(".meta-nav-button")],
 };
 
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
+const META_STORAGE_KEY = "rotation-keepers-meta-v1";
 const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
 const ENEMY_SCALE = 0.48;
 const HERO_SCALE = 0.64;
@@ -46,6 +54,9 @@ const XP_LINEAR_GROWTH = 7;
 const XP_QUADRATIC_GROWTH = 0.6;
 const UPGRADE_INPUT_LOCK_MS = 700;
 const VERSION_LABEL = "TRI-KEEPERS";
+const MAX_HERO_LEVEL = 30;
+const MAX_HERO_STAR = 5;
+const STAR_SHARD_COSTS = [0, 10, 20, 40, 80];
 const TIER_COLORS = {
   기본: "#aeb6c2",
   성장: "#aeb6c2",
@@ -55,6 +66,57 @@ const TIER_COLORS = {
 };
 
 const STARTING_HERO_IDS = ["sniper", "warrior", "mage"];
+
+const TALENTS = [
+  {
+    id: "tower_fortify",
+    name: "타워 보강",
+    text: "전투 시작 타워 체력 증가",
+    effect: (level) => `타워 체력 +${level * 18}`,
+  },
+  {
+    id: "combat_drill",
+    name: "전투 훈련",
+    text: "모든 영웅 공격력 증가",
+    effect: (level) => `공격력 +${level * 3}%`,
+  },
+  {
+    id: "start_xp",
+    name: "시작 감각",
+    text: "전투 시작 경험치 보유",
+    effect: (level) => `시작 EXP +${level * 4}`,
+  },
+  {
+    id: "spoils",
+    name: "전리품 감각",
+    text: "스테이지 보상 골드 증가",
+    effect: (level) => `골드 보상 +${level * 8}%`,
+  },
+];
+
+const GEAR_SLOTS = [
+  {
+    id: "weapon",
+    name: "무기 슬롯",
+    color: "#ffd166",
+    text: "출전 영웅 공격력 보정",
+    effect: (level) => `공격력 +${level * 2}%`,
+  },
+  {
+    id: "armor",
+    name: "방어 슬롯",
+    color: "#87df86",
+    text: "타워 내구 보정",
+    effect: (level) => `타워 체력 +${level * 8}`,
+  },
+  {
+    id: "charm",
+    name: "장신구 슬롯",
+    color: "#7fb5ff",
+    text: "출전 영웅 공격 간격 보정",
+    effect: (level) => `공격 간격 -${Math.min(12, level)}%`,
+  },
+];
 
 const HERO_BLUEPRINTS = [
   {
@@ -898,6 +960,12 @@ const BOSS_REWARD_CONFIG = {
 };
 
 let state;
+let metaState;
+let metaTab = "battle";
+let selectedMetaHeroId = "sniper";
+let selectedHeroDetailTab = "level";
+let lastStageRewards = null;
+let lastPulledTalentId = null;
 let lastTime = 0;
 let dpr = 1;
 let cssWidth = 0;
@@ -913,17 +981,231 @@ function spawn(time, edge, pos, type) {
   return { time, edge, pos, type };
 }
 
+function createDefaultMetaState() {
+  const heroes = {};
+  for (const blueprint of HERO_BLUEPRINTS) {
+    heroes[blueprint.id] = {
+      level: 1,
+      stars: 1,
+      shards: STARTING_HERO_IDS.includes(blueprint.id) ? 12 : 8,
+    };
+  }
+
+  return {
+    version: 1,
+    resources: {
+      gold: 1400,
+      heroXp: 720,
+      stones: 3,
+      essence: 160,
+    },
+    heroes,
+    talents: Object.fromEntries(TALENTS.map((talent) => [talent.id, 0])),
+    gear: Object.fromEntries(GEAR_SLOTS.map((slot) => [slot.id, 0])),
+    stageClears: 0,
+  };
+}
+
+function loadMetaState() {
+  const defaults = createDefaultMetaState();
+  if (typeof localStorage === "undefined") return defaults;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(META_STORAGE_KEY) || "null");
+    if (!saved || typeof saved !== "object") return defaults;
+    return mergeMetaState(defaults, saved);
+  } catch {
+    return defaults;
+  }
+}
+
+function mergeMetaState(defaults, saved) {
+  const merged = {
+    ...defaults,
+    ...saved,
+    resources: { ...defaults.resources, ...(saved.resources || {}) },
+    heroes: { ...defaults.heroes },
+    talents: { ...defaults.talents, ...(saved.talents || {}) },
+    gear: { ...defaults.gear, ...(saved.gear || {}) },
+  };
+
+  for (const blueprint of HERO_BLUEPRINTS) {
+    merged.heroes[blueprint.id] = {
+      ...defaults.heroes[blueprint.id],
+      ...(saved.heroes?.[blueprint.id] || {}),
+    };
+  }
+
+  return merged;
+}
+
+function saveMetaState() {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(META_STORAGE_KEY, JSON.stringify(metaState));
+}
+
+function getHeroMeta(heroId) {
+  if (!metaState.heroes[heroId]) {
+    metaState.heroes[heroId] = { level: 1, stars: 1, shards: 0 };
+  }
+  return metaState.heroes[heroId];
+}
+
+function getTalentLevel(talentId) {
+  return metaState?.talents?.[talentId] || 0;
+}
+
+function getGearLevel(slotId) {
+  return metaState?.gear?.[slotId] || 0;
+}
+
+function totalTalentLevels() {
+  return Object.values(metaState.talents).reduce((sum, level) => sum + level, 0);
+}
+
+function totalGearLevels() {
+  return Object.values(metaState.gear).reduce((sum, level) => sum + level, 0);
+}
+
+function accountLevel() {
+  const heroLevels = Object.values(metaState.heroes).reduce((sum, hero) => sum + hero.level - 1, 0);
+  return 1 + Math.floor((heroLevels + totalTalentLevels() * 2 + totalGearLevels() + metaState.stageClears * 2) / 8);
+}
+
+function heroLevelCost(level) {
+  return Math.round(58 + level * 28 + level * level * 1.6);
+}
+
+function promotionStoneCost(level) {
+  return level > 0 && level % 10 === 0 ? Math.max(1, level / 10) : 0;
+}
+
+function heroStarCost(stars) {
+  return STAR_SHARD_COSTS[stars] || Infinity;
+}
+
+function talentDrawCost() {
+  return 260 + totalTalentLevels() * 120;
+}
+
+function gearUpgradeCost(slotId) {
+  const level = getGearLevel(slotId);
+  return {
+    gold: 180 + level * 95,
+    essence: 34 + level * 18,
+  };
+}
+
+function canHeroLevelUp(heroId) {
+  const hero = getHeroMeta(heroId);
+  if (hero.level >= MAX_HERO_LEVEL) return false;
+  const stoneCost = promotionStoneCost(hero.level);
+  return metaState.resources.heroXp >= heroLevelCost(hero.level) && metaState.resources.stones >= stoneCost;
+}
+
+function canHeroStarUp(heroId) {
+  const hero = getHeroMeta(heroId);
+  if (hero.stars >= MAX_HERO_STAR) return false;
+  return hero.shards >= heroStarCost(hero.stars);
+}
+
+function canDrawTalent() {
+  return metaState.resources.gold >= talentDrawCost();
+}
+
+function canUpgradeGear(slotId) {
+  const cost = gearUpgradeCost(slotId);
+  return metaState.resources.gold >= cost.gold && metaState.resources.essence >= cost.essence;
+}
+
+function isHeroUltimateUnlocked(heroId) {
+  const hero = getHeroMeta(heroId);
+  return hero.stars >= 3 || hero.level >= 10;
+}
+
+function combatStatsForBlueprint(blueprint) {
+  const hero = getHeroMeta(blueprint.id);
+  const levelBonus = (hero.level - 1) * 0.045;
+  const starBonus = (hero.stars - 1) * 0.04;
+  const talentBonus = getTalentLevel("combat_drill") * 0.03;
+  const weaponBonus = getGearLevel("weapon") * 0.02;
+  const attackMultiplier = 1 + levelBonus + starBonus + talentBonus + weaponBonus;
+  const cooldownReduction = Math.min(0.28, getGearLevel("charm") * 0.01 + (hero.stars >= 4 ? 0.04 : 0));
+
+  return {
+    damage: Math.max(1, Math.round(blueprint.damage * attackMultiplier)),
+    cooldown: Math.max(0.32, blueprint.cooldown * (1 - cooldownReduction)),
+    range: blueprint.range + Math.floor((hero.level - 1) / 10) * 2,
+    metaLevel: hero.level,
+    metaStars: hero.stars,
+  };
+}
+
+function upgradeSelectedHeroLevel() {
+  const hero = getHeroMeta(selectedMetaHeroId);
+  if (!canHeroLevelUp(selectedMetaHeroId)) return;
+  const cost = heroLevelCost(hero.level);
+  const stoneCost = promotionStoneCost(hero.level);
+  metaState.resources.heroXp -= cost;
+  metaState.resources.stones -= stoneCost;
+  hero.level += 1;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function upgradeSelectedHeroStar() {
+  const hero = getHeroMeta(selectedMetaHeroId);
+  if (!canHeroStarUp(selectedMetaHeroId)) return;
+  hero.shards -= heroStarCost(hero.stars);
+  hero.stars += 1;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function drawTalentMeta() {
+  if (!canDrawTalent()) return;
+  metaState.resources.gold -= talentDrawCost();
+  const talent = pick(TALENTS);
+  metaState.talents[talent.id] += 1;
+  lastPulledTalentId = talent.id;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function upgradeGearSlot(slotId) {
+  if (!canUpgradeGear(slotId)) return;
+  const cost = gearUpgradeCost(slotId);
+  metaState.resources.gold -= cost.gold;
+  metaState.resources.essence -= cost.essence;
+  metaState.gear[slotId] += 1;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function refreshMetaPreviewState() {
+  if (!state || state.phase !== "meta") return;
+  state = createState();
+  state.phase = "meta";
+  syncUi();
+}
+
 function createState() {
   enemyId = 1;
+  const towerHp = 180 + getTalentLevel("tower_fortify") * 18 + getGearLevel("armor") * 8;
+  const startingXp = getTalentLevel("start_xp") * 4;
   return {
     phase: "playing",
     time: 0,
     waveIndex: 0,
     waveTime: 0,
     nextSpawn: 0,
-    hp: 180,
-    maxHp: 180,
-    xp: 0,
+    hp: towerHp,
+    maxHp: towerHp,
+    xp: startingXp,
     xpNeeded: xpRequirementForLevel(1),
     level: 1,
     killCount: 0,
@@ -952,8 +1234,10 @@ function heroBlueprintById(id) {
 
 function createHero(blueprint, index) {
   const slot = blueprint.initialSlot ?? index;
+  const metaStats = combatStatsForBlueprint(blueprint);
   return {
     ...blueprint,
+    ...metaStats,
     slot,
     aimAngle: HERO_ANGLES[slot],
     rotateT: 1,
@@ -2082,7 +2366,7 @@ function canOfferUpgrade(upgrade, hero, usedIds) {
 }
 
 function canOfferUltimate(hero) {
-  return hero.breakthrough && !hero.ultimate && state.level >= 6 && hero.basicPicks >= 1 && hero.totalPicks >= 5;
+  return isHeroUltimateUnlocked(hero.id) && hero.breakthrough && !hero.ultimate && state.level >= 6 && hero.basicPicks >= 1 && hero.totalPicks >= 5;
 }
 
 function hasAllGrowthChoices(hero) {
@@ -2209,6 +2493,38 @@ function checkWaveClear() {
   }
 }
 
+function calculateStageRewards(won) {
+  const reachedWave = Math.min(state.waveIndex + 1, WAVES.length);
+  const progress = won ? 1 : clamp(reachedWave / WAVES.length, 0.2, 0.82);
+  const goldMultiplier = 1 + getTalentLevel("spoils") * 0.08;
+  const shardHeroId = pick(STARTING_HERO_IDS);
+
+  return {
+    won,
+    gold: Math.round(((won ? 560 : 260) * progress + state.killCount * 3) * goldMultiplier),
+    heroXp: Math.round((won ? 380 : 170) * progress + state.level * 12),
+    stones: won ? 1 + (state.level >= 7 ? 1 : 0) : 0,
+    essence: Math.round((won ? 70 : 28) * progress),
+    shardHeroId,
+    shards: won ? 4 : 1,
+  };
+}
+
+function applyStageRewards(rewards) {
+  metaState.resources.gold += rewards.gold;
+  metaState.resources.heroXp += rewards.heroXp;
+  metaState.resources.stones += rewards.stones;
+  metaState.resources.essence += rewards.essence;
+  getHeroMeta(rewards.shardHeroId).shards += rewards.shards;
+  if (rewards.won) metaState.stageClears += 1;
+  saveMetaState();
+}
+
+function formatStageRewards(rewards) {
+  const shardHero = heroBlueprintById(rewards.shardHeroId);
+  return `보상: 골드 ${rewards.gold}, 영웅EXP ${rewards.heroXp}, 승급석 ${rewards.stones}, 정수 ${rewards.essence}, ${shardHero.name} 조각 ${rewards.shards}`;
+}
+
 function finish(won) {
   if (state.phase === "result") return;
   clearRotationInput();
@@ -2216,12 +2532,16 @@ function finish(won) {
   clearTimeout(bossBannerTimer);
   bossBannerTimer = 0;
   ui.bossBanner.classList.add("hidden");
+  lastStageRewards = calculateStageRewards(won);
+  applyStageRewards(lastStageRewards);
   state.phase = "result";
   ui.resultEyebrow.textContent = won ? "KEEP CLEAR" : "TOWER DOWN";
   ui.resultTitle.textContent = won ? "방어 성공" : "방어 실패";
-  ui.resultText.textContent = won
+  const resultSummary = won
     ? `레벨 ${state.level}, 처치 ${state.killCount}.`
     : `웨이브 ${Math.min(state.waveIndex + 1, WAVES.length)}, 처치 ${state.killCount}.`;
+  ui.resultText.innerHTML = `${resultSummary}<span class="reward-text">${formatStageRewards(lastStageRewards)}</span>`;
+  ui.resultButton.textContent = "로비로";
   ui.resultOverlay.classList.remove("hidden");
   syncUi();
 }
@@ -2803,12 +3123,32 @@ function showBossBanner(type) {
   bossBannerTimer = setTimeout(() => ui.bossBanner.classList.add("hidden"), 1560);
 }
 
-function restart() {
+function showMetaScreen(tab = metaTab) {
+  metaTab = tab;
+  clearUpgradeChoiceLock();
+  clearRewardRevealTimers();
+  clearTimeout(bossBannerTimer);
+  bossBannerTimer = 0;
+  if (!state) state = createState();
+  if (state.heroes) clearRotationInput();
+  state.phase = "meta";
+  ui.upgradeOverlay.classList.add("hidden");
+  ui.resultOverlay.classList.add("hidden");
+  ui.bossBanner.classList.add("hidden");
+  ui.rewardReveal.classList.add("hidden");
+  ui.rewardContinue.classList.add("hidden");
+  ui.metaScreen.classList.remove("hidden");
+  renderMeta();
+  syncUi();
+}
+
+function startBattle() {
   clearUpgradeChoiceLock();
   clearRewardRevealTimers();
   clearTimeout(bossBannerTimer);
   bossBannerTimer = 0;
   state = createState();
+  ui.metaScreen.classList.add("hidden");
   ui.upgradeOverlay.classList.add("hidden");
   ui.resultOverlay.classList.add("hidden");
   ui.bossBanner.classList.add("hidden");
@@ -2816,6 +3156,422 @@ function restart() {
   ui.rewardContinue.classList.add("hidden");
   pulseToast("WAVE 1");
   syncUi();
+}
+
+function renderMeta() {
+  syncMetaTopbar();
+  updateMetaNav();
+
+  if (metaTab === "heroes") {
+    renderHeroesMeta();
+  } else if (metaTab === "growth") {
+    renderGrowthMeta();
+  } else if (metaTab === "bag") {
+    renderBagMeta();
+  } else {
+    renderBattleMeta();
+  }
+}
+
+function syncMetaTopbar() {
+  ui.metaAccountLevel.textContent = `Lv.${accountLevel()}`;
+  ui.metaGold.textContent = formatNumber(metaState.resources.gold);
+  ui.metaHeroXp.textContent = formatNumber(metaState.resources.heroXp);
+  ui.metaStone.textContent = formatNumber(metaState.resources.stones);
+}
+
+function updateMetaNav() {
+  for (const button of ui.metaNavButtons) {
+    const tab = button.dataset.metaTab;
+    button.classList.toggle("active", tab === metaTab);
+    button.classList.toggle("ready", isMetaTabReady(tab));
+  }
+}
+
+function isMetaTabReady(tab) {
+  if (tab === "heroes") return HERO_BLUEPRINTS.some((hero) => canHeroLevelUp(hero.id) || canHeroStarUp(hero.id));
+  if (tab === "growth") return canDrawTalent();
+  if (tab === "bag") return GEAR_SLOTS.some((slot) => canUpgradeGear(slot.id));
+  return false;
+}
+
+function renderBattleMeta() {
+  const lastReward = lastStageRewards
+    ? `<section class="meta-panel"><div class="meta-section-title"><div><span>LAST REWARD</span><h2>최근 전투 보상</h2></div></div><p class="meta-copy">${escapeHtml(formatStageRewards(lastStageRewards))}</p></section>`
+    : "";
+
+  ui.metaContent.innerHTML = `
+    <div class="meta-page">
+      <section class="meta-stage">
+        <span class="meta-kicker">STAGE 1</span>
+        <h1>균열 초소</h1>
+        <p>8웨이브, 7웨이브 중간 보스, 8웨이브 보스. 보스 보상은 런 안의 랜덤 캐릭터 강화, 클리어 보상은 메타 성장 재화입니다.</p>
+        <div class="meta-stage-grid">
+          <div class="meta-stat"><span class="meta-small-label">WAVES</span><strong>${WAVES.length}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">PARTY</span><strong>${STARTING_HERO_IDS.length}명</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">BOSS</span><strong>2회</strong></div>
+        </div>
+        <div class="meta-action">
+          <button class="meta-primary" type="button" data-action="start-battle">전투 시작</button>
+        </div>
+      </section>
+
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>FORMATION</span>
+            <h2>출전 파티</h2>
+          </div>
+          <button class="meta-secondary" type="button" data-tab-link="heroes">영웅 보기</button>
+        </div>
+        <div class="meta-hero-list">
+          ${STARTING_HERO_IDS.map((id) => renderHeroButton(id, false)).join("")}
+        </div>
+      </section>
+
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>GROWTH PATH</span>
+            <h2>다음 목표</h2>
+          </div>
+        </div>
+        ${renderNextGoal()}
+      </section>
+
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>EXPECTED</span>
+            <h2>클리어 보상</h2>
+          </div>
+        </div>
+        <div class="meta-reward-grid">
+          <div class="meta-reward"><span>GOLD</span><strong>560+</strong></div>
+          <div class="meta-reward"><span>HERO EXP</span><strong>380+</strong></div>
+          <div class="meta-reward"><span>STONE</span><strong>1~2</strong></div>
+          <div class="meta-reward"><span>SHARD</span><strong>랜덤 4</strong></div>
+        </div>
+      </section>
+      ${lastReward}
+    </div>
+  `;
+}
+
+function renderHeroesMeta() {
+  const selected = heroBlueprintById(selectedMetaHeroId) || heroBlueprintById("sniper");
+  selectedMetaHeroId = selected.id;
+  const heroMeta = getHeroMeta(selected.id);
+  const stats = combatStatsForBlueprint(selected);
+
+  ui.metaContent.innerHTML = `
+    <div class="meta-page">
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>HERO ROSTER</span>
+            <h2>영웅</h2>
+          </div>
+        </div>
+        <div class="meta-hero-list">
+          ${HERO_BLUEPRINTS.map((hero) => renderHeroButton(hero.id, hero.id === selected.id)).join("")}
+        </div>
+      </section>
+
+      <section class="meta-panel" style="--hero-color: ${selected.color}">
+        <div class="meta-hero-head">
+          <div class="meta-portrait-large">${selected.glyph}</div>
+          <div class="meta-hero-name">
+            <h2>${selected.name}</h2>
+            <p>${selected.role}</p>
+            <div class="meta-stars">${renderStars(heroMeta.stars)}</div>
+          </div>
+        </div>
+
+        <div class="meta-stat-grid" style="margin-top: 12px">
+          <div class="meta-stat"><span class="meta-small-label">LEVEL</span><strong>Lv.${heroMeta.level}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">POWER</span><strong>${heroMetaPower(selected.id)}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">ANGLE</span><strong>${selected.angle}도</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">DMG</span><strong>${stats.damage}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">RANGE</span><strong>${stats.range}</strong></div>
+          <div class="meta-stat"><span class="meta-small-label">INTERVAL</span><strong>${stats.cooldown.toFixed(2)}s</strong></div>
+        </div>
+
+        <div class="meta-tabs">
+          ${["level", "star", "skill", "gear"].map((tab) => renderHeroDetailTab(tab)).join("")}
+        </div>
+
+        <div class="meta-detail-body">
+          ${renderHeroDetailBody(selected)}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderHeroButton(heroId, active) {
+  const hero = heroBlueprintById(heroId);
+  const meta = getHeroMeta(heroId);
+  const ready = canHeroLevelUp(heroId) || canHeroStarUp(heroId);
+  return `
+    <button class="meta-hero-button ${active ? "active" : ""} ${ready ? "ready" : ""}" type="button" data-hero-id="${hero.id}" style="--hero-color: ${hero.color}">
+      <span class="meta-hero-glyph">${hero.glyph}</span>
+      <strong>${hero.name}</strong>
+      <span>Lv.${meta.level} / ${meta.stars}성</span>
+    </button>
+  `;
+}
+
+function renderHeroDetailTab(tab) {
+  const labels = {
+    level: "레벨",
+    star: "별",
+    skill: "스킬",
+    gear: "장비",
+  };
+  return `<button class="meta-tab-button ${selectedHeroDetailTab === tab ? "active" : ""}" type="button" data-hero-tab="${tab}">${labels[tab]}</button>`;
+}
+
+function renderHeroDetailBody(hero) {
+  if (selectedHeroDetailTab === "star") return renderHeroStarPanel(hero);
+  if (selectedHeroDetailTab === "skill") return renderHeroSkillPanel(hero);
+  if (selectedHeroDetailTab === "gear") return renderHeroGearPanel();
+  return renderHeroLevelPanel(hero);
+}
+
+function renderHeroLevelPanel(hero) {
+  const meta = getHeroMeta(hero.id);
+  const cost = heroLevelCost(meta.level);
+  const stoneCost = promotionStoneCost(meta.level);
+  const isMax = meta.level >= MAX_HERO_LEVEL;
+  const canUpgrade = canHeroLevelUp(hero.id);
+  const buttonText = stoneCost > 0 ? "승급" : "레벨업";
+  return `
+    <div class="meta-resource-line">
+      <div>
+        <strong>다음 레벨 성장</strong>
+        <span>공격력, 일부 10레벨 구간 사거리, 궁극 해금 조건에 반영됩니다.</span>
+      </div>
+      <span class="${isHeroUltimateUnlocked(hero.id) ? "enough" : "missing"}">${isHeroUltimateUnlocked(hero.id) ? "궁극 해금" : "궁극 잠김"}</span>
+    </div>
+    <div class="meta-resource-line">
+      <div>
+        <strong>필요 영웅EXP</strong>
+        <span>${formatNumber(metaState.resources.heroXp)} / ${formatNumber(cost)}</span>
+      </div>
+      <span class="${metaState.resources.heroXp >= cost ? "enough" : "missing"}">${metaState.resources.heroXp >= cost ? "충분" : "부족"}</span>
+    </div>
+    <div class="meta-resource-line">
+      <div>
+        <strong>필요 승급석</strong>
+        <span>${formatNumber(metaState.resources.stones)} / ${formatNumber(stoneCost)}</span>
+      </div>
+      <span class="${metaState.resources.stones >= stoneCost ? "enough" : "missing"}">${stoneCost ? "10레벨 단위" : "필요 없음"}</span>
+    </div>
+    <button class="meta-primary" type="button" data-action="hero-level" ${canUpgrade && !isMax ? "" : "disabled"}>${isMax ? "최대 레벨" : buttonText}</button>
+  `;
+}
+
+function renderHeroStarPanel(hero) {
+  const meta = getHeroMeta(hero.id);
+  const cost = heroStarCost(meta.stars);
+  const isMax = meta.stars >= MAX_HERO_STAR;
+  const canUpgrade = canHeroStarUp(hero.id);
+  return `
+    <div class="meta-resource-line">
+      <div>
+        <strong>별 성장</strong>
+        <span>3성부터 궁극 선택지가 전투 카드 풀에 들어갈 수 있습니다.</span>
+      </div>
+      <span class="${isHeroUltimateUnlocked(hero.id) ? "enough" : "missing"}">${isHeroUltimateUnlocked(hero.id) ? "궁극 해금" : "3성 필요"}</span>
+    </div>
+    <div class="meta-resource-line">
+      <div>
+        <strong>${hero.name} 조각</strong>
+        <span>${isMax ? "최대 별 달성" : `${formatNumber(meta.shards)} / ${formatNumber(cost)}`}</span>
+      </div>
+      <span class="${canUpgrade || isMax ? "enough" : "missing"}">${isMax ? "최대" : canUpgrade ? "충분" : "부족"}</span>
+    </div>
+    <div class="meta-empty">조건부 추가 피해나 전투 시작 보너스 같은 캐릭터별 패시브는 이 별 성장 영역에 배치하는 방향입니다.</div>
+    <button class="meta-primary" type="button" data-action="hero-star" ${canUpgrade && !isMax ? "" : "disabled"}>${isMax ? "최대 별" : "별 상승"}</button>
+  `;
+}
+
+function renderHeroSkillPanel(hero) {
+  const order = { 성장: 1, 기본: 2, 고급: 3, 돌파: 4, 궁극: 5 };
+  const rows = heroUpgrades
+    .filter((upgrade) => upgrade.heroId === hero.id)
+    .sort((a, b) => order[a.tier] - order[b.tier])
+    .map((upgrade) => renderSkillRow(upgrade, hero))
+    .join("");
+
+  return `
+    <div class="meta-empty">전투 레벨업에서 나오는 카드 풀입니다. 성장 3종을 모두 모으면 돌파가 열리고, 궁극은 메타 레벨/별 조건을 만족해야 등장합니다.</div>
+    <div class="meta-skill-list">${rows}</div>
+  `;
+}
+
+function renderSkillRow(upgrade, hero) {
+  const lockedUltimate = upgrade.tier === "궁극" && !isHeroUltimateUnlocked(hero.id);
+  const stateText =
+    upgrade.tier === "궁극"
+      ? lockedUltimate
+        ? "잠김"
+        : "해금"
+      : upgrade.tier === "돌파"
+        ? "성장3"
+        : upgrade.tier === "고급"
+          ? "돌파후"
+          : upgrade.tier === "기본"
+            ? `${upgrade.maxRank}회`
+            : "1회";
+  const color = lockedUltimate ? "#747b86" : tierColor(upgrade.tier);
+  return `
+    <div class="meta-skill-row" style="--skill-color: ${color}">
+      <em>${upgrade.tier}</em>
+      <div>
+        <strong>${upgrade.title}</strong>
+        <span>${upgrade.text}</span>
+      </div>
+      <b class="meta-skill-state">${stateText}</b>
+    </div>
+  `;
+}
+
+function renderHeroGearPanel() {
+  return `
+    <div class="meta-empty">장비는 캐릭터 귀속이 아니라 슬롯 성장으로 처리합니다. 영웅을 교체해도 투자한 슬롯 레벨이 유지됩니다.</div>
+    <div class="meta-gear-grid">${GEAR_SLOTS.map((slot) => renderGearSlot(slot)).join("")}</div>
+  `;
+}
+
+function renderGrowthMeta() {
+  const cost = talentDrawCost();
+  ui.metaContent.innerHTML = `
+    <div class="meta-page">
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>TALENT</span>
+            <h2>재능</h2>
+          </div>
+        </div>
+        <p class="meta-copy">콩콩던전처럼 골드를 사용해 랜덤 재능 카드를 획득합니다. 이미 보유한 재능이 나오면 해당 재능 레벨이 자동으로 올라갑니다.</p>
+        <div class="meta-growth-grid" style="margin-top: 10px">
+          ${TALENTS.map((talent) => renderTalentCard(talent)).join("")}
+        </div>
+        <div class="meta-action">
+          <div class="meta-resource-line">
+            <div>
+              <strong>다음 재능 획득</strong>
+              <span>골드 ${formatNumber(metaState.resources.gold)} / ${formatNumber(cost)}</span>
+            </div>
+            <span class="${canDrawTalent() ? "enough" : "missing"}">${canDrawTalent() ? "가능" : "부족"}</span>
+          </div>
+          <button class="meta-primary" type="button" data-action="talent-draw" ${canDrawTalent() ? "" : "disabled"}>재능 획득</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderTalentCard(talent) {
+  const level = getTalentLevel(talent.id);
+  const pulled = lastPulledTalentId === talent.id ? "meta-pulled" : "";
+  return `
+    <div class="meta-talent-card ${pulled}">
+      <b>Lv.${level}</b>
+      <strong>${talent.name}</strong>
+      <span>${talent.text}</span>
+      <span>${talent.effect(level)}</span>
+    </div>
+  `;
+}
+
+function renderBagMeta() {
+  ui.metaContent.innerHTML = `
+    <div class="meta-page">
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>MATERIALS</span>
+            <h2>가방</h2>
+          </div>
+        </div>
+        <div class="meta-bag-grid">
+          <div class="meta-bag-item"><b>${formatNumber(metaState.resources.gold)}</b><strong>골드</strong><span>재능 획득과 장비 슬롯 강화에 사용</span></div>
+          <div class="meta-bag-item"><b>${formatNumber(metaState.resources.heroXp)}</b><strong>영웅EXP</strong><span>캐릭터 레벨업에 사용</span></div>
+          <div class="meta-bag-item"><b>${formatNumber(metaState.resources.stones)}</b><strong>승급석</strong><span>10레벨 단위 승급에 사용</span></div>
+          <div class="meta-bag-item"><b>${formatNumber(metaState.resources.essence)}</b><strong>정수</strong><span>장비 슬롯 강화에 사용</span></div>
+        </div>
+      </section>
+
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>SLOT GEAR</span>
+            <h2>장비 슬롯</h2>
+          </div>
+        </div>
+        <div class="meta-gear-grid">${GEAR_SLOTS.map((slot) => renderGearSlot(slot)).join("")}</div>
+      </section>
+
+      <section class="meta-panel">
+        <div class="meta-section-title">
+          <div>
+            <span>LOCKED</span>
+            <h2>보물/룬</h2>
+          </div>
+        </div>
+        <div class="meta-empty">보물, 룬, 컬렉션은 장기 메타 레이어로 보류합니다. 먼저 영웅 레벨/별/재능/장비 슬롯의 핵심 루프를 검증합니다.</div>
+      </section>
+    </div>
+  `;
+}
+
+function renderGearSlot(slot) {
+  const level = getGearLevel(slot.id);
+  const cost = gearUpgradeCost(slot.id);
+  const canUpgrade = canUpgradeGear(slot.id);
+  return `
+    <div class="meta-gear-slot" style="--gear-color: ${slot.color}">
+      <strong>${slot.name} Lv.${level}</strong>
+      <span>${slot.text}</span>
+      <span>${slot.effect(level)}</span>
+      <span>비용: 골드 ${formatNumber(cost.gold)} / 정수 ${formatNumber(cost.essence)}</span>
+      <button class="meta-secondary" type="button" data-action="gear-upgrade" data-slot-id="${slot.id}" ${canUpgrade ? "" : "disabled"}>강화</button>
+    </div>
+  `;
+}
+
+function renderNextGoal() {
+  const lowHero = HERO_BLUEPRINTS.find((blueprint) => getHeroMeta(blueprint.id).level < 5);
+  if (lowHero) {
+    const meta = getHeroMeta(lowHero.id);
+    return `<div class="meta-next-goal"><span>HERO LEVEL</span><strong>${lowHero.name} Lv.5 달성 ${meta.level}/5</strong></div>`;
+  }
+
+  const ultimateLocked = HERO_BLUEPRINTS.find((blueprint) => !isHeroUltimateUnlocked(blueprint.id));
+  if (ultimateLocked) {
+    return `<div class="meta-next-goal"><span>ULTIMATE</span><strong>${ultimateLocked.name} 3성 또는 Lv.10 달성</strong></div>`;
+  }
+
+  return `<div class="meta-next-goal"><span>STAGE</span><strong>균열 초소 클리어 ${metaState.stageClears}회</strong></div>`;
+}
+
+function heroMetaPower(heroId) {
+  const blueprint = heroBlueprintById(heroId);
+  const stats = combatStatsForBlueprint(blueprint);
+  const meta = getHeroMeta(heroId);
+  return Math.round(stats.damage + stats.range * 0.18 + meta.level * 3 + meta.stars * 18);
+}
+
+function renderStars(count) {
+  return "★".repeat(count) + "☆".repeat(MAX_HERO_STAR - count);
+}
+
+function restart() {
+  startBattle();
 }
 
 function loop(now) {
@@ -2874,6 +3630,22 @@ function shuffle(items) {
     out[j] = temp;
   }
   return out;
+}
+
+function formatNumber(value) {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 10000) return `${Math.round(value / 1000)}K`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return String(value);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function rgba(hex, alpha) {
@@ -2975,12 +3747,57 @@ document.addEventListener("pointercancel", markUpgradePointerReleased);
 document.addEventListener("dblclick", preventZoomGesture, { passive: false });
 document.addEventListener("contextmenu", preventZoomGesture);
 
+ui.metaContent.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+
+  const tabLink = button.dataset.tabLink;
+  if (tabLink) {
+    metaTab = tabLink;
+    renderMeta();
+    return;
+  }
+
+  const heroId = button.dataset.heroId;
+  if (heroId) {
+    selectedMetaHeroId = heroId;
+    renderMeta();
+    return;
+  }
+
+  const heroTab = button.dataset.heroTab;
+  if (heroTab) {
+    selectedHeroDetailTab = heroTab;
+    renderMeta();
+    return;
+  }
+
+  if (button.dataset.action === "start-battle") {
+    startBattle();
+  } else if (button.dataset.action === "hero-level") {
+    upgradeSelectedHeroLevel();
+  } else if (button.dataset.action === "hero-star") {
+    upgradeSelectedHeroStar();
+  } else if (button.dataset.action === "talent-draw") {
+    drawTalentMeta();
+  } else if (button.dataset.action === "gear-upgrade") {
+    upgradeGearSlot(button.dataset.slotId);
+  }
+});
+
+for (const button of ui.metaNavButtons) {
+  button.addEventListener("click", () => {
+    metaTab = button.dataset.metaTab || "battle";
+    renderMeta();
+  });
+}
+
 ui.restart.addEventListener("click", (event) => {
   event.stopPropagation();
   restart();
 });
 
-ui.resultButton.addEventListener("click", restart);
+ui.resultButton.addEventListener("click", () => showMetaScreen("battle"));
 ui.rewardContinue.addEventListener("click", closeBossReward);
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("orientationchange", resizeCanvas);
@@ -2999,8 +3816,9 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
   };
 }
 
+metaState = loadMetaState();
 resizeCanvas();
-restart();
+showMetaScreen("battle");
 requestAnimationFrame((time) => {
   lastTime = time;
   requestAnimationFrame(loop);
