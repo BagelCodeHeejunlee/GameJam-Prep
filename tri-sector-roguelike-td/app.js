@@ -1069,6 +1069,39 @@ function setRecommendedLineup() {
   renderMeta();
 }
 
+function addLineupHero(heroId) {
+  const lineup = lineupHeroIds();
+  if (lineup.includes(heroId) || lineup.length >= 3) return;
+  lineup.push(heroId);
+  metaState.lineup = lineup;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function removeLineupHero(heroId) {
+  const lineup = lineupHeroIds();
+  if (lineup.length <= 1) return;
+  metaState.lineup = lineup.filter((id) => id !== heroId);
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
+function moveLineupHero(heroId, direction) {
+  const lineup = lineupHeroIds();
+  const index = lineup.indexOf(heroId);
+  if (index < 0) return;
+  const nextIndex = clamp(index + direction, 0, lineup.length - 1);
+  if (index === nextIndex) return;
+  const [hero] = lineup.splice(index, 1);
+  lineup.splice(nextIndex, 0, hero);
+  metaState.lineup = lineup;
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
+}
+
 function toggleLineupHero(heroId) {
   const lineup = lineupHeroIds();
   const index = lineup.indexOf(heroId);
@@ -3303,6 +3336,11 @@ function renderHeroesMeta() {
     return;
   }
 
+  if (metaHeroView === "formation") {
+    renderHeroFormationMeta();
+    return;
+  }
+
   renderHeroRosterMeta();
 }
 
@@ -3324,7 +3362,7 @@ function renderHeroRosterMeta() {
         <div class="hero-section-title">
           <span class="hero-orb"></span>
           <strong>출전 영웅</strong>
-          <button class="lineup-recommend" type="button" data-action="recommended-lineup">권장 라인업</button>
+          <button class="lineup-recommend" type="button" data-action="formation-view">출전 세팅</button>
         </div>
         <div class="hero-card-grid deployed-grid">
           ${lineup.map((id) => renderRosterHeroCard(id, true)).join("")}
@@ -3339,19 +3377,93 @@ function renderHeroRosterMeta() {
           ${standby.length ? standby.map((hero) => renderRosterHeroCard(hero.id, false)).join("") : `<div class="meta-empty compact">모든 영웅이 출전 중입니다.</div>`}
         </div>
       </section>
+    </div>
+  `;
+}
 
-      <section class="hero-filter-strip" aria-label="영웅 필터">
-        <button type="button" class="filter-chip active">ALL</button>
-        <button type="button" class="filter-chip fire">화</button>
-        <button type="button" class="filter-chip lightning">번</button>
-        <button type="button" class="filter-chip wind">풍</button>
-        <button type="button" class="filter-chip frost">빙</button>
+function renderHeroFormationMeta() {
+  const lineup = lineupHeroIds();
+  const standby = HERO_BLUEPRINTS.filter((hero) => !lineup.includes(hero.id));
+  const emptySlots = Math.max(0, 3 - lineup.length);
+
+  ui.metaContent.innerHTML = `
+    <div class="meta-page formation-page">
+      <section class="formation-header">
+        <button class="formation-back" type="button" data-action="formation-back" aria-label="영웅 목록으로">‹</button>
+        <div>
+          <span class="meta-kicker">FORMATION</span>
+          <h2>출전 세팅</h2>
+        </div>
+        <button class="lineup-recommend" type="button" data-action="recommended-lineup">권장</button>
       </section>
 
-      <section class="hero-quick-actions">
-        <button type="button" class="hero-book-button">도감</button>
-        <button type="button" class="hero-book-button">포진</button>
+      <section class="formation-slots" aria-label="출전 슬롯">
+        ${lineup.map((id, index) => renderFormationSlot(id, index, lineup.length)).join("")}
+        ${Array.from({ length: emptySlots }, (_, index) => renderEmptyFormationSlot(lineup.length + index)).join("")}
       </section>
+
+      <section class="formation-bench">
+        <div class="hero-section-title simple">
+          <strong>대기 영웅</strong>
+        </div>
+        <div class="formation-bench-grid">
+          ${standby.length ? standby.map((hero) => renderBenchHeroCard(hero.id, lineup.length < 3)).join("") : `<div class="meta-empty compact">대기 중인 영웅이 없습니다.</div>`}
+        </div>
+      </section>
+
+      <section class="formation-note">
+        <strong>슬롯 순서</strong>
+        <span>1번/2번/3번 슬롯은 전투 시작 조준 방향과 레벨업 카드 풀에 그대로 반영됩니다.</span>
+      </section>
+    </div>
+  `;
+}
+
+function renderFormationSlot(heroId, index, lineupLength) {
+  const hero = heroBlueprintById(heroId);
+  const meta = getHeroMeta(heroId);
+  const angle = HERO_ANGLES[index * 2];
+  return `
+    <div class="formation-slot" style="--hero-color: ${hero.color}">
+      <div class="formation-slot-index">${index + 1}</div>
+      <button class="formation-hero" type="button" data-hero-id="${hero.id}">
+        <strong>${hero.glyph}</strong>
+        <span>${hero.name}</span>
+        <em>Lv.${meta.level} / ${angle}도</em>
+      </button>
+      <div class="formation-controls">
+        <button type="button" data-action="lineup-move" data-lineup-hero-id="${hero.id}" data-lineup-dir="-1" ${index === 0 ? "disabled" : ""}>‹</button>
+        <button type="button" data-action="lineup-remove" data-lineup-hero-id="${hero.id}" ${lineupLength <= 1 ? "disabled" : ""}>해제</button>
+        <button type="button" data-action="lineup-move" data-lineup-hero-id="${hero.id}" data-lineup-dir="1" ${index >= lineupLength - 1 ? "disabled" : ""}>›</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderEmptyFormationSlot(index) {
+  const angle = HERO_ANGLES[index * 2];
+  return `
+    <div class="formation-slot empty">
+      <div class="formation-slot-index">${index + 1}</div>
+      <div class="formation-empty-copy">
+        <strong>빈 슬롯</strong>
+        <span>${angle}도 시작</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderBenchHeroCard(heroId, canAdd) {
+  const hero = heroBlueprintById(heroId);
+  const meta = getHeroMeta(heroId);
+  return `
+    <div class="bench-hero-card" style="--hero-color: ${hero.color}">
+      <button class="bench-hero-main" type="button" data-hero-id="${hero.id}">
+        <strong>${hero.glyph}</strong>
+        <span>${hero.name}</span>
+        <em>Lv.${meta.level}</em>
+      </button>
+      <button class="bench-add-button" type="button" data-action="lineup-add" data-lineup-hero-id="${hero.id}" ${canAdd ? "" : "disabled"}>${canAdd ? "추가" : "3명 출전중"}</button>
     </div>
   `;
 }
@@ -3361,16 +3473,14 @@ function renderHeroDetailMeta() {
   selectedMetaHeroId = selected.id;
   const heroMeta = getHeroMeta(selected.id);
   const stats = combatStatsForBlueprint(selected);
-  const element = heroElement(selected.id);
 
   ui.metaContent.innerHTML = `
-    <div class="meta-page hero-detail-page" style="--hero-color: ${selected.color}; --element-color: ${element.color}">
+    <div class="meta-page hero-detail-page" style="--hero-color: ${selected.color}">
       <section class="hero-showcase">
         <button class="hero-detail-back top" type="button" data-action="hero-list" aria-label="영웅 목록으로">‹</button>
         <div class="hero-detail-title">
           <h2>${selected.name}</h2>
           <p>${selected.role}</p>
-          <span class="hero-role-badge">${element.icon} ${element.name}</span>
         </div>
         <button class="hero-switch prev" type="button" data-action="hero-prev" aria-label="이전 영웅">‹</button>
         <div class="hero-figure">${selected.glyph}</div>
@@ -3407,12 +3517,10 @@ function renderRosterHeroCard(heroId, deployed) {
   const hero = heroBlueprintById(heroId);
   const meta = getHeroMeta(heroId);
   const ready = canHeroLevelUp(heroId) || canHeroStarUp(heroId);
-  const element = heroElement(heroId);
   return `
-    <div class="roster-hero-card ${deployed ? "deployed" : "standby"} ${ready ? "ready" : ""}" style="--hero-color: ${hero.color}; --element-color: ${element.color}">
+    <div class="roster-hero-card ${deployed ? "deployed" : "standby"} ${ready ? "ready" : ""}" style="--hero-color: ${hero.color}">
       <button class="roster-hero-main" type="button" data-hero-id="${hero.id}">
         <span class="roster-level">${meta.level}레벨</span>
-        <span class="roster-element">${element.icon}</span>
         <strong>${hero.glyph}</strong>
         <em>${hero.name}</em>
         <i>${renderStars(Math.min(meta.stars, 2)).replaceAll("☆", "")}</i>
@@ -3696,16 +3804,6 @@ function renderStars(count) {
   return "★".repeat(count) + "☆".repeat(MAX_HERO_STAR - count);
 }
 
-function heroElement(heroId) {
-  const elements = {
-    archer: { name: "바람", icon: "풍", color: "#74dc8d" },
-    sniper: { name: "번개", icon: "번", color: "#ffd166" },
-    warrior: { name: "화염", icon: "화", color: "#ff6b6b" },
-    mage: { name: "마법", icon: "마", color: "#c89bff" },
-  };
-  return elements[heroId] || { name: "일반", icon: "ALL", color: "#aeb6c2" };
-}
-
 function selectAdjacentHero(direction) {
   const index = HERO_BLUEPRINTS.findIndex((hero) => hero.id === selectedMetaHeroId);
   const nextIndex = (index + direction + HERO_BLUEPRINTS.length) % HERO_BLUEPRINTS.length;
@@ -3925,6 +4023,12 @@ ui.metaContent.addEventListener("click", (event) => {
   } else if (button.dataset.action === "hero-list") {
     metaHeroView = "list";
     renderMeta();
+  } else if (button.dataset.action === "formation-view") {
+    metaHeroView = "formation";
+    renderMeta();
+  } else if (button.dataset.action === "formation-back") {
+    metaHeroView = "list";
+    renderMeta();
   } else if (button.dataset.action === "hero-prev") {
     selectAdjacentHero(-1);
   } else if (button.dataset.action === "hero-next") {
@@ -3933,6 +4037,12 @@ ui.metaContent.addEventListener("click", (event) => {
     setRecommendedLineup();
   } else if (button.dataset.action === "toggle-lineup") {
     toggleLineupHero(button.dataset.lineupHeroId);
+  } else if (button.dataset.action === "lineup-add") {
+    addLineupHero(button.dataset.lineupHeroId);
+  } else if (button.dataset.action === "lineup-remove") {
+    removeLineupHero(button.dataset.lineupHeroId);
+  } else if (button.dataset.action === "lineup-move") {
+    moveLineupHero(button.dataset.lineupHeroId, Number(button.dataset.lineupDir || 0));
   } else if (button.dataset.action === "hero-level") {
     upgradeSelectedHeroLevel();
   } else if (button.dataset.action === "hero-star") {
