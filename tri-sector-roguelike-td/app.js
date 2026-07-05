@@ -15,7 +15,13 @@ const ui = {
   teamList: document.getElementById("teamList"),
   toast: document.getElementById("toast"),
   upgradeOverlay: document.getElementById("upgradeOverlay"),
+  choiceEyebrow: document.getElementById("choiceEyebrow"),
+  choiceTitle: document.getElementById("choiceTitle"),
   upgradeChoices: document.getElementById("upgradeChoices"),
+  bossBanner: document.getElementById("bossBanner"),
+  bossBannerKicker: document.getElementById("bossBannerKicker"),
+  bossBannerTitle: document.getElementById("bossBannerTitle"),
+  bossBannerText: document.getElementById("bossBannerText"),
   resultOverlay: document.getElementById("resultOverlay"),
   resultEyebrow: document.getElementById("resultEyebrow"),
   resultTitle: document.getElementById("resultTitle"),
@@ -272,6 +278,55 @@ const WAVES = [
     spawn(6.65, "top", 0.6, "grunt"),
     spawn(6.8, "top", 0.8, "grunt"),
   ],
+  [
+    spawn(0.25, "top", 0.5, "midboss"),
+    spawn(0.85, "left", 0.26, "swarm"),
+    spawn(0.98, "left", 0.38, "swarm"),
+    spawn(1.11, "left", 0.5, "swarm"),
+    spawn(1.24, "left", 0.62, "swarm"),
+    spawn(1.37, "left", 0.74, "swarm"),
+    spawn(1.85, "right", 0.32, "runner"),
+    spawn(2.0, "right", 0.5, "runner"),
+    spawn(2.15, "right", 0.68, "runner"),
+    spawn(2.75, "bottom", 0.28, "tank"),
+    spawn(2.95, "bottom", 0.72, "tank"),
+    spawn(3.55, "top", 0.24, "swarm"),
+    spawn(3.68, "top", 0.36, "swarm"),
+    spawn(3.81, "top", 0.48, "swarm"),
+    spawn(3.94, "top", 0.6, "swarm"),
+    spawn(4.07, "top", 0.72, "swarm"),
+    spawn(4.65, "left", 0.42, "grunt"),
+    spawn(4.8, "right", 0.58, "grunt"),
+    spawn(5.35, "bottom", 0.36, "swarm"),
+    spawn(5.48, "bottom", 0.5, "swarm"),
+    spawn(5.61, "bottom", 0.64, "swarm"),
+  ],
+  [
+    spawn(0.25, "bottom", 0.5, "boss"),
+    spawn(0.9, "top", 0.2, "swarm"),
+    spawn(1.03, "top", 0.32, "swarm"),
+    spawn(1.16, "top", 0.44, "swarm"),
+    spawn(1.29, "top", 0.56, "swarm"),
+    spawn(1.42, "top", 0.68, "swarm"),
+    spawn(1.55, "top", 0.8, "swarm"),
+    spawn(2.05, "left", 0.28, "runner"),
+    spawn(2.22, "right", 0.72, "runner"),
+    spawn(2.85, "left", 0.42, "tank"),
+    spawn(3.05, "right", 0.58, "tank"),
+    spawn(3.75, "bottom", 0.24, "swarm"),
+    spawn(3.88, "bottom", 0.36, "swarm"),
+    spawn(4.01, "bottom", 0.48, "swarm"),
+    spawn(4.14, "bottom", 0.6, "swarm"),
+    spawn(4.27, "bottom", 0.72, "swarm"),
+    spawn(4.9, "left", 0.5, "brute"),
+    spawn(5.25, "right", 0.5, "brute"),
+    spawn(5.85, "top", 0.25, "swarm"),
+    spawn(5.98, "top", 0.4, "swarm"),
+    spawn(6.11, "top", 0.55, "swarm"),
+    spawn(6.24, "top", 0.7, "swarm"),
+    spawn(6.9, "left", 0.34, "runner"),
+    spawn(7.08, "right", 0.66, "runner"),
+  ],
 ];
 
 const TYPES = {
@@ -280,6 +335,36 @@ const TYPES = {
   runner: { hp: 34, speed: 14, radius: 9, damage: 5, attackInterval: 0.82, xp: 7, color: "#72d8ff", core: "#e7fbff" },
   tank: { hp: 132, speed: 5.5, radius: 14, damage: 13, attackInterval: 1.38, xp: 15, color: "#a88cff", core: "#f0d9ff" },
   brute: { hp: 205, speed: 4.5, radius: 16, damage: 18, attackInterval: 1.52, xp: 24, color: "#ff5f85", core: "#ffd6e0" },
+  midboss: {
+    hp: 420,
+    hpGrowth: 14,
+    speed: 3.8,
+    radius: 24,
+    damage: 16,
+    attackInterval: 1.18,
+    xp: 60,
+    color: "#ffb347",
+    core: "#fff0b6",
+    reward: "mid",
+    bannerKicker: "MID BOSS",
+    bannerTitle: "문지기 등장",
+    bannerText: "큰 적을 묶어 두는 동안 무리몹이 난입합니다",
+  },
+  boss: {
+    hp: 760,
+    hpGrowth: 22,
+    speed: 3.2,
+    radius: 30,
+    damage: 22,
+    attackInterval: 1.05,
+    xp: 100,
+    color: "#ff5f85",
+    core: "#ffe1ea",
+    reward: "boss",
+    bannerKicker: "BOSS",
+    bannerTitle: "균열 군주",
+    bannerText: "최종 압박입니다. 방향을 계속 다시 잡아야 합니다",
+  },
 };
 
 const heroUpgrades = [
@@ -790,12 +875,97 @@ const heroUpgrades = [
   },
 ];
 
+const BOSS_REWARD_SETS = {
+  mid: {
+    eyebrow: "MID BOSS DOWN",
+    title: "중간 보스 보상",
+    choices: [
+      {
+        id: "mid_repair",
+        meta: "타워 보상",
+        title: "긴급 수리",
+        text: "타워 체력 60 회복",
+        color: "#79e28e",
+        apply: () => {
+          state.hp = Math.min(state.maxHp, state.hp + 60);
+          addRing(tower().x, tower().y, "#79e28e", 16, 0.5);
+        },
+      },
+      {
+        id: "mid_xp",
+        meta: "성장 보상",
+        title: "전투 숙련",
+        text: "경험치 70 즉시 획득",
+        color: "#ffd166",
+        apply: () => {
+          state.xp += 70;
+          addFloat(tower().x, tower().y - 28, "+70 EXP", "#ffd166");
+        },
+      },
+      {
+        id: "mid_focus",
+        meta: "영웅 보상",
+        title: "집중 정비",
+        text: "무작위 출전 영웅 1명의 공격력과 공격 간격 개선",
+        color: "#6fd6ff",
+        apply: () => {
+          boostRandomHero({ damage: 9, cooldown: 0.94, range: 4, color: "#6fd6ff" });
+        },
+      },
+    ],
+  },
+  boss: {
+    eyebrow: "BOSS DOWN",
+    title: "보스 보상",
+    choices: [
+      {
+        id: "boss_rebuild",
+        meta: "타워 보상",
+        title: "성벽 재건",
+        text: "타워 최대 체력 +20, 체력 전부 회복",
+        color: "#79e28e",
+        apply: () => {
+          state.maxHp += 20;
+          state.hp = state.maxHp;
+          addRing(tower().x, tower().y, "#79e28e", 22, 0.65);
+        },
+      },
+      {
+        id: "boss_party",
+        meta: "파티 보상",
+        title: "승전의 깃발",
+        text: "모든 출전 영웅 공격력 +8, 사거리 +5",
+        color: "#b984ff",
+        apply: () => {
+          for (const hero of state.heroes) {
+            hero.damage += 8;
+            hero.range += 5;
+          }
+          addRing(tower().x, tower().y, "#b984ff", 24, 0.65);
+        },
+      },
+      {
+        id: "boss_xp",
+        meta: "성장 보상",
+        title: "균열의 지식",
+        text: "경험치 130 즉시 획득",
+        color: "#ffd166",
+        apply: () => {
+          state.xp += 130;
+          addFloat(tower().x, tower().y - 28, "+130 EXP", "#ffd166");
+        },
+      },
+    ],
+  },
+};
+
 let state;
 let lastTime = 0;
 let dpr = 1;
 let cssWidth = 0;
 let cssHeight = 0;
 let toastTimer = 0;
+let bossBannerTimer = 0;
 let upgradeUnlockTimer = 0;
 let upgradeUnlockNeedsRelease = false;
 let enemyId = 1;
@@ -1003,6 +1173,7 @@ function createEnemy(plan) {
     hit: 0,
     dead: false,
   });
+  if (type.reward) showBossBanner(type);
   enemyId += 1;
 }
 
@@ -1625,12 +1796,14 @@ function hitEnemy(enemy, amount, source, options = {}) {
 
 function killEnemy(enemy) {
   if (enemy.dead) return;
+  const type = TYPES[enemy.type];
   enemy.dead = true;
   const idx = state.enemies.indexOf(enemy);
   if (idx >= 0) state.enemies.splice(idx, 1);
   state.killCount += 1;
   addBurst(enemy.x, enemy.y, enemy.color, 18);
   addXpOrb(enemy.x, enemy.y, enemy.xp);
+  if (type?.reward) openBossReward(type.reward);
 }
 
 function pushEnemyOutward(enemy, amount) {
@@ -1639,7 +1812,7 @@ function pushEnemyOutward(enemy, amount) {
   const dx = enemy.x - t.x;
   const dy = enemy.y - t.y;
   const dist = Math.hypot(dx, dy) || 1;
-  const resistance = enemy.type === "brute" ? 0.42 : enemy.type === "tank" ? 0.58 : 1;
+  const resistance = enemy.type === "boss" ? 0.18 : enemy.type === "midboss" ? 0.28 : enemy.type === "brute" ? 0.42 : enemy.type === "tank" ? 0.58 : 1;
   const push = amount * resistance;
   enemy.x = clamp(enemy.x + (dx / dist) * push, 8, cssWidth - 8);
   enemy.y = clamp(enemy.y + (dy / dist) * push, 8, cssHeight - 8);
@@ -1705,6 +1878,8 @@ function openUpgrade() {
   clearRotationInput();
   lockUpgradeChoices(needsPointerRelease);
   state.phase = "upgrade";
+  ui.choiceEyebrow.textContent = "LEVEL UP";
+  ui.choiceTitle.textContent = "강화 선택";
   ui.upgradeChoices.innerHTML = "";
   const choices = drawChoices(3);
   if (!choices.length) {
@@ -1741,6 +1916,47 @@ function openUpgrade() {
   syncUi();
 }
 
+function openBossReward(rewardId) {
+  const rewardSet = BOSS_REWARD_SETS[rewardId];
+  if (!rewardSet || state.phase === "result") return;
+  const activePointerId = state.rotationPointerId;
+  const needsPointerRelease = activePointerId !== null;
+  if (activePointerId !== null) canvas.releasePointerCapture?.(activePointerId);
+  clearRotationInput();
+  lockUpgradeChoices(needsPointerRelease);
+  state.phase = "reward";
+  ui.choiceEyebrow.textContent = rewardSet.eyebrow;
+  ui.choiceTitle.textContent = rewardSet.title;
+  ui.upgradeChoices.innerHTML = "";
+
+  rewardSet.choices.forEach((choice, index) => {
+    const button = document.createElement("button");
+    button.className = "upgrade-card";
+    button.type = "button";
+    button.disabled = true;
+    button.style.setProperty("--choice-color", choice.color);
+    button.style.setProperty("--choice-delay", `${140 + index * 80}ms`);
+    button.innerHTML = `<span class="card-meta">${choice.meta}</span><strong>${choice.title}</strong><span>${choice.text}</span>`;
+    button.addEventListener("click", (event) => {
+      if (isUpgradeChoiceLocked()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      clearUpgradeChoiceLock();
+      choice.apply();
+      ui.upgradeOverlay.classList.add("hidden");
+      state.phase = "playing";
+      pulseToast(choice.title);
+      if (!tryOpenLevelUp()) syncUi();
+    });
+    ui.upgradeChoices.appendChild(button);
+  });
+
+  ui.upgradeOverlay.classList.remove("hidden");
+  syncUi();
+}
+
 function lockUpgradeChoices(needsPointerRelease) {
   clearTimeout(upgradeUnlockTimer);
   upgradeUnlockTimer = 0;
@@ -1760,13 +1976,13 @@ function clearUpgradeChoiceLock() {
 }
 
 function markUpgradePointerReleased() {
-  if (!state || state.phase !== "upgrade") return;
+  if (!state || !isChoicePhase()) return;
   upgradeUnlockNeedsRelease = false;
   if (!upgradeUnlockTimer) tryUnlockUpgradeChoices();
 }
 
 function tryUnlockUpgradeChoices() {
-  if (!state || state.phase !== "upgrade" || upgradeUnlockNeedsRelease) return;
+  if (!state || !isChoicePhase() || upgradeUnlockNeedsRelease) return;
   ui.upgradeOverlay.classList.remove("upgrade-locked");
   for (const button of ui.upgradeChoices.querySelectorAll(".upgrade-card")) {
     button.disabled = false;
@@ -1775,6 +1991,10 @@ function tryUnlockUpgradeChoices() {
 
 function isUpgradeChoiceLocked() {
   return ui.upgradeOverlay.classList.contains("upgrade-locked");
+}
+
+function isChoicePhase() {
+  return state.phase === "upgrade" || state.phase === "reward";
 }
 
 function drawChoices(count) {
@@ -1901,6 +2121,15 @@ function heroById(id) {
   return state.heroes.find((hero) => hero.id === id);
 }
 
+function boostRandomHero({ damage, cooldown, range, color }) {
+  const hero = pick(state.heroes);
+  hero.damage += damage;
+  hero.cooldown = Math.max(0.34, hero.cooldown * cooldown);
+  hero.range += range;
+  addFloat(tower().x, tower().y - 28, `${hero.name} 강화`, color);
+  addRing(tower().x, tower().y, color, 18, 0.55);
+}
+
 function updateEffects(dt) {
   for (let i = state.effects.length - 1; i >= 0; i -= 1) {
     const effect = state.effects[i];
@@ -1984,6 +2213,9 @@ function checkWaveClear() {
 function finish(won) {
   if (state.phase === "result") return;
   clearRotationInput();
+  clearTimeout(bossBannerTimer);
+  bossBannerTimer = 0;
+  ui.bossBanner.classList.add("hidden");
   state.phase = "result";
   ui.resultEyebrow.textContent = won ? "KEEP CLEAR" : "TOWER DOWN";
   ui.resultTitle.textContent = won ? "방어 성공" : "방어 실패";
@@ -2231,7 +2463,13 @@ function drawEnemies() {
     ctx.fillStyle = e.color;
     ctx.shadowColor = e.color;
     ctx.shadowBlur = 8;
-    if (e.type === "swarm") {
+    if (e.type === "boss" || e.type === "midboss") {
+      roundPoly(0, 0, e.radius * (e.type === "boss" ? 1.42 : 1.28), e.type === "boss" ? 8 : 7, Math.PI / 8);
+      ctx.fill();
+      ctx.strokeStyle = e.core;
+      ctx.lineWidth = e.type === "boss" ? 2.4 : 1.8;
+      ctx.stroke();
+    } else if (e.type === "swarm") {
       ctx.beginPath();
       ctx.moveTo(0, -e.radius * 1.28);
       ctx.lineTo(e.radius * 1.12, 0);
@@ -2554,11 +2792,25 @@ function pulseToast(text) {
   toastTimer = setTimeout(() => ui.toast.classList.add("hidden"), 650);
 }
 
+function showBossBanner(type) {
+  ui.bossBanner.style.setProperty("--boss-color", type.color);
+  ui.bossBannerKicker.textContent = type.bannerKicker || "WARNING";
+  ui.bossBannerTitle.textContent = type.bannerTitle || "BOSS";
+  ui.bossBannerText.textContent = type.bannerText || "거대한 적이 접근합니다";
+  ui.bossBanner.classList.remove("hidden");
+  state.shake = Math.max(state.shake, 0.95);
+  clearTimeout(bossBannerTimer);
+  bossBannerTimer = setTimeout(() => ui.bossBanner.classList.add("hidden"), 1560);
+}
+
 function restart() {
   clearUpgradeChoiceLock();
+  clearTimeout(bossBannerTimer);
+  bossBannerTimer = 0;
   state = createState();
   ui.upgradeOverlay.classList.add("hidden");
   ui.resultOverlay.classList.add("hidden");
+  ui.bossBanner.classList.add("hidden");
   pulseToast("WAVE 1");
   syncUi();
 }

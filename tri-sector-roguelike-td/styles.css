@@ -179,6 +179,51 @@ button {
   pointer-events: none;
 }
 
+.boss-banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  z-index: 4;
+  display: grid;
+  min-width: min(78%, 320px);
+  padding: 13px 16px 14px;
+  border: 1px solid color-mix(in srgb, var(--boss-color, #ffd166), transparent 18%);
+  border-radius: 8px;
+  color: var(--text);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--boss-color, #ffd166), transparent 74%), rgba(8, 12, 22, 0.94)),
+    rgba(7, 10, 18, 0.94);
+  box-shadow: 0 18px 58px rgba(0, 0, 0, 0.48), 0 0 32px color-mix(in srgb, var(--boss-color, #ffd166), transparent 76%);
+  pointer-events: none;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: bossBannerIn 1560ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
+}
+
+.boss-banner.hidden {
+  display: none;
+}
+
+.boss-banner span {
+  color: var(--boss-color, #ffd166);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.boss-banner strong {
+  margin-top: 2px;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.boss-banner em {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
 .hero-panel {
   display: grid;
   grid-template-columns: minmax(76px, 0.68fr) minmax(0, 1.35fr) auto 38px;
@@ -467,6 +512,28 @@ button {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes bossBannerIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -14px) scale(0.94);
+  }
+
+  15% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.02);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.98);
   }
 }
 

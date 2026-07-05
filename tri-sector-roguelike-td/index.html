@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Rotation Keepers</title>
     <meta name="theme-color" content="#101522" />
-    <link rel="stylesheet" href="styles.css?v=mid-swarm-20260705-1" />
+    <link rel="stylesheet" href="styles.css?v=boss-reward-20260705-1" />
   </head>
   <body>
     <main class="game-shell" aria-label="Rotation Keepers">
@@ -13,7 +13,7 @@
         <section class="hud-cluster" aria-label="전투 상태">
           <div class="stat">
             <span>WAVE</span>
-            <strong id="waveLabel">1/6</strong>
+            <strong id="waveLabel">1/8</strong>
           </div>
           <div class="stat wide">
             <span>TOWER</span>
@@ -31,6 +31,11 @@
       <section id="battleFrame" class="battle-frame" aria-label="전장">
         <canvas id="gameCanvas"></canvas>
         <div id="toast" class="toast hidden" aria-live="polite"></div>
+        <div id="bossBanner" class="boss-banner hidden" aria-live="polite">
+          <span id="bossBannerKicker">WARNING</span>
+          <strong id="bossBannerTitle">BOSS</strong>
+          <em id="bossBannerText">거대한 적이 접근합니다</em>
+        </div>
       </section>
 
       <footer class="hud hud-bottom">
@@ -51,8 +56,8 @@
 
       <section id="upgradeOverlay" class="overlay upgrade-overlay hidden" aria-label="레벨 업">
         <div class="modal">
-          <p class="eyebrow">LEVEL UP</p>
-          <h2>강화 선택</h2>
+          <p id="choiceEyebrow" class="eyebrow">LEVEL UP</p>
+          <h2 id="choiceTitle">강화 선택</h2>
           <div id="upgradeChoices" class="upgrade-choices"></div>
         </div>
       </section>
@@ -67,6 +72,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=mid-swarm-20260705-1"></script>
+    <script src="app.js?v=boss-reward-20260705-1"></script>
   </body>
 </html>
