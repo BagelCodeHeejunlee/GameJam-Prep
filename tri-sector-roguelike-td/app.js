@@ -36,6 +36,7 @@ const ROTATION_ATTACK_LOCK = 0.08;
 const XP_BASE_REQUIREMENT = 24;
 const XP_LINEAR_GROWTH = 7;
 const XP_QUADRATIC_GROWTH = 0.6;
+const UPGRADE_INPUT_LOCK_MS = 700;
 const VERSION_LABEL = "TRI-KEEPERS";
 const TIER_COLORS = {
   기본: "#aeb6c2",
@@ -728,6 +729,8 @@ let dpr = 1;
 let cssWidth = 0;
 let cssHeight = 0;
 let toastTimer = 0;
+let upgradeUnlockTimer = 0;
+let upgradeUnlockNeedsRelease = false;
 let enemyId = 1;
 
 function spawn(time, edge, pos, type) {
@@ -1629,23 +1632,36 @@ function tryOpenLevelUp() {
 }
 
 function openUpgrade() {
+  const activePointerId = state.rotationPointerId;
+  const needsPointerRelease = activePointerId !== null;
+  if (activePointerId !== null) canvas.releasePointerCapture?.(activePointerId);
   clearRotationInput();
+  lockUpgradeChoices(needsPointerRelease);
   state.phase = "upgrade";
   ui.upgradeChoices.innerHTML = "";
   const choices = drawChoices(3);
   if (!choices.length) {
+    clearUpgradeChoiceLock();
     state.phase = "playing";
     pulseToast("선택 가능한 강화 없음");
     syncUi();
     return;
   }
-  for (const choice of choices) {
+  choices.forEach((choice, index) => {
     const button = document.createElement("button");
     button.className = "upgrade-card";
     button.type = "button";
+    button.disabled = true;
     button.style.setProperty("--choice-color", choice.color);
+    button.style.setProperty("--choice-delay", `${140 + index * 80}ms`);
     button.innerHTML = `<span class="card-meta">${choice.meta}</span><strong>${choice.title}</strong><span>${choice.text}</span>`;
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (isUpgradeChoiceLocked()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      clearUpgradeChoiceLock();
       choice.apply();
       ui.upgradeOverlay.classList.add("hidden");
       state.phase = "playing";
@@ -1653,9 +1669,45 @@ function openUpgrade() {
       if (!tryOpenLevelUp()) syncUi();
     });
     ui.upgradeChoices.appendChild(button);
-  }
+  });
   ui.upgradeOverlay.classList.remove("hidden");
   syncUi();
+}
+
+function lockUpgradeChoices(needsPointerRelease) {
+  clearTimeout(upgradeUnlockTimer);
+  upgradeUnlockTimer = 0;
+  upgradeUnlockNeedsRelease = needsPointerRelease;
+  ui.upgradeOverlay.classList.add("upgrade-locked");
+  upgradeUnlockTimer = setTimeout(() => {
+    upgradeUnlockTimer = 0;
+    tryUnlockUpgradeChoices();
+  }, UPGRADE_INPUT_LOCK_MS);
+}
+
+function clearUpgradeChoiceLock() {
+  clearTimeout(upgradeUnlockTimer);
+  upgradeUnlockTimer = 0;
+  upgradeUnlockNeedsRelease = false;
+  ui.upgradeOverlay.classList.remove("upgrade-locked");
+}
+
+function markUpgradePointerReleased() {
+  if (!state || state.phase !== "upgrade") return;
+  upgradeUnlockNeedsRelease = false;
+  if (!upgradeUnlockTimer) tryUnlockUpgradeChoices();
+}
+
+function tryUnlockUpgradeChoices() {
+  if (!state || state.phase !== "upgrade" || upgradeUnlockNeedsRelease) return;
+  ui.upgradeOverlay.classList.remove("upgrade-locked");
+  for (const button of ui.upgradeChoices.querySelectorAll(".upgrade-card")) {
+    button.disabled = false;
+  }
+}
+
+function isUpgradeChoiceLocked() {
+  return ui.upgradeOverlay.classList.contains("upgrade-locked");
 }
 
 function drawChoices(count) {
@@ -2428,6 +2480,7 @@ function pulseToast(text) {
 }
 
 function restart() {
+  clearUpgradeChoiceLock();
   state = createState();
   ui.upgradeOverlay.classList.add("hidden");
   ui.resultOverlay.classList.add("hidden");
@@ -2580,12 +2633,15 @@ document.addEventListener(
 document.addEventListener(
   "touchend",
   (event) => {
+    markUpgradePointerReleased();
     const now = Date.now();
     if (now - lastTouchEnd < 320) event.preventDefault();
     lastTouchEnd = now;
   },
   { passive: false },
 );
+document.addEventListener("pointerup", markUpgradePointerReleased);
+document.addEventListener("pointercancel", markUpgradePointerReleased);
 document.addEventListener("dblclick", preventZoomGesture, { passive: false });
 document.addEventListener("contextmenu", preventZoomGesture);
 
