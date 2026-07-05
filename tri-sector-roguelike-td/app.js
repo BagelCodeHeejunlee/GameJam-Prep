@@ -30,6 +30,13 @@ const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
 const ENEMY_SCALE = 0.48;
 const HERO_SCALE = 0.64;
 const VERSION_LABEL = "TRI-KEEPERS";
+const TIER_COLORS = {
+  기본: "#aeb6c2",
+  성장: "#aeb6c2",
+  고급: "#4ea8ff",
+  돌파: "#b984ff",
+  궁극: "#ffd166",
+};
 
 const HERO_BLUEPRINTS = [
   {
@@ -261,6 +268,39 @@ const heroUpgrades = [
     },
   },
   {
+    id: "archer_advanced_barrage",
+    heroId: "archer",
+    tier: "고급",
+    title: "천공 분열",
+    text: "궁수 화살 수 +1, 화살 피해 소폭 증가",
+    apply: (hero) => {
+      hero.projectileCount += 1;
+      hero.damage += 3;
+    },
+  },
+  {
+    id: "archer_advanced_pierce",
+    heroId: "archer",
+    tier: "고급",
+    title: "유성 관통",
+    text: "궁수 화살 관통 +1, 관통 화살 피해 증가",
+    apply: (hero) => {
+      hero.pierce += 1;
+      hero.damage += 4;
+    },
+  },
+  {
+    id: "archer_advanced_burst",
+    heroId: "archer",
+    tier: "고급",
+    title: "성운 폭렬",
+    text: "폭발 화살 반경과 폭발 피해 증가",
+    apply: (hero) => {
+      hero.splashRadius += 10;
+      hero.splashRatio += 0.14;
+    },
+  },
+  {
     id: "archer_ultimate",
     heroId: "archer",
     tier: "궁극",
@@ -350,6 +390,39 @@ const heroUpgrades = [
       hero.range += 8;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
+    },
+  },
+  {
+    id: "warrior_advanced_sweep",
+    heroId: "warrior",
+    tier: "고급",
+    title: "압도 베기",
+    text: "전사 타격 수 +1, 공격각 소폭 증가",
+    apply: (hero) => {
+      hero.targets += 1;
+      hero.angle += 6;
+    },
+  },
+  {
+    id: "warrior_advanced_bulwark",
+    heroId: "warrior",
+    tier: "고급",
+    title: "수문장",
+    text: "타워를 공격 중인 적에게 주는 전사 피해 추가 증가",
+    apply: (hero) => {
+      hero.towerBonus += 0.38;
+      hero.damage += 3;
+    },
+  },
+  {
+    id: "warrior_advanced_bash",
+    heroId: "warrior",
+    tier: "고급",
+    title: "파쇄 돌진",
+    text: "전사 밀침 증가, 돌파 충격파 사거리 증가",
+    apply: (hero) => {
+      hero.push += 18;
+      hero.range += 6;
     },
   },
   {
@@ -447,6 +520,38 @@ const heroUpgrades = [
     },
   },
   {
+    id: "mage_advanced_chain",
+    heroId: "mage",
+    tier: "고급",
+    title: "균열 증식",
+    text: "보조 마법진 연쇄 대상 +1",
+    apply: (hero) => {
+      hero.chainCount += 1;
+    },
+  },
+  {
+    id: "mage_advanced_zone",
+    heroId: "mage",
+    tier: "고급",
+    title: "긴 여운",
+    text: "잔류 장판 지속시간과 피해 증가",
+    apply: (hero) => {
+      hero.zoneDuration += 0.8;
+      hero.zoneDps += 3;
+    },
+  },
+  {
+    id: "mage_advanced_echo",
+    heroId: "mage",
+    tier: "고급",
+    title: "중첩 메아리",
+    text: "2차 폭발 횟수 +1, 폭발 반경 증가",
+    apply: (hero) => {
+      hero.echoCount += 1;
+      hero.blastRadius += 4;
+    },
+  },
+  {
     id: "mage_ultimate",
     heroId: "mage",
     tier: "궁극",
@@ -516,8 +621,10 @@ function createHero(blueprint, index) {
     attackTimer: index * 0.18,
     growthPicked: {},
     basicRanks: {},
+    advancedPicked: {},
     growthPicks: 0,
     basicPicks: 0,
+    advancedPicks: 0,
     totalPicks: 0,
     breakthrough: false,
     ultimate: false,
@@ -1356,8 +1463,17 @@ function selectUpgradeForHero(hero, usedIds) {
   const breakthrough = heroUpgrades.find((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "돌파" && canOfferUpgrade(upgrade, hero, usedIds));
   if (breakthrough) return buildChoice(breakthrough, hero);
 
-  const ultimate = heroUpgrades.find((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "궁극" && canOfferUpgrade(upgrade, hero, usedIds));
-  if (ultimate) return buildChoice(ultimate, hero);
+  if (hero.breakthrough) {
+    const advanced = availableUpgrades(hero, "고급", usedIds);
+    const basic = availableUpgrades(hero, "기본", usedIds);
+    const ultimate = heroUpgrades.find((upgrade) => upgrade.heroId === hero.id && upgrade.tier === "궁극" && canOfferUpgrade(upgrade, hero, usedIds));
+    const postBreakthroughPool = pickWeightedPool([
+      { weight: 55, pool: advanced },
+      { weight: 30, pool: basic },
+      { weight: 15, pool: ultimate ? [ultimate] : [] },
+    ]);
+    if (postBreakthroughPool) return buildChoice(pick(postBreakthroughPool), hero);
+  }
 
   const growth = availableUpgrades(hero, "성장", usedIds);
   const basic = availableUpgrades(hero, "기본", usedIds);
@@ -1371,10 +1487,22 @@ function availableUpgrades(hero, tier, usedIds) {
   return heroUpgrades.filter((upgrade) => upgrade.heroId === hero.id && upgrade.tier === tier && canOfferUpgrade(upgrade, hero, usedIds));
 }
 
+function pickWeightedPool(entries) {
+  const available = entries.filter((entry) => entry.pool.length);
+  const totalWeight = available.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const entry of available) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.pool;
+  }
+  return available[0]?.pool || null;
+}
+
 function canOfferUpgrade(upgrade, hero, usedIds) {
   if (!hero || usedIds.has(upgrade.id)) return false;
   if (upgrade.tier === "성장") return !hero.growthPicked[upgrade.id];
   if (upgrade.tier === "기본") return getBasicRank(hero, upgrade.id) < upgrade.maxRank;
+  if (upgrade.tier === "고급") return hero.breakthrough && !hero.advancedPicked[upgrade.id];
   if (upgrade.tier === "돌파") return !hero.breakthrough && hasAllGrowthChoices(hero);
   if (upgrade.tier === "궁극") return canOfferUltimate(hero);
   return false;
@@ -1394,12 +1522,16 @@ function getBasicRank(hero, upgradeId) {
   return hero.basicRanks[upgradeId] || 0;
 }
 
+function tierColor(tier) {
+  return TIER_COLORS[tier] || TIER_COLORS["기본"];
+}
+
 function buildChoice(upgrade, hero) {
   const nextRank = upgrade.tier === "기본" ? getBasicRank(hero, upgrade.id) + 1 : null;
   return {
     ...upgrade,
     hero,
-    color: hero.color,
+    color: tierColor(upgrade.tier),
     meta: upgrade.tier === "기본" ? `${hero.name} 기본 ${nextRank}/${upgrade.maxRank}` : `${hero.name} ${upgrade.tier}`,
     apply: () => applyHeroUpgrade(upgrade, hero),
   };
@@ -1413,6 +1545,9 @@ function applyHeroUpgrade(upgrade, hero) {
   } else if (upgrade.tier === "기본") {
     hero.basicRanks[upgrade.id] = getBasicRank(hero, upgrade.id) + 1;
     hero.basicPicks += 1;
+  } else if (upgrade.tier === "고급") {
+    hero.advancedPicked[upgrade.id] = true;
+    hero.advancedPicks += 1;
   }
   hero.totalPicks += 1;
 }
@@ -2018,7 +2153,8 @@ function syncUi() {
 
 function teamPower() {
   return state.heroes.reduce(
-    (sum, hero) => sum + hero.damage + hero.growthPicks * 5 + hero.basicPicks * 2 + (hero.breakthrough ? 14 : 0) + (hero.ultimate ? 20 : 0),
+    (sum, hero) =>
+      sum + hero.damage + hero.growthPicks * 5 + hero.basicPicks * 2 + hero.advancedPicks * 7 + (hero.breakthrough ? 14 : 0) + (hero.ultimate ? 20 : 0),
     0,
   );
 }
@@ -2033,7 +2169,7 @@ function renderTeamList() {
         <div class="team-card" style="--hero-color: ${hero.color}">
           <b>${hero.glyph}</b>
           <span>${hero.name}</span>
-          <em>${aim}도 G${hero.growthPicks}/3 B${hero.basicPicks} ${badges}</em>
+          <em>${aim}도 G${hero.growthPicks}/3 B${hero.basicPicks} A${hero.advancedPicks}/3 ${badges}</em>
         </div>
       `;
     })
