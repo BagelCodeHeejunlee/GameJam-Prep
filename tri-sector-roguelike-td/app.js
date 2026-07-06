@@ -63,7 +63,7 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
-const SPRITE_VERSION = "engineer-quarter-traps-20260706-1";
+const SPRITE_VERSION = "engineer-persistent-traps-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -220,21 +220,23 @@ const HERO_BLUEPRINTS = [
     glyph: "공",
     color: "#62e69f",
     glow: "rgba(98, 230, 159, 0.42)",
-    damage: 24,
+    damage: 9,
     range: 116,
     angle: 70,
     cooldown: 1.18,
     trapRadius: 4.5,
     trapTriggerRadius: 2,
     trapArmDelay: 0.28,
-    trapLifetime: 4.8,
+    trapLifetime: null,
+    trapPersistent: true,
     trapCount: 1,
     trapSpread: 16,
     trapCharges: 1,
+    trapRearmDelay: 0.18,
     trapSlowDuration: 0,
     trapSlowFactor: 0.55,
     trapExpireExplodes: false,
-    maxTraps: 6,
+    maxTraps: 24,
     ultimateEvery: 5,
     initialSlot: 4,
   },
@@ -1313,7 +1315,7 @@ const heroUpgrades = [
     text: "공병이 한 번에 설치하는 지뢰 +1",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 1;
+      hero.maxTraps += 4;
     },
   },
   {
@@ -1334,7 +1336,6 @@ const heroUpgrades = [
     text: "지뢰가 한 번 더 기폭 가능",
     apply: (hero) => {
       hero.trapCharges += 1;
-      hero.trapLifetime += 0.7;
     },
   },
   {
@@ -1343,9 +1344,9 @@ const heroUpgrades = [
     tier: "기본",
     maxRank: 5,
     title: "고폭 장약",
-    text: "공병 지뢰 피해 +4",
+    text: "공병 지뢰 피해 +2",
     apply: (hero) => {
-      hero.damage += 4;
+      hero.damage += 2;
     },
   },
   {
@@ -1382,7 +1383,7 @@ const heroUpgrades = [
       hero.trapRadius += 1;
       hero.trapTriggerRadius += 0.75;
       hero.trapSlowDuration += 0.45;
-      hero.maxTraps += 2;
+      hero.maxTraps += 8;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
@@ -1395,7 +1396,7 @@ const heroUpgrades = [
     text: "공병 설치 지뢰 +1, 최대 유지 지뢰 증가",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 2;
+      hero.maxTraps += 10;
     },
   },
   {
@@ -1410,14 +1411,14 @@ const heroUpgrades = [
     },
   },
   {
-    id: "engineer_advanced_deadman",
+    id: "engineer_advanced_dual_fuse",
     heroId: "engineer",
     tier: "고급",
-    title: "잔류 기폭",
-    text: "지뢰가 지속시간 종료 시 자동 폭발",
+    title: "이중 신관",
+    text: "지뢰 기폭 횟수 +1, 재무장 시간 감소",
     apply: (hero) => {
-      hero.trapExpireExplodes = true;
-      hero.trapLifetime += 0.8;
+      hero.trapCharges += 1;
+      hero.trapRearmDelay = Math.max(0.08, (hero.trapRearmDelay || 0.18) * 0.65);
     },
   },
   {
@@ -2434,9 +2435,7 @@ function triggerEngineerUltimate(hero) {
       radius: hero.trapRadius + 1.25,
       triggerRadius: hero.trapTriggerRadius + 1,
       armDelay: 0.08 + index * 0.035,
-      life: hero.trapLifetime + 1.2,
       charges: 1,
-      expireExplodes: true,
       ultimate: true,
     });
   }
@@ -2729,7 +2728,8 @@ function addTrap(hero, config) {
     if (index >= 0) state.traps.splice(index, 1);
   }
 
-  const life = config.life ?? hero.trapLifetime;
+  const persistent = config.persistent ?? hero.trapPersistent ?? false;
+  const life = persistent ? Infinity : (config.life ?? hero.trapLifetime);
   state.traps.push({
     heroId: hero.id,
     x: clamp(config.x, 10, cssWidth - 10),
@@ -2740,14 +2740,15 @@ function addTrap(hero, config) {
     color: config.ultimate ? "#b9ff8b" : hero.color,
     armDelay: config.armDelay ?? hero.trapArmDelay,
     maxArmDelay: config.armDelay ?? hero.trapArmDelay,
+    persistent,
     life,
     maxLife: life,
     charges: config.charges ?? hero.trapCharges,
     maxCharges: config.charges ?? hero.trapCharges,
     slowDuration: hero.trapSlowDuration || 0,
     slowFactor: hero.trapSlowFactor || 0.55,
-    expireExplodes: config.expireExplodes ?? hero.trapExpireExplodes,
-    rearmDelay: 0.18,
+    expireExplodes: persistent ? false : config.expireExplodes ?? hero.trapExpireExplodes,
+    rearmDelay: config.rearmDelay ?? hero.trapRearmDelay ?? 0.18,
     createdAt: state.time,
     pulse: 0,
     ultimate: !!config.ultimate,
@@ -2758,11 +2759,11 @@ function addTrap(hero, config) {
 function updateTraps(dt) {
   for (let i = state.traps.length - 1; i >= 0; i -= 1) {
     const trap = state.traps[i];
-    trap.life -= dt;
+    if (!trap.persistent) trap.life -= dt;
     trap.armDelay = Math.max(0, trap.armDelay - dt);
     trap.pulse += dt;
 
-    if (trap.life <= 0) {
+    if (!trap.persistent && trap.life <= 0) {
       if (trap.expireExplodes && trap.charges > 0) explodeTrap(trap);
       state.traps.splice(i, 1);
       continue;
@@ -3803,7 +3804,7 @@ function drawZones() {
 
 function drawTraps() {
   for (const trap of state.traps) {
-    const lifeRatio = Math.max(0, trap.life / trap.maxLife);
+    const lifeRatio = trap.persistent ? 1 : Math.max(0, trap.life / trap.maxLife);
     const armed = trap.armDelay <= 0;
     const armRatio = trap.maxArmDelay > 0 ? 1 - trap.armDelay / trap.maxArmDelay : 1;
     const pulse = 0.92 + Math.sin((state.time + trap.createdAt) * 8) * 0.08;
