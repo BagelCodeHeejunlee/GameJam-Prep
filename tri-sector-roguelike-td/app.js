@@ -609,7 +609,7 @@ const heroUpgrades = [
     heroId: "archer",
     tier: "성장",
     title: "연발 시위",
-    text: "궁수 기본 화살 수 +1",
+    text: "궁수가 같은 대상에게 화살을 1발 더 발사",
     apply: (hero) => {
       hero.projectileCount += 1;
     },
@@ -673,7 +673,7 @@ const heroUpgrades = [
     heroId: "archer",
     tier: "돌파",
     title: "천공 포화",
-    text: "화살 수, 관통, 폭발이 한 단계 강화된 천공 화살로 전환",
+    text: "같은 대상 다중 사격, 관통, 폭발이 강화된 천공 화살로 전환",
     apply: (hero) => {
       hero.breakthrough = true;
       hero.projectileCount = Math.max(hero.projectileCount + 1, 3);
@@ -690,7 +690,7 @@ const heroUpgrades = [
     heroId: "archer",
     tier: "고급",
     title: "천공 분열",
-    text: "궁수 화살 수 +1, 화살 피해 소폭 증가",
+    text: "같은 대상에게 발사하는 궁수 화살 +1, 화살 피해 소폭 증가",
     apply: (hero) => {
       hero.projectileCount += 1;
       hero.damage += 3;
@@ -1788,14 +1788,14 @@ function attackArcher(hero) {
 
   const aim = heroAim(hero);
   const target = targets[0];
-  const baseAngle = Math.atan2(target.y - aim.y, target.x - aim.x);
   const count = Math.max(1, hero.projectileCount);
-  const spread = count > 1 ? 7 * DEG : 0;
   const damage = prepareHeroDamage(hero);
+  const centerIndex = (count - 1) / 2;
 
   for (let i = 0; i < count; i += 1) {
-    const offset = (i - (count - 1) / 2) * spread;
-    fireProjectile(hero, aim.x, aim.y, baseAngle + offset, damage, hero.pierce);
+    const origin = archerProjectileOrigin(aim, target, i - centerIndex);
+    const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
+    fireProjectile(hero, origin.x, origin.y, angle, damage, hero.pierce);
   }
 
   state.effects.push({
@@ -1810,6 +1810,20 @@ function attackArcher(hero) {
 
   chargeUltimate(hero, () => triggerArrowRain(hero));
   return true;
+}
+
+function archerProjectileOrigin(aim, target, offsetIndex) {
+  if (offsetIndex === 0) return { x: aim.x, y: aim.y };
+
+  const angle = Math.atan2(target.y - aim.y, target.x - aim.x);
+  const laneSpacing = 4;
+  const side = offsetIndex * laneSpacing;
+  const sideAngle = angle + Math.PI / 2;
+
+  return {
+    x: aim.x + Math.cos(sideAngle) * side,
+    y: aim.y + Math.sin(sideAngle) * side,
+  };
 }
 
 function fireProjectile(hero, x, y, angle, damage, pierce) {
