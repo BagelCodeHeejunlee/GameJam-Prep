@@ -63,7 +63,17 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
-const SPRITE_VERSION = "horde-balance-20260706-1";
+const FORMATION_OFFSETS = [-0.062, 0.036, -0.021, 0.054, -0.044, 0.014, 0.066, -0.032];
+const TYPE_FORMATION_SPREAD = {
+  swarm: 1,
+  runner: 0.82,
+  grunt: 0.66,
+  tank: 0.4,
+  brute: 0.34,
+  midboss: 0,
+  boss: 0,
+};
+const SPRITE_VERSION = "spawn-formation-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -1071,20 +1081,53 @@ function wave(...plans) {
 }
 
 function stream(start, edge, positions, type, count, interval = 0.16) {
-  return Array.from({ length: count }, (_, index) =>
-    spawn(roundTime(start + index * interval), edge, positions[index % positions.length], type)
+  return fan(
+    start,
+    positions.map((pos) => [edge, pos]),
+    type,
+    count,
+    interval
   );
 }
 
 function fan(start, lanes, type, count, interval = 0.14) {
   return Array.from({ length: count }, (_, index) => {
-    const lane = lanes[index % lanes.length];
-    return spawn(roundTime(start + index * interval), lane[0], lane[1], type);
+    const laneIndex = index % lanes.length;
+    const laneCycle = Math.floor(index / lanes.length);
+    const lane = lanes[laneIndex];
+    return spawn(
+      formationTime(start, index, laneIndex, interval),
+      lane[0],
+      formationPos(lane[1], index, laneIndex, laneCycle, lanes.length, type),
+      type
+    );
   });
+}
+
+function formationTime(start, index, laneIndex, interval) {
+  const laneStagger = (laneIndex % 3) * interval * 0.1;
+  const cadenceOffset = (((index * 5 + laneIndex * 3) % 7) - 3) * interval * 0.035;
+  return roundTime(Math.max(0.02, start + index * interval + laneStagger + cadenceOffset));
+}
+
+function formationPos(basePos, index, laneIndex, laneCycle, laneCount, type) {
+  const spread = 0.07 * (TYPE_FORMATION_SPREAD[type] ?? 0.75);
+  if (spread <= 0) return basePos;
+
+  const offset = FORMATION_OFFSETS[(index + laneIndex * 3) % FORMATION_OFFSETS.length] * (spread / 0.07);
+  const wave = Math.sin(index * 0.91 + laneIndex * 1.73) * spread * 0.36;
+  const sweep = ((laneCycle % 5) - 2) * spread * 0.16;
+  const laneSeparation = laneCount > 1 ? ((laneIndex / (laneCount - 1 || 1)) - 0.5) * spread * 0.18 : 0;
+
+  return roundPos(clamp(basePos + offset + wave + sweep + laneSeparation, 0.12, 0.88));
 }
 
 function roundTime(value) {
   return Math.round(value * 100) / 100;
+}
+
+function roundPos(value) {
+  return Math.round(value * 1000) / 1000;
 }
 
 function createDefaultMetaState() {
