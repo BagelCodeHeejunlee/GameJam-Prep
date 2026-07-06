@@ -63,7 +63,7 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
-const SPRITE_VERSION = "engineer-random-traps-20260706-1";
+const SPRITE_VERSION = "engineer-quarter-traps-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -224,8 +224,8 @@ const HERO_BLUEPRINTS = [
     range: 116,
     angle: 70,
     cooldown: 1.18,
-    trapRadius: 18,
-    trapTriggerRadius: 8,
+    trapRadius: 4.5,
+    trapTriggerRadius: 2,
     trapArmDelay: 0.28,
     trapLifetime: 4.8,
     trapCount: 1,
@@ -1365,9 +1365,9 @@ const heroUpgrades = [
     tier: "기본",
     maxRank: 4,
     title: "폭약 반경",
-    text: "공병 지뢰 폭발 반경 +3",
+    text: "공병 지뢰 폭발 반경 +0.75",
     apply: (hero) => {
-      hero.trapRadius += 3;
+      hero.trapRadius += 0.75;
     },
   },
   {
@@ -1379,8 +1379,8 @@ const heroUpgrades = [
     apply: (hero) => {
       hero.breakthrough = true;
       hero.trapCount = Math.max(hero.trapCount + 1, 2);
-      hero.trapRadius += 4;
-      hero.trapTriggerRadius += 3;
+      hero.trapRadius += 1;
+      hero.trapTriggerRadius += 0.75;
       hero.trapSlowDuration += 0.45;
       hero.maxTraps += 2;
       state.shake = 0.5;
@@ -1405,8 +1405,8 @@ const heroUpgrades = [
     title: "감지 신관",
     text: "지뢰 감지 반경과 폭발 반경 증가",
     apply: (hero) => {
-      hero.trapTriggerRadius += 4;
-      hero.trapRadius += 3;
+      hero.trapTriggerRadius += 1;
+      hero.trapRadius += 0.75;
     },
   },
   {
@@ -2424,14 +2424,15 @@ function triggerMageUltimate(hero, target) {
 
 function triggerEngineerUltimate(hero) {
   const aim = heroAim(hero);
+  const t = tower();
   for (let index = 0; index < 5; index += 1) {
     const position = randomEngineerTrapPosition(hero, aim, 0.36, 0.98);
     addTrap(hero, {
       x: position.x,
       y: position.y,
       damage: Math.round(hero.damage * 1.35),
-      radius: hero.trapRadius + 5,
-      triggerRadius: hero.trapTriggerRadius + 4,
+      radius: hero.trapRadius + 1.25,
+      triggerRadius: hero.trapTriggerRadius + 1,
       armDelay: 0.08 + index * 0.035,
       life: hero.trapLifetime + 1.2,
       charges: 1,
@@ -2771,7 +2772,7 @@ function updateTraps(dt) {
     const target = state.enemies.find((enemy) => {
       if (enemy.dead) return false;
       const dist = Math.hypot(enemy.x - trap.x, enemy.y - trap.y);
-      return dist <= trap.triggerRadius + enemyTargetRadius(enemy);
+      return dist <= trap.triggerRadius + enemy.radius;
     });
 
     if (!target) continue;
@@ -2790,7 +2791,7 @@ function explodeTrap(trap) {
   for (const enemy of [...state.enemies]) {
     if (enemy.dead) continue;
     const dist = Math.hypot(enemy.x - trap.x, enemy.y - trap.y);
-    if (dist > trap.radius + enemyTargetRadius(enemy)) continue;
+    if (dist > trap.radius + enemy.radius) continue;
     hitEnemy(enemy, trap.damage, { x: trap.x, y: trap.y, color: trap.color }, { quiet: hitCount > 0 });
     if (trap.slowDuration > 0) applyEnemySlow(enemy, trap.slowDuration, trap.slowFactor);
     hitCount += 1;
