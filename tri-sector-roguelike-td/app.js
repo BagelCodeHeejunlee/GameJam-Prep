@@ -63,6 +63,25 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
+const SPRITE_VERSION = "sprite-assets-20260706-1";
+const SPRITE_ASSETS = {
+  heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
+  enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
+};
+const HERO_SPRITES = {
+  archer: { x: 16, y: 361, w: 398, h: 543 },
+  warrior: { x: 418, y: 371, w: 418, h: 538 },
+  mage: { x: 836, y: 358, w: 415, h: 548 },
+};
+const ENEMY_SPRITES = {
+  swarm: { x: 59, y: 274, w: 359, h: 288 },
+  grunt: { x: 418, y: 184, w: 380, h: 363 },
+  runner: { x: 842, y: 252, w: 360, h: 309 },
+  tank: { x: 30, y: 656, w: 388, h: 387 },
+  brute: { x: 419, y: 674, w: 417, h: 371 },
+  midboss: { x: 836, y: 636, w: 388, h: 417 },
+  boss: { x: 836, y: 636, w: 388, h: 417 },
+};
 
 const STARTING_HERO_IDS = ["archer"];
 
@@ -3066,6 +3085,11 @@ function drawHeroes() {
     ctx.arc(0, 0, unit * 1.4, 0, TWO_PI);
     ctx.fill();
 
+    if (drawHeroSprite(hero, unit)) {
+      ctx.restore();
+      continue;
+    }
+
     ctx.fillStyle = "#151d2c";
     ctx.strokeStyle = hero.color;
     ctx.lineWidth = 1.5;
@@ -3097,57 +3121,96 @@ function drawHeroes() {
   }
 }
 
+function drawHeroSprite(hero, unit) {
+  const asset = SPRITE_ASSETS.heroes;
+  const sprite = HERO_SPRITES[hero.id];
+  if (!asset.ready || !sprite) return false;
+
+  const displayH = unit * (hero.id === "mage" ? 5.4 : 5.15);
+  const displayW = displayH * (sprite.w / sprite.h);
+  ctx.save();
+  ctx.shadowColor = hero.glow || hero.color;
+  ctx.shadowBlur = hero.breakthrough ? 9 : 5;
+  ctx.drawImage(asset.image, sprite.x, sprite.y, sprite.w, sprite.h, -displayW / 2, -displayH / 2, displayW, displayH);
+  ctx.restore();
+  return true;
+}
+
 function drawEnemies() {
   for (const e of state.enemies) {
     ctx.save();
     ctx.translate(e.x, e.y);
     ctx.scale(1 + e.hit * 0.08, 1 + e.hit * 0.08);
-    ctx.fillStyle = e.color;
-    ctx.shadowColor = e.color;
-    ctx.shadowBlur = 8;
-    if (e.type === "boss" || e.type === "midboss") {
-      roundPoly(0, 0, e.radius * (e.type === "boss" ? 1.42 : 1.28), e.type === "boss" ? 8 : 7, Math.PI / 8);
-      ctx.fill();
-      ctx.strokeStyle = e.core;
-      ctx.lineWidth = e.type === "boss" ? 2.4 : 1.8;
-      ctx.stroke();
-    } else if (e.type === "swarm") {
-      ctx.beginPath();
-      ctx.moveTo(0, -e.radius * 1.28);
-      ctx.lineTo(e.radius * 1.12, 0);
-      ctx.lineTo(0, e.radius * 1.28);
-      ctx.lineTo(-e.radius * 1.12, 0);
-      ctx.closePath();
-      ctx.fill();
-    } else if (e.type === "runner") {
-      ctx.beginPath();
-      ctx.moveTo(0, -e.radius * 1.35);
-      ctx.lineTo(e.radius * 1.25, e.radius * 0.95);
-      ctx.lineTo(-e.radius * 1.25, e.radius * 0.95);
-      ctx.closePath();
-      ctx.fill();
-    } else if (e.type === "tank" || e.type === "brute") {
-      roundPoly(0, 0, e.radius * (e.type === "brute" ? 1.32 : 1.24), e.type === "brute" ? 7 : 6, Math.PI / 6);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(0, 0, e.radius, 0, TWO_PI);
-      ctx.fill();
-    }
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = e.core;
-    ctx.beginPath();
-    ctx.arc(0, 0, e.radius * 0.36, 0, TWO_PI);
-    ctx.fill();
+    const metrics = drawEnemySprite(e) || drawEnemyShape(e);
 
     const bw = Math.max(10, e.radius * 2.3);
+    const hpY = -(metrics?.height || e.radius * 2) * 0.48 - 6;
     ctx.fillStyle = "rgba(0,0,0,0.42)";
-    ctx.fillRect(-bw / 2, -e.radius - 7, bw, 3);
+    ctx.fillRect(-bw / 2, hpY, bw, 3);
     ctx.fillStyle = "#79e28e";
-    ctx.fillRect(-bw / 2, -e.radius - 7, bw * Math.max(0, e.hp / e.maxHp), 3);
+    ctx.fillRect(-bw / 2, hpY, bw * Math.max(0, e.hp / e.maxHp), 3);
     ctx.restore();
     drawEnemyAttackLine(e);
   }
+}
+
+function drawEnemySprite(enemy) {
+  const asset = SPRITE_ASSETS.enemies;
+  const sprite = ENEMY_SPRITES[enemy.type];
+  if (!asset.ready || !sprite) return null;
+
+  const typeScale = enemy.type === "boss" ? 5.0 : enemy.type === "midboss" ? 4.55 : enemy.type === "swarm" ? 4.25 : 4.55;
+  const displayH = enemy.radius * typeScale;
+  const displayW = displayH * (sprite.w / sprite.h);
+
+  ctx.save();
+  ctx.shadowColor = enemy.color;
+  ctx.shadowBlur = enemy.type === "boss" || enemy.type === "midboss" ? 10 : 5;
+  ctx.drawImage(asset.image, sprite.x, sprite.y, sprite.w, sprite.h, -displayW / 2, -displayH / 2, displayW, displayH);
+  ctx.restore();
+
+  return { width: displayW, height: displayH };
+}
+
+function drawEnemyShape(e) {
+  ctx.fillStyle = e.color;
+  ctx.shadowColor = e.color;
+  ctx.shadowBlur = 8;
+  if (e.type === "boss" || e.type === "midboss") {
+    roundPoly(0, 0, e.radius * (e.type === "boss" ? 1.42 : 1.28), e.type === "boss" ? 8 : 7, Math.PI / 8);
+    ctx.fill();
+    ctx.strokeStyle = e.core;
+    ctx.lineWidth = e.type === "boss" ? 2.4 : 1.8;
+    ctx.stroke();
+  } else if (e.type === "swarm") {
+    ctx.beginPath();
+    ctx.moveTo(0, -e.radius * 1.28);
+    ctx.lineTo(e.radius * 1.12, 0);
+    ctx.lineTo(0, e.radius * 1.28);
+    ctx.lineTo(-e.radius * 1.12, 0);
+    ctx.closePath();
+    ctx.fill();
+  } else if (e.type === "runner") {
+    ctx.beginPath();
+    ctx.moveTo(0, -e.radius * 1.35);
+    ctx.lineTo(e.radius * 1.25, e.radius * 0.95);
+    ctx.lineTo(-e.radius * 1.25, e.radius * 0.95);
+    ctx.closePath();
+    ctx.fill();
+  } else if (e.type === "tank" || e.type === "brute") {
+    roundPoly(0, 0, e.radius * (e.type === "brute" ? 1.32 : 1.24), e.type === "brute" ? 7 : 6, Math.PI / 6);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.arc(0, 0, e.radius, 0, TWO_PI);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = e.core;
+  ctx.beginPath();
+  ctx.arc(0, 0, e.radius * 0.36, 0, TWO_PI);
+  ctx.fill();
+  return { width: e.radius * 2, height: e.radius * 2 };
 }
 
 function drawProjectiles() {
@@ -4064,6 +4127,19 @@ function roundPoly(x, y, radius, sides, rotation) {
     else ctx.lineTo(px, py);
   }
   ctx.closePath();
+}
+
+function loadSpriteImage(src) {
+  const image = new Image();
+  const asset = { image, ready: false, failed: false };
+  image.onload = () => {
+    asset.ready = true;
+  };
+  image.onerror = () => {
+    asset.failed = true;
+  };
+  image.src = src;
+  return asset;
 }
 
 function mix(a, b, t) {
