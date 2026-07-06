@@ -63,7 +63,7 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
-const SPRITE_VERSION = "sprite-assets-20260706-1";
+const SPRITE_VERSION = "sprite-hit-radius-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -2007,9 +2007,9 @@ function triggerWarriorUltimate(hero) {
     const dx = enemy.x - t.x;
     const dy = enemy.y - t.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > radius) return false;
+    if (dist > radius + enemyTargetRadius(enemy)) return false;
     const enemyAngle = Math.atan2(dy, dx) / DEG;
-    return Math.abs(angleDiff(enemyAngle, aim.angle)) <= hero.angle / 2;
+    return Math.abs(angleDiff(enemyAngle, aim.angle)) <= hero.angle / 2 + enemyAnglePadding(enemy, dist);
   });
 
   for (const enemy of targets) {
@@ -2067,6 +2067,37 @@ function triggerMageUltimate(hero, target) {
   });
 }
 
+function enemySpriteScale(enemy) {
+  if (enemy.type === "boss") return 5.0;
+  if (enemy.type === "midboss") return 4.55;
+  if (enemy.type === "swarm") return 4.25;
+  return 4.55;
+}
+
+function enemyTargetRadius(enemy) {
+  if (!enemy) return 0;
+  const sprite = ENEMY_SPRITES[enemy.type];
+  if (!sprite) return enemy.radius * 1.65;
+  const displayH = enemy.radius * enemySpriteScale(enemy);
+  const displayW = displayH * (sprite.w / sprite.h);
+  return Math.max(enemy.radius * 1.55, Math.min(displayW, displayH) * 0.36);
+}
+
+function enemyAnglePadding(enemy, distance) {
+  if (distance <= 0) return 180;
+  const ratio = Math.min(0.95, enemyTargetRadius(enemy) / distance);
+  return Math.asin(ratio) / DEG;
+}
+
+function distanceToSegment(px, py, ax, ay, bx, by) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const lengthSq = abx * abx + aby * aby;
+  if (lengthSq <= 0) return Math.hypot(px - ax, py - ay);
+  const t = clamp(((px - ax) * abx + (py - ay) * aby) / lengthSq, 0, 1);
+  return Math.hypot(px - (ax + abx * t), py - (ay + aby * t));
+}
+
 function findTargets(hero, limit, rangeOverride, angleOverride) {
   const aim = heroAim(hero);
   const range = rangeOverride ?? hero.range;
@@ -2079,10 +2110,10 @@ function findTargets(hero, limit, rangeOverride, angleOverride) {
     const dx = enemy.x - aim.x;
     const dy = enemy.y - aim.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > range) continue;
+    if (dist > range + enemyTargetRadius(enemy)) continue;
     const enemyAngle = Math.atan2(dy, dx) / DEG;
     const diff = Math.abs(angleDiff(enemyAngle, aim.angle));
-    if (diff <= angle / 2) {
+    if (diff <= angle / 2 + enemyAnglePadding(enemy, dist)) {
       candidates.push({
         enemy,
         danger: Math.hypot(enemy.x - t.x, enemy.y - t.y),
@@ -2099,9 +2130,9 @@ function enemyInCastCone(circle, enemy) {
   const dx = enemy.x - t.x;
   const dy = enemy.y - t.y;
   const dist = Math.hypot(dx, dy);
-  if (dist > circle.range) return false;
+  if (dist > circle.range + enemyTargetRadius(enemy)) return false;
   const enemyAngle = Math.atan2(dy, dx) / DEG;
-  return Math.abs(angleDiff(enemyAngle, circle.angle)) <= 55;
+  return Math.abs(angleDiff(enemyAngle, circle.angle)) <= 55 + enemyAnglePadding(enemy, dist);
 }
 
 function updateProjectiles(dt) {
@@ -2122,8 +2153,8 @@ function updateProjectiles(dt) {
     let consumed = false;
     for (const enemy of [...state.enemies]) {
       if (enemy.dead || p.hitIds.includes(enemy.id)) continue;
-      const dist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
-      if (dist > enemy.radius + p.radius) continue;
+      const dist = distanceToSegment(enemy.x, enemy.y, p.prevX, p.prevY, p.x, p.y);
+      if (dist > enemyTargetRadius(enemy) + p.radius) continue;
 
       p.hitIds.push(enemy.id);
       hitEnemy(enemy, p.damage, { x: p.prevX, y: p.prevY, color: p.color });
@@ -2148,10 +2179,11 @@ function enemyInLine(enemy, x, y, angleDeg, range, width) {
   const uy = Math.sin(angle);
   const dx = enemy.x - x;
   const dy = enemy.y - y;
+  const hitRadius = enemyTargetRadius(enemy);
   const forward = dx * ux + dy * uy;
-  if (forward < 0 || forward > range) return false;
+  if (forward < -hitRadius || forward > range + hitRadius) return false;
   const side = Math.abs(dx * uy - dy * ux);
-  return side <= width + enemy.radius;
+  return side <= width + hitRadius;
 }
 
 function triggerProjectileSplash(projectile, origin) {
@@ -2160,7 +2192,7 @@ function triggerProjectileSplash(projectile, origin) {
   for (const enemy of [...state.enemies]) {
     if (enemy.dead || enemy.id === origin.id || projectile.hitIds.includes(enemy.id)) continue;
     const dist = Math.hypot(enemy.x - origin.x, enemy.y - origin.y);
-    if (dist > projectile.splashRadius + enemy.radius) continue;
+    if (dist > projectile.splashRadius + enemyTargetRadius(enemy)) continue;
     projectile.hitIds.push(enemy.id);
     hitEnemy(enemy, damage, { x: origin.x, y: origin.y, color: projectile.color }, { quiet: true });
     hitCount += 1;
@@ -2202,7 +2234,7 @@ function explodeMagicCircle(circle) {
   for (const enemy of [...state.enemies]) {
     if (enemy.dead) continue;
     const dist = Math.hypot(enemy.x - circle.x, enemy.y - circle.y);
-    if (dist <= circle.radius + enemy.radius) {
+    if (dist <= circle.radius + enemyTargetRadius(enemy)) {
       hits.push(enemy);
       hitEnemy(enemy, circle.damage, { x: circle.x, y: circle.y, color: circle.color });
     }
@@ -2291,7 +2323,7 @@ function updateZones(dt) {
       for (const enemy of [...state.enemies]) {
         if (enemy.dead) continue;
         const dist = Math.hypot(enemy.x - zone.x, enemy.y - zone.y);
-        if (dist <= zone.radius + enemy.radius) {
+        if (dist <= zone.radius + enemyTargetRadius(enemy)) {
           hitEnemy(enemy, damage, { x: zone.x, y: zone.y, color: zone.color }, { quiet: true });
         }
       }
@@ -2312,9 +2344,9 @@ function updateSkyStrikes(dt) {
       const dx = enemy.x - t.x;
       const dy = enemy.y - t.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > strike.range) return false;
+      if (dist > strike.range + enemyTargetRadius(enemy)) return false;
       const enemyAngle = Math.atan2(dy, dx) / DEG;
-      return Math.abs(angleDiff(enemyAngle, strike.angle)) <= strike.arc / 2;
+      return Math.abs(angleDiff(enemyAngle, strike.angle)) <= strike.arc / 2 + enemyAnglePadding(enemy, dist);
     });
 
     for (const enemy of targets) {
@@ -3159,8 +3191,7 @@ function drawEnemySprite(enemy) {
   const sprite = ENEMY_SPRITES[enemy.type];
   if (!asset.ready || !sprite) return null;
 
-  const typeScale = enemy.type === "boss" ? 5.0 : enemy.type === "midboss" ? 4.55 : enemy.type === "swarm" ? 4.25 : 4.55;
-  const displayH = enemy.radius * typeScale;
+  const displayH = enemy.radius * enemySpriteScale(enemy);
   const displayW = displayH * (sprite.w / sprite.h);
 
   ctx.save();
