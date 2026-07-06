@@ -10,7 +10,6 @@ const ui = {
   xpFill: document.getElementById("xpFill"),
   heroLevel: document.getElementById("heroLevelLabel"),
   damage: document.getElementById("damageLabel"),
-  speed: document.getElementById("speedLabel"),
   range: document.getElementById("rangeLabel"),
   teamList: document.getElementById("teamList"),
   toast: document.getElementById("toast"),
@@ -3462,7 +3461,6 @@ function syncUi() {
   ui.xpFill.style.width = `${clamp((state.xp / state.xpNeeded) * 100, 0, 100)}%`;
   ui.heroLevel.textContent = `Lv.${state.level} / ${VERSION_LABEL}`;
   ui.damage.textContent = String(teamPower());
-  ui.speed.textContent = rotationLabel();
   ui.range.textContent = String(state.killCount);
   renderTeamList();
 }
@@ -4246,12 +4244,6 @@ function stopPointerRotation(event) {
   canvas.releasePointerCapture?.(event.pointerId);
   state.rotationPointerId = null;
   setRotationInput(0);
-}
-
-function rotationLabel() {
-  if (state.rotationInput > 0 || state.rotationVelocity > 3) return "CW";
-  if (state.rotationInput < 0 || state.rotationVelocity < -3) return "CCW";
-  return "0";
 }
 
 function preventZoomGesture(event) {
