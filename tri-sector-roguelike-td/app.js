@@ -4137,12 +4137,6 @@ function setRotationInput(direction) {
   const next = Math.sign(direction);
   if (state.rotationInput === next) return;
   state.rotationInput = next;
-
-  if (next !== 0) {
-    const t = tower();
-    addRing(t.x, t.y, next > 0 ? "#ffd166" : "#6fd6ff", 8, 0.28);
-    pulseToast(next > 0 ? "CLOCKWISE" : "COUNTER");
-  }
 }
 
 function clearRotationInput() {
