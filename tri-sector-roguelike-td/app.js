@@ -63,7 +63,7 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
-const SPRITE_VERSION = "sprite-hit-radius-20260706-1";
+const SPRITE_VERSION = "engineer-traps-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -210,6 +210,31 @@ const HERO_BLUEPRINTS = [
     zoneDps: 7,
     chainCount: 0,
     echoCount: 0,
+    ultimateEvery: 5,
+    initialSlot: 4,
+  },
+  {
+    id: "engineer",
+    name: "공병",
+    role: "설치형 폭발",
+    glyph: "공",
+    color: "#62e69f",
+    glow: "rgba(98, 230, 159, 0.42)",
+    damage: 24,
+    range: 116,
+    angle: 70,
+    cooldown: 1.18,
+    trapRadius: 28,
+    trapTriggerRadius: 12,
+    trapArmDelay: 0.28,
+    trapLifetime: 4.8,
+    trapCount: 1,
+    trapSpread: 16,
+    trapCharges: 1,
+    trapSlowDuration: 0,
+    trapSlowFactor: 0.55,
+    trapExpireExplodes: false,
+    maxTraps: 6,
     ultimateEvery: 5,
     initialSlot: 4,
   },
@@ -551,6 +576,148 @@ const STAGE_3_WAVES = [
   ],
 ];
 
+const STAGE_4_WAVES = [
+  [
+    spawn(0.18, "top", 0.48, "swarm"),
+    spawn(0.42, "top", 0.52, "swarm"),
+    spawn(0.78, "top", 0.44, "swarm"),
+    spawn(1.28, "right", 0.64, "runner"),
+    spawn(1.72, "right", 0.72, "runner"),
+    spawn(2.35, "top", 0.5, "grunt"),
+  ],
+  [
+    spawn(0.18, "left", 0.36, "swarm"),
+    spawn(0.38, "left", 0.28, "swarm"),
+    spawn(0.58, "left", 0.44, "swarm"),
+    spawn(1.2, "bottom", 0.5, "tank"),
+    spawn(1.88, "left", 0.34, "runner"),
+    spawn(2.22, "left", 0.42, "runner"),
+  ],
+  [
+    spawn(0.18, "right", 0.66, "grunt"),
+    spawn(0.2, "top", 0.5, "swarm"),
+    spawn(0.64, "top", 0.42, "swarm"),
+    spawn(1.08, "top", 0.58, "swarm"),
+    spawn(1.76, "right", 0.74, "tank"),
+    spawn(2.48, "bottom", 0.52, "runner"),
+  ],
+  [
+    spawn(0.16, "bottom", 0.48, "swarm"),
+    spawn(0.36, "bottom", 0.52, "swarm"),
+    spawn(0.56, "bottom", 0.44, "swarm"),
+    spawn(0.76, "bottom", 0.58, "swarm"),
+    spawn(1.42, "left", 0.34, "grunt"),
+    spawn(1.92, "left", 0.26, "grunt"),
+    spawn(2.58, "bottom", 0.5, "tank"),
+  ],
+  [
+    spawn(0.18, "top", 0.5, "brute"),
+    spawn(0.82, "top", 0.42, "swarm"),
+    spawn(1.02, "top", 0.58, "swarm"),
+    spawn(1.42, "right", 0.66, "runner"),
+    spawn(1.78, "right", 0.74, "runner"),
+    spawn(2.46, "left", 0.34, "grunt"),
+  ],
+  [
+    spawn(0.18, "right", 0.68, "swarm"),
+    spawn(0.38, "right", 0.76, "swarm"),
+    spawn(0.58, "right", 0.6, "swarm"),
+    spawn(0.88, "left", 0.32, "swarm"),
+    spawn(1.08, "left", 0.4, "swarm"),
+    spawn(1.68, "bottom", 0.5, "tank"),
+    spawn(2.34, "top", 0.5, "runner"),
+  ],
+  [
+    spawn(0.24, "left", 0.34, "midboss"),
+    spawn(0.92, "top", 0.5, "swarm"),
+    spawn(1.12, "top", 0.42, "swarm"),
+    spawn(1.32, "top", 0.58, "swarm"),
+    spawn(1.82, "right", 0.66, "runner"),
+    spawn(2.22, "right", 0.74, "runner"),
+    spawn(2.84, "bottom", 0.5, "grunt"),
+  ],
+  [
+    spawn(0.16, "bottom", 0.5, "tank"),
+    spawn(0.5, "bottom", 0.42, "swarm"),
+    spawn(0.7, "bottom", 0.58, "swarm"),
+    spawn(1.22, "right", 0.66, "grunt"),
+    spawn(1.24, "left", 0.34, "grunt"),
+    spawn(2.0, "right", 0.74, "runner"),
+    spawn(2.02, "left", 0.26, "runner"),
+  ],
+  [
+    spawn(0.16, "top", 0.5, "swarm"),
+    spawn(0.32, "top", 0.42, "swarm"),
+    spawn(0.48, "top", 0.58, "swarm"),
+    spawn(0.64, "right", 0.66, "swarm"),
+    spawn(0.8, "right", 0.74, "swarm"),
+    spawn(1.45, "left", 0.34, "brute"),
+    spawn(2.35, "top", 0.48, "runner"),
+    spawn(2.55, "top", 0.56, "runner"),
+  ],
+  [
+    spawn(0.2, "right", 0.66, "tank"),
+    spawn(0.22, "left", 0.34, "tank"),
+    spawn(0.88, "bottom", 0.5, "swarm"),
+    spawn(1.06, "bottom", 0.42, "swarm"),
+    spawn(1.24, "bottom", 0.58, "swarm"),
+    spawn(1.92, "top", 0.5, "grunt"),
+    spawn(2.42, "right", 0.74, "runner"),
+    spawn(2.44, "left", 0.26, "runner"),
+  ],
+  [
+    spawn(0.16, "left", 0.34, "runner"),
+    spawn(0.18, "left", 0.42, "runner"),
+    spawn(0.2, "left", 0.26, "runner"),
+    spawn(0.86, "top", 0.5, "brute"),
+    spawn(1.52, "right", 0.66, "swarm"),
+    spawn(1.72, "right", 0.74, "swarm"),
+    spawn(1.92, "right", 0.58, "swarm"),
+    spawn(2.62, "bottom", 0.5, "tank"),
+  ],
+  [
+    spawn(0.18, "bottom", 0.5, "brute"),
+    spawn(0.78, "bottom", 0.42, "swarm"),
+    spawn(0.98, "bottom", 0.58, "swarm"),
+    spawn(1.18, "bottom", 0.5, "swarm"),
+    spawn(1.76, "top", 0.5, "runner"),
+    spawn(1.78, "right", 0.66, "runner"),
+    spawn(2.44, "left", 0.34, "tank"),
+  ],
+  [
+    spawn(0.16, "top", 0.5, "tank"),
+    spawn(0.18, "right", 0.66, "tank"),
+    spawn(0.84, "top", 0.42, "swarm"),
+    spawn(1.04, "right", 0.74, "swarm"),
+    spawn(1.42, "left", 0.34, "runner"),
+    spawn(1.62, "left", 0.26, "runner"),
+    spawn(2.28, "bottom", 0.5, "brute"),
+    spawn(2.92, "top", 0.58, "grunt"),
+  ],
+  [
+    spawn(0.18, "right", 0.66, "midboss"),
+    spawn(0.86, "left", 0.34, "swarm"),
+    spawn(1.06, "left", 0.26, "swarm"),
+    spawn(1.26, "left", 0.42, "swarm"),
+    spawn(1.82, "bottom", 0.5, "tank"),
+    spawn(2.46, "top", 0.5, "runner"),
+    spawn(2.66, "top", 0.42, "runner"),
+    spawn(2.86, "top", 0.58, "runner"),
+  ],
+  [
+    spawn(0.28, "top", 0.5, "boss"),
+    spawn(0.96, "right", 0.66, "swarm"),
+    spawn(1.16, "right", 0.74, "swarm"),
+    spawn(1.36, "right", 0.58, "swarm"),
+    spawn(1.92, "left", 0.34, "runner"),
+    spawn(2.12, "left", 0.26, "runner"),
+    spawn(2.62, "bottom", 0.5, "tank"),
+    spawn(3.18, "top", 0.42, "grunt"),
+    spawn(3.2, "right", 0.66, "grunt"),
+    spawn(3.22, "left", 0.34, "grunt"),
+  ],
+];
+
 const STAGE_CONFIGS = [
   {
     number: 1,
@@ -579,8 +746,18 @@ const STAGE_CONFIGS = [
     heroLimit: 3,
     availableHeroIds: ["archer", "warrior", "mage"],
     recommendedLineup: ["archer", "warrior", "mage"],
-    unlockHeroId: null,
+    unlockHeroId: "engineer",
     waves: STAGE_3_WAVES,
+  },
+  {
+    number: 4,
+    name: "매설 전선",
+    waveCount: 15,
+    heroLimit: 3,
+    availableHeroIds: ["archer", "warrior", "mage", "engineer"],
+    recommendedLineup: ["engineer", "warrior", "mage"],
+    unlockHeroId: null,
+    waves: STAGE_4_WAVES,
   },
 ];
 
@@ -1128,6 +1305,134 @@ const heroUpgrades = [
       addRing(tower().x, tower().y, hero.color, 18, 0.56);
     },
   },
+  {
+    id: "engineer_growth_cluster",
+    heroId: "engineer",
+    tier: "성장",
+    title: "분산 매설",
+    text: "공병이 한 번에 설치하는 지뢰 +1",
+    apply: (hero) => {
+      hero.trapCount += 1;
+      hero.maxTraps += 1;
+    },
+  },
+  {
+    id: "engineer_growth_sticky",
+    heroId: "engineer",
+    tier: "성장",
+    title: "점착 폭약",
+    text: "지뢰 폭발에 맞은 적이 짧게 감속",
+    apply: (hero) => {
+      hero.trapSlowDuration += 0.85;
+    },
+  },
+  {
+    id: "engineer_growth_relay",
+    heroId: "engineer",
+    tier: "성장",
+    title: "예비 기폭장치",
+    text: "지뢰가 한 번 더 기폭 가능",
+    apply: (hero) => {
+      hero.trapCharges += 1;
+      hero.trapLifetime += 0.7;
+    },
+  },
+  {
+    id: "engineer_basic_damage",
+    heroId: "engineer",
+    tier: "기본",
+    maxRank: 5,
+    title: "고폭 장약",
+    text: "공병 지뢰 피해 +4",
+    apply: (hero) => {
+      hero.damage += 4;
+    },
+  },
+  {
+    id: "engineer_basic_tempo",
+    heroId: "engineer",
+    tier: "기본",
+    maxRank: 4,
+    title: "빠른 매설",
+    text: "공병 설치 간격 -7%",
+    apply: (hero) => {
+      hero.cooldown = Math.max(0.72, hero.cooldown * 0.93);
+    },
+  },
+  {
+    id: "engineer_basic_radius",
+    heroId: "engineer",
+    tier: "기본",
+    maxRank: 4,
+    title: "폭약 반경",
+    text: "공병 지뢰 폭발 반경 +5",
+    apply: (hero) => {
+      hero.trapRadius += 5;
+    },
+  },
+  {
+    id: "engineer_break",
+    heroId: "engineer",
+    tier: "돌파",
+    title: "지뢰망 구축",
+    text: "분산 매설, 감속, 예비 기폭이 강화된 지뢰망으로 전환",
+    apply: (hero) => {
+      hero.breakthrough = true;
+      hero.trapCount = Math.max(hero.trapCount + 1, 2);
+      hero.trapRadius += 6;
+      hero.trapTriggerRadius += 5;
+      hero.trapSlowDuration += 0.45;
+      hero.maxTraps += 2;
+      state.shake = 0.5;
+      addRing(tower().x, tower().y, hero.color, 14, 0.48);
+    },
+  },
+  {
+    id: "engineer_advanced_grid",
+    heroId: "engineer",
+    tier: "고급",
+    title: "격자 매설",
+    text: "공병 설치 지뢰 +1, 최대 유지 지뢰 증가",
+    apply: (hero) => {
+      hero.trapCount += 1;
+      hero.maxTraps += 2;
+    },
+  },
+  {
+    id: "engineer_advanced_sensor",
+    heroId: "engineer",
+    tier: "고급",
+    title: "감지 신관",
+    text: "지뢰 감지 반경과 폭발 반경 증가",
+    apply: (hero) => {
+      hero.trapTriggerRadius += 6;
+      hero.trapRadius += 5;
+    },
+  },
+  {
+    id: "engineer_advanced_deadman",
+    heroId: "engineer",
+    tier: "고급",
+    title: "잔류 기폭",
+    text: "지뢰가 지속시간 종료 시 자동 폭발",
+    apply: (hero) => {
+      hero.trapExpireExplodes = true;
+      hero.trapLifetime += 0.8;
+    },
+  },
+  {
+    id: "engineer_ultimate",
+    heroId: "engineer",
+    tier: "궁극",
+    title: "폭쇄 지대",
+    text: "일정 설치마다 현재 조준 방향에 대형 지뢰밭을 전개",
+    apply: (hero) => {
+      hero.ultimate = true;
+      hero.ultimateCharge = hero.ultimateEvery - 2;
+      state.shake = 0.7;
+      addRing(tower().x, tower().y, hero.color, 18, 0.56);
+    },
+  },
 ];
 
 const BOSS_REWARD_CONFIG = {
@@ -1283,7 +1588,7 @@ function unlockLabelForHero(heroId) {
 }
 
 function heroRosterOrder(hero) {
-  const order = ["archer", "warrior", "mage", "sniper"];
+  const order = ["archer", "warrior", "mage", "engineer", "sniper"];
   const index = order.indexOf(hero.id);
   return index < 0 ? order.length : index;
 }
@@ -1531,6 +1836,7 @@ function createState() {
     projectiles: [],
     magicCircles: [],
     zones: [],
+    traps: [],
     skyStrikes: [],
     effects: [],
     particles: [],
@@ -1629,6 +1935,7 @@ function update(dt) {
   updateProjectiles(dt);
   updateMagicCircles(dt);
   updateZones(dt);
+  updateTraps(dt);
   updateSkyStrikes(dt);
   updateXpOrbs(dt);
   updateEffects(dt);
@@ -1701,6 +2008,8 @@ function createEnemy(plan) {
     attackTimer: type.attackInterval * 0.45,
     attackFlash: 0,
     attacking: false,
+    slowTimer: 0,
+    slowFactor: 1,
     xp: type.xp,
     color: type.color,
     core: type.core,
@@ -1722,11 +2031,14 @@ function updateEnemies(dt) {
     const dist = Math.hypot(dx, dy) || 1;
     e.hit = Math.max(0, e.hit - dt * 6);
     e.attackFlash = Math.max(0, e.attackFlash - dt * 5);
+    e.slowTimer = Math.max(0, (e.slowTimer || 0) - dt);
+    if (e.slowTimer <= 0) e.slowFactor = 1;
     const stopDist = t.r + e.radius * 1.05;
 
     if (dist > stopDist) {
       e.attacking = false;
-      const step = Math.min(e.speed * dt, dist - stopDist);
+      const speed = e.speed * (e.slowTimer > 0 ? e.slowFactor : 1);
+      const step = Math.min(speed * dt, dist - stopDist);
       e.x += (dx / dist) * step;
       e.y += (dy / dist) * step;
       continue;
@@ -1768,6 +2080,7 @@ function attackWithHero(hero) {
   if (hero.id === "archer") return attackArcher(hero);
   if (hero.id === "warrior") return attackWarrior(hero);
   if (hero.id === "mage") return attackMage(hero);
+  if (hero.id === "engineer") return attackEngineer(hero);
   return false;
 }
 
@@ -1928,6 +2241,60 @@ function attackMage(hero) {
   return true;
 }
 
+function attackEngineer(hero) {
+  const aim = heroAim(hero);
+  const targets = findTargets(hero, 1);
+  const center = engineerTrapCenter(hero, aim, targets[0]);
+  const count = Math.max(1, hero.trapCount || 1);
+  const damage = prepareHeroDamage(hero);
+  const sideAngle = aim.angle * DEG + Math.PI / 2;
+  const centerIndex = (count - 1) / 2;
+
+  for (let i = 0; i < count; i += 1) {
+    const offset = (i - centerIndex) * (hero.trapSpread || 16);
+    addTrap(hero, {
+      x: center.x + Math.cos(sideAngle) * offset,
+      y: center.y + Math.sin(sideAngle) * offset,
+      damage,
+      armDelay: hero.trapArmDelay + i * 0.045,
+    });
+  }
+
+  state.effects.push({
+    type: "muzzle",
+    x: aim.x,
+    y: aim.y,
+    angle: aim.angle,
+    color: hero.color,
+    life: 0.14,
+    maxLife: 0.14,
+  });
+
+  chargeUltimate(hero, () => triggerEngineerUltimate(hero));
+  return true;
+}
+
+function engineerTrapCenter(hero, aim, target) {
+  const t = tower();
+  const angle = aim.angle * DEG;
+  const fallbackDistance = Math.min(hero.range * 0.72, Math.min(cssWidth, cssHeight) * 0.28);
+  let x = t.x + Math.cos(angle) * fallbackDistance;
+  let y = t.y + Math.sin(angle) * fallbackDistance;
+
+  if (target) {
+    const dx = t.x - target.x;
+    const dy = t.y - target.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    x = target.x + (dx / dist) * 18;
+    y = target.y + (dy / dist) * 18;
+  }
+
+  return {
+    x: clamp(x, 14, cssWidth - 14),
+    y: clamp(y, 14, cssHeight - 14),
+  };
+}
+
 function prepareHeroDamage(hero) {
   return hero.damage;
 }
@@ -2065,6 +2432,43 @@ function triggerMageUltimate(hero, target) {
     life: 0.6,
     maxLife: 0.6,
   });
+}
+
+function triggerEngineerUltimate(hero) {
+  const aim = heroAim(hero);
+  const t = tower();
+  const angle = aim.angle * DEG;
+  const sideAngle = angle + Math.PI / 2;
+  const distances = [0.42, 0.58, 0.74, 0.9, 1.04].map((ratio) => Math.min(hero.range * ratio, Math.min(cssWidth, cssHeight) * 0.34));
+  const offsets = [0, -18, 18, -8, 8];
+
+  distances.forEach((distance, index) => {
+    addTrap(hero, {
+      x: t.x + Math.cos(angle) * distance + Math.cos(sideAngle) * offsets[index],
+      y: t.y + Math.sin(angle) * distance + Math.sin(sideAngle) * offsets[index],
+      damage: Math.round(hero.damage * 1.35),
+      radius: hero.trapRadius + 9,
+      triggerRadius: hero.trapTriggerRadius + 8,
+      armDelay: 0.08 + index * 0.035,
+      life: hero.trapLifetime + 1.2,
+      charges: 1,
+      expireExplodes: true,
+      ultimate: true,
+    });
+  });
+
+  state.effects.push({
+    type: "mark",
+    x: t.x,
+    y: t.y,
+    angle: aim.angle,
+    arc: Math.max(36, hero.angle),
+    range: hero.range,
+    color: hero.color,
+    life: 0.42,
+    maxLife: 0.42,
+  });
+  state.shake = Math.max(state.shake, 0.65);
 }
 
 function enemySpriteScale(enemy) {
@@ -2330,6 +2734,101 @@ function updateZones(dt) {
     }
     if (zone.life <= 0) state.zones.splice(i, 1);
   }
+}
+
+function addTrap(hero, config) {
+  const maxTraps = hero.maxTraps || 6;
+  const owned = state.traps.filter((trap) => trap.heroId === hero.id).sort((a, b) => a.createdAt - b.createdAt);
+  while (owned.length >= maxTraps) {
+    const old = owned.shift();
+    const index = state.traps.indexOf(old);
+    if (index >= 0) state.traps.splice(index, 1);
+  }
+
+  const life = config.life ?? hero.trapLifetime;
+  state.traps.push({
+    heroId: hero.id,
+    x: clamp(config.x, 10, cssWidth - 10),
+    y: clamp(config.y, 10, cssHeight - 10),
+    radius: config.radius ?? hero.trapRadius,
+    triggerRadius: config.triggerRadius ?? hero.trapTriggerRadius,
+    damage: config.damage,
+    color: config.ultimate ? "#b9ff8b" : hero.color,
+    armDelay: config.armDelay ?? hero.trapArmDelay,
+    maxArmDelay: config.armDelay ?? hero.trapArmDelay,
+    life,
+    maxLife: life,
+    charges: config.charges ?? hero.trapCharges,
+    maxCharges: config.charges ?? hero.trapCharges,
+    slowDuration: hero.trapSlowDuration || 0,
+    slowFactor: hero.trapSlowFactor || 0.55,
+    expireExplodes: config.expireExplodes ?? hero.trapExpireExplodes,
+    rearmDelay: 0.18,
+    createdAt: state.time,
+    pulse: 0,
+    ultimate: !!config.ultimate,
+  });
+  addRing(config.x, config.y, hero.color, config.ultimate ? 8 : 5, 0.24);
+}
+
+function updateTraps(dt) {
+  for (let i = state.traps.length - 1; i >= 0; i -= 1) {
+    const trap = state.traps[i];
+    trap.life -= dt;
+    trap.armDelay = Math.max(0, trap.armDelay - dt);
+    trap.pulse += dt;
+
+    if (trap.life <= 0) {
+      if (trap.expireExplodes && trap.charges > 0) explodeTrap(trap);
+      state.traps.splice(i, 1);
+      continue;
+    }
+
+    if (trap.armDelay > 0) continue;
+    const target = state.enemies.find((enemy) => {
+      if (enemy.dead) return false;
+      const dist = Math.hypot(enemy.x - trap.x, enemy.y - trap.y);
+      return dist <= trap.triggerRadius + enemyTargetRadius(enemy);
+    });
+
+    if (!target) continue;
+    explodeTrap(trap);
+    trap.charges -= 1;
+    if (trap.charges <= 0) {
+      state.traps.splice(i, 1);
+    } else {
+      trap.armDelay = trap.rearmDelay;
+    }
+  }
+}
+
+function explodeTrap(trap) {
+  let hitCount = 0;
+  for (const enemy of [...state.enemies]) {
+    if (enemy.dead) continue;
+    const dist = Math.hypot(enemy.x - trap.x, enemy.y - trap.y);
+    if (dist > trap.radius + enemyTargetRadius(enemy)) continue;
+    hitEnemy(enemy, trap.damage, { x: trap.x, y: trap.y, color: trap.color }, { quiet: hitCount > 0 });
+    if (trap.slowDuration > 0) applyEnemySlow(enemy, trap.slowDuration, trap.slowFactor);
+    hitCount += 1;
+  }
+
+  state.effects.push({
+    type: "shock",
+    x: trap.x,
+    y: trap.y,
+    radius: trap.radius,
+    color: trap.color,
+    life: trap.ultimate ? 0.34 : 0.24,
+    maxLife: trap.ultimate ? 0.34 : 0.24,
+  });
+  addBurst(trap.x, trap.y, trap.color, trap.ultimate ? 16 : 10);
+  if (hitCount > 0) state.shake = Math.max(state.shake, trap.ultimate ? 0.62 : 0.34);
+}
+
+function applyEnemySlow(enemy, duration, factor) {
+  enemy.slowTimer = Math.max(enemy.slowTimer || 0, duration);
+  enemy.slowFactor = Math.min(enemy.slowFactor || 1, factor);
 }
 
 function updateSkyStrikes(dt) {
@@ -2930,6 +3429,7 @@ function draw() {
   drawMap();
   drawAttackCones();
   drawZones();
+  drawTraps();
   drawMagicCircles();
   drawSkyStrikeMarks();
   drawTower();
@@ -3144,6 +3644,12 @@ function drawHeroes() {
     } else if (hero.id === "warrior") {
       ctx.moveTo(-unit * 0.55, -unit * 0.1);
       ctx.lineTo(unit * 0.58, -unit * 1.5);
+    } else if (hero.id === "engineer") {
+      roundPoly(0, -unit * 0.58, unit * 0.62, 6, Math.PI / 6);
+      ctx.moveTo(-unit * 0.72, -unit * 0.06);
+      ctx.lineTo(unit * 0.72, -unit * 0.06);
+      ctx.moveTo(0, -unit * 0.78);
+      ctx.lineTo(0, unit * 0.4);
     } else {
       ctx.arc(0, -unit * 0.5, unit * 0.58, 0, TWO_PI);
     }
@@ -3174,6 +3680,15 @@ function drawEnemies() {
     ctx.translate(e.x, e.y);
     ctx.scale(1 + e.hit * 0.08, 1 + e.hit * 0.08);
     const metrics = drawEnemySprite(e) || drawEnemyShape(e);
+    if (e.slowTimer > 0) {
+      ctx.strokeStyle = "#9fffc8";
+      ctx.globalAlpha = 0.62;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, (metrics?.width || e.radius * 2) * 0.32, 0, TWO_PI);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
 
     const bw = Math.max(10, e.radius * 2.3);
     const hpY = -(metrics?.height || e.radius * 2) * 0.48 - 6;
@@ -3298,6 +3813,52 @@ function drawZones() {
     ctx.beginPath();
     ctx.arc(zone.x, zone.y, zone.radius * (0.94 + Math.sin(state.time * 7) * 0.03), 0, TWO_PI);
     ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawTraps() {
+  for (const trap of state.traps) {
+    const lifeRatio = Math.max(0, trap.life / trap.maxLife);
+    const armed = trap.armDelay <= 0;
+    const armRatio = trap.maxArmDelay > 0 ? 1 - trap.armDelay / trap.maxArmDelay : 1;
+    const pulse = 0.92 + Math.sin((state.time + trap.createdAt) * 8) * 0.08;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = armed ? 0.16 + lifeRatio * 0.12 : 0.1 + armRatio * 0.12;
+    ctx.fillStyle = trap.color;
+    ctx.beginPath();
+    ctx.arc(trap.x, trap.y, trap.radius, 0, TWO_PI);
+    ctx.fill();
+
+    ctx.globalAlpha = armed ? 0.42 : 0.24;
+    ctx.strokeStyle = trap.color;
+    ctx.lineWidth = trap.ultimate ? 2.1 : 1.5;
+    ctx.beginPath();
+    ctx.arc(trap.x, trap.y, trap.triggerRadius * pulse, 0, TWO_PI);
+    ctx.stroke();
+
+    ctx.globalAlpha = armed ? 0.92 : 0.55;
+    ctx.fillStyle = "#101522";
+    ctx.strokeStyle = trap.color;
+    ctx.lineWidth = 1.6;
+    roundPoly(trap.x, trap.y, trap.ultimate ? 5.8 : 4.4, 6, Math.PI / 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.globalAlpha = armed ? 0.95 : 0.45;
+    ctx.fillStyle = trap.color;
+    ctx.beginPath();
+    ctx.arc(trap.x, trap.y, trap.ultimate ? 2.2 : 1.7, 0, TWO_PI);
+    ctx.fill();
+
+    if (trap.charges > 1) {
+      ctx.globalAlpha = 0.9;
+      ctx.font = "800 7px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(String(trap.charges), trap.x, trap.y - 7);
+    }
     ctx.restore();
   }
 }
