@@ -73,7 +73,21 @@ const TYPE_FORMATION_SPREAD = {
   midboss: 0,
   boss: 0,
 };
-const SPRITE_VERSION = "spawn-formation-20260706-1";
+const SURROUND_LANES = [
+  ["top", 0.34],
+  ["right", 0.32],
+  ["bottom", 0.66],
+  ["left", 0.68],
+  ["top", 0.5],
+  ["right", 0.5],
+  ["bottom", 0.5],
+  ["left", 0.5],
+  ["top", 0.66],
+  ["right", 0.68],
+  ["bottom", 0.34],
+  ["left", 0.32],
+];
+const SPRITE_VERSION = "surround-waves-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -266,47 +280,47 @@ const STAGE_2_WAVES = [
   wave(spawn(0.22, "top", 0.5, "tank"), fan(0.48, [["right", 0.66], ["bottom", 0.5], ["left", 0.34]], "swarm", 11, 0.16), fan(2.3, [["right", 0.74], ["top", 0.43]], "runner", 4, 0.16)),
   wave(fan(0.2, [["left", 0.34], ["bottom", 0.58]], "swarm", 12, 0.15), fan(1.0, [["right", 0.66], ["top", 0.5]], "runner", 4, 0.18), spawn(1.8, "top", 0.44, "grunt"), spawn(1.84, "right", 0.72, "grunt"), spawn(2.7, "left", 0.34, "tank")),
   wave(spawn(0.2, "top", 0.5, "tank"), fan(0.46, [["right", 0.66], ["bottom", 0.5]], "runner", 6, 0.18), fan(1.25, [["left", 0.34], ["bottom", 0.58], ["top", 0.5]], "swarm", 12, 0.14), spawn(2.8, "left", 0.42, "grunt")),
-  wave(spawn(0.18, "left", 0.34, "brute"), stream(0.44, "bottom", [0.42, 0.5, 0.58, 0.66], "swarm", 14, 0.13), fan(1.45, [["top", 0.5], ["right", 0.66]], "runner", 5, 0.16), spawn(2.55, "bottom", 0.5, "grunt")),
-  wave(spawn(0.26, "top", 0.5, "midboss"), fan(0.72, [["right", 0.66], ["bottom", 0.5], ["left", 0.34]], "swarm", 14, 0.12), fan(1.75, [["bottom", 0.58], ["left", 0.26]], "runner", 6, 0.15), spawn(2.65, "top", 0.44, "grunt"), spawn(2.68, "right", 0.72, "grunt")),
-  wave(spawn(0.18, "bottom", 0.5, "tank"), spawn(0.22, "left", 0.34, "tank"), fan(0.82, [["top", 0.42], ["right", 0.74]], "swarm", 16, 0.11), fan(1.95, [["left", 0.26], ["bottom", 0.58]], "runner", 6, 0.14), fan(2.7, [["right", 0.66], ["top", 0.5]], "grunt", 4, 0.16)),
-  wave(spawn(0.18, "right", 0.66, "brute"), fan(0.2, [["top", 0.5], ["right", 0.74]], "swarm", 16, 0.12), fan(1.2, [["left", 0.34], ["bottom", 0.58]], "runner", 7, 0.13), spawn(2.2, "top", 0.5, "tank"), spawn(2.55, "right", 0.58, "grunt")),
-  wave(spawn(0.26, "bottom", 0.5, "boss"), fan(0.82, [["left", 0.34], ["bottom", 0.58], ["top", 0.5], ["right", 0.66]], "swarm", 20, 0.1), fan(1.9, [["left", 0.26], ["bottom", 0.66]], "runner", 8, 0.13), fan(2.85, [["top", 0.44], ["right", 0.72], ["left", 0.34]], "grunt", 6, 0.14)),
+  wave(spawn(0.18, "left", 0.34, "brute"), surround(0.44, "swarm", 14, 0.13, 0), fan(1.45, [["top", 0.5], ["right", 0.66]], "runner", 5, 0.16), spawn(2.55, "bottom", 0.5, "grunt")),
+  wave(spawn(0.26, "top", 0.5, "midboss"), surround(0.72, "swarm", 14, 0.12, 3), fan(1.75, [["bottom", 0.58], ["left", 0.26]], "runner", 6, 0.15), spawn(2.65, "top", 0.44, "grunt"), spawn(2.68, "right", 0.72, "grunt")),
+  wave(spawn(0.18, "bottom", 0.5, "tank"), spawn(0.22, "left", 0.34, "tank"), surround(0.82, "swarm", 16, 0.11, 6), fan(1.95, [["left", 0.26], ["bottom", 0.58]], "runner", 6, 0.14), fan(2.7, [["right", 0.66], ["top", 0.5]], "grunt", 4, 0.16)),
+  wave(spawn(0.18, "right", 0.66, "brute"), surround(0.2, "swarm", 16, 0.12, 9), fan(1.2, [["left", 0.34], ["bottom", 0.58]], "runner", 7, 0.13), spawn(2.2, "top", 0.5, "tank"), spawn(2.55, "right", 0.58, "grunt")),
+  wave(spawn(0.26, "bottom", 0.5, "boss"), surround(0.82, "swarm", 20, 0.1, 1), surround(1.9, "runner", 8, 0.13, 5), fan(2.85, [["top", 0.44], ["right", 0.72], ["left", 0.34]], "grunt", 6, 0.14)),
 ];
 
 const STAGE_3_WAVES = [
-  wave(fan(0.22, [["top", 0.5], ["right", 0.66], ["left", 0.66]], "swarm", 12, 0.15), spawn(1.25, "top", 0.43, "runner"), spawn(1.27, "right", 0.74, "grunt"), spawn(1.72, "left", 0.66, "runner")),
-  wave(fan(0.18, [["bottom", 0.5], ["right", 0.34], ["left", 0.34]], "swarm", 13, 0.14), fan(1.08, [["left", 0.26], ["right", 0.26]], "runner", 4, 0.16), spawn(1.85, "bottom", 0.5, "tank"), spawn(2.1, "top", 0.5, "grunt")),
-  wave(spawn(0.18, "top", 0.5, "tank"), fan(0.3, [["right", 0.66], ["left", 0.66], ["top", 0.42]], "swarm", 15, 0.12), fan(1.35, [["left", 0.58], ["top", 0.5]], "runner", 5, 0.14), spawn(2.15, "right", 0.66, "grunt")),
-  wave(fan(0.16, [["right", 0.34], ["bottom", 0.5], ["left", 0.34]], "swarm", 16, 0.12), fan(1.0, [["left", 0.26], ["right", 0.26]], "runner", 5, 0.14), spawn(1.75, "top", 0.5, "brute"), spawn(2.42, "bottom", 0.58, "grunt")),
-  wave(spawn(0.18, "left", 0.66, "brute"), fan(0.22, [["top", 0.5], ["right", 0.66]], "swarm", 16, 0.12), fan(1.18, [["right", 0.74], ["left", 0.58]], "runner", 6, 0.13), spawn(1.95, "top", 0.5, "tank"), spawn(2.48, "right", 0.66, "grunt")),
-  wave(spawn(0.16, "bottom", 0.5, "tank"), fan(0.18, [["right", 0.34], ["left", 0.34], ["bottom", 0.58]], "swarm", 18, 0.1), fan(1.18, [["top", 0.5], ["right", 0.34], ["left", 0.34]], "runner", 7, 0.12), fan(2.15, [["bottom", 0.42], ["top", 0.5]], "grunt", 4, 0.14)),
-  wave(fan(0.16, [["top", 0.44], ["right", 0.66], ["left", 0.66]], "runner", 8, 0.12), fan(0.72, [["left", 0.58], ["right", 0.74]], "swarm", 16, 0.1), spawn(1.45, "right", 0.66, "tank"), spawn(1.7, "bottom", 0.5, "brute"), spawn(2.3, "top", 0.56, "grunt")),
-  wave(spawn(0.24, "top", 0.5, "midboss"), fan(0.72, [["right", 0.66], ["left", 0.66], ["bottom", 0.5]], "swarm", 20, 0.09), fan(1.52, [["bottom", 0.58], ["right", 0.34], ["left", 0.34]], "runner", 8, 0.12), spawn(2.35, "left", 0.34, "tank"), spawn(2.38, "bottom", 0.58, "grunt")),
-  wave(fan(0.16, [["left", 0.34], ["bottom", 0.5], ["right", 0.34]], "runner", 8, 0.11), fan(0.7, [["bottom", 0.42], ["left", 0.26], ["right", 0.26]], "swarm", 20, 0.09), spawn(1.95, "top", 0.5, "tank"), spawn(2.0, "bottom", 0.5, "grunt"), spawn(2.35, "left", 0.4, "grunt")),
-  wave(spawn(0.16, "right", 0.66, "brute"), spawn(0.2, "left", 0.66, "brute"), fan(0.46, [["top", 0.5], ["right", 0.74], ["left", 0.58]], "runner", 10, 0.1), fan(1.2, [["right", 0.58], ["left", 0.74]], "swarm", 18, 0.09), spawn(2.28, "bottom", 0.5, "tank")),
-  wave(fan(0.14, [["top", 0.5], ["right", 0.66], ["left", 0.66]], "swarm", 24, 0.08), spawn(0.32, "right", 0.66, "tank"), spawn(0.36, "left", 0.66, "runner"), fan(1.05, [["right", 0.74], ["left", 0.58]], "runner", 8, 0.11), spawn(1.82, "bottom", 0.5, "brute"), spawn(2.35, "top", 0.5, "grunt")),
-  wave(spawn(0.14, "bottom", 0.5, "brute"), fan(0.18, [["right", 0.34], ["left", 0.34], ["bottom", 0.42], ["bottom", 0.58]], "swarm", 24, 0.08), fan(1.18, [["top", 0.44], ["right", 0.66], ["left", 0.66]], "runner", 9, 0.1), spawn(2.2, "bottom", 0.58, "tank"), spawn(2.55, "top", 0.5, "grunt")),
-  wave(spawn(0.14, "top", 0.5, "tank"), spawn(0.18, "right", 0.66, "tank"), fan(0.58, [["right", 0.74], ["left", 0.58], ["top", 0.42]], "swarm", 24, 0.08), fan(1.45, [["left", 0.34], ["bottom", 0.5]], "runner", 10, 0.1), spawn(2.25, "bottom", 0.5, "brute"), spawn(2.85, "top", 0.58, "grunt")),
-  wave(spawn(0.14, "right", 0.34, "tank"), spawn(0.18, "bottom", 0.5, "tank"), spawn(0.22, "left", 0.34, "tank"), fan(0.72, [["top", 0.5], ["right", 0.66], ["left", 0.66]], "swarm", 24, 0.08), fan(1.62, [["top", 0.42], ["right", 0.34], ["left", 0.34]], "runner", 10, 0.1), fan(2.35, [["top", 0.42], ["right", 0.72], ["left", 0.28]], "grunt", 6, 0.12)),
-  wave(spawn(0.28, "bottom", 0.5, "boss"), fan(0.78, [["top", 0.5], ["right", 0.66], ["left", 0.66], ["bottom", 0.42]], "swarm", 30, 0.07), fan(1.65, [["right", 0.74], ["left", 0.58], ["bottom", 0.58]], "runner", 12, 0.09), fan(2.65, [["right", 0.34], ["left", 0.34]], "grunt", 8, 0.11), spawn(3.15, "top", 0.5, "brute"), spawn(3.2, "right", 0.66, "tank"), spawn(3.24, "left", 0.66, "tank")),
+  wave(surround(0.22, "swarm", 12, 0.15, 0), spawn(1.25, "top", 0.43, "runner"), spawn(1.27, "right", 0.74, "grunt"), spawn(1.72, "left", 0.66, "runner")),
+  wave(surround(0.18, "swarm", 13, 0.14, 3), fan(1.08, [["left", 0.26], ["right", 0.26]], "runner", 4, 0.16), spawn(1.85, "bottom", 0.5, "tank"), spawn(2.1, "top", 0.5, "grunt")),
+  wave(spawn(0.18, "top", 0.5, "tank"), surround(0.3, "swarm", 15, 0.12, 6), fan(1.35, [["left", 0.58], ["top", 0.5]], "runner", 5, 0.14), spawn(2.15, "right", 0.66, "grunt")),
+  wave(surround(0.16, "swarm", 16, 0.12, 9), fan(1.0, [["left", 0.26], ["right", 0.26]], "runner", 5, 0.14), spawn(1.75, "top", 0.5, "brute"), spawn(2.42, "bottom", 0.58, "grunt")),
+  wave(spawn(0.18, "left", 0.66, "brute"), surround(0.22, "swarm", 16, 0.12, 1), fan(1.18, [["right", 0.74], ["left", 0.58]], "runner", 6, 0.13), spawn(1.95, "top", 0.5, "tank"), spawn(2.48, "right", 0.66, "grunt")),
+  wave(spawn(0.16, "bottom", 0.5, "tank"), surround(0.18, "swarm", 18, 0.1, 4), surround(1.18, "runner", 7, 0.12, 8), fan(2.15, [["bottom", 0.42], ["top", 0.5]], "grunt", 4, 0.14)),
+  wave(surround(0.16, "runner", 8, 0.12, 2), surround(0.72, "swarm", 16, 0.1, 7), spawn(1.45, "right", 0.66, "tank"), spawn(1.7, "bottom", 0.5, "brute"), spawn(2.3, "top", 0.56, "grunt")),
+  wave(spawn(0.24, "top", 0.5, "midboss"), surround(0.72, "swarm", 20, 0.09, 10), surround(1.52, "runner", 8, 0.12, 3), spawn(2.35, "left", 0.34, "tank"), spawn(2.38, "bottom", 0.58, "grunt")),
+  wave(surround(0.16, "runner", 8, 0.11, 6), surround(0.7, "swarm", 20, 0.09, 0), spawn(1.95, "top", 0.5, "tank"), spawn(2.0, "bottom", 0.5, "grunt"), spawn(2.35, "left", 0.4, "grunt")),
+  wave(spawn(0.16, "right", 0.66, "brute"), spawn(0.2, "left", 0.66, "brute"), surround(0.46, "runner", 10, 0.1, 4), surround(1.2, "swarm", 18, 0.09, 8), spawn(2.28, "bottom", 0.5, "tank")),
+  wave(surround(0.14, "swarm", 24, 0.08, 1), spawn(0.32, "right", 0.66, "tank"), spawn(0.36, "left", 0.66, "runner"), surround(1.05, "runner", 8, 0.11, 5), spawn(1.82, "bottom", 0.5, "brute"), spawn(2.35, "top", 0.5, "grunt")),
+  wave(spawn(0.14, "bottom", 0.5, "brute"), surround(0.18, "swarm", 24, 0.08, 9), surround(1.18, "runner", 9, 0.1, 2), spawn(2.2, "bottom", 0.58, "tank"), spawn(2.55, "top", 0.5, "grunt")),
+  wave(spawn(0.14, "top", 0.5, "tank"), spawn(0.18, "right", 0.66, "tank"), surround(0.58, "swarm", 24, 0.08, 5), surround(1.45, "runner", 10, 0.1, 11), spawn(2.25, "bottom", 0.5, "brute"), spawn(2.85, "top", 0.58, "grunt")),
+  wave(spawn(0.14, "right", 0.34, "tank"), spawn(0.18, "bottom", 0.5, "tank"), spawn(0.22, "left", 0.34, "tank"), surround(0.72, "swarm", 24, 0.08, 3), surround(1.62, "runner", 10, 0.1, 7), fan(2.35, [["top", 0.42], ["right", 0.72], ["left", 0.28]], "grunt", 6, 0.12)),
+  wave(spawn(0.28, "bottom", 0.5, "boss"), surround(0.78, "swarm", 30, 0.07, 0), surround(1.65, "runner", 12, 0.09, 6), fan(2.65, [["right", 0.34], ["left", 0.34]], "grunt", 8, 0.11), spawn(3.15, "top", 0.5, "brute"), spawn(3.2, "right", 0.66, "tank"), spawn(3.24, "left", 0.66, "tank")),
 ];
 
 const STAGE_4_WAVES = [
-  wave(fan(0.18, [["top", 0.48], ["right", 0.64]], "swarm", 12, 0.13), spawn(1.35, "right", 0.72, "runner"), spawn(2.05, "top", 0.5, "grunt")),
-  wave(fan(0.16, [["left", 0.36], ["bottom", 0.5]], "swarm", 14, 0.12), spawn(1.2, "bottom", 0.5, "tank"), fan(1.75, [["left", 0.34], ["left", 0.42]], "runner", 4, 0.14)),
-  wave(spawn(0.14, "right", 0.66, "grunt"), fan(0.16, [["top", 0.5], ["right", 0.74], ["bottom", 0.52]], "swarm", 16, 0.11), spawn(1.55, "right", 0.74, "tank"), fan(2.2, [["bottom", 0.52], ["top", 0.42]], "runner", 5, 0.12)),
-  wave(fan(0.14, [["bottom", 0.48], ["left", 0.34]], "swarm", 18, 0.1), fan(1.28, [["left", 0.34], ["bottom", 0.58]], "grunt", 4, 0.16), spawn(2.35, "bottom", 0.5, "tank")),
-  wave(spawn(0.14, "top", 0.5, "brute"), fan(0.52, [["top", 0.42], ["top", 0.58], ["right", 0.66]], "swarm", 20, 0.09), fan(1.38, [["right", 0.66], ["right", 0.74]], "runner", 6, 0.11), spawn(2.25, "left", 0.34, "grunt")),
-  wave(fan(0.12, [["right", 0.68], ["left", 0.32]], "swarm", 22, 0.085), spawn(1.15, "bottom", 0.5, "tank"), fan(1.65, [["top", 0.5], ["right", 0.6], ["left", 0.4]], "runner", 7, 0.1), spawn(2.45, "left", 0.34, "grunt")),
-  wave(spawn(0.18, "left", 0.34, "midboss"), fan(0.62, [["top", 0.5], ["right", 0.66], ["bottom", 0.5]], "swarm", 24, 0.08), fan(1.55, [["right", 0.74], ["bottom", 0.58], ["left", 0.42]], "runner", 8, 0.09), spawn(2.45, "bottom", 0.5, "tank"), spawn(2.75, "top", 0.5, "grunt")),
-  wave(spawn(0.12, "bottom", 0.5, "tank"), fan(0.42, [["bottom", 0.42], ["bottom", 0.58], ["right", 0.66], ["left", 0.34]], "swarm", 26, 0.075), fan(1.3, [["right", 0.74], ["left", 0.26]], "runner", 9, 0.09), fan(2.1, [["right", 0.66], ["left", 0.34]], "grunt", 6, 0.11)),
-  wave(fan(0.12, [["top", 0.5], ["right", 0.66], ["left", 0.34]], "swarm", 28, 0.07), spawn(1.18, "left", 0.34, "brute"), fan(1.72, [["top", 0.48], ["top", 0.56], ["right", 0.74]], "runner", 10, 0.085), spawn(2.55, "bottom", 0.5, "tank")),
-  wave(spawn(0.12, "right", 0.66, "tank"), spawn(0.16, "left", 0.34, "tank"), fan(0.64, [["bottom", 0.5], ["top", 0.5], ["right", 0.74], ["left", 0.26]], "swarm", 30, 0.065), fan(1.62, [["right", 0.74], ["left", 0.26], ["top", 0.42]], "runner", 10, 0.085), spawn(2.45, "top", 0.5, "grunt")),
-  wave(fan(0.12, [["left", 0.34], ["left", 0.42], ["left", 0.26]], "runner", 10, 0.08), spawn(0.72, "top", 0.5, "brute"), fan(1.15, [["right", 0.66], ["right", 0.74], ["right", 0.58], ["bottom", 0.5]], "swarm", 30, 0.065), spawn(2.45, "bottom", 0.5, "tank"), fan(2.75, [["top", 0.5], ["right", 0.66]], "grunt", 4, 0.1)),
-  wave(spawn(0.12, "bottom", 0.5, "brute"), fan(0.62, [["bottom", 0.42], ["bottom", 0.58], ["top", 0.5], ["right", 0.66]], "swarm", 32, 0.06), fan(1.58, [["top", 0.5], ["right", 0.66], ["left", 0.34]], "runner", 12, 0.08), spawn(2.35, "left", 0.34, "tank"), spawn(2.6, "bottom", 0.5, "grunt")),
-  wave(spawn(0.12, "top", 0.5, "tank"), spawn(0.16, "right", 0.66, "tank"), fan(0.56, [["top", 0.42], ["right", 0.74], ["left", 0.58], ["bottom", 0.5]], "swarm", 34, 0.055), fan(1.5, [["left", 0.34], ["left", 0.26], ["bottom", 0.58]], "runner", 13, 0.075), spawn(2.28, "bottom", 0.5, "brute"), fan(2.85, [["top", 0.58], ["right", 0.34]], "grunt", 4, 0.1)),
-  wave(spawn(0.14, "right", 0.66, "midboss"), fan(0.72, [["left", 0.34], ["left", 0.26], ["left", 0.42], ["top", 0.5]], "swarm", 34, 0.055), spawn(1.58, "bottom", 0.5, "tank"), fan(2.05, [["top", 0.5], ["top", 0.42], ["top", 0.58]], "runner", 14, 0.07), fan(2.9, [["right", 0.34], ["left", 0.34]], "grunt", 6, 0.09)),
-  wave(spawn(0.24, "top", 0.5, "boss"), fan(0.82, [["right", 0.66], ["right", 0.74], ["right", 0.58], ["left", 0.34], ["bottom", 0.5]], "swarm", 40, 0.05), fan(1.8, [["left", 0.34], ["left", 0.26], ["bottom", 0.58]], "runner", 16, 0.065), fan(2.68, [["bottom", 0.5], ["top", 0.42], ["right", 0.66], ["left", 0.34]], "grunt", 10, 0.08), spawn(3.12, "top", 0.5, "brute"), spawn(3.16, "right", 0.66, "tank"), spawn(3.2, "left", 0.66, "tank")),
+  wave(surround(0.18, "swarm", 12, 0.13, 0), spawn(1.35, "right", 0.72, "runner"), spawn(2.05, "top", 0.5, "grunt")),
+  wave(surround(0.16, "swarm", 14, 0.12, 3), spawn(1.2, "bottom", 0.5, "tank"), surround(1.75, "runner", 4, 0.14, 7)),
+  wave(spawn(0.14, "right", 0.66, "grunt"), surround(0.16, "swarm", 16, 0.11, 6), spawn(1.55, "right", 0.74, "tank"), surround(2.2, "runner", 5, 0.12, 10)),
+  wave(surround(0.14, "swarm", 18, 0.1, 9), fan(1.28, [["left", 0.34], ["bottom", 0.58]], "grunt", 4, 0.16), spawn(2.35, "bottom", 0.5, "tank")),
+  wave(spawn(0.14, "top", 0.5, "brute"), surround(0.52, "swarm", 20, 0.09, 1), surround(1.38, "runner", 6, 0.11, 5), spawn(2.25, "left", 0.34, "grunt")),
+  wave(surround(0.12, "swarm", 22, 0.085, 4), spawn(1.15, "bottom", 0.5, "tank"), surround(1.65, "runner", 7, 0.1, 8), spawn(2.45, "left", 0.34, "grunt")),
+  wave(spawn(0.18, "left", 0.34, "midboss"), surround(0.62, "swarm", 24, 0.08, 11), surround(1.55, "runner", 8, 0.09, 2), spawn(2.45, "bottom", 0.5, "tank"), spawn(2.75, "top", 0.5, "grunt")),
+  wave(spawn(0.12, "bottom", 0.5, "tank"), surround(0.42, "swarm", 26, 0.075, 5), surround(1.3, "runner", 9, 0.09, 9), fan(2.1, [["right", 0.66], ["left", 0.34]], "grunt", 6, 0.11)),
+  wave(surround(0.12, "swarm", 28, 0.07, 0), spawn(1.18, "left", 0.34, "brute"), surround(1.72, "runner", 10, 0.085, 6), spawn(2.55, "bottom", 0.5, "tank")),
+  wave(spawn(0.12, "right", 0.66, "tank"), spawn(0.16, "left", 0.34, "tank"), surround(0.64, "swarm", 30, 0.065, 10), surround(1.62, "runner", 10, 0.085, 3), spawn(2.45, "top", 0.5, "grunt")),
+  wave(surround(0.12, "runner", 10, 0.08, 7), spawn(0.72, "top", 0.5, "brute"), surround(1.15, "swarm", 30, 0.065, 1), spawn(2.45, "bottom", 0.5, "tank"), fan(2.75, [["top", 0.5], ["right", 0.66]], "grunt", 4, 0.1)),
+  wave(spawn(0.12, "bottom", 0.5, "brute"), surround(0.62, "swarm", 32, 0.06, 4), surround(1.58, "runner", 12, 0.08, 8), spawn(2.35, "left", 0.34, "tank"), spawn(2.6, "bottom", 0.5, "grunt")),
+  wave(spawn(0.12, "top", 0.5, "tank"), spawn(0.16, "right", 0.66, "tank"), surround(0.56, "swarm", 34, 0.055, 11), surround(1.5, "runner", 13, 0.075, 5), spawn(2.28, "bottom", 0.5, "brute"), fan(2.85, [["top", 0.58], ["right", 0.34]], "grunt", 4, 0.1)),
+  wave(spawn(0.14, "right", 0.66, "midboss"), surround(0.72, "swarm", 34, 0.055, 2), spawn(1.58, "bottom", 0.5, "tank"), surround(2.05, "runner", 14, 0.07, 6), fan(2.9, [["right", 0.34], ["left", 0.34]], "grunt", 6, 0.09)),
+  wave(spawn(0.24, "top", 0.5, "boss"), surround(0.82, "swarm", 40, 0.05, 9), surround(1.8, "runner", 16, 0.065, 3), fan(2.68, [["bottom", 0.5], ["top", 0.42], ["right", 0.66], ["left", 0.34]], "grunt", 10, 0.08), spawn(3.12, "top", 0.5, "brute"), spawn(3.16, "right", 0.66, "tank"), spawn(3.2, "left", 0.66, "tank")),
 ];
 
 const STAGE_CONFIGS = [
@@ -1102,6 +1116,12 @@ function fan(start, lanes, type, count, interval = 0.14) {
       type
     );
   });
+}
+
+function surround(start, type, count, interval = 0.1, offset = 0) {
+  const rotateBy = ((offset % SURROUND_LANES.length) + SURROUND_LANES.length) % SURROUND_LANES.length;
+  const lanes = [...SURROUND_LANES.slice(rotateBy), ...SURROUND_LANES.slice(0, rotateBy)];
+  return fan(start, lanes, type, count, interval);
 }
 
 function formationTime(start, index, laneIndex, interval) {
