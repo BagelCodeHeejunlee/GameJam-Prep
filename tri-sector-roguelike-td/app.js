@@ -1793,9 +1793,11 @@ function attackArcher(hero) {
   const centerIndex = (count - 1) / 2;
 
   for (let i = 0; i < count; i += 1) {
-    const origin = archerProjectileOrigin(aim, target, i - centerIndex);
+    const offsetIndex = i - centerIndex;
+    const origin = archerProjectileOrigin(aim, target, offsetIndex);
     const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
-    fireProjectile(hero, origin.x, origin.y, angle, damage, hero.pierce);
+    const delay = i * 0.035;
+    fireProjectile(hero, origin.x, origin.y, angle, damage, hero.pierce, { delay });
   }
 
   state.effects.push({
@@ -1816,7 +1818,7 @@ function archerProjectileOrigin(aim, target, offsetIndex) {
   if (offsetIndex === 0) return { x: aim.x, y: aim.y };
 
   const angle = Math.atan2(target.y - aim.y, target.x - aim.x);
-  const laneSpacing = 4;
+  const laneSpacing = 11;
   const side = offsetIndex * laneSpacing;
   const sideAngle = angle + Math.PI / 2;
 
@@ -1826,7 +1828,7 @@ function archerProjectileOrigin(aim, target, offsetIndex) {
   };
 }
 
-function fireProjectile(hero, x, y, angle, damage, pierce) {
+function fireProjectile(hero, x, y, angle, damage, pierce, options = {}) {
   state.projectiles.push({
     heroId: hero.id,
     x,
@@ -1842,6 +1844,7 @@ function fireProjectile(hero, x, y, angle, damage, pierce) {
     color: projectileColor(hero),
     splashRadius: hero.splashRadius || 0,
     splashRatio: hero.splashRatio || 0,
+    delay: options.delay || 0,
     hitIds: [],
   });
 }
@@ -2085,6 +2088,11 @@ function enemyInCastCone(circle, enemy) {
 function updateProjectiles(dt) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
     const p = state.projectiles[i];
+    if (p.delay > 0) {
+      p.delay = Math.max(0, p.delay - dt);
+      continue;
+    }
+
     p.prevX = p.x;
     p.prevY = p.y;
     const step = Math.hypot(p.vx * dt, p.vy * dt);
