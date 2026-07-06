@@ -63,7 +63,7 @@ const TIER_COLORS = {
   돌파: "#b984ff",
   궁극: "#ffd166",
 };
-const SPRITE_VERSION = "engineer-traps-20260706-1";
+const SPRITE_VERSION = "engineer-random-traps-20260706-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -224,8 +224,8 @@ const HERO_BLUEPRINTS = [
     range: 116,
     angle: 70,
     cooldown: 1.18,
-    trapRadius: 28,
-    trapTriggerRadius: 12,
+    trapRadius: 18,
+    trapTriggerRadius: 8,
     trapArmDelay: 0.28,
     trapLifetime: 4.8,
     trapCount: 1,
@@ -1365,9 +1365,9 @@ const heroUpgrades = [
     tier: "기본",
     maxRank: 4,
     title: "폭약 반경",
-    text: "공병 지뢰 폭발 반경 +5",
+    text: "공병 지뢰 폭발 반경 +3",
     apply: (hero) => {
-      hero.trapRadius += 5;
+      hero.trapRadius += 3;
     },
   },
   {
@@ -1379,8 +1379,8 @@ const heroUpgrades = [
     apply: (hero) => {
       hero.breakthrough = true;
       hero.trapCount = Math.max(hero.trapCount + 1, 2);
-      hero.trapRadius += 6;
-      hero.trapTriggerRadius += 5;
+      hero.trapRadius += 4;
+      hero.trapTriggerRadius += 3;
       hero.trapSlowDuration += 0.45;
       hero.maxTraps += 2;
       state.shake = 0.5;
@@ -1405,8 +1405,8 @@ const heroUpgrades = [
     title: "감지 신관",
     text: "지뢰 감지 반경과 폭발 반경 증가",
     apply: (hero) => {
-      hero.trapTriggerRadius += 6;
-      hero.trapRadius += 5;
+      hero.trapTriggerRadius += 4;
+      hero.trapRadius += 3;
     },
   },
   {
@@ -2243,18 +2243,14 @@ function attackMage(hero) {
 
 function attackEngineer(hero) {
   const aim = heroAim(hero);
-  const targets = findTargets(hero, 1);
-  const center = engineerTrapCenter(hero, aim, targets[0]);
   const count = Math.max(1, hero.trapCount || 1);
   const damage = prepareHeroDamage(hero);
-  const sideAngle = aim.angle * DEG + Math.PI / 2;
-  const centerIndex = (count - 1) / 2;
 
   for (let i = 0; i < count; i += 1) {
-    const offset = (i - centerIndex) * (hero.trapSpread || 16);
+    const position = randomEngineerTrapPosition(hero, aim);
     addTrap(hero, {
-      x: center.x + Math.cos(sideAngle) * offset,
-      y: center.y + Math.sin(sideAngle) * offset,
+      x: position.x,
+      y: position.y,
       damage,
       armDelay: hero.trapArmDelay + i * 0.045,
     });
@@ -2274,24 +2270,16 @@ function attackEngineer(hero) {
   return true;
 }
 
-function engineerTrapCenter(hero, aim, target) {
+function randomEngineerTrapPosition(hero, aim, minRatio = 0.38, maxRatio = 0.94) {
   const t = tower();
-  const angle = aim.angle * DEG;
-  const fallbackDistance = Math.min(hero.range * 0.72, Math.min(cssWidth, cssHeight) * 0.28);
-  let x = t.x + Math.cos(angle) * fallbackDistance;
-  let y = t.y + Math.sin(angle) * fallbackDistance;
-
-  if (target) {
-    const dx = t.x - target.x;
-    const dy = t.y - target.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    x = target.x + (dx / dist) * 18;
-    y = target.y + (dy / dist) * 18;
-  }
+  const safeMin = clamp(minRatio, 0, 0.95);
+  const safeMax = clamp(Math.max(maxRatio, safeMin + 0.05), safeMin + 0.05, 1);
+  const angle = (aim.angle + (Math.random() - 0.5) * hero.angle * 0.86) * DEG;
+  const distance = hero.range * (safeMin + Math.random() * (safeMax - safeMin));
 
   return {
-    x: clamp(x, 14, cssWidth - 14),
-    y: clamp(y, 14, cssHeight - 14),
+    x: clamp(t.x + Math.cos(angle) * distance, 14, cssWidth - 14),
+    y: clamp(t.y + Math.sin(angle) * distance, 14, cssHeight - 14),
   };
 }
 
@@ -2436,26 +2424,21 @@ function triggerMageUltimate(hero, target) {
 
 function triggerEngineerUltimate(hero) {
   const aim = heroAim(hero);
-  const t = tower();
-  const angle = aim.angle * DEG;
-  const sideAngle = angle + Math.PI / 2;
-  const distances = [0.42, 0.58, 0.74, 0.9, 1.04].map((ratio) => Math.min(hero.range * ratio, Math.min(cssWidth, cssHeight) * 0.34));
-  const offsets = [0, -18, 18, -8, 8];
-
-  distances.forEach((distance, index) => {
+  for (let index = 0; index < 5; index += 1) {
+    const position = randomEngineerTrapPosition(hero, aim, 0.36, 0.98);
     addTrap(hero, {
-      x: t.x + Math.cos(angle) * distance + Math.cos(sideAngle) * offsets[index],
-      y: t.y + Math.sin(angle) * distance + Math.sin(sideAngle) * offsets[index],
+      x: position.x,
+      y: position.y,
       damage: Math.round(hero.damage * 1.35),
-      radius: hero.trapRadius + 9,
-      triggerRadius: hero.trapTriggerRadius + 8,
+      radius: hero.trapRadius + 5,
+      triggerRadius: hero.trapTriggerRadius + 4,
       armDelay: 0.08 + index * 0.035,
       life: hero.trapLifetime + 1.2,
       charges: 1,
       expireExplodes: true,
       ultimate: true,
     });
-  });
+  }
 
   state.effects.push({
     type: "mark",
@@ -3826,15 +3809,15 @@ function drawTraps() {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = armed ? 0.16 + lifeRatio * 0.12 : 0.1 + armRatio * 0.12;
+    ctx.globalAlpha = armed ? 0.1 + lifeRatio * 0.1 : 0.07 + armRatio * 0.08;
     ctx.fillStyle = trap.color;
     ctx.beginPath();
     ctx.arc(trap.x, trap.y, trap.radius, 0, TWO_PI);
     ctx.fill();
 
-    ctx.globalAlpha = armed ? 0.42 : 0.24;
+    ctx.globalAlpha = armed ? 0.32 : 0.18;
     ctx.strokeStyle = trap.color;
-    ctx.lineWidth = trap.ultimate ? 2.1 : 1.5;
+    ctx.lineWidth = trap.ultimate ? 1.6 : 1.1;
     ctx.beginPath();
     ctx.arc(trap.x, trap.y, trap.triggerRadius * pulse, 0, TWO_PI);
     ctx.stroke();
@@ -3842,22 +3825,22 @@ function drawTraps() {
     ctx.globalAlpha = armed ? 0.92 : 0.55;
     ctx.fillStyle = "#101522";
     ctx.strokeStyle = trap.color;
-    ctx.lineWidth = 1.6;
-    roundPoly(trap.x, trap.y, trap.ultimate ? 5.8 : 4.4, 6, Math.PI / 6);
+    ctx.lineWidth = 1.1;
+    roundPoly(trap.x, trap.y, trap.ultimate ? 3.8 : 2.8, 6, Math.PI / 6);
     ctx.fill();
     ctx.stroke();
 
     ctx.globalAlpha = armed ? 0.95 : 0.45;
     ctx.fillStyle = trap.color;
     ctx.beginPath();
-    ctx.arc(trap.x, trap.y, trap.ultimate ? 2.2 : 1.7, 0, TWO_PI);
+    ctx.arc(trap.x, trap.y, trap.ultimate ? 1.35 : 1.0, 0, TWO_PI);
     ctx.fill();
 
     if (trap.charges > 1) {
       ctx.globalAlpha = 0.9;
-      ctx.font = "800 7px ui-sans-serif, system-ui";
+      ctx.font = "800 6px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(String(trap.charges), trap.x, trap.y - 7);
+      ctx.fillText(String(trap.charges), trap.x, trap.y - 5);
     }
     ctx.restore();
   }
