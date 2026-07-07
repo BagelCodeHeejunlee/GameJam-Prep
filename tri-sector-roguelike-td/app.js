@@ -89,7 +89,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "engineer-trap-density-20260707-1";
+const SPRITE_VERSION = "engineer-power-growth-capacity-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -246,23 +246,23 @@ const HERO_BLUEPRINTS = [
     glyph: "공",
     color: "#62e69f",
     glow: "rgba(98, 230, 159, 0.42)",
-    damage: 14,
+    damage: 20,
     range: 128,
     angle: 76,
-    cooldown: 0.92,
+    cooldown: 1.08,
     trapRadius: 9.5,
     trapTriggerRadius: 6.6,
     trapArmDelay: 0.24,
     trapLifetime: null,
     trapPersistent: true,
-    trapCount: 3,
+    trapCount: 2,
     trapSpread: 22,
     trapCharges: 1,
     trapRearmDelay: 0.18,
     trapSlowDuration: 0,
     trapSlowFactor: 0.55,
     trapExpireExplodes: false,
-    maxTraps: 54,
+    maxTraps: 36,
     ultimateEvery: 5,
     initialSlot: 4,
   },
@@ -925,10 +925,10 @@ const heroUpgrades = [
     heroId: "engineer",
     tier: "성장",
     title: "분산 매설",
-    text: "공병이 한 번에 설치하는 지뢰 +1",
+    text: "공병이 한 번에 설치하는 지뢰 +1, 최대 유지 지뢰 증가",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 9;
+      hero.maxTraps += 12;
     },
   },
   {
@@ -970,7 +970,7 @@ const heroUpgrades = [
     title: "빠른 매설",
     text: "공병 설치 간격 -7%",
     apply: (hero) => {
-      hero.cooldown = Math.max(0.62, hero.cooldown * 0.93);
+      hero.cooldown = Math.max(0.72, hero.cooldown * 0.93);
     },
   },
   {
