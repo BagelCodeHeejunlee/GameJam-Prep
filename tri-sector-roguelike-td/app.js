@@ -87,7 +87,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "surround-waves-20260706-1";
+const SPRITE_VERSION = "sustained-trap-balance-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -244,23 +244,23 @@ const HERO_BLUEPRINTS = [
     glyph: "공",
     color: "#62e69f",
     glow: "rgba(98, 230, 159, 0.42)",
-    damage: 9,
-    range: 116,
+    damage: 12,
+    range: 122,
     angle: 70,
-    cooldown: 1.18,
-    trapRadius: 4.5,
-    trapTriggerRadius: 2,
-    trapArmDelay: 0.28,
+    cooldown: 1.08,
+    trapRadius: 8,
+    trapTriggerRadius: 5,
+    trapArmDelay: 0.24,
     trapLifetime: null,
     trapPersistent: true,
-    trapCount: 1,
-    trapSpread: 16,
+    trapCount: 2,
+    trapSpread: 20,
     trapCharges: 1,
     trapRearmDelay: 0.18,
     trapSlowDuration: 0,
     trapSlowFactor: 0.55,
     trapExpireExplodes: false,
-    maxTraps: 24,
+    maxTraps: 36,
     ultimateEvery: 5,
     initialSlot: 4,
   },
@@ -926,7 +926,7 @@ const heroUpgrades = [
     text: "공병이 한 번에 설치하는 지뢰 +1",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 4;
+      hero.maxTraps += 6;
     },
   },
   {
@@ -955,9 +955,9 @@ const heroUpgrades = [
     tier: "기본",
     maxRank: 5,
     title: "고폭 장약",
-    text: "공병 지뢰 피해 +2",
+    text: "공병 지뢰 피해 +3",
     apply: (hero) => {
-      hero.damage += 2;
+      hero.damage += 3;
     },
   },
   {
@@ -977,9 +977,10 @@ const heroUpgrades = [
     tier: "기본",
     maxRank: 4,
     title: "폭약 반경",
-    text: "공병 지뢰 폭발 반경 +0.75",
+    text: "공병 지뢰 폭발/감지 반경 증가",
     apply: (hero) => {
-      hero.trapRadius += 0.75;
+      hero.trapRadius += 1.2;
+      hero.trapTriggerRadius += 0.45;
     },
   },
   {
@@ -991,10 +992,10 @@ const heroUpgrades = [
     apply: (hero) => {
       hero.breakthrough = true;
       hero.trapCount = Math.max(hero.trapCount + 1, 2);
-      hero.trapRadius += 1;
-      hero.trapTriggerRadius += 0.75;
+      hero.trapRadius += 1.5;
+      hero.trapTriggerRadius += 1.2;
       hero.trapSlowDuration += 0.45;
-      hero.maxTraps += 8;
+      hero.maxTraps += 12;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
@@ -1007,7 +1008,7 @@ const heroUpgrades = [
     text: "공병 설치 지뢰 +1, 최대 유지 지뢰 증가",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 10;
+      hero.maxTraps += 12;
     },
   },
   {
@@ -1017,8 +1018,8 @@ const heroUpgrades = [
     title: "감지 신관",
     text: "지뢰 감지 반경과 폭발 반경 증가",
     apply: (hero) => {
-      hero.trapTriggerRadius += 1;
-      hero.trapRadius += 0.75;
+      hero.trapTriggerRadius += 1.5;
+      hero.trapRadius += 1.2;
     },
   },
   {
@@ -1091,7 +1092,25 @@ function spawn(time, edge, pos, type) {
 }
 
 function wave(...plans) {
-  return plans.flat().sort((a, b) => a.time - b.time);
+  return paceWave(plans.flat().sort((a, b) => a.time - b.time));
+}
+
+function paceWave(plans) {
+  const scale = wavePaceScale(plans.length);
+  if (scale <= 1) return plans;
+  return plans.map((plan) => ({
+    ...plan,
+    time: roundTime(plan.time * scale),
+  }));
+}
+
+function wavePaceScale(count) {
+  if (count >= 60) return 2.45;
+  if (count >= 45) return 2.15;
+  if (count >= 32) return 1.85;
+  if (count >= 22) return 1.55;
+  if (count >= 14) return 1.3;
+  return 1;
 }
 
 function stream(start, edge, positions, type, count, interval = 0.16) {
