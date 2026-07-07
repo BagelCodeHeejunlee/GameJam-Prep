@@ -189,13 +189,14 @@ button {
 
 .battle-start-action {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 92px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 78px;
   gap: 8px;
   min-height: 0;
 }
 
 .battle-start-action .meta-primary {
   min-height: 0;
+  font-size: 13px;
 }
 
 .battle-start-action .meta-secondary {

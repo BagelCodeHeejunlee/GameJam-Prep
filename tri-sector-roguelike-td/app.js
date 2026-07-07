@@ -47,6 +47,7 @@ const HERO_SCALE = 0.64;
 const ROTATION_SPEED = 240;
 const ROTATION_ACCEL = 1600;
 const ROTATION_DECEL = 2200;
+const ROTATION_SNAP_SPEED = 720;
 const ROTATION_ATTACK_LOCK = 0.08;
 const XP_BASE_REQUIREMENT = 24;
 const XP_LINEAR_GROWTH = 7;
@@ -89,7 +90,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "stage1-five-second-delay-20260707-1";
+const SPRITE_VERSION = "rotation-mode-starts-20260708-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -1522,13 +1523,14 @@ function refreshMetaPreviewState() {
   syncUi();
 }
 
-function createState() {
+function createState(rotationMode = "free") {
   enemyId = 1;
   const towerHp = 180 + getTalentLevel("tower_fortify") * 18 + getGearLevel("armor") * 8;
   const startingXp = getTalentLevel("start_xp") * 4;
   const stage = currentStageConfig();
   return {
     phase: "playing",
+    rotationMode,
     stage,
     waves: stage.waves,
     time: 0,
@@ -1568,11 +1570,14 @@ function heroBlueprintById(id) {
 function createHero(blueprint, index) {
   const slot = index * 2;
   const metaStats = combatStatsForBlueprint(blueprint);
+  const aimAngle = HERO_ANGLES[slot];
   return {
     ...blueprint,
     ...metaStats,
     slot,
-    aimAngle: HERO_ANGLES[slot],
+    aimAngle,
+    snapAngle: aimAngle,
+    snapTargetAngle: aimAngle,
     rotateT: 1,
     attackTimer: index * 0.18,
     growthPicked: {},
@@ -1628,6 +1633,9 @@ function heroVisualPosition(hero, distance = 0) {
 }
 
 function isRotating() {
+  if (isSnapRotationMode()) {
+    return state.heroes.some((hero) => Math.abs((hero.snapTargetAngle ?? hero.snapAngle ?? hero.aimAngle) - (hero.snapAngle ?? hero.aimAngle)) > 0.5);
+  }
   return Math.abs(state.rotationVelocity) > 0.5 || state.rotationInput !== 0;
 }
 
@@ -1661,6 +1669,11 @@ function update(dt) {
 }
 
 function updateRotation(dt) {
+  if (isSnapRotationMode()) {
+    updateSnapRotation(dt);
+    return;
+  }
+
   const targetVelocity = state.rotationInput * ROTATION_SPEED;
   const rate = state.rotationInput === 0 ? ROTATION_DECEL : ROTATION_ACCEL;
   state.rotationVelocity = approach(state.rotationVelocity, targetVelocity, rate * dt);
@@ -1679,6 +1692,34 @@ function updateRotation(dt) {
   }
 
   for (const hero of state.heroes) hero.rotateT = 1;
+}
+
+function updateSnapRotation(dt) {
+  let anyRotating = false;
+  const maxDelta = ROTATION_SNAP_SPEED * dt;
+
+  for (const hero of state.heroes) {
+    if (!Number.isFinite(hero.snapAngle)) hero.snapAngle = hero.aimAngle;
+    if (!Number.isFinite(hero.snapTargetAngle)) hero.snapTargetAngle = hero.snapAngle;
+
+    const diff = hero.snapTargetAngle - hero.snapAngle;
+    if (Math.abs(diff) <= 0.5) {
+      hero.snapAngle = hero.snapTargetAngle;
+      hero.aimAngle = normalizeAngle(hero.snapAngle);
+      hero.rotateT = 1;
+      continue;
+    }
+
+    const delta = clamp(diff, -maxDelta, maxDelta);
+    hero.snapAngle += delta;
+    hero.aimAngle = normalizeAngle(hero.snapAngle);
+    hero.rotateT = 0;
+    hero.attackTimer = Math.max(hero.attackTimer, ROTATION_ATTACK_LOCK);
+    state.rotationCount += Math.abs(delta) / 360;
+    anyRotating = true;
+  }
+
+  if (!anyRotating) state.rotationInput = 0;
 }
 
 function spawnWaveEnemies() {
@@ -3849,12 +3890,12 @@ function showMetaScreen(tab = metaTab) {
   syncUi();
 }
 
-function startBattle() {
+function startBattle(rotationMode = "free") {
   clearUpgradeChoiceLock();
   clearRewardRevealTimers();
   clearTimeout(bossBannerTimer);
   bossBannerTimer = 0;
-  state = createState();
+  state = createState(rotationMode);
   ui.metaScreen.classList.add("hidden");
   ui.upgradeOverlay.classList.add("hidden");
   ui.resultOverlay.classList.add("hidden");
@@ -3934,7 +3975,9 @@ function renderBattleMeta() {
         </div>
       </section>
       <section class="battle-start-action">
-        <button class="meta-primary" type="button" data-action="start-battle">전투 시작</button>
+        <button class="meta-primary rotation-start-button" type="button" data-action="start-battle" data-rotation-mode="snap3">3방향</button>
+        <button class="meta-primary rotation-start-button" type="button" data-action="start-battle" data-rotation-mode="snap6">6방향</button>
+        <button class="meta-primary rotation-start-button" type="button" data-action="start-battle" data-rotation-mode="free">자유</button>
         <button class="meta-secondary reset-progress-button" type="button" data-action="reset-progress">초기화</button>
       </section>
     </div>
@@ -4532,12 +4575,17 @@ canvas.addEventListener("pointerdown", (event) => {
   if (state.phase !== "playing") return;
   state.rotationPointerId = event.pointerId;
   canvas.setPointerCapture?.(event.pointerId);
+  if (isSnapRotationMode()) {
+    queueSnapRotation(pointerRotationDirection(event));
+    return;
+  }
   setRotationInput(pointerRotationDirection(event));
 });
 
 canvas.addEventListener("pointermove", (event) => {
   if (state.rotationPointerId !== event.pointerId) return;
   event.preventDefault();
+  if (isSnapRotationMode()) return;
   setRotationInput(pointerRotationDirection(event));
 });
 
@@ -4548,6 +4596,32 @@ canvas.addEventListener("pointerleave", stopPointerRotation);
 function pointerRotationDirection(event) {
   const rect = canvas.getBoundingClientRect();
   return event.clientX - rect.left >= rect.width / 2 ? 1 : -1;
+}
+
+function isSnapRotationMode(mode = state?.rotationMode) {
+  return mode === "snap3" || mode === "snap6";
+}
+
+function rotationStepForMode(mode = state?.rotationMode) {
+  if (mode === "snap3") return 120;
+  if (mode === "snap6") return 60;
+  return 0;
+}
+
+function queueSnapRotation(direction) {
+  const step = rotationStepForMode();
+  const dir = Math.sign(direction);
+  if (!step || !dir) return;
+
+  state.rotationInput = 0;
+  state.rotationVelocity = 0;
+  for (const hero of state.heroes) {
+    if (!Number.isFinite(hero.snapAngle)) hero.snapAngle = hero.aimAngle;
+    if (!Number.isFinite(hero.snapTargetAngle)) hero.snapTargetAngle = hero.snapAngle;
+    hero.snapTargetAngle += dir * step;
+    hero.rotateT = 0;
+    hero.attackTimer = Math.max(hero.attackTimer, ROTATION_ATTACK_LOCK);
+  }
 }
 
 function setRotationInput(direction) {
@@ -4565,7 +4639,11 @@ function clearRotationInput() {
   state.rotationInput = 0;
   state.rotationVelocity = 0;
   state.rotationPointerId = null;
-  for (const hero of state.heroes) hero.rotateT = 1;
+  for (const hero of state.heroes) {
+    hero.snapAngle = hero.aimAngle;
+    hero.snapTargetAngle = hero.aimAngle;
+    hero.rotateT = 1;
+  }
 }
 
 function stopPointerRotation(event) {
@@ -4573,6 +4651,7 @@ function stopPointerRotation(event) {
   event.preventDefault();
   canvas.releasePointerCapture?.(event.pointerId);
   state.rotationPointerId = null;
+  if (isSnapRotationMode()) return;
   setRotationInput(0);
 }
 
@@ -4636,7 +4715,7 @@ ui.metaContent.addEventListener("click", (event) => {
   }
 
   if (button.dataset.action === "start-battle") {
-    startBattle();
+    startBattle(button.dataset.rotationMode || "free");
   } else if (button.dataset.action === "reset-progress") {
     resetMetaProgress();
   } else if (button.dataset.action === "hero-list") {
