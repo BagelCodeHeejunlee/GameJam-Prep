@@ -90,7 +90,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "starting-three-heroes-20260708-1";
+const SPRITE_VERSION = "starting-full-party-20260708-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -331,11 +331,11 @@ const STAGE_CONFIGS = [
     number: 1,
     name: "회전 입문",
     waveCount: 5,
-    heroLimit: 1,
+    heroLimit: 3,
     enemyHpMultiplier: 0.78,
     enemySpeedMultiplier: 0.92,
     availableHeroIds: ["archer", "warrior", "mage"],
-    recommendedLineup: ["archer"],
+    recommendedLineup: ["archer", "warrior", "mage"],
     unlockHeroId: null,
     waves: STAGE_1_WAVES,
   },
@@ -343,11 +343,11 @@ const STAGE_CONFIGS = [
     number: 2,
     name: "양면 압박",
     waveCount: 10,
-    heroLimit: 2,
+    heroLimit: 3,
     enemyHpMultiplier: 0.95,
     enemySpeedMultiplier: 0.95,
     availableHeroIds: ["archer", "warrior", "mage"],
-    recommendedLineup: ["archer", "warrior"],
+    recommendedLineup: ["archer", "warrior", "mage"],
     unlockHeroId: null,
     waves: STAGE_2_WAVES,
   },
