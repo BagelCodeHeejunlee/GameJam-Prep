@@ -40,7 +40,7 @@ const ui = {
 
 const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
-const META_STORAGE_KEY = "rotation-keepers-meta-v2";
+const META_STORAGE_KEY = "rotation-keepers-meta-v3";
 const HERO_ANGLES = [-90, -30, 30, 90, 150, 210];
 const ENEMY_SCALE = 0.48;
 const HERO_SCALE = 0.64;
@@ -89,7 +89,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "engineer-power-growth-capacity-20260707-1";
+const SPRITE_VERSION = "meta-reset-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -1182,7 +1182,7 @@ function createDefaultMetaState() {
   }
 
   return {
-    version: 2,
+    version: 3,
     resources: {
       gold: 1400,
       heroXp: 720,
