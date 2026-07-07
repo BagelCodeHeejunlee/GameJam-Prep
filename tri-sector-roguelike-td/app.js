@@ -89,7 +89,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "explicit-reinforcement-wave-data-20260707-1";
+const SPRITE_VERSION = "engineer-trap-density-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -246,23 +246,23 @@ const HERO_BLUEPRINTS = [
     glyph: "공",
     color: "#62e69f",
     glow: "rgba(98, 230, 159, 0.42)",
-    damage: 12,
-    range: 122,
-    angle: 70,
-    cooldown: 1.08,
-    trapRadius: 8,
-    trapTriggerRadius: 5,
+    damage: 14,
+    range: 128,
+    angle: 76,
+    cooldown: 0.92,
+    trapRadius: 9.5,
+    trapTriggerRadius: 6.6,
     trapArmDelay: 0.24,
     trapLifetime: null,
     trapPersistent: true,
-    trapCount: 2,
-    trapSpread: 20,
+    trapCount: 3,
+    trapSpread: 22,
     trapCharges: 1,
     trapRearmDelay: 0.18,
     trapSlowDuration: 0,
     trapSlowFactor: 0.55,
     trapExpireExplodes: false,
-    maxTraps: 36,
+    maxTraps: 54,
     ultimateEvery: 5,
     initialSlot: 4,
   },
@@ -928,7 +928,7 @@ const heroUpgrades = [
     text: "공병이 한 번에 설치하는 지뢰 +1",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 6;
+      hero.maxTraps += 9;
     },
   },
   {
@@ -957,9 +957,9 @@ const heroUpgrades = [
     tier: "기본",
     maxRank: 5,
     title: "고폭 장약",
-    text: "공병 지뢰 피해 +3",
+    text: "공병 지뢰 피해 +4",
     apply: (hero) => {
-      hero.damage += 3;
+      hero.damage += 4;
     },
   },
   {
@@ -970,7 +970,7 @@ const heroUpgrades = [
     title: "빠른 매설",
     text: "공병 설치 간격 -7%",
     apply: (hero) => {
-      hero.cooldown = Math.max(0.72, hero.cooldown * 0.93);
+      hero.cooldown = Math.max(0.62, hero.cooldown * 0.93);
     },
   },
   {
@@ -981,8 +981,8 @@ const heroUpgrades = [
     title: "폭약 반경",
     text: "공병 지뢰 폭발/감지 반경 증가",
     apply: (hero) => {
-      hero.trapRadius += 1.2;
-      hero.trapTriggerRadius += 0.45;
+      hero.trapRadius += 1.6;
+      hero.trapTriggerRadius += 0.75;
     },
   },
   {
@@ -994,10 +994,10 @@ const heroUpgrades = [
     apply: (hero) => {
       hero.breakthrough = true;
       hero.trapCount = Math.max(hero.trapCount + 1, 2);
-      hero.trapRadius += 1.5;
-      hero.trapTriggerRadius += 1.2;
+      hero.trapRadius += 2;
+      hero.trapTriggerRadius += 1.8;
       hero.trapSlowDuration += 0.45;
-      hero.maxTraps += 12;
+      hero.maxTraps += 18;
       state.shake = 0.5;
       addRing(tower().x, tower().y, hero.color, 14, 0.48);
     },
@@ -1010,7 +1010,7 @@ const heroUpgrades = [
     text: "공병 설치 지뢰 +1, 최대 유지 지뢰 증가",
     apply: (hero) => {
       hero.trapCount += 1;
-      hero.maxTraps += 12;
+      hero.maxTraps += 16;
     },
   },
   {
@@ -1020,8 +1020,8 @@ const heroUpgrades = [
     title: "감지 신관",
     text: "지뢰 감지 반경과 폭발 반경 증가",
     apply: (hero) => {
-      hero.trapTriggerRadius += 1.5;
-      hero.trapRadius += 1.2;
+      hero.trapTriggerRadius += 2.2;
+      hero.trapRadius += 1.8;
     },
   },
   {
@@ -1966,7 +1966,7 @@ function attackEngineer(hero) {
   return true;
 }
 
-function randomEngineerTrapPosition(hero, aim, minRatio = 0.38, maxRatio = 0.94) {
+function randomEngineerTrapPosition(hero, aim, minRatio = 0.28, maxRatio = 0.94) {
   const t = tower();
   const safeMin = clamp(minRatio, 0, 0.95);
   const safeMax = clamp(Math.max(maxRatio, safeMin + 0.05), safeMin + 0.05, 1);
@@ -2121,14 +2121,14 @@ function triggerMageUltimate(hero, target) {
 function triggerEngineerUltimate(hero) {
   const aim = heroAim(hero);
   const t = tower();
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 6; index += 1) {
     const position = randomEngineerTrapPosition(hero, aim, 0.36, 0.98);
     addTrap(hero, {
       x: position.x,
       y: position.y,
-      damage: Math.round(hero.damage * 1.35),
-      radius: hero.trapRadius + 1.25,
-      triggerRadius: hero.trapTriggerRadius + 1,
+      damage: Math.round(hero.damage * 1.45),
+      radius: hero.trapRadius + 2,
+      triggerRadius: hero.trapTriggerRadius + 1.4,
       armDelay: 0.08 + index * 0.035,
       charges: 1,
       ultimate: true,
