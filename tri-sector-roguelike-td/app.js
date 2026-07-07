@@ -52,6 +52,8 @@ const XP_BASE_REQUIREMENT = 24;
 const XP_LINEAR_GROWTH = 7;
 const XP_QUADRATIC_GROWTH = 0.6;
 const UPGRADE_INPUT_LOCK_MS = 700;
+const CONTINUOUS_WAVE_DELAY = 0.7;
+const REWARD_WAVE_DELAY = 1.05;
 const VERSION_LABEL = "TRI-KEEPERS";
 const MAX_HERO_LEVEL = 30;
 const MAX_HERO_STAR = 5;
@@ -87,7 +89,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "sustained-trap-balance-20260707-1";
+const SPRITE_VERSION = "continuous-wave-flow-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -1092,7 +1094,7 @@ function spawn(time, edge, pos, type) {
 }
 
 function wave(...plans) {
-  return paceWave(plans.flat().sort((a, b) => a.time - b.time));
+  return sustainWave(paceWave(plans.flat().sort((a, b) => a.time - b.time)));
 }
 
 function paceWave(plans) {
@@ -1105,12 +1107,53 @@ function paceWave(plans) {
 }
 
 function wavePaceScale(count) {
-  if (count >= 60) return 2.45;
-  if (count >= 45) return 2.15;
-  if (count >= 32) return 1.85;
-  if (count >= 22) return 1.55;
-  if (count >= 14) return 1.3;
+  if (count >= 60) return 2.85;
+  if (count >= 45) return 2.45;
+  if (count >= 32) return 2.15;
+  if (count >= 22) return 1.8;
+  if (count >= 14) return 1.45;
   return 1;
+}
+
+function sustainWave(plans) {
+  const extraCount = sustainedExtraCount(plans.length);
+  if (extraCount <= 0) return plans;
+
+  const pool = plans.filter((plan) => plan.type === "swarm" || plan.type === "runner" || plan.type === "grunt");
+  if (!pool.length) return plans;
+
+  const lastTime = plans.length ? plans[plans.length - 1].time : 0;
+  const interval = sustainedExtraInterval(plans.length);
+  const extras = Array.from({ length: extraCount }, (_, index) => {
+    const source = pool[(index * 5 + plans.length) % pool.length];
+    const laneIndex = (index * 3 + plans.length) % SURROUND_LANES.length;
+    const lane = SURROUND_LANES[laneIndex];
+    return spawn(
+      roundTime(lastTime + 0.55 + index * interval),
+      lane[0],
+      formationPos(lane[1], index + plans.length, laneIndex, Math.floor(index / SURROUND_LANES.length), SURROUND_LANES.length, source.type),
+      source.type
+    );
+  });
+
+  return [...plans, ...extras].sort((a, b) => a.time - b.time);
+}
+
+function sustainedExtraCount(count) {
+  if (count >= 60) return 28;
+  if (count >= 45) return 22;
+  if (count >= 32) return 16;
+  if (count >= 22) return 10;
+  if (count >= 14) return 6;
+  return 0;
+}
+
+function sustainedExtraInterval(count) {
+  if (count >= 60) return 0.22;
+  if (count >= 45) return 0.24;
+  if (count >= 32) return 0.26;
+  if (count >= 22) return 0.28;
+  return 0.32;
 }
 
 function stream(start, edge, positions, type, count, interval = 0.16) {
@@ -3023,17 +3066,41 @@ function updateFloatingTexts(dt) {
 function checkWaveClear() {
   const wave = state.waves[state.waveIndex];
   if (!wave) return;
-  if (state.nextSpawn >= wave.length && state.enemies.length === 0) {
-    state.waveIndex += 1;
-    if (state.waveIndex >= state.waves.length) {
-      finish(true);
-      return;
-    }
-    state.waveTime = 0;
-    state.nextSpawn = 0;
-    state.waveBanner = 1.2;
-    pulseToast("WAVE " + (state.waveIndex + 1));
+  if (state.nextSpawn < wave.length) return;
+
+  const finalWave = state.waveIndex >= state.waves.length - 1;
+  if (finalWave) {
+    if (state.enemies.length === 0) finish(true);
+    return;
   }
+
+  const nextWave = state.waves[state.waveIndex + 1];
+  const currentRewardWave = waveHasRewardEnemy(wave);
+  const nextRewardWave = waveHasRewardEnemy(nextWave);
+  const requiresClear = currentRewardWave || nextRewardWave;
+  const delay = nextRewardWave || currentRewardWave ? REWARD_WAVE_DELAY : CONTINUOUS_WAVE_DELAY;
+  const lastSpawnTime = wave.length ? wave[wave.length - 1].time : 0;
+
+  if (state.waveTime < lastSpawnTime + delay) return;
+  if (requiresClear && state.enemies.length > 0) return;
+
+  advanceWave();
+}
+
+function waveHasRewardEnemy(wave) {
+  return !!wave?.some((plan) => TYPES[plan.type]?.reward);
+}
+
+function advanceWave() {
+  state.waveIndex += 1;
+  if (state.waveIndex >= state.waves.length) {
+    finish(true);
+    return;
+  }
+  state.waveTime = 0;
+  state.nextSpawn = 0;
+  state.waveBanner = 1.2;
+  pulseToast("WAVE " + (state.waveIndex + 1));
 }
 
 function calculateStageRewards(won) {
