@@ -189,11 +189,24 @@ button {
 
 .battle-start-action {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 8px;
   min-height: 0;
 }
 
 .battle-start-action .meta-primary {
   min-height: 0;
+}
+
+.battle-start-action .meta-secondary {
+  min-height: 0;
+  font-size: 12px;
+}
+
+.reset-progress-button {
+  color: #ffdfdf;
+  border-color: rgba(255, 135, 135, 0.3);
+  background: rgba(116, 35, 43, 0.5);
 }
 
 .meta-screen.hero-detail-mode {

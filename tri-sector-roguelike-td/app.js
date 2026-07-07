@@ -89,7 +89,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "meta-reset-20260707-1";
+const SPRITE_VERSION = "meta-reset-button-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -1236,6 +1236,19 @@ function mergeMetaState(defaults, saved) {
 function saveMetaState() {
   if (typeof localStorage === "undefined") return;
   localStorage.setItem(META_STORAGE_KEY, JSON.stringify(metaState));
+}
+
+function resetMetaProgress() {
+  const confirmed = typeof window === "undefined" || window.confirm("진행 데이터를 초기화하고 1레벨부터 다시 시작할까요?");
+  if (!confirmed) return;
+  metaState = createDefaultMetaState();
+  metaTab = "battle";
+  metaHeroView = "list";
+  selectedMetaHeroId = "archer";
+  selectedHeroDetailTab = "level";
+  saveMetaState();
+  refreshMetaPreviewState();
+  renderMeta();
 }
 
 function getHeroMeta(heroId) {
@@ -3908,6 +3921,7 @@ function renderBattleMeta() {
       </section>
       <section class="battle-start-action">
         <button class="meta-primary" type="button" data-action="start-battle">전투 시작</button>
+        <button class="meta-secondary reset-progress-button" type="button" data-action="reset-progress">초기화</button>
       </section>
     </div>
   `;
@@ -4609,6 +4623,8 @@ ui.metaContent.addEventListener("click", (event) => {
 
   if (button.dataset.action === "start-battle") {
     startBattle();
+  } else if (button.dataset.action === "reset-progress") {
+    resetMetaProgress();
   } else if (button.dataset.action === "hero-list") {
     metaHeroView = "list";
     renderMeta();
