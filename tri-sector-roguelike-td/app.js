@@ -90,7 +90,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "rotation-mode-starts-20260708-1";
+const SPRITE_VERSION = "starting-three-heroes-20260708-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -110,7 +110,7 @@ const ENEMY_SPRITES = {
   boss: { x: 836, y: 636, w: 388, h: 417 },
 };
 
-const STARTING_HERO_IDS = ["archer"];
+const STARTING_HERO_IDS = ["archer", "warrior", "mage"];
 
 const TALENTS = [
   {
@@ -334,21 +334,21 @@ const STAGE_CONFIGS = [
     heroLimit: 1,
     enemyHpMultiplier: 0.78,
     enemySpeedMultiplier: 0.92,
-    availableHeroIds: ["archer"],
+    availableHeroIds: ["archer", "warrior", "mage"],
     recommendedLineup: ["archer"],
-    unlockHeroId: "warrior",
+    unlockHeroId: null,
     waves: STAGE_1_WAVES,
   },
   {
     number: 2,
-    name: "전사 합류",
+    name: "양면 압박",
     waveCount: 10,
     heroLimit: 2,
     enemyHpMultiplier: 0.95,
     enemySpeedMultiplier: 0.95,
-    availableHeroIds: ["archer", "warrior"],
+    availableHeroIds: ["archer", "warrior", "mage"],
     recommendedLineup: ["archer", "warrior"],
-    unlockHeroId: "mage",
+    unlockHeroId: null,
     waves: STAGE_2_WAVES,
   },
   {
