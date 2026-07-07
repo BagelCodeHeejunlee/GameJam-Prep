@@ -89,7 +89,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "per-wave-delay-data-20260707-1";
+const SPRITE_VERSION = "stage1-five-second-delay-20260707-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -269,11 +269,11 @@ const HERO_BLUEPRINTS = [
 ];
 
 const STAGE_1_WAVES = [
-  wave({ nextDelay: 1.75 }, stream(0.45, "top", [0.46, 0.54], "swarm", 3, 0.62)),
-  wave({ nextDelay: 1.75 }, stream(0.35, "left", [0.42, 0.52], "swarm", 3, 0.5), spawn(2.45, "bottom", 0.54, "swarm"), spawn(3.05, "left", 0.6, "grunt")),
-  wave({ nextDelay: 1.85 }, stream(0.32, "right", [0.34, 0.5, 0.66], "swarm", 5, 0.36), spawn(2.25, "top", 0.5, "grunt"), spawn(3.05, "bottom", 0.58, "runner")),
-  wave({ nextDelay: 2.1 }, stream(0.28, "top", [0.32, 0.5, 0.68], "swarm", 5, 0.28), spawn(1.95, "left", 0.45, "grunt"), spawn(2.45, "right", 0.55, "grunt"), spawn(3.25, "bottom", 0.5, "runner")),
-  wave({ nextDelay: 2.4 }, stream(0.28, "left", [0.42, 0.52], "swarm", 4, 0.26), stream(0.95, "right", [0.45, 0.55], "swarm", 4, 0.26), spawn(1.8, "top", 0.5, "grunt"), spawn(3.0, "bottom", 0.5, "tank")),
+  wave({ nextDelay: 5 }, stream(0.45, "top", [0.46, 0.54], "swarm", 3, 0.62)),
+  wave({ nextDelay: 5 }, stream(0.35, "left", [0.42, 0.52], "swarm", 3, 0.5), spawn(2.45, "bottom", 0.54, "swarm"), spawn(3.05, "left", 0.6, "grunt")),
+  wave({ nextDelay: 5 }, stream(0.32, "right", [0.34, 0.5, 0.66], "swarm", 5, 0.36), spawn(2.25, "top", 0.5, "grunt"), spawn(3.05, "bottom", 0.58, "runner")),
+  wave({ nextDelay: 5 }, stream(0.28, "top", [0.32, 0.5, 0.68], "swarm", 5, 0.28), spawn(1.95, "left", 0.45, "grunt"), spawn(2.45, "right", 0.55, "grunt"), spawn(3.25, "bottom", 0.5, "runner")),
+  wave({ nextDelay: 5 }, stream(0.28, "left", [0.42, 0.52], "swarm", 4, 0.26), stream(0.95, "right", [0.45, 0.55], "swarm", 4, 0.26), spawn(1.8, "top", 0.5, "grunt"), spawn(3.0, "bottom", 0.5, "tank")),
 ];
 
 const STAGE_2_WAVES = [
