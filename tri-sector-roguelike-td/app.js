@@ -90,7 +90,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "fewer-monsters-20260708-1";
+const SPRITE_VERSION = "unified-attack-angles-20260708-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -173,7 +173,7 @@ const HERO_BLUEPRINTS = [
     glow: "rgba(111, 214, 255, 0.42)",
     damage: 26,
     range: 135,
-    angle: 55,
+    angle: 120,
     cooldown: 0.82,
     projectileSpeed: 560,
     pierce: 0,
@@ -186,13 +186,13 @@ const HERO_BLUEPRINTS = [
   {
     id: "sniper",
     name: "저격수",
-    role: "15도 정밀 관통",
+    role: "초장거리 관통",
     glyph: "저",
     color: "#f7e36a",
     glow: "rgba(247, 227, 106, 0.42)",
     damage: 68,
     range: 166,
-    angle: 15,
+    angle: 120,
     cooldown: 1.55,
     projectileSpeed: 760,
     projectileRadius: 5,
@@ -212,7 +212,7 @@ const HERO_BLUEPRINTS = [
     glow: "rgba(255, 141, 98, 0.42)",
     damage: 34,
     range: 58,
-    angle: 95,
+    angle: 120,
     cooldown: 0.92,
     targets: 1,
     towerBonus: 0,
@@ -229,7 +229,7 @@ const HERO_BLUEPRINTS = [
     glow: "rgba(200, 155, 255, 0.42)",
     damage: 16,
     range: 118,
-    angle: 80,
+    angle: 120,
     cooldown: 1.15,
     blastRadius: 34,
     castDelay: 0.35,
@@ -249,7 +249,7 @@ const HERO_BLUEPRINTS = [
     glow: "rgba(98, 230, 159, 0.42)",
     damage: 20,
     range: 128,
-    angle: 76,
+    angle: 120,
     cooldown: 1.08,
     trapRadius: 9.5,
     trapTriggerRadius: 6.6,
@@ -754,10 +754,10 @@ const heroUpgrades = [
     heroId: "warrior",
     tier: "고급",
     title: "압도 베기",
-    text: "전사 타격 수 +1, 공격각 소폭 증가",
+    text: "전사 타격 수 +1, 공격력 소폭 증가",
     apply: (hero) => {
       hero.targets += 1;
-      hero.angle += 6;
+      hero.damage += 3;
     },
   },
   {
