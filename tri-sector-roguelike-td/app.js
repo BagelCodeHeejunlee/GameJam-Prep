@@ -49,6 +49,10 @@ const ROTATION_ACCEL = 1600;
 const ROTATION_DECEL = 2200;
 const ROTATION_SNAP_SPEED = 720;
 const ROTATION_ATTACK_LOCK = 0.08;
+const THREE_SECTOR_BOUNDARY_ANGLES = [-30, 90, -150];
+const SPAWN_BOUNDARY_SAFE_ANGLE = 10;
+const SPAWN_EDGE_MIN_POS = 0.08;
+const SPAWN_EDGE_MAX_POS = 0.92;
 const XP_BASE_REQUIREMENT = 24;
 const XP_LINEAR_GROWTH = 7;
 const XP_QUADRATIC_GROWTH = 0.6;
@@ -90,7 +94,7 @@ const SURROUND_LANES = [
   ["bottom", 0.34],
   ["left", 0.32],
 ];
-const SPRITE_VERSION = "unified-attack-angles-20260708-1";
+const SPRITE_VERSION = "sector-safe-spawns-20260708-1";
 const SPRITE_ASSETS = {
   heroes: loadSpriteImage(`assets/sprites/heroes.png?v=${SPRITE_VERSION}`),
   enemies: loadSpriteImage(`assets/sprites/enemies.png?v=${SPRITE_VERSION}`),
@@ -1733,22 +1737,8 @@ function spawnWaveEnemies() {
 function createEnemy(plan) {
   const type = TYPES[plan.type];
   const pad = 6;
-  let x = cssWidth * 0.5;
-  let y = cssHeight * 0.5;
-
-  if (plan.edge === "top") {
-    x = cssWidth * plan.pos;
-    y = pad;
-  } else if (plan.edge === "bottom") {
-    x = cssWidth * plan.pos;
-    y = cssHeight - pad;
-  } else if (plan.edge === "left") {
-    x = pad;
-    y = cssHeight * plan.pos;
-  } else {
-    x = cssWidth - pad;
-    y = cssHeight * plan.pos;
-  }
+  const spawnPoint = resolveEnemySpawnPoint(plan, pad);
+  const { x, y } = spawnPoint;
 
   const hpMultiplier = state.stage.enemyHpMultiplier ?? 1;
   const speedMultiplier = state.stage.enemySpeedMultiplier ?? 1;
@@ -1778,6 +1768,50 @@ function createEnemy(plan) {
   });
   if (type.reward) showBossBanner(type);
   enemyId += 1;
+}
+
+function resolveEnemySpawnPoint(plan, pad) {
+  const edge = plan.edge || "right";
+  const basePos = Number.isFinite(plan.pos) ? plan.pos : 0.5;
+  const basePoint = enemySpawnPoint(edge, basePos, pad);
+  if (distanceFromThreeSectorBoundary(spawnAngleFromTower(basePoint)) >= SPAWN_BOUNDARY_SAFE_ANGLE) return basePoint;
+
+  const preferredDirection = (Math.round((plan.time || 0) * 100) + enemyId) % 2 === 0 ? -1 : 1;
+  const candidates = [];
+  for (let step = 1; step <= 28; step += 1) {
+    for (const direction of [preferredDirection, -preferredDirection]) {
+      const pos = clamp(basePos + direction * step * 0.01, SPAWN_EDGE_MIN_POS, SPAWN_EDGE_MAX_POS);
+      if (pos === basePos) continue;
+      const point = enemySpawnPoint(edge, pos, pad);
+      candidates.push({
+        point,
+        shift: Math.abs(pos - basePos),
+        distance: distanceFromThreeSectorBoundary(spawnAngleFromTower(point)),
+        preferred: direction === preferredDirection ? 0 : 1,
+      });
+    }
+  }
+
+  const safeCandidates = candidates.filter((candidate) => candidate.distance >= SPAWN_BOUNDARY_SAFE_ANGLE);
+  const pool = safeCandidates.length ? safeCandidates : candidates;
+  pool.sort((a, b) => a.shift - b.shift || a.preferred - b.preferred || b.distance - a.distance);
+  return pool[0]?.point || basePoint;
+}
+
+function enemySpawnPoint(edge, pos, pad) {
+  if (edge === "top") return { x: cssWidth * pos, y: pad };
+  if (edge === "bottom") return { x: cssWidth * pos, y: cssHeight - pad };
+  if (edge === "left") return { x: pad, y: cssHeight * pos };
+  return { x: cssWidth - pad, y: cssHeight * pos };
+}
+
+function spawnAngleFromTower(point) {
+  const t = tower();
+  return Math.atan2(point.y - t.y, point.x - t.x) / DEG;
+}
+
+function distanceFromThreeSectorBoundary(angle) {
+  return Math.min(...THREE_SECTOR_BOUNDARY_ANGLES.map((boundary) => Math.abs(angleDiff(angle, boundary))));
 }
 
 function updateEnemies(dt) {
