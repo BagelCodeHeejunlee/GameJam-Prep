@@ -16,6 +16,17 @@ function boardWith(entries) {
 
 {
   const result = Engine.resolvePlacement(boardWith([
+    [5, { berry: 2, blueberry: 1 }],
+    [6, { berry: 3 }],
+  ]), 6);
+  assert.deepEqual(result.board[5].pieces, { blueberry: 1 }, "일치하지 않는 B1은 원래 판에 남아야 한다");
+  assert.deepEqual(result.board[6].pieces, { berry: 5 }, "새 A3 판에는 일치한 A2만 이동해야 한다");
+  assert.deepEqual(result.completed, []);
+  assert.deepEqual(result.emptied, []);
+}
+
+{
+  const result = Engine.resolvePlacement(boardWith([
     [5, { berry: 2, blueberry: 1, lemon: 1 }],
     [1, { berry: 4 }],
     [6, { blueberry: 2 }],

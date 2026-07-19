@@ -123,6 +123,12 @@
     const sourceIndexes = getNeighbors(index).filter((neighborIndex) =>
       !locked.has(neighborIndex) && board[neighborIndex]?.pieces[type] > 0
     );
+    // A source plate may contain several cake types. Pulling one matching type
+    // must never remove the other types from that source plate.
+    const sourceNonMatching = new Map(sourceIndexes.map((sourceIndex) => [
+      sourceIndex,
+      Object.fromEntries(Object.entries(board[sourceIndex].pieces).filter(([sourceType]) => sourceType !== type)),
+    ]));
     const supply = sourceIndexes.reduce((sum, sourceIndex) => sum + board[sourceIndex].pieces[type], 0);
     const wanted = Math.min(supply, PLATE_CAPACITY - target.pieces[type]);
     if (wanted <= 0) return null;
@@ -141,6 +147,14 @@
       target.pieces[type] = (target.pieces[type] || 0) + count;
       origins.push({ index: sourceIndex, count });
       remaining -= count;
+    }
+
+    for (const [sourceIndex, expected] of sourceNonMatching) {
+      for (const [sourceType, count] of Object.entries(expected)) {
+        if (board[sourceIndex].pieces[sourceType] !== count) {
+          throw new Error(`일치하지 않는 ${sourceType} 조각이 함께 이동했습니다.`);
+        }
+      }
     }
 
     const spread = spreadPieces(board, index, displaced, origins, locked);
