@@ -41,16 +41,26 @@
     return types.length === 1 && plate.pieces[types[0]] === PLATE_CAPACITY;
   }
 
-  function choosePullType(board, index, locked) {
+  function receivedKey(index, type) {
+    return `${index}:${type}`;
+  }
+
+  function choosePullType(board, index, locked, received = new Set()) {
     const plate = board[index];
     if (!plate) return null;
+    const free = PLATE_CAPACITY - totalPieces(plate);
     const candidates = Object.keys(plate.pieces).map((type) => {
       const incoming = getNeighbors(index).reduce((sum, neighborIndex) => {
-        if (locked.has(neighborIndex) || !board[neighborIndex]) return sum;
+        if (locked.has(neighborIndex) || !board[neighborIndex] || received.has(receivedKey(neighborIndex, type))) return sum;
         return sum + (board[neighborIndex].pieces[type] || 0);
       }, 0);
-      return { type, incoming, own: plate.pieces[type] || 0 };
-    }).filter((candidate) => candidate.incoming > 0 && candidate.own < PLATE_CAPACITY);
+      const own = plate.pieces[type] || 0;
+      const completionPossible = own + incoming >= PLATE_CAPACITY;
+      const movable = completionPossible
+        ? Math.min(incoming, PLATE_CAPACITY - own)
+        : Math.min(incoming, free);
+      return { type, incoming, own, movable };
+    }).filter((candidate) => candidate.movable > 0 && candidate.own < PLATE_CAPACITY);
 
     candidates.sort((a, b) =>
       b.incoming - a.incoming ||
@@ -84,7 +94,7 @@
     return accepted;
   }
 
-  function spreadPieces(board, centerIndex, displaced, origins, locked) {
+  function spreadPieces(board, centerIndex, displaced, origins, locked, received) {
     const moves = [];
     const recipients = [];
     const neighborOrder = getNeighbors(centerIndex);
@@ -105,6 +115,7 @@
         const accepted = addToPlate(board[destination], type, remaining);
         if (!accepted) continue;
         remaining -= accepted;
+        received.add(receivedKey(destination, type));
         moves.push({ type, count: accepted, to: destination });
         recipients.push({ index: destination, preferredType: type });
       }
@@ -116,12 +127,14 @@
     return { moves, recipients };
   }
 
-  function pullType(board, index, type, locked) {
+  function pullType(board, index, type, locked, received) {
     const target = board[index];
     if (!target || locked.has(index) || !target.pieces[type]) return null;
 
     const sourceIndexes = getNeighbors(index).filter((neighborIndex) =>
-      !locked.has(neighborIndex) && board[neighborIndex]?.pieces[type] > 0
+      !locked.has(neighborIndex) &&
+      board[neighborIndex]?.pieces[type] > 0 &&
+      !received.has(receivedKey(neighborIndex, type))
     );
     // A source plate may contain several cake types. Pulling one matching type
     // must never remove the other types from that source plate.
@@ -130,10 +143,13 @@
       Object.fromEntries(Object.entries(board[sourceIndex].pieces).filter(([sourceType]) => sourceType !== type)),
     ]));
     const supply = sourceIndexes.reduce((sum, sourceIndex) => sum + board[sourceIndex].pieces[type], 0);
-    const wanted = Math.min(supply, PLATE_CAPACITY - target.pieces[type]);
+    const free = PLATE_CAPACITY - totalPieces(target);
+    const completionPossible = target.pieces[type] + supply >= PLATE_CAPACITY;
+    const wanted = completionPossible
+      ? Math.min(supply, PLATE_CAPACITY - target.pieces[type])
+      : Math.min(supply, free);
     if (wanted <= 0) return null;
 
-    const free = PLATE_CAPACITY - totalPieces(target);
     const displaced = removeOtherPieces(target, type, Math.max(0, wanted - free));
     let remaining = wanted;
     const origins = [];
@@ -145,6 +161,7 @@
       source.pieces[type] -= count;
       cleanPieces(source);
       target.pieces[type] = (target.pieces[type] || 0) + count;
+      received.add(receivedKey(index, type));
       origins.push({ index: sourceIndex, count });
       remaining -= count;
     }
@@ -157,7 +174,7 @@
       }
     }
 
-    const spread = spreadPieces(board, index, displaced, origins, locked);
+    const spread = spreadPieces(board, index, displaced, origins, locked, received);
     return {
       event: { kind: "pull", target: index, type, count: wanted, origins, displaced, spread: spread.moves },
       recipients: spread.recipients,
@@ -171,6 +188,7 @@
     const events = [];
     const queue = [{ index: placedIndex, preferredType: null }];
     const attempts = new Map();
+    const received = new Set();
     let safety = 0;
 
     while (queue.length && safety < 48) {
@@ -184,10 +202,16 @@
 
       const type = item.preferredType && board[item.index].pieces[item.preferredType]
         ? item.preferredType
-        : choosePullType(board, item.index, locked);
+        : choosePullType(board, item.index, locked, received);
       if (!type) continue;
 
-      const result = pullType(board, item.index, type, locked);
+      let result = pullType(board, item.index, type, locked, received);
+      if (!result && item.preferredType) {
+        const fallbackType = choosePullType(board, item.index, locked, received);
+        if (fallbackType && fallbackType !== type) {
+          result = pullType(board, item.index, fallbackType, locked, received);
+        }
+      }
       if (!result) continue;
       events.push(result.event);
 

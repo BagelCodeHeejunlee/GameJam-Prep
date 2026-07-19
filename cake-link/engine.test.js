@@ -68,6 +68,27 @@ function applyAnimationSteps(inputBoard, steps) {
 }
 
 {
+  const initial = boardWith([
+    [5, { berry: 2, blueberry: 2, lemon: 2 }],
+    [4, { berry: 1, blueberry: 3, lemon: 2 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(result.events, [], "6칸이 꽉 찼고 어떤 색도 완성할 수 없으면 서로 교환하지 않아야 한다");
+  assert.deepEqual(result.settledBoard, initial);
+}
+
+{
+  const initial = boardWith([
+    [5, { berry: 3, blueberry: 3 }],
+    [4, { berry: 3, lemon: 3 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.equal(result.completed.length, 1, "꽉 찬 판이라도 이동 결과 같은 색 6개가 되면 교환할 수 있어야 한다");
+  assert.ok(result.events.length <= 2, "완성 가능한 교환이 왕복으로 반복되면 안 된다");
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
   const neighbors = Engine.getNeighbors(5);
   assert.deepEqual(neighbors, [1, 6, 9, 4], "우선순위는 상, 우, 하, 좌여야 한다");
 }
