@@ -266,10 +266,10 @@
     state.activeCells = new Set([fromIndex, toIndex]);
     elements.board.querySelector(`[data-cell="${fromIndex}"]`)?.classList.add("transferring");
     elements.board.querySelector(`[data-cell="${toIndex}"]`)?.classList.add("receiving");
-    await wait(230);
+    await wait(125);
   }
 
-  async function flySlice(fromIndex, toIndex, type) {
+  async function flySlice(fromIndex, toIndex, type, laneIndex = 0, laneCount = 1) {
     const fromCell = elements.board.querySelector(`[data-cell="${fromIndex}"]`);
     const toCell = elements.board.querySelector(`[data-cell="${toIndex}"]`);
     if (!fromCell || !toCell) return;
@@ -286,10 +286,13 @@
     const unitX = deltaX / distance;
     const unitY = deltaY / distance;
     const edgeOffset = Math.min(fromRect.width, fromRect.height) * .27;
-    const startX = fromX + unitX * edgeOffset;
-    const startY = fromY + unitY * edgeOffset;
-    const endX = toX - unitX * edgeOffset;
-    const endY = toY - unitY * edgeOffset;
+    const laneOffset = (laneIndex - (laneCount - 1) / 2) * Math.min(9, fromRect.width * .09);
+    const perpendicularX = -unitY;
+    const perpendicularY = unitX;
+    const startX = fromX + unitX * edgeOffset + perpendicularX * laneOffset;
+    const startY = fromY + unitY * edgeOffset + perpendicularY * laneOffset;
+    const endX = toX - unitX * edgeOffset + perpendicularX * laneOffset;
+    const endY = toY - unitY * edgeOffset + perpendicularY * laneOffset;
     const middleX = (startX + endX) / 2;
     const middleY = (startY + endY) / 2 - 10;
 
@@ -305,10 +308,16 @@
       { transform: `translate(-50%, -50%) scale(.92) rotate(${travelAngle - 4}deg)`, left: `${startX}px`, top: `${startY}px` },
       { transform: `translate(-50%, -72%) scale(1.08) rotate(${travelAngle + 3}deg)`, left: `${middleX}px`, top: `${middleY}px`, offset: .52 },
       { transform: `translate(-50%, -50%) scale(.92) rotate(${travelAngle}deg)`, left: `${endX}px`, top: `${endY}px` },
-    ], { duration: 240, easing: "cubic-bezier(.3,.7,.25,1)", fill: "forwards" });
-    playTone(560, .08, "sine");
+    ], { duration: 150, easing: "cubic-bezier(.3,.7,.25,1)", fill: "forwards" });
     await travel.finished.catch(() => {});
     movingSlice.remove();
+  }
+
+  async function flySliceGroup(fromIndex, toIndex, type, count) {
+    playTone(560, .06, "sine");
+    await Promise.all(Array.from({ length: count }, (_, index) =>
+      flySlice(fromIndex, toIndex, type, index, count)
+    ));
   }
 
   function removeOnePiece(board, fromIndex, type) {
@@ -329,31 +338,51 @@
     addOnePiece(board, toIndex, type);
   }
 
-  async function animateResolution(events, activeSession) {
-    const steps = Engine.buildAnimationSteps(events);
+  function transferSignature(step) {
+    const displaced = step.displaced
+      ? `${step.displaced.from}>${step.displaced.to}:${step.displaced.type}`
+      : "none";
+    return `${step.from}>${step.to}:${step.type}|${displaced}`;
+  }
+
+  function groupAnimationSteps(steps) {
+    const groups = [];
     for (const step of steps) {
+      const previous = groups.at(-1);
+      if (previous && transferSignature(previous[0]) === transferSignature(step)) previous.push(step);
+      else groups.push([step]);
+    }
+    return groups;
+  }
+
+  async function animateResolution(events, activeSession) {
+    const groups = groupAnimationSteps(Engine.buildAnimationSteps(events));
+    for (const group of groups) {
+      const step = group[0];
       if (activeSession !== sessionId) return false;
       await alignPlates(step.from, step.to, step.type, step.displaced?.type || null);
       if (activeSession !== sessionId) return false;
 
       if (step.displaced) {
-        await flySlice(step.from, step.to, step.type);
+        await flySliceGroup(step.from, step.to, step.type, group.length);
         const destinationIsFull = Engine.totalPieces(state.board[step.displaced.to]) >= Engine.PLATE_CAPACITY;
         await alignPlates(step.displaced.from, step.displaced.to, step.displaced.type, destinationIsFull ? step.type : null);
         if (activeSession !== sessionId) return false;
-        await flySlice(step.displaced.from, step.displaced.to, step.displaced.type);
-        moveOnePiece(state.board, step.from, step.to, step.type);
-        moveOnePiece(state.board, step.displaced.from, step.displaced.to, step.displaced.type);
+        await flySliceGroup(step.displaced.from, step.displaced.to, step.displaced.type, group.length);
+        for (const groupedStep of group) {
+          moveOnePiece(state.board, groupedStep.from, groupedStep.to, groupedStep.type);
+          moveOnePiece(state.board, groupedStep.displaced.from, groupedStep.displaced.to, groupedStep.displaced.type);
+        }
       } else {
-        removeOnePiece(state.board, step.from, step.type);
+        for (const groupedStep of group) removeOnePiece(state.board, groupedStep.from, groupedStep.type);
         renderBoard();
-        await wait(25);
-        await flySlice(step.from, step.to, step.type);
-        addOnePiece(state.board, step.to, step.type);
+        await wait(8);
+        await flySliceGroup(step.from, step.to, step.type, group.length);
+        for (const groupedStep of group) addOnePiece(state.board, groupedStep.to, groupedStep.type);
       }
 
       renderBoard();
-      await wait(45);
+      await wait(12);
     }
     return true;
   }
@@ -381,7 +410,7 @@
     state.activeCells = new Set([cellIndex]);
     playTone(245, .08, "sine");
     render();
-    await wait(260);
+    await wait(120);
     if (activeSession !== sessionId) return;
 
     let result;
@@ -399,7 +428,7 @@
       state.activeCells.clear();
       playTone(510, .09, "sine");
       renderBoard();
-      await wait(120);
+      await wait(45);
     }
 
     if (result.completed.length) {
@@ -410,7 +439,7 @@
       playComplete(combo);
       render();
       showToast(combo > 1 ? `${combo}판 연쇄 완성!` : "케이크 한 판 완성!");
-      await wait(620);
+      await wait(420);
       if (activeSession !== sessionId) return;
     } else if (result.emptied.length) {
       showToast("빈 판이 정리됐어요");
