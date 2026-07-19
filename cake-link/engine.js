@@ -59,10 +59,11 @@
       const movable = completionPossible
         ? Math.min(incoming, PLATE_CAPACITY - own)
         : Math.min(incoming, free);
-      return { type, incoming, own, movable };
+      return { type, incoming, own, total: own + incoming, movable };
     }).filter((candidate) => candidate.movable > 0 && candidate.own < PLATE_CAPACITY);
 
     candidates.sort((a, b) =>
+      b.total - a.total ||
       b.incoming - a.incoming ||
       b.own - a.own ||
       CAKE_ORDER.indexOf(a.type) - CAKE_ORDER.indexOf(b.type)
@@ -127,6 +128,51 @@
     return { moves, recipients };
   }
 
+  function spreadMatchingRemainders(board, sourceIndex, keepType, locked, received) {
+    const source = board[sourceIndex];
+    const events = [];
+    const recipients = [];
+    const touched = [sourceIndex];
+    const neighborOrder = getNeighbors(sourceIndex);
+
+    for (const type of CAKE_ORDER) {
+      if (type === keepType || !source.pieces[type]) continue;
+      let remaining = source.pieces[type];
+      const matching = neighborOrder
+        .filter((index) =>
+          !locked.has(index) &&
+          board[index]?.pieces[type] > 0 &&
+          totalPieces(board[index]) < PLATE_CAPACITY
+        )
+        .sort((a, b) => board[b].pieces[type] - board[a].pieces[type] || neighborOrder.indexOf(a) - neighborOrder.indexOf(b));
+      const moves = [];
+
+      for (const destination of matching) {
+        if (remaining <= 0) break;
+        const accepted = addToPlate(board[destination], type, remaining);
+        if (!accepted) continue;
+        source.pieces[type] -= accepted;
+        remaining -= accepted;
+        received.add(receivedKey(destination, type));
+        moves.push({ type, count: accepted, to: destination });
+        recipients.push({ index: destination, preferredType: type });
+        touched.push(destination);
+      }
+
+      if (moves.length) {
+        events.push({
+          kind: "spread",
+          source: sourceIndex,
+          type,
+          count: moves.reduce((sum, move) => sum + move.count, 0),
+          moves,
+        });
+      }
+    }
+    cleanPieces(source);
+    return { events, recipients, touched };
+  }
+
   function pullType(board, index, type, locked, received) {
     const target = board[index];
     if (!target || locked.has(index) || !target.pieces[type]) return null;
@@ -175,10 +221,19 @@
     }
 
     const spread = spreadPieces(board, index, displaced, origins, locked, received);
+    const remainderSpread = spreadMatchingRemainders(board, index, type, locked, received);
     return {
-      event: { kind: "pull", target: index, type, count: wanted, origins, displaced, spread: spread.moves },
-      recipients: spread.recipients,
-      touched: [index, ...origins.map((origin) => origin.index), ...spread.moves.map((move) => move.to)],
+      events: [
+        { kind: "pull", target: index, type, count: wanted, origins, displaced, spread: spread.moves },
+        ...remainderSpread.events,
+      ],
+      recipients: [...spread.recipients, ...remainderSpread.recipients],
+      touched: [
+        index,
+        ...origins.map((origin) => origin.index),
+        ...spread.moves.map((move) => move.to),
+        ...remainderSpread.touched,
+      ],
     };
   }
 
@@ -213,7 +268,7 @@
         }
       }
       if (!result) continue;
-      events.push(result.event);
+      events.push(...result.events);
 
       const uniqueTouched = [...new Set(result.touched)];
       for (const touchedIndex of uniqueTouched) {
@@ -238,6 +293,14 @@
   function buildAnimationSteps(events) {
     const steps = [];
     for (const event of events) {
+      if (event.kind === "spread") {
+        for (const move of event.moves) {
+          for (let count = 0; count < move.count; count += 1) {
+            steps.push({ from: event.source, to: move.to, type: event.type, displaced: null });
+          }
+        }
+        continue;
+      }
       const origins = event.origins.flatMap((origin) =>
         Array.from({ length: origin.count }, () => origin.index)
       );

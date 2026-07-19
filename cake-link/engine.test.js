@@ -69,6 +69,20 @@ function applyAnimationSteps(inputBoard, steps) {
 
 {
   const initial = boardWith([
+    [4, { berry: 2 }],
+    [5, { berry: 2, blueberry: 2 }],
+    [6, { blueberry: 1 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.equal(result.board[4], null, "A2를 모두 준 기존 판은 정리되어야 한다");
+  assert.deepEqual(result.board[5].pieces, { berry: 4 }, "새 판은 전체 합계가 많은 A4로 정렬되어야 한다");
+  assert.deepEqual(result.board[6].pieces, { blueberry: 3 }, "새 판의 B2는 주변 B1 판으로 이동해야 한다");
+  assert.equal(result.events.filter((event) => event.kind === "spread").length, 1);
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
+  const initial = boardWith([
     [5, { berry: 2, blueberry: 2, lemon: 2 }],
     [4, { berry: 1, blueberry: 3, lemon: 2 }],
   ]);
