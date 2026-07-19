@@ -83,6 +83,39 @@ function applyAnimationSteps(inputBoard, steps) {
 
 {
   const initial = boardWith([
+    [4, { berry: 4 }],
+    [5, { berry: 1, blueberry: 3 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(result.board[4].pieces, { blueberry: 3 }, "A4 판은 밀려난 B3을 받아야 한다");
+  assert.deepEqual(result.board[5].pieces, { berry: 5 }, "새 판은 빈자리보다 많은 A도 모두 받아 A5가 되어야 한다");
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
+  const initial = boardWith([
+    [4, { berry: 2 }],
+    [5, { berry: 2, blueberry: 2 }],
+    [6, { blueberry: 1 }],
+    [7, { blueberry: 3 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.equal(result.board[4], null);
+  assert.deepEqual(result.board[5].pieces, { berry: 4 });
+  assert.deepEqual(result.board[6].pieces, { blueberry: 3 }, "인접 판은 새 판의 B2까지만 받아야 한다");
+  assert.deepEqual(result.board[7].pieces, { blueberry: 3 }, "인접 판의 이웃인 두 번째 칸은 연계되면 안 된다");
+  assert.ok(result.events.every((event) =>
+    event.source !== 7 &&
+    event.target !== 7 &&
+    !event.origins?.some((origin) => origin.index === 7) &&
+    !event.moves?.some((move) => move.to === 7) &&
+    !event.spread?.some((move) => move.to === 7)
+  ));
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
+  const initial = boardWith([
     [5, { berry: 2, blueberry: 2, lemon: 2 }],
     [4, { berry: 1, blueberry: 3, lemon: 2 }],
   ]);
@@ -98,7 +131,7 @@ function applyAnimationSteps(inputBoard, steps) {
   ]);
   const result = Engine.resolvePlacement(initial, 5);
   assert.equal(result.completed.length, 1, "꽉 찬 판이라도 이동 결과 같은 색 6개가 되면 교환할 수 있어야 한다");
-  assert.ok(result.events.length <= 2, "완성 가능한 교환이 왕복으로 반복되면 안 된다");
+  assert.ok(result.events.length <= 2, "완성 가능한 교환이 반복되면 안 된다");
   assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
 }
 

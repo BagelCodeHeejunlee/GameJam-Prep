@@ -191,9 +191,12 @@
     const supply = sourceIndexes.reduce((sum, sourceIndex) => sum + board[sourceIndex].pieces[type], 0);
     const free = PLATE_CAPACITY - totalPieces(target);
     const completionPossible = target.pieces[type] + supply >= PLATE_CAPACITY;
-    const wanted = completionPossible
+    // A newly placed plate with at least one free slot gathers the chosen type
+    // up to six pieces, even when that means moving its other types aside.
+    // A plate that started full may exchange pieces only to complete six.
+    const wanted = free > 0 || completionPossible
       ? Math.min(supply, PLATE_CAPACITY - target.pieces[type])
-      : Math.min(supply, free);
+      : 0;
     if (wanted <= 0) return null;
 
     const displaced = removeOtherPieces(target, type, Math.max(0, wanted - free));
@@ -241,41 +244,18 @@
     const board = cloneBoard(inputBoard);
     const locked = new Set();
     const events = [];
-    const queue = [{ index: placedIndex, preferredType: null }];
-    const attempts = new Map();
     const received = new Set();
-    let safety = 0;
 
-    while (queue.length && safety < 48) {
-      safety += 1;
-      const item = queue.shift();
-      if (!board[item.index] || locked.has(item.index)) continue;
-      const key = `${item.index}:${item.preferredType || "auto"}`;
-      const tried = attempts.get(key) || 0;
-      if (tried >= 2) continue;
-      attempts.set(key, tried + 1);
-
-      const type = item.preferredType && board[item.index].pieces[item.preferredType]
-        ? item.preferredType
-        : choosePullType(board, item.index, locked, received);
-      if (!type) continue;
-
-      let result = pullType(board, item.index, type, locked, received);
-      if (!result && item.preferredType) {
-        const fallbackType = choosePullType(board, item.index, locked, received);
-        if (fallbackType && fallbackType !== type) {
-          result = pullType(board, item.index, fallbackType, locked, received);
-        }
-      }
-      if (!result) continue;
+    // Only the newly placed plate initiates sorting. Its four direct neighbors
+    // may receive pieces, but they do not start another pull from a second ring.
+    const type = choosePullType(board, placedIndex, locked, received);
+    const result = type ? pullType(board, placedIndex, type, locked, received) : null;
+    if (result) {
       events.push(...result.events);
 
       const uniqueTouched = [...new Set(result.touched)];
       for (const touchedIndex of uniqueTouched) {
         if (isComplete(board[touchedIndex])) locked.add(touchedIndex);
-      }
-      for (const recipient of result.recipients) {
-        if (!locked.has(recipient.index)) queue.push(recipient);
       }
     }
 
@@ -287,7 +267,7 @@
     const settledBoard = cloneBoard(board);
     for (const index of [...completed, ...emptied]) board[index] = null;
 
-    return { board, settledBoard, events, completed, emptied, safetyLimitReached: safety >= 48 };
+    return { board, settledBoard, events, completed, emptied, safetyLimitReached: false };
   }
 
   function buildAnimationSteps(events) {
