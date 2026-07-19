@@ -7,6 +7,19 @@ function boardWith(entries) {
   for (const [index, value] of entries) board[index] = plate(value, index + 1);
   return board;
 }
+function applyAnimationSteps(inputBoard, steps) {
+  const board = Engine.cloneBoard(inputBoard);
+  const move = ({ from, to, type }) => {
+    board[from].pieces[type] -= 1;
+    if (board[from].pieces[type] === 0) delete board[from].pieces[type];
+    board[to].pieces[type] = (board[to].pieces[type] || 0) + 1;
+  };
+  for (const step of steps) {
+    move(step);
+    if (step.displaced) move(step.displaced);
+  }
+  return board;
+}
 
 {
   const result = Engine.resolvePlacement(boardWith([[5, { berry: 2 }], [1, { berry: 3 }]]), 5);
@@ -15,14 +28,18 @@ function boardWith(entries) {
 }
 
 {
-  const result = Engine.resolvePlacement(boardWith([
+  const initial = boardWith([
     [5, { berry: 2, blueberry: 1 }],
     [6, { berry: 3 }],
-  ]), 6);
+  ]);
+  const result = Engine.resolvePlacement(initial, 6);
   assert.deepEqual(result.board[5].pieces, { blueberry: 1 }, "일치하지 않는 B1은 원래 판에 남아야 한다");
   assert.deepEqual(result.board[6].pieces, { berry: 5 }, "새 A3 판에는 일치한 A2만 이동해야 한다");
   assert.deepEqual(result.completed, []);
   assert.deepEqual(result.emptied, []);
+  const steps = Engine.buildAnimationSteps(result.events);
+  assert.equal(steps.length, 2, "A 조각은 한 조각씩 두 번 이동해야 한다");
+  assert.deepEqual(applyAnimationSteps(initial, steps), result.settledBoard, "애니메이션 중간 이동의 최종 상태가 게임 결과와 같아야 한다");
 }
 
 {
@@ -38,14 +55,16 @@ function boardWith(entries) {
 }
 
 {
-  const result = Engine.resolvePlacement(boardWith([
+  const initial = boardWith([
     [5, { berry: 2, blueberry: 2 }],
     [1, { berry: 4 }],
     [6, { blueberry: 5 }],
-  ]), 5);
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
   assert.equal(result.completed.length, 2, "밀려난 조각으로 연쇄 완성이 가능해야 한다");
   assert.equal(result.board[5], null);
   assert.deepEqual(result.board[6].pieces, { blueberry: 1 }, "완성 판으로 이동하고 남은 조각은 원래 판에 남아야 한다");
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
 }
 
 {

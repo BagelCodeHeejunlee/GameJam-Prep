@@ -52,6 +52,7 @@
       rack: [], batch: 0, deckIndex: 0, nextId: 1,
       completed: 0, score: 0, swaps: MAX_SWAPS, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(),
+      rotations: Array(Engine.BOARD_SIZE ** 2).fill(0),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
     };
   }
@@ -87,7 +88,7 @@
     return slots.slice(0, Engine.PLATE_CAPACITY);
   }
 
-  function plateMarkup(plateData) {
+  function plateMarkup(plateData, rotation = 0) {
     const slots = slotsFor(plateData);
     const gradient = `conic-gradient(from -30deg, ${slots.map((type, index) => {
       const start = index * 60;
@@ -98,7 +99,7 @@
       .map(([type, count]) => `<span title="${CAKES[type].name} ${count}개">${CAKES[type].emoji}${count}</span>`)
       .join("");
     const emptyClass = Engine.totalPieces(plateData) ? "" : " empty-plate";
-    return `<div class="cake-plate${emptyClass}" aria-hidden="true"><div class="cake-wheel" style="--cake-gradient:${gradient}"></div><div class="plate-counts">${counts}</div></div>`;
+    return `<div class="cake-plate${emptyClass}" aria-hidden="true"><div class="cake-wheel" style="--cake-gradient:${gradient};--wheel-rotation:${rotation}deg"></div><div class="plate-counts">${counts}</div></div>`;
   }
 
   function plateLabel(plateData) {
@@ -117,7 +118,7 @@
       if (state.activeCells.has(index)) classes.push("active");
       if (state.completeCells.has(index)) classes.push("complete");
       const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}` : `${row}행 ${col}열, 빈칸`;
-      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}</div>`;
+      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData, state.rotations[index]) : ""}</div>`;
     }).join("");
   }
 
@@ -221,6 +222,142 @@
     elements.hint.textContent = "판을 위로 끌어 빈칸에 놓으세요";
   }
 
+  function nearestRotation(current, desired) {
+    let result = desired;
+    while (result - current > 180) result -= 360;
+    while (result - current < -180) result += 360;
+    return result;
+  }
+
+  function directionDegrees(fromIndex, toIndex) {
+    const difference = toIndex - fromIndex;
+    if (difference === 1) return 0;
+    if (difference === Engine.BOARD_SIZE) return 90;
+    if (difference === -1) return 180;
+    return -90;
+  }
+
+  function slotIndexFor(plateData, type) {
+    return slotsFor(plateData).lastIndexOf(type);
+  }
+
+  function receivingSlotIndex(plateData, openType) {
+    const slots = slotsFor(plateData);
+    const emptyIndex = slots.findIndex((type) => type === null);
+    if (emptyIndex >= 0) return emptyIndex;
+    if (openType) return slots.findIndex((type) => type === openType);
+    return 0;
+  }
+
+  function rotatePlateToward(index, slotIndex, direction) {
+    if (slotIndex < 0) return;
+    const current = state.rotations[index] || 0;
+    const desired = direction - slotIndex * 60;
+    const rotation = nearestRotation(current, desired);
+    state.rotations[index] = rotation;
+    const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
+    if (wheel) wheel.style.setProperty("--wheel-rotation", `${rotation}deg`);
+  }
+
+  async function alignPlates(fromIndex, toIndex, type, receiverOpenType) {
+    const direction = directionDegrees(fromIndex, toIndex);
+    rotatePlateToward(fromIndex, slotIndexFor(state.board[fromIndex], type), direction);
+    rotatePlateToward(toIndex, receivingSlotIndex(state.board[toIndex], receiverOpenType), direction + 180);
+    state.activeCells = new Set([fromIndex, toIndex]);
+    elements.board.querySelector(`[data-cell="${fromIndex}"]`)?.classList.add("transferring");
+    elements.board.querySelector(`[data-cell="${toIndex}"]`)?.classList.add("receiving");
+    await wait(230);
+  }
+
+  async function flySlice(fromIndex, toIndex, type) {
+    const fromCell = elements.board.querySelector(`[data-cell="${fromIndex}"]`);
+    const toCell = elements.board.querySelector(`[data-cell="${toIndex}"]`);
+    if (!fromCell || !toCell) return;
+    const fromRect = fromCell.getBoundingClientRect();
+    const toRect = toCell.getBoundingClientRect();
+    const fromX = fromRect.left + fromRect.width / 2;
+    const fromY = fromRect.top + fromRect.height / 2;
+    const toX = toRect.left + toRect.width / 2;
+    const toY = toRect.top + toRect.height / 2;
+    const deltaX = toX - fromX;
+    const deltaY = toY - fromY;
+    const distance = Math.hypot(deltaX, deltaY) || 1;
+    const travelAngle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+    const unitX = deltaX / distance;
+    const unitY = deltaY / distance;
+    const edgeOffset = Math.min(fromRect.width, fromRect.height) * .27;
+    const startX = fromX + unitX * edgeOffset;
+    const startY = fromY + unitY * edgeOffset;
+    const endX = toX - unitX * edgeOffset;
+    const endY = toY - unitY * edgeOffset;
+    const middleX = (startX + endX) / 2;
+    const middleY = (startY + endY) / 2 - 10;
+
+    const movingSlice = document.createElement("div");
+    movingSlice.className = "moving-slice";
+    movingSlice.style.setProperty("--slice-color", CAKES[type].color);
+    movingSlice.dataset.emoji = CAKES[type].emoji;
+    movingSlice.style.left = `${startX}px`;
+    movingSlice.style.top = `${startY}px`;
+    document.body.appendChild(movingSlice);
+
+    const travel = movingSlice.animate([
+      { transform: `translate(-50%, -50%) scale(.92) rotate(${travelAngle - 4}deg)`, left: `${startX}px`, top: `${startY}px` },
+      { transform: `translate(-50%, -72%) scale(1.08) rotate(${travelAngle + 3}deg)`, left: `${middleX}px`, top: `${middleY}px`, offset: .52 },
+      { transform: `translate(-50%, -50%) scale(.92) rotate(${travelAngle}deg)`, left: `${endX}px`, top: `${endY}px` },
+    ], { duration: 240, easing: "cubic-bezier(.3,.7,.25,1)", fill: "forwards" });
+    playTone(560, .08, "sine");
+    await travel.finished.catch(() => {});
+    movingSlice.remove();
+  }
+
+  function removeOnePiece(board, fromIndex, type) {
+    const from = board[fromIndex];
+    if (!from?.pieces[type]) throw new Error(`${type} 조각 출발 상태가 일치하지 않습니다.`);
+    from.pieces[type] -= 1;
+    if (from.pieces[type] === 0) delete from.pieces[type];
+  }
+
+  function addOnePiece(board, toIndex, type) {
+    const to = board[toIndex];
+    if (!to) throw new Error(`${type} 조각 도착 상태가 일치하지 않습니다.`);
+    to.pieces[type] = (to.pieces[type] || 0) + 1;
+  }
+
+  function moveOnePiece(board, fromIndex, toIndex, type) {
+    removeOnePiece(board, fromIndex, type);
+    addOnePiece(board, toIndex, type);
+  }
+
+  async function animateResolution(events, activeSession) {
+    const steps = Engine.buildAnimationSteps(events);
+    for (const step of steps) {
+      if (activeSession !== sessionId) return false;
+      await alignPlates(step.from, step.to, step.type, step.displaced?.type || null);
+      if (activeSession !== sessionId) return false;
+
+      if (step.displaced) {
+        await flySlice(step.from, step.to, step.type);
+        const destinationIsFull = Engine.totalPieces(state.board[step.displaced.to]) >= Engine.PLATE_CAPACITY;
+        await alignPlates(step.displaced.from, step.displaced.to, step.displaced.type, destinationIsFull ? step.type : null);
+        if (activeSession !== sessionId) return false;
+        await flySlice(step.displaced.from, step.displaced.to, step.displaced.type);
+        moveOnePiece(state.board, step.from, step.to, step.type);
+        moveOnePiece(state.board, step.displaced.from, step.displaced.to, step.displaced.type);
+      } else {
+        removeOnePiece(state.board, step.from, step.type);
+        renderBoard();
+        await wait(25);
+        await flySlice(step.from, step.to, step.type);
+        addOnePiece(state.board, step.to, step.type);
+      }
+
+      renderBoard();
+      await wait(45);
+    }
+    return true;
+  }
+
   function swapPlate(index) {
     if (state.busy || state.swaps <= 0 || !state.rack[index]) return;
     state.swaps -= 1;
@@ -238,6 +375,7 @@
 
     state.busy = true;
     state.board[cellIndex] = chosen;
+    state.rotations[cellIndex] = 0;
     state.rack[rackIndex] = null;
     state.score += 10;
     state.activeCells = new Set([cellIndex]);
@@ -255,18 +393,13 @@
     }
 
     if (result.events.length) {
-      const touched = new Set();
-      for (const event of result.events) {
-        touched.add(event.target);
-        event.origins.forEach((origin) => touched.add(origin.index));
-        event.spread.forEach((move) => touched.add(move.to));
-      }
-      state.activeCells = touched;
+      const animationFinished = await animateResolution(result.events, activeSession);
+      if (!animationFinished || activeSession !== sessionId) return;
       state.board = result.settledBoard;
+      state.activeCells.clear();
       playTone(510, .09, "sine");
-      render();
-      await wait(300);
-      if (activeSession !== sessionId) return;
+      renderBoard();
+      await wait(120);
     }
 
     if (result.completed.length) {
@@ -284,6 +417,7 @@
     }
 
     state.board = result.board;
+    state.board.forEach((plateData, index) => { if (!plateData) state.rotations[index] = 0; });
     state.activeCells.clear();
     state.completeCells.clear();
 

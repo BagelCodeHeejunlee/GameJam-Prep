@@ -211,6 +211,34 @@
     return { board, settledBoard, events, completed, emptied, safetyLimitReached: safety >= 48 };
   }
 
+  function buildAnimationSteps(events) {
+    const steps = [];
+    for (const event of events) {
+      const origins = event.origins.flatMap((origin) =>
+        Array.from({ length: origin.count }, () => origin.index)
+      );
+      const displaced = CAKE_ORDER.flatMap((type) =>
+        Array.from({ length: event.displaced[type] || 0 }, () => type)
+      );
+      const destinations = event.spread.flatMap((move) =>
+        Array.from({ length: move.count }, () => ({ type: move.type, to: move.to }))
+      );
+
+      for (const origin of origins) {
+        const displacedType = displaced.shift() || null;
+        let displacedMove = null;
+        if (displacedType) {
+          const destinationIndex = destinations.findIndex((move) => move.type === displacedType);
+          if (destinationIndex < 0) throw new Error(`${displacedType} 조각의 이동 목적지가 없습니다.`);
+          const destination = destinations.splice(destinationIndex, 1)[0];
+          displacedMove = { from: event.target, to: destination.to, type: displacedType };
+        }
+        steps.push({ from: origin, to: event.target, type: event.type, displaced: displacedMove });
+      }
+    }
+    return steps;
+  }
+
   return {
     BOARD_SIZE,
     PLATE_CAPACITY,
@@ -221,5 +249,6 @@
     isComplete,
     choosePullType,
     resolvePlacement,
+    buildAnimationSteps,
   };
 });
