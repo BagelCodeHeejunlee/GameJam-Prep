@@ -24,8 +24,7 @@
 
   const $ = (selector) => document.querySelector(selector);
   const elements = {
-    board: $("#board"), rack: $("#rack"), completed: $("#completedLabel"),
-    score: $("#scoreLabel"), best: $("#bestLabel"), swap: $("#swapLabel"),
+    board: $("#board"), rack: $("#rack"), swap: $("#swapLabel"),
     hint: $("#boardHint"), toast: $("#toast"), sound: $("#soundButton"),
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
     resultCompleted: $("#resultCompleted"), resultScore: $("#resultScore"),
@@ -35,6 +34,7 @@
   let toastTimer;
   let audioContext;
   let sessionId = 0;
+  let dragGesture = null;
 
   function mulberry32(seed) {
     return function random() {
@@ -49,7 +49,7 @@
     const random = mulberry32(STAGE_SEED);
     return {
       board: Array(Engine.BOARD_SIZE ** 2).fill(null),
-      rack: [], selected: null, batch: 0, deckIndex: 0, nextId: 1,
+      rack: [], batch: 0, deckIndex: 0, nextId: 1,
       completed: 0, score: 0, swaps: MAX_SWAPS, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
@@ -75,7 +75,6 @@
   function refillRack() {
     state.batch += 1;
     state.rack = [0, 1, 2].map((slot) => generatedPlate(slot));
-    state.selected = null;
     showToast(`${state.batch}번째 판 묶음이 도착했어요`);
   }
 
@@ -110,7 +109,7 @@
   }
 
   function renderBoard() {
-    elements.board.classList.toggle("ready", state.selected !== null && !state.busy);
+    elements.board.classList.remove("ready");
     elements.board.innerHTML = state.board.map((plateData, index) => {
       const row = Math.floor(index / 4) + 1;
       const col = index % 4 + 1;
@@ -118,47 +117,21 @@
       if (state.activeCells.has(index)) classes.push("active");
       if (state.completeCells.has(index)) classes.push("complete");
       const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}` : `${row}행 ${col}열, 빈칸`;
-      return `<div class="${classes.join(" ")}" role="gridcell" tabindex="${plateData ? -1 : 0}" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}</div>`;
+      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}</div>`;
     }).join("");
-
-    elements.board.querySelectorAll(".cell.empty").forEach((cell) => {
-      cell.addEventListener("click", () => placeSelected(Number(cell.dataset.cell)));
-      cell.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); placeSelected(Number(cell.dataset.cell)); }
-      });
-      cell.addEventListener("dragover", (event) => { if (!state.busy) { event.preventDefault(); cell.classList.add("drag-over"); } });
-      cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
-      cell.addEventListener("drop", (event) => {
-        event.preventDefault();
-        cell.classList.remove("drag-over");
-        const rackIndex = Number(event.dataTransfer.getData("text/plain"));
-        if (Number.isInteger(rackIndex)) { state.selected = rackIndex; placeSelected(Number(cell.dataset.cell)); }
-      });
-    });
   }
 
   function renderRack() {
     elements.rack.innerHTML = state.rack.map((plateData, index) => {
       if (!plateData) return `<div class="rack-card used" aria-label="사용한 자리"><span>사용 완료</span></div>`;
-      const selected = state.selected === index ? " selected" : "";
-      return `<div class="rack-card${selected}" role="button" tabindex="0" draggable="true" data-rack="${index}" aria-pressed="${state.selected === index}" aria-label="${plateLabel(plateData)} 판 선택">${plateMarkup(plateData)}<button class="swap-button" type="button" data-swap="${index}" ${state.swaps <= 0 || state.busy ? "disabled" : ""}>교체</button></div>`;
+      return `<div class="rack-card" role="group" data-rack="${index}" aria-label="${plateLabel(plateData)} 판. 빈칸으로 끌어서 놓으세요.">${plateMarkup(plateData)}<button class="swap-button" type="button" data-swap="${index}" ${state.swaps <= 0 || state.busy ? "disabled" : ""} aria-label="이 판 교체">↻</button></div>`;
     }).join("");
 
     elements.rack.querySelectorAll(".rack-card[data-rack]").forEach((card) => {
-      const select = () => selectRack(Number(card.dataset.rack));
-      card.addEventListener("click", (event) => { if (!event.target.closest(".swap-button")) select(); });
-      card.addEventListener("keydown", (event) => {
-        if ((event.key === "Enter" || event.key === " ") && !event.target.closest(".swap-button")) { event.preventDefault(); select(); }
-      });
-      card.addEventListener("dragstart", (event) => {
-        state.selected = Number(card.dataset.rack);
-        event.dataTransfer.setData("text/plain", card.dataset.rack);
-        event.dataTransfer.effectAllowed = "move";
-        elements.board.classList.add("ready");
-        card.classList.add("selected");
-      });
+      card.addEventListener("pointerdown", (event) => beginDrag(event, Number(card.dataset.rack), card));
     });
     elements.rack.querySelectorAll(".swap-button").forEach((button) => {
+      button.addEventListener("pointerdown", (event) => event.stopPropagation());
       button.addEventListener("click", (event) => { event.stopPropagation(); swapPlate(Number(button.dataset.swap)); });
     });
   }
@@ -166,36 +139,99 @@
   function render() {
     renderBoard();
     renderRack();
-    elements.completed.textContent = state.completed;
-    elements.score.textContent = state.score.toLocaleString("ko-KR");
-    elements.best.textContent = state.best.toLocaleString("ko-KR");
     elements.swap.textContent = state.swaps;
-    elements.hint.textContent = state.selected === null ? "아래 판을 고르고 빈칸을 눌러주세요" : "좋아요! 놓을 빈칸을 골라주세요";
+    elements.hint.textContent = state.busy ? "케이크를 정렬하고 있어요" : "판을 위로 끌어 빈칸에 놓으세요";
   }
 
-  function selectRack(index) {
-    if (state.busy || !state.rack[index]) return;
-    state.selected = state.selected === index ? null : index;
+  function dragLift(pointerType) {
+    return pointerType === "touch" || pointerType === "pen" ? Math.min(112, window.innerHeight * .17) : 76;
+  }
+
+  function beginDrag(event, rackIndex, card) {
+    if (event.button !== 0 || state.busy || !state.rack[rackIndex] || dragGesture) return;
+    event.preventDefault();
+    const lift = dragLift(event.pointerType);
+    const ghost = document.createElement("div");
+    ghost.className = "drag-ghost";
+    ghost.innerHTML = plateMarkup(state.rack[rackIndex]);
+    document.body.appendChild(ghost);
+
+    dragGesture = {
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      rackIndex,
+      card,
+      ghost,
+      lift,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+      targetCell: null,
+    };
+    card.setPointerCapture?.(event.pointerId);
+    card.classList.add("dragging");
+    document.body.classList.add("is-dragging");
+    elements.board.classList.add("ready");
+    positionDrag(event.clientX, event.clientY);
     playTone(420, .05, "sine");
-    render();
+  }
+
+  function positionDrag(clientX, clientY) {
+    if (!dragGesture) return;
+    const ghostX = Math.max(52, Math.min(window.innerWidth - 52, clientX));
+    const ghostY = Math.max(52, clientY - dragGesture.lift);
+    dragGesture.ghost.style.left = `${ghostX}px`;
+    dragGesture.ghost.style.top = `${ghostY}px`;
+
+    document.querySelector(".cell.drop-target")?.classList.remove("drop-target");
+    const candidate = document.elementFromPoint(ghostX, ghostY)?.closest(".cell.empty");
+    dragGesture.targetCell = candidate ? Number(candidate.dataset.cell) : null;
+    candidate?.classList.add("drop-target");
+    elements.hint.textContent = candidate ? "여기에 놓을까요?" : "판을 빈칸 위까지 끌어주세요";
+  }
+
+  function moveDrag(event) {
+    if (!dragGesture || event.pointerId !== dragGesture.pointerId) return;
+    event.preventDefault();
+    const distance = Math.hypot(event.clientX - dragGesture.startX, event.clientY - dragGesture.startY);
+    if (distance > 5) dragGesture.moved = true;
+    positionDrag(event.clientX, event.clientY);
+  }
+
+  function finishDrag(event) {
+    if (!dragGesture || event.pointerId !== dragGesture.pointerId) return;
+    event.preventDefault();
+    const distance = Math.hypot(event.clientX - dragGesture.startX, event.clientY - dragGesture.startY);
+    if (distance > 5) dragGesture.moved = true;
+    positionDrag(event.clientX, event.clientY);
+    const { rackIndex, targetCell, moved } = dragGesture;
+    clearDrag();
+    if (moved && targetCell !== null) placeRackAt(rackIndex, targetCell);
+    else showToast("판을 끌어서 빈칸 위에 놓아주세요");
+  }
+
+  function clearDrag() {
+    if (!dragGesture) return;
+    document.querySelector(".cell.drop-target")?.classList.remove("drop-target");
+    dragGesture.card.classList.remove("dragging");
+    dragGesture.ghost.remove();
+    dragGesture = null;
+    document.body.classList.remove("is-dragging");
+    elements.board.classList.remove("ready");
+    elements.hint.textContent = "판을 위로 끌어 빈칸에 놓으세요";
   }
 
   function swapPlate(index) {
     if (state.busy || state.swaps <= 0 || !state.rack[index]) return;
     state.swaps -= 1;
     state.rack[index] = generatedPlate(index);
-    if (state.selected === index) state.selected = null;
     playTone(330, .08, "triangle");
     showToast("새로운 판으로 교체했어요");
     render();
   }
 
-  async function placeSelected(cellIndex) {
-    if (state.busy || state.selected === null || state.board[cellIndex]) {
-      if (state.selected === null) showToast("먼저 아래 판을 골라주세요");
-      return;
-    }
-    const rackIndex = state.selected;
+  async function placeRackAt(rackIndex, cellIndex) {
+    if (state.busy || state.board[cellIndex]) return;
     const chosen = state.rack[rackIndex];
     if (!chosen) return;
     const activeSession = sessionId;
@@ -203,7 +239,6 @@
     state.busy = true;
     state.board[cellIndex] = chosen;
     state.rack[rackIndex] = null;
-    state.selected = null;
     state.score += 10;
     state.activeCells = new Set([cellIndex]);
     playTone(245, .08, "sine");
@@ -301,6 +336,7 @@
   }
 
   function restart() {
+    clearDrag();
     sessionId += 1;
     const sound = state?.sound ?? true;
     state = newState();
@@ -320,6 +356,11 @@
     elements.sound.setAttribute("aria-label", state.sound ? "소리 끄기" : "소리 켜기");
     if (state.sound) playTone(520, .08, "sine");
   });
+
+  document.addEventListener("pointermove", moveDrag, { passive: false });
+  document.addEventListener("pointerup", finishDrag, { passive: false });
+  document.addEventListener("pointercancel", clearDrag);
+  window.addEventListener("blur", clearDrag);
 
   restart();
 })();

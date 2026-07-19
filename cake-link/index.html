@@ -19,7 +19,6 @@
         <div class="brand" aria-label="케이크 링크">
           <span class="brand-mark" aria-hidden="true">🍰</span>
           <div>
-            <p>CAKE PUZZLE</p>
             <h1>케이크 링크</h1>
           </div>
         </div>
@@ -30,74 +29,19 @@
         </div>
       </header>
 
-      <section class="status-bar" aria-label="게임 현황">
-        <div class="stage-chip">
-          <span>STAGE</span>
-          <strong>TEST 01</strong>
-        </div>
-        <div class="stat">
-          <span>완성</span>
-          <strong id="completedLabel">0</strong>
-        </div>
-        <div class="stat">
-          <span>점수</span>
-          <strong id="scoreLabel">0</strong>
-        </div>
-        <div class="stat">
-          <span>최고</span>
-          <strong id="bestLabel">0</strong>
-        </div>
-      </section>
-
-      <section class="play-area">
-        <div class="board-column">
-          <div class="board-heading">
-            <div>
-              <span class="eyebrow">4 × 4 BOARD</span>
-              <h2>케이크 진열대</h2>
-            </div>
-            <p id="boardHint">아래 판을 고르고 빈칸을 눌러주세요</p>
-          </div>
-
-          <div id="board" class="board" role="grid" aria-label="4 곱하기 4 케이크 보드"></div>
-
-          <div class="legend" aria-label="케이크 종류">
-            <span><i class="berry"></i>딸기</span>
-            <span><i class="blueberry"></i>블루베리</span>
-            <span><i class="lemon"></i>레몬</span>
-            <span><i class="matcha"></i>말차</span>
-            <span><i class="choco"></i>초코</span>
-          </div>
-        </div>
-
-        <aside class="guide-panel">
-          <span class="eyebrow">HOW TO PLAY</span>
-          <h2>한 판을 완성해요</h2>
-          <ol>
-            <li><b>1</b><span>아래의 판 3개 중 하나를 골라요.</span></li>
-            <li><b>2</b><span>빈칸에 놓으면 같은 조각이 새 판으로 모여요.</span></li>
-            <li><b>3</b><span>같은 조각 6개가 되면 완성되어 사라져요.</span></li>
-          </ol>
-          <div class="rule-note">
-            <span aria-hidden="true">↗</span>
-            <p>밀려난 조각은 같은 종류가 있는 주변 판으로, 없다면 조각이 출발한 판으로 이동해요.</p>
-          </div>
-        </aside>
+      <section class="game-stage">
+        <div id="board" class="board" role="grid" aria-label="4 곱하기 4 케이크 보드"></div>
       </section>
 
       <section class="tray-panel" aria-label="놓을 수 있는 케이크 판">
         <div class="tray-heading">
-          <div>
-            <span class="eyebrow">YOUR TRAY</span>
-            <h2>놓을 판을 골라주세요</h2>
-          </div>
+          <p id="boardHint">판을 위로 끌어 빈칸에 놓으세요</p>
           <div class="swap-count" title="판 교체 가능 횟수">
-            <span>교체</span>
+            <span aria-hidden="true">↻</span>
             <strong id="swapLabel">3</strong>
           </div>
         </div>
         <div id="rack" class="rack"></div>
-        <p class="touch-hint">판을 누른 뒤 빈칸을 누르거나, 빈칸으로 끌어 놓으세요.</p>
       </section>
     </main>
 
