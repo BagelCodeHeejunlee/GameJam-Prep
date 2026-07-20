@@ -105,4 +105,31 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
   }
 }
 
+{
+  const turn = Motion.createRotationMotion({ current: 0, target: 120 });
+  assert.ok(turn.duration >= 200 && turn.duration <= 228, "rotation stays visible without becoming sluggish");
+  assert.equal(turn.points[0].angle, 0);
+  assert.ok(turn.points[1].angle < 0, "clockwise rotation begins with a small counter movement");
+  assert.ok(turn.points[2].angle > 120, "clockwise rotation gently overshoots its target");
+  assert.equal(turn.points.at(-1).angle, 120, "rotation settles exactly on its target");
+}
+
+{
+  const turn = Motion.createRotationMotion({ current: 90, target: -30 });
+  assert.ok(turn.points[1].angle > 90, "counter-clockwise rotation winds up in the opposite direction");
+  assert.ok(turn.points[2].angle < -30, "counter-clockwise overshoot follows travel direction");
+  assert.equal(turn.points.at(-1).angle, -30);
+}
+
+{
+  const still = Motion.createRotationMotion({ current: 45, target: 45 });
+  const reduced = Motion.createRotationMotion({ current: 0, target: 180, reducedMotion: true });
+  assert.equal(still.duration, 150, "an aligned plate still gives a short readiness cue");
+  assert.ok(still.points.some((point) => point.angle < 45));
+  assert.ok(still.points.some((point) => point.angle > 45));
+  assert.equal(still.points.at(-1).angle, 45);
+  assert.ok(reduced.duration <= 16, "reduced motion rotation completes immediately");
+  assert.equal(reduced.points.at(-1).angle, 180);
+}
+
 console.log("Cake Link motion tests passed");

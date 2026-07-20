@@ -289,13 +289,32 @@
   }
 
   function rotatePlateToward(index, slotIndex, direction) {
-    if (slotIndex < 0) return;
+    if (slotIndex < 0) return Promise.resolve();
     const current = state.rotations[index] || 0;
     const desired = direction - slotIndex * 60;
     const rotation = nearestRotation(current, desired);
     state.rotations[index] = rotation;
     const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
-    if (wheel) wheel.style.setProperty("--wheel-rotation", `${rotation}deg`);
+    if (!wheel) return Promise.resolve();
+    wheel.style.setProperty("--wheel-rotation", `${rotation}deg`);
+
+    const turn = Motion.createRotationMotion({
+      current,
+      target: rotation,
+      reducedMotion: reducedMotion(),
+    });
+    if (turn.duration <= 1) return Promise.resolve();
+
+    const animation = wheel.animate(turn.points.map((point) => ({
+      transform: `rotate(${point.angle}deg)`,
+      offset: point.offset,
+      easing: point.easing,
+    })), {
+      duration: turn.duration,
+      easing: "linear",
+      fill: "both",
+    });
+    return animation.finished.catch(() => {}).finally(() => animation.cancel());
   }
 
   function reducedMotion() {
@@ -306,10 +325,12 @@
     const cell = elements.board.querySelector(`[data-cell="${index}"]`);
     if (!cell) return;
     cell.classList.remove("transferring", "receiving", "landing");
-    const transferX = Math.cos(direction * Math.PI / 180) * 3;
-    const transferY = Math.sin(direction * Math.PI / 180) * 3;
+    const transferX = Math.cos(direction * Math.PI / 180) * 4.5;
+    const transferY = Math.sin(direction * Math.PI / 180) * 4.5;
     cell.style.setProperty("--transfer-x", `${transferX}px`);
     cell.style.setProperty("--transfer-y", `${transferY}px`);
+    cell.style.setProperty("--transfer-windup-x", `${transferX * -.22}px`);
+    cell.style.setProperty("--transfer-windup-y", `${transferY * -.22}px`);
     cell.style.setProperty("--transfer-tail-x", `${transferX * .28}px`);
     cell.style.setProperty("--transfer-tail-y", `${transferY * .28}px`);
     void cell.offsetWidth;
@@ -328,12 +349,16 @@
 
   async function alignPlates(fromIndex, toIndex, type, receiverOpenType) {
     const direction = directionDegrees(fromIndex, toIndex);
-    rotatePlateToward(fromIndex, slotIndexFor(state.board[fromIndex], type), direction);
-    rotatePlateToward(toIndex, receivingSlotIndex(state.board[toIndex], receiverOpenType), direction + 180);
+    const donorTurn = rotatePlateToward(fromIndex, slotIndexFor(state.board[fromIndex], type), direction);
+    const receiverTurn = rotatePlateToward(toIndex, receivingSlotIndex(state.board[toIndex], receiverOpenType), direction + 180);
     state.activeCells = new Set([fromIndex, toIndex]);
     cueTransferCell(fromIndex, "transferring", direction);
     cueTransferCell(toIndex, "receiving", direction + 180);
-    await wait(reducedMotion() ? 0 : 96);
+    await Promise.all([
+      donorTurn,
+      receiverTurn,
+      wait(reducedMotion() ? 0 : 205),
+    ]);
   }
 
   function createMovingSlice(type, extraClass = "") {

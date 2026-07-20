@@ -450,10 +450,10 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   box-shadow: inset 0 0 0 3px rgba(238,117,132,.2), 0 8px 18px rgba(103,66,43,.12);
 }
 .cell.transferring .cake-plate {
-  animation: plateOffer 90ms cubic-bezier(.2,.8,.2,1) both;
+  animation: plateOffer 200ms cubic-bezier(.2,.8,.2,1) both;
 }
 .cell.receiving .cake-plate {
-  animation: plateReceive 96ms cubic-bezier(.2,.8,.2,1) both;
+  animation: plateReceive 200ms cubic-bezier(.2,.8,.2,1) both;
 }
 .cell.landing { z-index: 6; }
 .cell.landing::before {
@@ -496,8 +496,22 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
     var(--cake-gradient);
   box-shadow: inset 0 0 0 1px rgba(89,60,49,.1), 0 2px 5px rgba(89,60,49,.12);
   transform: rotate(var(--wheel-rotation, 0deg));
-  transition: transform 96ms cubic-bezier(.2,.78,.2,1);
+  transition: transform 190ms cubic-bezier(.18,.72,.18,1);
   will-change: transform;
+}
+.cake-wheel::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 5%;
+  left: 50%;
+  width: 13%;
+  height: 6%;
+  border: 1px solid rgba(89,60,49,.16);
+  border-radius: 999px;
+  background: #fffaf0;
+  box-shadow: 0 1px 3px rgba(89,60,49,.2);
+  transform: translateX(-50%);
 }
 .cake-wheel::after {
   content: "";
@@ -766,8 +780,8 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 @keyframes liftPlate { from { opacity: .25; transform: translate(-50%, -40%) scale(.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes cellPulse { 0%,100%{transform:scale(1)} 45%{transform:scale(1.055);box-shadow:inset 0 0 0 3px rgba(238,117,132,.35),0 8px 18px rgba(103,66,43,.16)} }
 @keyframes completePop { 0%{transform:scale(1)} 45%{transform:scale(1.15);filter:brightness(1.12)} 100%{transform:scale(.75);opacity:0} }
-@keyframes plateOffer { 0%{transform:translate(0,0) scale(1)} 58%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.965)} 100%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.015)} }
-@keyframes plateReceive { 0%{transform:translate(0,0) scale(1)} 55%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.975)} 100%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.01)} }
+@keyframes plateOffer { 0%{transform:translate(0,0) scale(1)} 15%{transform:translate(var(--transfer-windup-x),var(--transfer-windup-y)) scale(1.012)} 58%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.965)} 82%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.012)} 100%{transform:translate(0,0) scale(1)} }
+@keyframes plateReceive { 0%{transform:translate(0,0) scale(1)} 15%{transform:translate(var(--transfer-windup-x),var(--transfer-windup-y)) scale(1.008)} 55%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.975)} 80%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.01)} 100%{transform:translate(0,0) scale(1)} }
 @keyframes plateLand { 0%{transform:scale(.96)} 38%{transform:scale(1.055)} 72%{transform:scale(.992)} 100%{transform:scale(1)} }
 @keyframes landingRipple { 0%{opacity:.62;transform:scale(.56)} 100%{opacity:0;transform:scale(1.28)} }
 @keyframes parkedSliceIn { 0%{opacity:.62;filter:brightness(1.13)} 100%{opacity:.92;filter:brightness(1)} }

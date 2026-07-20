@@ -122,5 +122,48 @@
     };
   }
 
-  return { createFlightMotion, quadraticPoint };
+  function createRotationMotion(options = {}) {
+    const current = finite(options.current);
+    const target = finite(options.target, current);
+    const delta = target - current;
+    const distance = Math.abs(delta);
+    const reducedMotion = Boolean(options.reducedMotion);
+
+    if (reducedMotion) {
+      return {
+        duration: 1,
+        points: [
+          { angle: current, offset: 0, easing: "linear" },
+          { angle: target, offset: 1, easing: "linear" },
+        ],
+      };
+    }
+
+    if (distance < 0.001) {
+      return {
+        duration: 150,
+        points: [
+          { angle: current, offset: 0, easing: "cubic-bezier(.4,0,.6,1)" },
+          { angle: current - 3, offset: 0.24, easing: "cubic-bezier(.2,.75,.2,1)" },
+          { angle: current + 2, offset: 0.72, easing: "cubic-bezier(.2,.75,.2,1)" },
+          { angle: current, offset: 1, easing: "linear" },
+        ],
+      };
+    }
+
+    const direction = Math.sign(delta);
+    const windup = clamp(distance * 0.045, 2, 4.5) * direction;
+    const overshoot = clamp(distance * 0.065, 3, 7) * direction;
+    return {
+      duration: clamp(Math.round(190 + distance * 0.2), 200, 228),
+      points: [
+        { angle: current, offset: 0, easing: "cubic-bezier(.42,0,.65,1)" },
+        { angle: current - windup, offset: 0.12, easing: "cubic-bezier(.18,.72,.18,1)" },
+        { angle: target + overshoot, offset: 0.82, easing: "cubic-bezier(.2,.72,.2,1)" },
+        { angle: target, offset: 1, easing: "linear" },
+      ],
+    };
+  }
+
+  return { createFlightMotion, createRotationMotion, quadraticPoint };
 });
