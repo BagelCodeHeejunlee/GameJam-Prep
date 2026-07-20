@@ -3,6 +3,7 @@
 
   const Engine = window.CakeLinkEngine;
   const Stages = window.CakeLinkStages;
+  const Motion = window.CakeLinkMotion;
   const CAKES = {
     berry: { name: "딸기", emoji: "🍓", color: "#f07483" },
     blueberry: { name: "블루베리", emoji: "🫐", color: "#8b78c7" },
@@ -39,6 +40,7 @@
   let sessionId = 0;
   let dragGesture = null;
   let resultAction = "retry";
+  const reducedMotionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
   function mulberry32(seed) {
     return function random() {
@@ -296,14 +298,50 @@
     if (wheel) wheel.style.setProperty("--wheel-rotation", `${rotation}deg`);
   }
 
+  function reducedMotion() {
+    return Boolean(reducedMotionQuery?.matches);
+  }
+
+  function cueTransferCell(index, className, direction) {
+    const cell = elements.board.querySelector(`[data-cell="${index}"]`);
+    if (!cell) return;
+    cell.classList.remove("transferring", "receiving", "landing");
+    const transferX = Math.cos(direction * Math.PI / 180) * 3;
+    const transferY = Math.sin(direction * Math.PI / 180) * 3;
+    cell.style.setProperty("--transfer-x", `${transferX}px`);
+    cell.style.setProperty("--transfer-y", `${transferY}px`);
+    cell.style.setProperty("--transfer-tail-x", `${transferX * .28}px`);
+    cell.style.setProperty("--transfer-tail-y", `${transferY * .28}px`);
+    void cell.offsetWidth;
+    cell.classList.add(className);
+  }
+
+  function landPlate(index, type) {
+    const cell = elements.board.querySelector(`[data-cell="${index}"]`);
+    if (!cell) return;
+    cell.classList.remove("transferring", "receiving", "landing");
+    cell.style.setProperty("--landing-color", CAKES[type]?.color || "#ee7584");
+    void cell.offsetWidth;
+    cell.classList.add("landing");
+    window.setTimeout(() => cell.classList.remove("landing"), reducedMotion() ? 0 : 210);
+  }
+
   async function alignPlates(fromIndex, toIndex, type, receiverOpenType) {
     const direction = directionDegrees(fromIndex, toIndex);
     rotatePlateToward(fromIndex, slotIndexFor(state.board[fromIndex], type), direction);
     rotatePlateToward(toIndex, receivingSlotIndex(state.board[toIndex], receiverOpenType), direction + 180);
     state.activeCells = new Set([fromIndex, toIndex]);
-    elements.board.querySelector(`[data-cell="${fromIndex}"]`)?.classList.add("transferring");
-    elements.board.querySelector(`[data-cell="${toIndex}"]`)?.classList.add("receiving");
-    await wait(125);
+    cueTransferCell(fromIndex, "transferring", direction);
+    cueTransferCell(toIndex, "receiving", direction + 180);
+    await wait(reducedMotion() ? 0 : 96);
+  }
+
+  function createMovingSlice(type, extraClass = "") {
+    const movingSlice = document.createElement("div");
+    movingSlice.className = `moving-slice${extraClass ? ` ${extraClass}` : ""}`;
+    movingSlice.style.setProperty("--slice-color", CAKES[type].color);
+    movingSlice.dataset.emoji = CAKES[type].emoji;
+    return movingSlice;
   }
 
   async function flySlice(fromIndex, toIndex, type, laneIndex = 0, laneCount = 1) {
@@ -312,49 +350,55 @@
     if (!fromCell || !toCell) return;
     const fromRect = fromCell.getBoundingClientRect();
     const toRect = toCell.getBoundingClientRect();
-    const fromX = fromRect.left + fromRect.width / 2;
-    const fromY = fromRect.top + fromRect.height / 2;
-    const toX = toRect.left + toRect.width / 2;
-    const toY = toRect.top + toRect.height / 2;
-    const deltaX = toX - fromX;
-    const deltaY = toY - fromY;
-    const distance = Math.hypot(deltaX, deltaY) || 1;
-    const travelAngle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
-    const unitX = deltaX / distance;
-    const unitY = deltaY / distance;
-    const edgeOffset = Math.min(fromRect.width, fromRect.height) * .27;
-    const laneOffset = (laneIndex - (laneCount - 1) / 2) * Math.min(9, fromRect.width * .09);
-    const perpendicularX = -unitY;
-    const perpendicularY = unitX;
-    const startX = fromX + unitX * edgeOffset + perpendicularX * laneOffset;
-    const startY = fromY + unitY * edgeOffset + perpendicularY * laneOffset;
-    const endX = toX - unitX * edgeOffset + perpendicularX * laneOffset;
-    const endY = toY - unitY * edgeOffset + perpendicularY * laneOffset;
-    const middleX = (startX + endX) / 2;
-    const middleY = (startY + endY) / 2 - 10;
+    const flight = Motion.createFlightMotion({
+      fromRect,
+      toRect,
+      laneIndex,
+      laneCount,
+      reducedMotion: reducedMotion(),
+    });
 
-    const movingSlice = document.createElement("div");
-    movingSlice.className = "moving-slice";
-    movingSlice.style.setProperty("--slice-color", CAKES[type].color);
-    movingSlice.dataset.emoji = CAKES[type].emoji;
-    movingSlice.style.left = `${startX}px`;
-    movingSlice.style.top = `${startY}px`;
+    const movingSlice = createMovingSlice(type);
+    movingSlice.style.left = `${flight.start.x}px`;
+    movingSlice.style.top = `${flight.start.y}px`;
     document.body.appendChild(movingSlice);
 
-    const travel = movingSlice.animate([
-      { transform: `translate(-50%, -50%) scale(.92) rotate(${travelAngle - 4}deg)`, left: `${startX}px`, top: `${startY}px` },
-      { transform: `translate(-50%, -72%) scale(1.08) rotate(${travelAngle + 3}deg)`, left: `${middleX}px`, top: `${middleY}px`, offset: .52 },
-      { transform: `translate(-50%, -50%) scale(.92) rotate(${travelAngle}deg)`, left: `${endX}px`, top: `${endY}px` },
-    ], { duration: 150, easing: "cubic-bezier(.3,.7,.25,1)", fill: "forwards" });
+    const travel = movingSlice.animate(flight.points.map((point, index) => ({
+      opacity: index === 0 ? .82 : index === flight.points.length - 1 ? .9 : 1,
+      transform: `translate3d(${point.x - flight.start.x}px, ${point.y - flight.start.y}px, 0) translate(-50%, -50%) rotate(${point.rotation}deg) scale(${point.scale})`,
+      offset: point.offset,
+    })), {
+      duration: flight.duration,
+      delay: flight.delay,
+      easing: flight.easing,
+      fill: "forwards",
+    });
     await travel.finished.catch(() => {});
     movingSlice.remove();
+    return flight.points.at(-1);
   }
 
   async function flySliceGroup(fromIndex, toIndex, type, count) {
-    playTone(560, .06, "sine");
-    await Promise.all(Array.from({ length: count }, (_, index) =>
+    const landings = await Promise.all(Array.from({ length: count }, (_, index) =>
       flySlice(fromIndex, toIndex, type, index, count)
     ));
+    playTone(590, .045, "sine");
+    return landings.filter(Boolean);
+  }
+
+  function holdLandedSlices(landings, type) {
+    return landings.map((landing) => {
+      const slice = createMovingSlice(type, "parked-slice");
+      slice.style.left = `${landing.x}px`;
+      slice.style.top = `${landing.y}px`;
+      slice.style.transform = `translate(-50%, -50%) rotate(${landing.rotation}deg) scale(${landing.scale})`;
+      document.body.appendChild(slice);
+      return slice;
+    });
+  }
+
+  function removeHeldSlices(slices) {
+    slices.forEach((slice) => slice.remove());
   }
 
   function removeOnePiece(board, fromIndex, type) {
@@ -401,25 +445,45 @@
       if (activeSession !== sessionId) return false;
 
       if (step.displaced) {
-        await flySliceGroup(step.from, step.to, step.type, group.length);
-        const destinationIsFull = Engine.totalPieces(state.board[step.displaced.to]) >= Engine.PLATE_CAPACITY;
-        await alignPlates(step.displaced.from, step.displaced.to, step.displaced.type, destinationIsFull ? step.type : null);
+        const incomingLandings = await flySliceGroup(step.from, step.to, step.type, group.length);
         if (activeSession !== sessionId) return false;
-        await flySliceGroup(step.displaced.from, step.displaced.to, step.displaced.type, group.length);
-        for (const groupedStep of group) {
-          moveOnePiece(state.board, groupedStep.from, groupedStep.to, groupedStep.type);
-          moveOnePiece(state.board, groupedStep.displaced.from, groupedStep.displaced.to, groupedStep.displaced.type);
+        const heldSlices = holdLandedSlices(incomingLandings, step.type);
+        try {
+          landPlate(step.to, step.type);
+          await wait(reducedMotion() ? 0 : 42);
+          if (activeSession !== sessionId) return false;
+          const destinationIsFull = Engine.totalPieces(state.board[step.displaced.to]) >= Engine.PLATE_CAPACITY;
+          await alignPlates(step.displaced.from, step.displaced.to, step.displaced.type, destinationIsFull ? step.type : null);
+          if (activeSession !== sessionId) return false;
+          await flySliceGroup(step.displaced.from, step.displaced.to, step.displaced.type, group.length);
+          if (activeSession !== sessionId) return false;
+          for (const groupedStep of group) {
+            moveOnePiece(state.board, groupedStep.from, groupedStep.to, groupedStep.type);
+            moveOnePiece(state.board, groupedStep.displaced.from, groupedStep.displaced.to, groupedStep.displaced.type);
+          }
+          renderBoard();
+          landPlate(step.to, step.type);
+          landPlate(step.displaced.to, step.displaced.type);
+        } finally {
+          removeHeldSlices(heldSlices);
         }
       } else {
+        const flight = flySliceGroup(step.from, step.to, step.type, group.length);
+        await wait(reducedMotion() ? 0 : 12);
+        if (activeSession !== sessionId) {
+          await flight;
+          return false;
+        }
         for (const groupedStep of group) removeOnePiece(state.board, groupedStep.from, groupedStep.type);
         renderBoard();
-        await wait(8);
-        await flySliceGroup(step.from, step.to, step.type, group.length);
+        await flight;
+        if (activeSession !== sessionId) return false;
         for (const groupedStep of group) addOnePiece(state.board, groupedStep.to, groupedStep.type);
+        renderBoard();
+        landPlate(step.to, step.type);
       }
 
-      renderBoard();
-      await wait(12);
+      await wait(reducedMotion() ? 0 : 18);
     }
     return true;
   }
@@ -588,6 +652,7 @@
 
   function restart(announce = true) {
     clearDrag();
+    document.querySelectorAll(".moving-slice").forEach((slice) => slice.remove());
     sessionId += 1;
     const sound = state?.sound ?? true;
     state = newState();

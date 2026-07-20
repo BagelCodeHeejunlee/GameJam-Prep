@@ -449,6 +449,27 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   background: rgba(255,255,255,.9);
   box-shadow: inset 0 0 0 3px rgba(238,117,132,.2), 0 8px 18px rgba(103,66,43,.12);
 }
+.cell.transferring .cake-plate {
+  animation: plateOffer 90ms cubic-bezier(.2,.8,.2,1) both;
+}
+.cell.receiving .cake-plate {
+  animation: plateReceive 96ms cubic-bezier(.2,.8,.2,1) both;
+}
+.cell.landing { z-index: 6; }
+.cell.landing::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 17%;
+  border: 3px solid var(--landing-color, #ee7584);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: landingRipple 190ms ease-out both;
+}
+.cell.landing .cake-plate {
+  z-index: 2;
+  animation: plateLand 190ms cubic-bezier(.2,.9,.25,1.18) both;
+}
 
 .cake-plate {
   position: relative;
@@ -475,7 +496,7 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
     var(--cake-gradient);
   box-shadow: inset 0 0 0 1px rgba(89,60,49,.1), 0 2px 5px rgba(89,60,49,.12);
   transform: rotate(var(--wheel-rotation, 0deg));
-  transition: transform 115ms cubic-bezier(.32,.72,.28,1);
+  transition: transform 96ms cubic-bezier(.2,.78,.2,1);
   will-change: transform;
 }
 .cake-wheel::after {
@@ -610,6 +631,12 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   box-shadow: 0 8px 13px rgba(72,43,31,.26), inset 0 -3px 0 rgba(89,60,49,.12);
   clip-path: polygon(7% 50%, 92% 4%, 100% 50%, 92% 96%);
   pointer-events: none;
+  transform-origin: 18% 50%;
+  will-change: transform, opacity;
+}
+.moving-slice.parked-slice {
+  z-index: 129;
+  animation: parkedSliceIn 120ms ease-out both;
 }
 .moving-slice::after {
   content: attr(data-emoji);
@@ -739,6 +766,11 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 @keyframes liftPlate { from { opacity: .25; transform: translate(-50%, -40%) scale(.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes cellPulse { 0%,100%{transform:scale(1)} 45%{transform:scale(1.055);box-shadow:inset 0 0 0 3px rgba(238,117,132,.35),0 8px 18px rgba(103,66,43,.16)} }
 @keyframes completePop { 0%{transform:scale(1)} 45%{transform:scale(1.15);filter:brightness(1.12)} 100%{transform:scale(.75);opacity:0} }
+@keyframes plateOffer { 0%{transform:translate(0,0) scale(1)} 58%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.965)} 100%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.015)} }
+@keyframes plateReceive { 0%{transform:translate(0,0) scale(1)} 55%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.975)} 100%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.01)} }
+@keyframes plateLand { 0%{transform:scale(.96)} 38%{transform:scale(1.055)} 72%{transform:scale(.992)} 100%{transform:scale(1)} }
+@keyframes landingRipple { 0%{opacity:.62;transform:scale(.56)} 100%{opacity:0;transform:scale(1.28)} }
+@keyframes parkedSliceIn { 0%{opacity:.62;filter:brightness(1.13)} 100%{opacity:.92;filter:brightness(1)} }
 @keyframes modalIn { from{opacity:0;transform:translateY(18px) scale(.96)} to{opacity:1;transform:none} }
 @keyframes moveWarning { 0%{transform:scale(1.3)} 100%{transform:scale(1)} }
 
