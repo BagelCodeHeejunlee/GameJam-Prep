@@ -12,7 +12,11 @@
   const EMPTY_COLOR = "#eee4d6";
   const BEST_KEY = "cakeLink.v1.bestScore";
   const MAX_SWAPS = 3;
-  const STAGE_SEED = 4416;
+  const STAGE_CONFIG = Object.freeze({
+    1: Object.freeze({ id: 1, title: "스테이지 1", difficulty: "쉬움", seed: 4416 }),
+  });
+  const CURRENT_STAGE_ID = 1;
+  const currentStage = STAGE_CONFIG[CURRENT_STAGE_ID];
   const STARTER_DECK = [
     { berry: 3 }, { berry: 2, blueberry: 1 }, { matcha: 3 },
     { berry: 2, lemon: 1 }, { matcha: 2, choco: 1 }, { blueberry: 3 },
@@ -28,6 +32,7 @@
     homeButton: $("#homeButton"), homeSound: $("#homeSoundButton"),
     guideButton: $("#guideButton"), guide: $("#guideOverlay"),
     guideClose: $("#guideCloseButton"), guidePlay: $("#guidePlayButton"),
+    stageTitle: $("#currentStageTitle"), stageDifficulty: $("#stageDifficulty"),
     board: $("#board"), rack: $("#rack"), swap: $("#swapLabel"),
     hint: $("#boardHint"), toast: $("#toast"), sound: $("#soundButton"),
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
@@ -50,7 +55,7 @@
   }
 
   function newState() {
-    const random = mulberry32(STAGE_SEED);
+    const random = mulberry32(currentStage.seed);
     return {
       board: Array(Engine.BOARD_SIZE ** 2).fill(null),
       rack: [], batch: 0, deckIndex: 0, nextId: 1,
@@ -509,6 +514,12 @@
     });
   }
 
+  function syncStageInfo() {
+    elements.stageTitle.textContent = currentStage.title;
+    elements.stageDifficulty.textContent = currentStage.difficulty;
+    elements.stageDifficulty.dataset.difficulty = currentStage.difficulty;
+  }
+
   function restart(announce = true) {
     clearDrag();
     sessionId += 1;
@@ -516,6 +527,7 @@
     state = newState();
     state.sound = sound;
     elements.result.classList.add("hidden");
+    syncStageInfo();
     syncSoundButtons();
     refillRack(announce);
     render();
