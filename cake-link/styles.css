@@ -448,6 +448,7 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 .cell.complete .cake-wheel { animation: completePop 520ms cubic-bezier(.22,.7,.2,1) both; }
 .cell.complete .plate-counts { opacity: 0; }
 .cell.emptying .cake-plate { animation: emptyPlateOut 380ms ease-out both; }
+.cell.sorting .plate-counts { opacity: 0; }
 .cell.transferring, .cell.receiving {
   z-index: 5;
 }
@@ -608,8 +609,13 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   pointer-events: none;
   will-change: transform;
 }
-.moving-slice.parked-slice {
-  z-index: 129;
+.moving-slice.plate-transition-backdrop { z-index: 126; }
+.moving-slice.plate-transition-retained { z-index: 128; }
+.moving-slice.flying-transfer { z-index: 130; }
+.plate-transition-wheel {
+  width: 100%;
+  height: 100%;
+  filter: none;
 }
 .moving-slice-visual {
   width: 100%;
@@ -620,6 +626,7 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
+.plate-transition-retained .moving-slice-visual { filter: none; }
 
 .toast {
   position: fixed;

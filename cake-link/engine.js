@@ -405,6 +405,43 @@
     return steps;
   }
 
+  function buildAnimationBatches(events) {
+    return events.map((event) => {
+      const transfers = event.kind === "spread"
+        ? event.moves.map((move) => ({
+          from: event.source,
+          to: move.to,
+          type: event.type,
+          count: move.count,
+        }))
+        : [
+          ...event.origins.map((origin) => ({
+            from: origin.index,
+            to: event.target,
+            type: event.type,
+            count: origin.count,
+          })),
+          ...event.spread.map((move) => ({
+            from: event.target,
+            to: move.to,
+            type: move.type,
+            count: move.count,
+          })),
+        ];
+      const grouped = [];
+      for (const transfer of transfers) {
+        const existing = grouped.find((candidate) =>
+          candidate.from === transfer.from &&
+          candidate.to === transfer.to &&
+          candidate.type === transfer.type
+        );
+        if (existing) existing.count += transfer.count;
+        else grouped.push({ ...transfer });
+      }
+      return grouped;
+    }).filter((batch) => batch.length > 0);
+  }
+
   return {
     BOARD_SIZE,
     PLATE_CAPACITY,
@@ -416,6 +453,7 @@
     choosePullType,
     consolidateLocalColors,
     resolvePlacement,
+    buildAnimationBatches,
     buildAnimationSteps,
   };
 });

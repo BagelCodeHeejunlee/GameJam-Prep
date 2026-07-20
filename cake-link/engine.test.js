@@ -20,6 +20,22 @@ function applyAnimationSteps(inputBoard, steps) {
   }
   return board;
 }
+function applyAnimationBatches(inputBoard, batches) {
+  const board = Engine.cloneBoard(inputBoard);
+  for (const batch of batches) {
+    for (const transfer of batch) {
+      board[transfer.from].pieces[transfer.type] -= transfer.count;
+      if (board[transfer.from].pieces[transfer.type] === 0) delete board[transfer.from].pieces[transfer.type];
+    }
+    for (const transfer of batch) {
+      board[transfer.to].pieces[transfer.type] = (board[transfer.to].pieces[transfer.type] || 0) + transfer.count;
+    }
+    for (const plateData of board) {
+      assert.ok(!plateData || Engine.totalPieces(plateData) <= Engine.PLATE_CAPACITY, "애니메이션 중간 판도 6조각을 넘으면 안 된다");
+    }
+  }
+  return board;
+}
 
 {
   const result = Engine.resolvePlacement(boardWith([[5, { berry: 2 }], [1, { berry: 3 }]]), 5);
@@ -95,6 +111,41 @@ function applyAnimationSteps(inputBoard, steps) {
   assert.equal(result.safetyLimitReached, false, "후속 정렬이 같은 B 조각을 두 판 사이에서 반복 이동하면 안 된다");
   assert.equal(result.events.length, 2, "B 조각은 정해진 수집 판으로 한 번만 이동해야 한다");
   assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
+  const initial = boardWith([
+    [4, { berry: 3 }],
+    [5, { berry: 3 }],
+    [6, { berry: 3 }],
+    [9, { berry: 3 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(result.completed, [5, 9], "십자 배치의 A3 네 판은 A6 두 판으로 정렬되어야 한다");
+  assert.deepEqual(result.settledBoard[5].pieces, { berry: 6 });
+  assert.deepEqual(result.settledBoard[9].pieces, { berry: 6 });
+  assert.deepEqual(result.emptied, [4, 6]);
+  assert.deepEqual(
+    applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)),
+    result.settledBoard,
+    "빈칸을 경유해 보이더라도 논리 결과는 기존의 A6 두 판과 같아야 한다",
+  );
+}
+
+{
+  const initial = boardWith([
+    [1, { berry: 1 }],
+    [5, { berry: 1, blueberry: 4 }],
+    [6, { berry: 4, blueberry: 2 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  const batches = Engine.buildAnimationBatches(result.events);
+  assert.equal(batches.length, result.events.length, "한 정렬 이벤트는 하나의 원자적 애니메이션 묶음이어야 한다");
+  assert.deepEqual(
+    applyAnimationBatches(initial, batches),
+    result.settledBoard,
+    "들어오고 밀려나는 조각을 함께 이동해도 엔진 결과와 같아야 한다",
+  );
 }
 
 {

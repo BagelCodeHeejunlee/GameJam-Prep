@@ -204,4 +204,145 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
   }
 }
 
+{
+  const occupied = new Set([4, 5, 6, 9]);
+  const route = Motion.findGridRoute({
+    fromIndex: 4,
+    toIndex: 9,
+    columns: 4,
+    cellCount: 16,
+    isPlayable: () => true,
+    isOccupied: (index) => occupied.has(index),
+  });
+  assert.deepEqual(
+    route,
+    [4, 8, 9],
+    "a diagonal arm-to-arm transfer uses the empty neighboring cell instead of jumping across the center plate",
+  );
+}
+
+{
+  const occupied = new Set([4, 5]);
+  assert.deepEqual(
+    Motion.findGridRoute({
+      fromIndex: 4,
+      toIndex: 5,
+      columns: 4,
+      cellCount: 16,
+      isPlayable: () => true,
+      isOccupied: (index) => occupied.has(index),
+    }),
+    [4, 5],
+    "adjacent plates still exchange directly even when both endpoints are occupied",
+  );
+}
+
+{
+  const route = Motion.findGridRoute({
+    fromIndex: 3,
+    toIndex: 4,
+    columns: 4,
+    cellCount: 16,
+    isPlayable: () => true,
+    isOccupied: () => false,
+  });
+  assert.ok(route.length > 2, "neighbor lookup does not wrap between the right and left edges of adjacent rows");
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    const rowDistance = Math.abs(Math.floor(previous / 4) - Math.floor(current / 4));
+    const columnDistance = Math.abs(previous % 4 - current % 4);
+    assert.equal(rowDistance + columnDistance, 1, "every routed hop stays orthogonally adjacent");
+  }
+}
+
+{
+  const route = Motion.findGridRoute({
+    fromIndex: 4,
+    toIndex: 9,
+    columns: 4,
+    cellCount: 16,
+    isPlayable: (index) => [4, 5, 9].includes(index),
+    isOccupied: (index) => index === 5,
+  });
+  assert.equal(
+    route,
+    null,
+    "routing never crosses an occupied plate or a blocked board cell when no empty visual path exists",
+  );
+}
+
+{
+  const motion = Motion.createRoutedFlightMotion({
+    rects: [rect(0, 0, 80), rect(0, 100, 80), rect(100, 100, 80)],
+  });
+  assert.deepEqual(motion.start, { x: 40, y: 40 });
+  assert.deepEqual(motion.end, { x: 140, y: 140 });
+  assert.ok(motion.points.length > 3, "a routed flight rounds its intermediate corner");
+  assert.equal(motion.points[0].offset, 0);
+  assert.equal(motion.points.at(-1).offset, 1);
+  assert.ok(
+    motion.points.every((point, index) => index === 0 || point.offset > motion.points[index - 1].offset),
+    "routed keyframe offsets advance monotonically",
+  );
+  assert.ok(motion.duration >= 190 && motion.duration <= 280, "a detour stays quick enough for repeated transfers");
+}
+
+{
+  const transition = Motion.createSlotTransition({
+    beforeSlots: ["berry", "berry", "blueberry", null, null, null],
+    afterSlots: ["berry", "berry", "berry", "berry", "blueberry", null],
+  });
+  assert.deepEqual(
+    transition.retained,
+    [
+      { type: "berry", count: 2, fromFirst: 0, fromLast: 1, toFirst: 0, toLast: 1 },
+      { type: "blueberry", count: 1, fromFirst: 2, fromLast: 2, toFirst: 4, toLast: 4 },
+    ],
+    "existing groups reserve their final sorted sectors before the incoming group lands",
+  );
+  assert.deepEqual(
+    transition.added,
+    [{ type: "berry", count: 2, first: 2, last: 3 }],
+    "incoming A2 receives two genuinely empty final sectors",
+  );
+  const retainedSlots = new Set(transition.retained.flatMap((group) =>
+    Array.from({ length: group.count }, (_, index) => group.toFirst + index)
+  ));
+  const incomingSlots = transition.added.flatMap((group) =>
+    Array.from({ length: group.count }, (_, index) => group.first + index)
+  );
+  assert.ok(
+    incomingSlots.every((slot) => !retainedSlots.has(slot)),
+    "a flying group cannot cover a retained slice at landing",
+  );
+}
+
+{
+  const transition = Motion.createSlotTransition({
+    beforeSlots: ["berry", "blueberry", "blueberry", "blueberry", null, null],
+    afterSlots: ["berry", "berry", "berry", "blueberry", null, null],
+  });
+  assert.deepEqual(transition.added, [{ type: "berry", count: 2, first: 1, last: 2 }]);
+  assert.deepEqual(transition.removed, [{ type: "blueberry", count: 2, first: 2, last: 3 }]);
+  assert.deepEqual(
+    transition.retained.find((group) => group.type === "blueberry"),
+    { type: "blueberry", count: 1, fromFirst: 1, fromLast: 1, toFirst: 3, toLast: 3 },
+    "a displaced color reflows to its surviving final sector while both flying groups are off the plates",
+  );
+}
+
+{
+  assert.equal(
+    Motion.createSlotReflowRotation({ baseRotation: 30, fromFirst: 1, toFirst: 5 }),
+    270,
+    "a retained group moving four slots forward keeps the full +240 degree path",
+  );
+  assert.equal(
+    Motion.createSlotReflowRotation({ baseRotation: 30, fromFirst: 5, toFirst: 1 }),
+    -210,
+    "a retained group moving four slots backward keeps the full -240 degree path",
+  );
+}
+
 console.log("Cake Link motion tests passed");
