@@ -189,14 +189,14 @@
   }
 
   function difficultyLabel(clearRate) {
-    if (clearRate >= .80) return "쉬움";
-    if (clearRate >= .45) return "보통";
-    if (clearRate >= .18) return "어려움";
+    if (clearRate >= .90) return "쉬움";
+    if (clearRate >= .70) return "보통";
+    if (clearRate >= .40) return "어려움";
     return "매우 어려움";
   }
 
   function simulateStage(stage, options = {}) {
-    const runs = Math.max(1, Math.min(5000, Math.floor(options.runs || 300)));
+    const runs = Math.max(1, Math.min(20000, Math.floor(options.runs || 300)));
     const skill = options.skill || "standard";
     const baseSeed = options.seed ?? stage.seed;
     const outcomes = { clear: 0, limit: 0, locked: 0 };

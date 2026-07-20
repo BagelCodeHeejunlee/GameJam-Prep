@@ -2,6 +2,15 @@ const assert = require("node:assert/strict");
 const Stages = require("./stages.js");
 
 const stages = Object.values(Stages.STAGES);
+const EXPECTED_GOALS = {
+  1: { berry: 3 },
+  2: { berry: 3, lemon: 3 },
+  3: { matcha: 3, lemon: 3 },
+  4: { berry: 2, matcha: 2, choco: 2 },
+  5: { berry: 3, lemon: 3, blueberry: 2 },
+  6: { matcha: 3, choco: 3, blueberry: 3 },
+  7: { berry: 3, matcha: 3, lemon: 3, choco: 2, blueberry: 2 },
+};
 
 assert.equal(stages.length, 7, "1~7 스테이지가 모두 있어야 한다");
 
@@ -25,6 +34,8 @@ for (const [position, stage] of stages.entries()) {
   assert.ok(["쉬움", "보통", "어려움"].includes(stage.difficulty));
   assert.ok(Number.isInteger(stage.moveLimit) && stage.moveLimit > 0);
   assert.ok(Number.isInteger(stage.seed) && stage.seed > 0);
+  assert.deepEqual(stage.goals, EXPECTED_GOALS[stage.id], `${stage.title} 목표는 원안에서 바뀌면 안 된다`);
+  assert.deepEqual(stage.boardMask, ["1111", "1111", "1111", "1111"], `${stage.title}는 기본 4×4 보드를 사용해야 한다`);
 
   assert.equal(stage.boardMask.length, 4, `${stage.title} 보드는 4행이어야 한다`);
   stage.boardMask.forEach((row) => assert.match(row, /^[01]{4}$/, `${stage.title} 보드 행은 0/1 네 칸이어야 한다`));
