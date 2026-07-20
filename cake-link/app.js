@@ -64,14 +64,10 @@
   }
 
   function generatedPlate(slot) {
-    if (state.deckIndex < currentStage.deck.length) return plate(currentStage.deck[state.deckIndex++]);
-    const order = Engine.CAKE_ORDER;
-    const goalTypes = Object.keys(currentStage.goals);
-    const primary = goalTypes[(state.batch + slot) % goalTypes.length];
-    const secondary = order[(order.indexOf(primary) + 1 + Math.floor(state.random() * 3)) % order.length];
-    const mainCount = 2 + Math.floor(state.random() * 3);
-    const pieces = { [primary]: mainCount };
-    if (mainCount < 5 && state.random() < .52) pieces[secondary] = 1;
+    if (state.deckIndex < currentStage.openingRack.length) {
+      return plate(currentStage.openingRack[state.deckIndex++]);
+    }
+    const pieces = Stages.createWeightedPlate(currentStage, state.random);
     state.deckIndex += 1;
     return plate(pieces);
   }
