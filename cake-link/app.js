@@ -267,11 +267,11 @@
   }
 
   function directionDegrees(fromIndex, toIndex) {
-    const difference = toIndex - fromIndex;
-    if (difference === 1) return 0;
-    if (difference === Engine.BOARD_SIZE) return 90;
-    if (difference === -1) return 180;
-    return -90;
+    const fromRow = Math.floor(fromIndex / Engine.BOARD_SIZE);
+    const fromColumn = fromIndex % Engine.BOARD_SIZE;
+    const toRow = Math.floor(toIndex / Engine.BOARD_SIZE);
+    const toColumn = toIndex % Engine.BOARD_SIZE;
+    return Math.atan2(toRow - fromRow, toColumn - fromColumn) * 180 / Math.PI;
   }
 
   function slotIndexFor(plateData, type) {

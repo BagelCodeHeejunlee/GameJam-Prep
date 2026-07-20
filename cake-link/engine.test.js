@@ -68,6 +68,36 @@ function applyAnimationSteps(inputBoard, steps) {
 }
 
 {
+  // Reproduction: place B3C3 above, A5 to the right, then place A1B1 in the center.
+  // The primary pull completes A6 and leaves B split as B3 + B1 unless the local
+  // group performs a second consolidation pass.
+  const initial = boardWith([
+    [1, { blueberry: 3, lemon: 3 }],
+    [6, { berry: 5 }],
+    [5, { berry: 1, blueberry: 1 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(result.settledBoard[5].pieces, { berry: 6 }, "A6은 중앙에서 먼저 완성되어야 한다");
+  assert.deepEqual(result.board[6].pieces, { blueberry: 4 }, "분리된 B3과 B1은 빈자리가 있는 한 판에 B4로 합쳐져야 한다");
+  assert.deepEqual(result.board[1].pieces, { lemon: 3 }, "B가 빠진 혼합 판에는 C3만 남아야 한다");
+  assert.deepEqual(result.completed, [5]);
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
+  const initial = boardWith([
+    [4, { berry: 3, blueberry: 1 }],
+    [5, { berry: 3, matcha: 2 }],
+    [6, { berry: 1, blueberry: 4 }],
+    [9, { berry: 2 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.equal(result.safetyLimitReached, false, "후속 정렬이 같은 B 조각을 두 판 사이에서 반복 이동하면 안 된다");
+  assert.equal(result.events.length, 2, "B 조각은 정해진 수집 판으로 한 번만 이동해야 한다");
+  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+}
+
+{
   const initial = boardWith([
     [4, { berry: 2 }],
     [5, { berry: 2, blueberry: 2 }],

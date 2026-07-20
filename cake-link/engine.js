@@ -173,6 +173,99 @@
     return { events, recipients, touched };
   }
 
+  function consolidateLocalColors(board, centerIndex, locked) {
+    const events = [];
+    const touched = new Set();
+    const localOrder = [centerIndex, ...getNeighbors(centerIndex)];
+    const collectorByType = new Map();
+    let changed = true;
+    let passes = 0;
+
+    // After the primary pull, moving one color can open room that lets another
+    // split color consolidate. Repeat only inside the placed plate's local cross.
+    while (changed && passes < CAKE_ORDER.length * 2) {
+      changed = false;
+      passes += 1;
+      const localIndexes = localOrder.filter((index) =>
+        board[index] && totalPieces(board[index]) > 0 && !locked.has(index) && !isComplete(board[index])
+      );
+      const colorTotals = Object.fromEntries(CAKE_ORDER.map((type) => [
+        type,
+        localIndexes.reduce((sum, index) => sum + (board[index].pieces[type] || 0), 0),
+      ]));
+      const colorOrder = [...CAKE_ORDER].sort((a, b) =>
+        colorTotals[b] - colorTotals[a] || CAKE_ORDER.indexOf(a) - CAKE_ORDER.indexOf(b)
+      );
+
+      for (const type of colorOrder) {
+        const holders = localIndexes.filter((index) => board[index]?.pieces[type] > 0 && !locked.has(index));
+        if (holders.length < 2) continue;
+
+        const total = holders.reduce((sum, index) => sum + board[index].pieces[type], 0);
+        const collectors = holders.map((index) => {
+          const own = board[index].pieces[type];
+          const free = PLATE_CAPACITY - totalPieces(board[index]);
+          const resultCount = own + Math.min(total - own, free);
+          const otherPieces = totalPieces(board[index]) - own;
+          return { index, own, free, resultCount, otherPieces };
+        }).filter((candidate) => candidate.free > 0 && candidate.resultCount > candidate.own);
+        collectors.sort((a, b) =>
+          b.resultCount - a.resultCount ||
+          a.otherPieces - b.otherPieces ||
+          b.own - a.own ||
+          localOrder.indexOf(a.index) - localOrder.indexOf(b.index)
+        );
+        let collector = null;
+        const assignedIndex = collectorByType.get(type);
+        if (assignedIndex !== undefined && holders.includes(assignedIndex) && !locked.has(assignedIndex)) {
+          const own = board[assignedIndex].pieces[type];
+          const free = PLATE_CAPACITY - totalPieces(board[assignedIndex]);
+          collector = {
+            index: assignedIndex,
+            own,
+            free,
+            resultCount: own + Math.min(total - own, free),
+            otherPieces: totalPieces(board[assignedIndex]) - own,
+          };
+        } else if (collectors[0]) {
+          collector = collectors[0];
+          collectorByType.set(type, collector.index);
+        }
+        if (!collector) continue;
+
+        const donors = holders.filter((index) => index !== collector.index).sort((a, b) => {
+          const otherA = totalPieces(board[a]) - board[a].pieces[type];
+          const otherB = totalPieces(board[b]) - board[b].pieces[type];
+          return otherB - otherA || board[b].pieces[type] - board[a].pieces[type] || localOrder.indexOf(a) - localOrder.indexOf(b);
+        });
+
+        for (const donorIndex of donors) {
+          const free = PLATE_CAPACITY - totalPieces(board[collector.index]);
+          if (free <= 0) break;
+          const count = Math.min(board[donorIndex].pieces[type], free);
+          if (count <= 0) continue;
+          board[donorIndex].pieces[type] -= count;
+          cleanPieces(board[donorIndex]);
+          board[collector.index].pieces[type] = (board[collector.index].pieces[type] || 0) + count;
+          events.push({
+            kind: "spread",
+            source: donorIndex,
+            type,
+            count,
+            moves: [{ type, count, to: collector.index }],
+          });
+          touched.add(donorIndex);
+          touched.add(collector.index);
+          changed = true;
+        }
+
+        if (isComplete(board[collector.index])) locked.add(collector.index);
+      }
+    }
+
+    return { events, touched: [...touched], safetyLimitReached: changed };
+  }
+
   function pullType(board, index, type, locked, received) {
     const target = board[index];
     if (!target || locked.has(index) || !target.pieces[type]) return null;
@@ -259,6 +352,12 @@
       }
     }
 
+    const consolidation = consolidateLocalColors(board, placedIndex, locked);
+    events.push(...consolidation.events);
+    for (const touchedIndex of consolidation.touched) {
+      if (isComplete(board[touchedIndex])) locked.add(touchedIndex);
+    }
+
     const completed = [...locked].sort((a, b) => a - b);
     const emptied = [];
     for (let index = 0; index < board.length; index += 1) {
@@ -267,7 +366,7 @@
     const settledBoard = cloneBoard(board);
     for (const index of [...completed, ...emptied]) board[index] = null;
 
-    return { board, settledBoard, events, completed, emptied, safetyLimitReached: false };
+    return { board, settledBoard, events, completed, emptied, safetyLimitReached: consolidation.safetyLimitReached };
   }
 
   function buildAnimationSteps(events) {
@@ -315,6 +414,7 @@
     getNeighbors,
     isComplete,
     choosePullType,
+    consolidateLocalColors,
     resolvePlacement,
     buildAnimationSteps,
   };
