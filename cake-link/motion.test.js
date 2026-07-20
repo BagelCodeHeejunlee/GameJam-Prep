@@ -22,7 +22,7 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
   assert.deepEqual(motion.points.map((point) => point.offset), [0, 0.22, 0.5, 0.78, 1]);
   closeTo(motion.points[0].x, motion.start.x, "first point begins at start");
   closeTo(motion.points[4].x, motion.end.x, "last point ends at end");
-  assert.ok(motion.control.y > 50, "rightward flight bends along its perpendicular, not always upward");
+  closeTo(motion.control.y, 50, "reference-style flight stays on the direct plate-to-plate line");
 }
 
 {
@@ -30,7 +30,7 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
   closeTo(motion.start.y, 77, "vertical start uses a 27% edge inset");
   closeTo(motion.end.y, 223, "vertical end uses a 27% edge inset");
   closeTo(motion.travelAngle, 90, "vertical travel angle is retained");
-  assert.ok(motion.control.x < 50, "downward flight bends sideways along its perpendicular");
+  closeTo(motion.control.x, 50, "vertical flight stays on the direct plate-to-plate line");
   closeTo(motion.control.y, (motion.start.y + motion.end.y) / 2, "curve displacement is perpendicular");
   const midpoint = {
     x: (motion.start.x + motion.end.x) / 2,
@@ -62,20 +62,22 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
   });
   closeTo(first.laneOffset, -last.laneOffset, "outer lanes are symmetric");
   closeTo(middle.laneOffset, 0, "middle lane is centered");
-  assert.ok(Math.abs(first.laneOffset) <= 7 && Math.abs(last.laneOffset) <= 7, "fan stays within 7px");
+  assert.ok(Math.abs(first.laneOffset) <= 4 && Math.abs(last.laneOffset) <= 4, "fan stays within 4px");
   closeTo(first.start.y + last.start.y, middle.start.y * 2, "lane endpoints fan symmetrically");
   assert.equal(first.delay, 0);
-  assert.equal(middle.delay, 6);
-  assert.equal(last.delay, 12);
+  assert.equal(middle.delay, 5);
+  assert.equal(last.delay, 10);
 }
 
 {
   for (const distance of [0, 1, 50, 200, 1000]) {
     const options = { fromRect: rect(0, 0), toRect: rect(distance, 0), laneIndex: 3, laneCount: 6 };
     const motion = Motion.createFlightMotion(options);
-    assert.ok(motion.duration >= 165 && motion.duration <= 225, "duration stays within the snappy motion range");
-    assert.ok(motion.delay >= 0 && motion.delay <= 12, "group staggering never exceeds 12ms");
+    assert.ok(motion.duration >= 165 && motion.duration <= 220, "duration stays within the reference motion range");
+    assert.ok(motion.delay >= 0 && motion.delay <= 10, "same-color pieces stay visually together");
     assert.deepEqual(Motion.createFlightMotion(options), motion, "motion is deterministic");
+    assert.ok(motion.points.every((point) => point.rotation === motion.travelAngle), "slice orientation stays fixed in flight");
+    assert.ok(motion.points.every((point) => point.scale === 1), "slice size stays fixed in flight");
   }
 }
 
@@ -107,26 +109,22 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
 
 {
   const turn = Motion.createRotationMotion({ current: 0, target: 120 });
-  assert.ok(turn.duration >= 200 && turn.duration <= 228, "rotation stays visible without becoming sluggish");
+  assert.ok(turn.duration >= 210 && turn.duration <= 320, "rotation stays readable like the reference");
   assert.equal(turn.points[0].angle, 0);
-  assert.ok(turn.points[1].angle < 0, "clockwise rotation begins with a small counter movement");
-  assert.ok(turn.points[2].angle > 120, "clockwise rotation gently overshoots its target");
+  assert.equal(turn.points.length, 2, "rotation travels directly without wind-up or overshoot");
   assert.equal(turn.points.at(-1).angle, 120, "rotation settles exactly on its target");
 }
 
 {
   const turn = Motion.createRotationMotion({ current: 90, target: -30 });
-  assert.ok(turn.points[1].angle > 90, "counter-clockwise rotation winds up in the opposite direction");
-  assert.ok(turn.points[2].angle < -30, "counter-clockwise overshoot follows travel direction");
+  assert.equal(turn.points.length, 2);
   assert.equal(turn.points.at(-1).angle, -30);
 }
 
 {
   const still = Motion.createRotationMotion({ current: 45, target: 45 });
   const reduced = Motion.createRotationMotion({ current: 0, target: 180, reducedMotion: true });
-  assert.equal(still.duration, 150, "an aligned plate still gives a short readiness cue");
-  assert.ok(still.points.some((point) => point.angle < 45));
-  assert.ok(still.points.some((point) => point.angle > 45));
+  assert.equal(still.duration, 0, "an aligned plate does not fake a rotation");
   assert.equal(still.points.at(-1).angle, 45);
   assert.ok(reduced.duration <= 16, "reduced motion rotation completes immediately");
   assert.equal(reduced.points.at(-1).angle, 180);

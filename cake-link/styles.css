@@ -443,32 +443,13 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 }
 .cell.drop-target::after { color: var(--berry); border-color: var(--berry); }
 .cell.active { z-index: 3; animation: cellPulse .48s ease both; }
-.cell.complete { z-index: 4; animation: completePop .42s ease both; }
+.cell.complete,
+.cell.emptying { z-index: 4; overflow: visible; }
+.cell.complete .cake-wheel { animation: completePop 520ms cubic-bezier(.22,.7,.2,1) both; }
+.cell.complete .plate-counts { opacity: 0; }
+.cell.emptying .cake-plate { animation: emptyPlateOut 380ms ease-out both; }
 .cell.transferring, .cell.receiving {
   z-index: 5;
-  background: rgba(255,255,255,.9);
-  box-shadow: inset 0 0 0 3px rgba(238,117,132,.2), 0 8px 18px rgba(103,66,43,.12);
-}
-.cell.transferring .cake-plate {
-  animation: plateOffer 200ms cubic-bezier(.2,.8,.2,1) both;
-}
-.cell.receiving .cake-plate {
-  animation: plateReceive 200ms cubic-bezier(.2,.8,.2,1) both;
-}
-.cell.landing { z-index: 6; }
-.cell.landing::before {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  inset: 17%;
-  border: 3px solid var(--landing-color, #ee7584);
-  border-radius: 50%;
-  pointer-events: none;
-  animation: landingRipple 190ms ease-out both;
-}
-.cell.landing .cake-plate {
-  z-index: 2;
-  animation: plateLand 190ms cubic-bezier(.2,.9,.25,1.18) both;
 }
 
 .cake-plate {
@@ -492,26 +473,13 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   background:
-    repeating-conic-gradient(from -30deg, transparent 0deg 57deg, rgba(255,255,255,.82) 57deg 60deg),
+    repeating-conic-gradient(from -30deg, transparent 0deg 56.5deg, rgba(255,255,255,.94) 56.5deg 60deg),
+    radial-gradient(circle at 48% 42%, rgba(255,255,255,.22), transparent 53%),
     var(--cake-gradient);
-  box-shadow: inset 0 0 0 1px rgba(89,60,49,.1), 0 2px 5px rgba(89,60,49,.12);
+  box-shadow: inset 0 0 0 1px rgba(89,60,49,.13), 0 2px 5px rgba(89,60,49,.12);
   transform: rotate(var(--wheel-rotation, 0deg));
-  transition: transform 190ms cubic-bezier(.18,.72,.18,1);
+  transition: none;
   will-change: transform;
-}
-.cake-wheel::before {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  top: 5%;
-  left: 50%;
-  width: 13%;
-  height: 6%;
-  border: 1px solid rgba(89,60,49,.16);
-  border-radius: 999px;
-  background: #fffaf0;
-  box-shadow: 0 1px 3px rgba(89,60,49,.2);
-  transform: translateX(-50%);
 }
 .cake-wheel::after {
   content: "";
@@ -645,12 +613,11 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   box-shadow: 0 8px 13px rgba(72,43,31,.26), inset 0 -3px 0 rgba(89,60,49,.12);
   clip-path: polygon(7% 50%, 92% 4%, 100% 50%, 92% 96%);
   pointer-events: none;
-  transform-origin: 18% 50%;
-  will-change: transform, opacity;
+  transform-origin: center;
+  will-change: transform;
 }
 .moving-slice.parked-slice {
   z-index: 129;
-  animation: parkedSliceIn 120ms ease-out both;
 }
 .moving-slice::after {
   content: attr(data-emoji);
@@ -779,12 +746,15 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 
 @keyframes liftPlate { from { opacity: .25; transform: translate(-50%, -40%) scale(.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes cellPulse { 0%,100%{transform:scale(1)} 45%{transform:scale(1.055);box-shadow:inset 0 0 0 3px rgba(238,117,132,.35),0 8px 18px rgba(103,66,43,.16)} }
-@keyframes completePop { 0%{transform:scale(1)} 45%{transform:scale(1.15);filter:brightness(1.12)} 100%{transform:scale(.75);opacity:0} }
-@keyframes plateOffer { 0%{transform:translate(0,0) scale(1)} 15%{transform:translate(var(--transfer-windup-x),var(--transfer-windup-y)) scale(1.012)} 58%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.965)} 82%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.012)} 100%{transform:translate(0,0) scale(1)} }
-@keyframes plateReceive { 0%{transform:translate(0,0) scale(1)} 15%{transform:translate(var(--transfer-windup-x),var(--transfer-windup-y)) scale(1.008)} 55%{transform:translate(var(--transfer-x),var(--transfer-y)) scale(.975)} 80%{transform:translate(var(--transfer-tail-x),var(--transfer-tail-y)) scale(1.01)} 100%{transform:translate(0,0) scale(1)} }
-@keyframes plateLand { 0%{transform:scale(.96)} 38%{transform:scale(1.055)} 72%{transform:scale(.992)} 100%{transform:scale(1)} }
-@keyframes landingRipple { 0%{opacity:.62;transform:scale(.56)} 100%{opacity:0;transform:scale(1.28)} }
-@keyframes parkedSliceIn { 0%{opacity:.62;filter:brightness(1.13)} 100%{opacity:.92;filter:brightness(1)} }
+@keyframes completePop {
+  0%, 42% { opacity: 1; transform: translateY(0) rotate(var(--wheel-rotation, 0deg)) scale(1); }
+  55% { opacity: 1; transform: translateY(-8px) rotate(var(--wheel-rotation, 0deg)) scale(1.03); }
+  100% { opacity: 0; transform: translateY(-18dvh) rotate(var(--wheel-rotation, 0deg)) scale(.72); }
+}
+@keyframes emptyPlateOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.42); }
+}
 @keyframes modalIn { from{opacity:0;transform:translateY(18px) scale(.96)} to{opacity:1;transform:none} }
 @keyframes moveWarning { 0%{transform:scale(1.3)} 100%{transform:scale(1)} }
 

@@ -63,7 +63,7 @@
       rack: [], batch: 0, deckIndex: 0, nextId,
       completed: 0, completedByType: {}, score: 0, swaps: currentStage.swaps,
       movesRemaining: currentStage.moveLimit, busy: false,
-      sound: true, random, activeCells: new Set(), completeCells: new Set(),
+      sound: true, random, activeCells: new Set(), completeCells: new Set(), emptyCells: new Set(),
       rotations: Array(Engine.BOARD_SIZE ** 2).fill(0),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
     };
@@ -140,6 +140,7 @@
       const classes = ["cell", plateData ? "occupied" : "empty"];
       if (state.activeCells.has(index)) classes.push("active");
       if (state.completeCells.has(index)) classes.push("complete");
+      if (state.emptyCells.has(index)) classes.push("emptying");
       const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}` : `${row}행 ${col}열, 빈칸`;
       return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData, state.rotations[index]) : ""}</div>`;
     }).join("");
@@ -273,7 +274,8 @@
     const fromColumn = fromIndex % Engine.BOARD_SIZE;
     const toRow = Math.floor(toIndex / Engine.BOARD_SIZE);
     const toColumn = toIndex % Engine.BOARD_SIZE;
-    return Math.atan2(toRow - fromRow, toColumn - fromColumn) * 180 / Math.PI;
+    // CSS conic gradients start at twelve o'clock, while atan2 starts at three.
+    return Math.atan2(toRow - fromRow, toColumn - fromColumn) * 180 / Math.PI + 90;
   }
 
   function slotIndexFor(plateData, type) {
@@ -321,44 +323,20 @@
     return Boolean(reducedMotionQuery?.matches);
   }
 
-  function cueTransferCell(index, className, direction) {
+  function cueTransferCell(index, className) {
     const cell = elements.board.querySelector(`[data-cell="${index}"]`);
     if (!cell) return;
-    cell.classList.remove("transferring", "receiving", "landing");
-    const transferX = Math.cos(direction * Math.PI / 180) * 4.5;
-    const transferY = Math.sin(direction * Math.PI / 180) * 4.5;
-    cell.style.setProperty("--transfer-x", `${transferX}px`);
-    cell.style.setProperty("--transfer-y", `${transferY}px`);
-    cell.style.setProperty("--transfer-windup-x", `${transferX * -.22}px`);
-    cell.style.setProperty("--transfer-windup-y", `${transferY * -.22}px`);
-    cell.style.setProperty("--transfer-tail-x", `${transferX * .28}px`);
-    cell.style.setProperty("--transfer-tail-y", `${transferY * .28}px`);
-    void cell.offsetWidth;
+    cell.classList.remove("transferring", "receiving");
     cell.classList.add(className);
-  }
-
-  function landPlate(index, type) {
-    const cell = elements.board.querySelector(`[data-cell="${index}"]`);
-    if (!cell) return;
-    cell.classList.remove("transferring", "receiving", "landing");
-    cell.style.setProperty("--landing-color", CAKES[type]?.color || "#ee7584");
-    void cell.offsetWidth;
-    cell.classList.add("landing");
-    window.setTimeout(() => cell.classList.remove("landing"), reducedMotion() ? 0 : 210);
   }
 
   async function alignPlates(fromIndex, toIndex, type, receiverOpenType) {
     const direction = directionDegrees(fromIndex, toIndex);
     const donorTurn = rotatePlateToward(fromIndex, slotIndexFor(state.board[fromIndex], type), direction);
     const receiverTurn = rotatePlateToward(toIndex, receivingSlotIndex(state.board[toIndex], receiverOpenType), direction + 180);
-    state.activeCells = new Set([fromIndex, toIndex]);
-    cueTransferCell(fromIndex, "transferring", direction);
-    cueTransferCell(toIndex, "receiving", direction + 180);
-    await Promise.all([
-      donorTurn,
-      receiverTurn,
-      wait(reducedMotion() ? 0 : 205),
-    ]);
+    cueTransferCell(fromIndex, "transferring");
+    cueTransferCell(toIndex, "receiving");
+    await Promise.all([donorTurn, receiverTurn]);
   }
 
   function createMovingSlice(type, extraClass = "") {
@@ -388,8 +366,7 @@
     movingSlice.style.top = `${flight.start.y}px`;
     document.body.appendChild(movingSlice);
 
-    const travel = movingSlice.animate(flight.points.map((point, index) => ({
-      opacity: index === 0 ? .82 : index === flight.points.length - 1 ? .9 : 1,
+    const travel = movingSlice.animate(flight.points.map((point) => ({
       transform: `translate3d(${point.x - flight.start.x}px, ${point.y - flight.start.y}px, 0) translate(-50%, -50%) rotate(${point.rotation}deg) scale(${point.scale})`,
       offset: point.offset,
     })), {
@@ -399,31 +376,32 @@
       fill: "forwards",
     });
     await travel.finished.catch(() => {});
-    movingSlice.remove();
-    return flight.points.at(-1);
+    return { point: flight.points.at(-1), element: movingSlice };
   }
 
   async function flySliceGroup(fromIndex, toIndex, type, count) {
-    const landings = await Promise.all(Array.from({ length: count }, (_, index) =>
+    const arrivals = await Promise.all(Array.from({ length: count }, (_, index) =>
       flySlice(fromIndex, toIndex, type, index, count)
     ));
     playTone(590, .045, "sine");
-    return landings.filter(Boolean);
+    return arrivals.filter(Boolean);
   }
 
-  function holdLandedSlices(landings, type) {
-    return landings.map((landing) => {
-      const slice = createMovingSlice(type, "parked-slice");
-      slice.style.left = `${landing.x}px`;
-      slice.style.top = `${landing.y}px`;
-      slice.style.transform = `translate(-50%, -50%) rotate(${landing.rotation}deg) scale(${landing.scale})`;
-      document.body.appendChild(slice);
-      return slice;
-    });
+  function holdLandedSlices(arrivals) {
+    const slices = arrivals.map((arrival) => arrival.element).filter(Boolean);
+    slices.forEach((slice) => slice.classList.add("parked-slice"));
+    return slices;
   }
 
   function removeHeldSlices(slices) {
     slices.forEach((slice) => slice.remove());
+  }
+
+  function nextPaint() {
+    if (reducedMotion()) return Promise.resolve();
+    return new Promise((resolve) => window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    }));
   }
 
   function removeOnePiece(board, fromIndex, type) {
@@ -437,11 +415,6 @@
     const to = board[toIndex];
     if (!to) throw new Error(`${type} 조각 도착 상태가 일치하지 않습니다.`);
     to.pieces[type] = (to.pieces[type] || 0) + 1;
-  }
-
-  function moveOnePiece(board, fromIndex, toIndex, type) {
-    removeOnePiece(board, fromIndex, type);
-    addOnePiece(board, toIndex, type);
   }
 
   function transferSignature(step) {
@@ -463,6 +436,8 @@
 
   async function animateResolution(events, activeSession) {
     const groups = groupAnimationSteps(Engine.buildAnimationSteps(events));
+    state.activeCells.clear();
+    renderBoard();
     for (const group of groups) {
       const step = group[0];
       if (activeSession !== sessionId) return false;
@@ -470,45 +445,55 @@
       if (activeSession !== sessionId) return false;
 
       if (step.displaced) {
-        const incomingLandings = await flySliceGroup(step.from, step.to, step.type, group.length);
-        if (activeSession !== sessionId) return false;
-        const heldSlices = holdLandedSlices(incomingLandings, step.type);
+        const incomingFlight = flySliceGroup(step.from, step.to, step.type, group.length);
+        for (const groupedStep of group) removeOnePiece(state.board, groupedStep.from, groupedStep.type);
+        renderBoard();
+        const incomingArrivals = await incomingFlight;
+        if (activeSession !== sessionId) {
+          removeHeldSlices(incomingArrivals.map((arrival) => arrival.element));
+          return false;
+        }
+        const heldSlices = holdLandedSlices(incomingArrivals);
+        let outgoingSlices = [];
         try {
-          landPlate(step.to, step.type);
-          await wait(reducedMotion() ? 0 : 42);
-          if (activeSession !== sessionId) return false;
           const destinationIsFull = Engine.totalPieces(state.board[step.displaced.to]) >= Engine.PLATE_CAPACITY;
           await alignPlates(step.displaced.from, step.displaced.to, step.displaced.type, destinationIsFull ? step.type : null);
           if (activeSession !== sessionId) return false;
-          await flySliceGroup(step.displaced.from, step.displaced.to, step.displaced.type, group.length);
-          if (activeSession !== sessionId) return false;
+          const outgoingFlight = flySliceGroup(step.displaced.from, step.displaced.to, step.displaced.type, group.length);
           for (const groupedStep of group) {
-            moveOnePiece(state.board, groupedStep.from, groupedStep.to, groupedStep.type);
-            moveOnePiece(state.board, groupedStep.displaced.from, groupedStep.displaced.to, groupedStep.displaced.type);
+            removeOnePiece(state.board, groupedStep.displaced.from, groupedStep.displaced.type);
+            addOnePiece(state.board, groupedStep.to, groupedStep.type);
           }
           renderBoard();
-          landPlate(step.to, step.type);
-          landPlate(step.displaced.to, step.displaced.type);
+          const outgoingArrivals = await outgoingFlight;
+          outgoingSlices = outgoingArrivals.map((arrival) => arrival.element);
+          if (activeSession !== sessionId) return false;
+          for (const groupedStep of group) {
+            addOnePiece(state.board, groupedStep.displaced.to, groupedStep.displaced.type);
+          }
+          renderBoard();
+          await nextPaint();
         } finally {
           removeHeldSlices(heldSlices);
+          removeHeldSlices(outgoingSlices);
         }
       } else {
         const flight = flySliceGroup(step.from, step.to, step.type, group.length);
-        await wait(reducedMotion() ? 0 : 12);
-        if (activeSession !== sessionId) {
-          await flight;
-          return false;
-        }
         for (const groupedStep of group) removeOnePiece(state.board, groupedStep.from, groupedStep.type);
         renderBoard();
-        await flight;
-        if (activeSession !== sessionId) return false;
+        const arrivals = await flight;
+        const arrivedSlices = arrivals.map((arrival) => arrival.element);
+        if (activeSession !== sessionId) {
+          removeHeldSlices(arrivedSlices);
+          return false;
+        }
         for (const groupedStep of group) addOnePiece(state.board, groupedStep.to, groupedStep.type);
         renderBoard();
-        landPlate(step.to, step.type);
+        await nextPaint();
+        removeHeldSlices(arrivedSlices);
       }
 
-      await wait(reducedMotion() ? 0 : 18);
+      await wait(reducedMotion() ? 0 : 10);
     }
     return true;
   }
@@ -558,6 +543,7 @@
       await wait(45);
     }
 
+    state.emptyCells = new Set(result.emptied);
     if (result.completed.length) {
       state.completeCells = new Set(result.completed);
       state.completed += result.completed.length;
@@ -574,16 +560,20 @@
       playComplete(combo);
       render();
       showToast(combo > 1 ? `${combo}판 연쇄 완성!` : "케이크 한 판 완성!");
-      await wait(420);
+      await wait(reducedMotion() ? 0 : 520);
       if (activeSession !== sessionId) return;
     } else if (result.emptied.length) {
+      render();
       showToast("빈 판이 정리됐어요");
+      await wait(reducedMotion() ? 0 : 380);
+      if (activeSession !== sessionId) return;
     }
 
     state.board = result.board;
     state.board.forEach((plateData, index) => { if (!plateData) state.rotations[index] = 0; });
     state.activeCells.clear();
     state.completeCells.clear();
+    state.emptyCells.clear();
 
     const goalMet = Stages.isComplete(currentStage, state.completedByType);
     if (!goalMet && state.movesRemaining > 0 && state.rack.every((item) => !item)) refillRack();
