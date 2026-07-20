@@ -13,13 +13,69 @@
     <title>케이크 링크</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <main class="game-shell">
+  <body class="menu-open">
+    <section id="homeScreen" class="home-screen" aria-labelledby="homeTitle">
+      <div class="home-decoration home-decoration-one" aria-hidden="true"></div>
+      <div class="home-decoration home-decoration-two" aria-hidden="true"></div>
+
+      <header class="home-toolbar">
+        <span class="puzzle-chip"><span aria-hidden="true">✦</span> 4×4 SORT PUZZLE</span>
+        <div class="home-actions">
+          <button id="homeSoundButton" class="menu-icon-button" type="button" aria-label="소리 끄기" aria-pressed="true">♪</button>
+          <button id="guideButton" class="menu-icon-button" type="button" aria-label="게임 방법 보기">?</button>
+        </div>
+      </header>
+
+      <div class="home-content">
+        <div class="home-title-block">
+          <span class="home-kicker">SORT · MATCH · BAKE</span>
+          <h1 id="homeTitle"><span>CAKE</span><span>LINK!</span></h1>
+          <p>조각을 모아 완벽한 한 판을 완성하세요</p>
+        </div>
+
+        <div class="home-puzzle" aria-hidden="true">
+          <span class="floating-fruit fruit-one">🍓</span>
+          <span class="floating-fruit fruit-two">🫐</span>
+          <span class="floating-fruit fruit-three">🍋</span>
+          <div class="home-board">
+            <span class="home-cell empty"></span>
+            <span class="home-cell"><i class="menu-plate menu-berry"></i></span>
+            <span class="home-cell empty"></span>
+            <span class="home-cell"><i class="menu-plate menu-lemon"></i></span>
+            <span class="home-cell"><i class="menu-plate menu-mix"></i></span>
+            <span class="home-cell empty"></span>
+            <span class="home-cell"><i class="menu-plate menu-blue"></i></span>
+            <span class="home-cell empty"></span>
+            <span class="home-cell empty"></span>
+            <span class="home-cell"><i class="menu-plate menu-matcha"></i></span>
+            <span class="home-cell empty"></span>
+            <span class="home-cell"><i class="menu-plate menu-pink-mix"></i></span>
+            <span class="home-cell"><i class="menu-plate menu-choco"></i></span>
+            <span class="home-cell empty"></span>
+            <span class="home-cell"><i class="menu-plate menu-berry"></i></span>
+            <span class="home-cell empty"></span>
+          </div>
+          <span class="home-complete-badge"><b>6</b><small>완성!</small></span>
+        </div>
+
+        <button id="playButton" class="play-button" type="button">
+          <span class="play-symbol" aria-hidden="true">▶</span>
+          <span><strong>플레이</strong><small>케이크 퍼즐 시작하기</small></span>
+        </button>
+      </div>
+
+      <p class="home-footer"><span aria-hidden="true">🍰</span> 같은 조각 6개를 모으면 케이크 완성!</p>
+    </section>
+
+    <main id="gameShell" class="game-shell screen-hidden">
       <header class="topbar">
-        <div class="brand" aria-label="케이크 링크">
-          <span class="brand-mark" aria-hidden="true">🍰</span>
-          <div>
-            <h1>케이크 링크</h1>
+        <div class="game-nav">
+          <button id="homeButton" class="icon-button home-button" type="button" aria-label="메인 화면으로 돌아가기">⌂</button>
+          <div class="brand" aria-label="케이크 링크">
+            <span class="brand-mark" aria-hidden="true">🍰</span>
+            <div>
+              <h1>케이크 링크</h1>
+            </div>
           </div>
         </div>
 
@@ -58,6 +114,20 @@
           <div><span>최종 점수</span><strong id="resultScore">0</strong></div>
         </div>
         <button id="retryButton" class="primary-button" type="button">한 번 더 만들기</button>
+      </section>
+    </div>
+
+    <div id="guideOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+      <section class="guide-card">
+        <button id="guideCloseButton" class="guide-close" type="button" aria-label="게임 방법 닫기">×</button>
+        <span class="eyebrow">HOW TO PLAY</span>
+        <h2 id="guideTitle">케이크 만드는 법</h2>
+        <div class="guide-steps">
+          <div><span>1</span><b>판을 끌어 놓기</b><p>하단의 케이크 판을 4×4 보드 빈칸으로 끌어주세요.</p></div>
+          <div><span>2</span><b>같은 조각 모으기</b><p>새 판과 상하좌우의 같은 조각이 한곳으로 정렬돼요.</p></div>
+          <div><span>6</span><b>한 판 완성하기</b><p>같은 조각 6개가 모이면 완성된 판이 사라져요.</p></div>
+        </div>
+        <button id="guidePlayButton" class="primary-button" type="button">바로 플레이</button>
       </section>
     </div>
 

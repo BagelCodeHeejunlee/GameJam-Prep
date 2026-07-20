@@ -24,6 +24,10 @@
 
   const $ = (selector) => document.querySelector(selector);
   const elements = {
+    home: $("#homeScreen"), gameShell: $("#gameShell"), play: $("#playButton"),
+    homeButton: $("#homeButton"), homeSound: $("#homeSoundButton"),
+    guideButton: $("#guideButton"), guide: $("#guideOverlay"),
+    guideClose: $("#guideCloseButton"), guidePlay: $("#guidePlayButton"),
     board: $("#board"), rack: $("#rack"), swap: $("#swapLabel"),
     hint: $("#boardHint"), toast: $("#toast"), sound: $("#soundButton"),
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
@@ -73,10 +77,10 @@
     return plate(pieces);
   }
 
-  function refillRack() {
+  function refillRack(announce = true) {
     state.batch += 1;
     state.rack = [0, 1, 2].map((slot) => generatedPlate(slot));
-    showToast(`${state.batch}번째 판 묶음이 도착했어요`);
+    if (announce) showToast(`${state.batch}번째 판 묶음이 도착했어요`);
   }
 
   function slotsFor(plateData) {
@@ -498,32 +502,84 @@
     });
   }
 
-  function restart() {
+  function syncSoundButtons() {
+    [elements.sound, elements.homeSound].forEach((button) => {
+      button.setAttribute("aria-pressed", String(state.sound));
+      button.setAttribute("aria-label", state.sound ? "소리 끄기" : "소리 켜기");
+    });
+  }
+
+  function restart(announce = true) {
     clearDrag();
     sessionId += 1;
     const sound = state?.sound ?? true;
     state = newState();
     state.sound = sound;
     elements.result.classList.add("hidden");
-    elements.sound.setAttribute("aria-pressed", String(sound));
-    elements.sound.setAttribute("aria-label", sound ? "소리 끄기" : "소리 켜기");
-    refillRack();
+    syncSoundButtons();
+    refillRack(announce);
     render();
   }
 
-  elements.restart.addEventListener("click", restart);
-  elements.retry.addEventListener("click", restart);
-  elements.sound.addEventListener("click", () => {
+  function toggleSound() {
     state.sound = !state.sound;
-    elements.sound.setAttribute("aria-pressed", String(state.sound));
-    elements.sound.setAttribute("aria-label", state.sound ? "소리 끄기" : "소리 켜기");
+    syncSoundButtons();
     if (state.sound) playTone(520, .08, "sine");
+  }
+
+  function startGame() {
+    elements.guide.classList.add("hidden");
+    elements.home.classList.add("screen-hidden");
+    elements.gameShell.classList.remove("screen-hidden");
+    document.body.classList.remove("menu-open");
+    playTone(520, .08, "sine");
+    elements.homeButton.focus();
+  }
+
+  function showHome(focusPlay = false) {
+    elements.guide.classList.add("hidden");
+    elements.result.classList.add("hidden");
+    elements.toast.classList.remove("show");
+    elements.gameShell.classList.add("screen-hidden");
+    elements.home.classList.remove("screen-hidden");
+    document.body.classList.add("menu-open");
+    if (focusPlay) elements.play.focus();
+  }
+
+  function openGuide() {
+    elements.guide.classList.remove("hidden");
+    elements.guideClose.focus();
+  }
+
+  function closeGuide() {
+    elements.guide.classList.add("hidden");
+    elements.guideButton.focus();
+  }
+
+  elements.restart.addEventListener("click", () => restart(true));
+  elements.retry.addEventListener("click", () => restart(true));
+  elements.sound.addEventListener("click", toggleSound);
+  elements.homeSound.addEventListener("click", toggleSound);
+  elements.play.addEventListener("click", startGame);
+  elements.guidePlay.addEventListener("click", startGame);
+  elements.guideButton.addEventListener("click", openGuide);
+  elements.guideClose.addEventListener("click", closeGuide);
+  elements.guide.addEventListener("click", (event) => {
+    if (event.target === elements.guide) closeGuide();
+  });
+  elements.homeButton.addEventListener("click", () => {
+    restart(false);
+    showHome(true);
   });
 
   document.addEventListener("pointermove", moveDrag, { passive: false });
   document.addEventListener("pointerup", finishDrag, { passive: false });
   document.addEventListener("pointercancel", clearDrag);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.guide.classList.contains("hidden")) closeGuide();
+  });
   window.addEventListener("blur", clearDrag);
 
-  restart();
+  restart(false);
+  showHome();
 })();
