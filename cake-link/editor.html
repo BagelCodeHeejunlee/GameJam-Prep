@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fff8ef" />
+    <meta name="description" content="케이크 링크 스테이지 데이터 편집 및 난이도 시뮬레이션" />
+    <title>케이크 링크 · 스테이지 랩</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <header class="lab-header">
+      <a class="lab-brand" href="./" aria-label="케이크 링크 게임으로 돌아가기">
+        <span aria-hidden="true">🍰</span>
+        <div><strong>STAGE LAB</strong><small>케이크 링크 밸런스 편집기</small></div>
+      </a>
+      <nav class="header-actions" aria-label="편집기 작업">
+        <button id="resetStageButton" class="button ghost" type="button">현재 스테이지 초기화</button>
+        <button id="saveButton" class="button secondary" type="button">브라우저에 저장</button>
+        <button id="copyAllButton" class="button primary" type="button">전체 JSON 복사</button>
+      </nav>
+    </header>
+
+    <div class="lab-layout">
+      <aside class="stage-sidebar" aria-label="스테이지 선택">
+        <div class="sidebar-heading"><b>STAGES</b><span id="savedState">원본 데이터</span></div>
+        <div id="stageList" class="stage-list"></div>
+        <a class="game-link" href="./">← 게임으로 돌아가기</a>
+      </aside>
+
+      <main class="editor-main">
+        <section class="editor-heading">
+          <div>
+            <span class="eyebrow">SELECTED STAGE</span>
+            <h1 id="editorTitle">스테이지 1</h1>
+          </div>
+          <div id="validationSummary" class="validation-summary" role="status"></div>
+        </section>
+
+        <div class="editor-columns">
+          <div class="config-column">
+            <section class="panel" aria-labelledby="basicTitle">
+              <div class="panel-title"><div><span>01</span><h2 id="basicTitle">기본 설정</h2></div></div>
+              <div class="form-grid basics-grid">
+                <label>인덱스<input id="stageIdInput" type="number" min="1" readonly /></label>
+                <label>난이도<select id="difficultyInput"><option>쉬움</option><option>보통</option><option>어려움</option><option>매우 어려움</option></select></label>
+                <label>횟수 제한<input id="moveLimitInput" type="number" min="1" max="99" /></label>
+                <label>교체권<input id="swapsInput" type="number" min="0" max="20" /></label>
+                <label>랜덤 시드<input id="seedInput" type="number" min="1" /></label>
+                <label>다음 스테이지<input id="nextStageInput" type="number" min="1" placeholder="없음" /></label>
+              </div>
+              <div class="efficiency-strip">
+                <span>총 목표 <b id="totalGoalsValue">0판</b></span>
+                <span>목표 1판당 <b id="movesPerGoalValue">0회</b></span>
+                <span>사용 가능 칸 <b id="playableCellsValue">0칸</b></span>
+              </div>
+            </section>
+
+            <section class="panel" aria-labelledby="colorTitle">
+              <div class="panel-title"><div><span>02</span><h2 id="colorTitle">목표 · 등장 색 · 색상 웨이트</h2></div><b id="colorWeightTotal" class="weight-total">100%</b></div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>색깔</th><th>등장</th><th>목표 판</th><th>웨이트</th></tr></thead>
+                  <tbody id="colorTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="panel board-panel" aria-labelledby="boardTitle">
+              <div class="panel-title"><div><span>03</span><h2 id="boardTitle">보드 모양 · 시작 케이크 판</h2></div><small>칸을 선택해 편집</small></div>
+              <div class="board-workspace">
+                <div id="boardEditor" class="board-editor" role="grid" aria-label="4 곱하기 4 보드 편집"></div>
+                <div class="cell-inspector">
+                  <div class="inspector-heading"><b id="selectedCellLabel">0번 칸</b><label class="switch"><input id="cellActiveInput" type="checkbox" /><span>사용</span></label></div>
+                  <p>시작 조각</p>
+                  <div id="initialPieceInputs" class="piece-inputs"></div>
+                  <div class="capacity-line"><span>판 조각 수</span><b id="initialCapacity">0 / 6</b></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" aria-labelledby="openingTitle">
+              <div class="panel-title"><div><span>04</span><h2 id="openingTitle">첫 하단 3판</h2></div><small>랜덤 전에 확정 공급</small></div>
+              <div id="openingRackEditor" class="opening-editor"></div>
+            </section>
+
+            <section class="panel" aria-labelledby="patternTitle">
+              <div class="panel-title"><div><span>05</span><h2 id="patternTitle">판 배치 웨이트</h2></div><b id="patternWeightTotal" class="weight-total">100%</b></div>
+              <div class="table-wrap">
+                <table class="data-table pattern-table">
+                  <thead><tr><th>패턴</th><th>예시 의미</th><th>웨이트</th><th></th></tr></thead>
+                  <tbody id="patternTableBody"></tbody>
+                </table>
+              </div>
+              <button id="addPatternButton" class="button ghost small" type="button">+ 패턴 추가</button>
+            </section>
+
+            <section class="panel" aria-labelledby="jsonTitle">
+              <div class="panel-title"><div><span>06</span><h2 id="jsonTitle">선택 스테이지 JSON</h2></div></div>
+              <textarea id="jsonEditor" class="json-editor" spellcheck="false" aria-label="선택 스테이지 JSON"></textarea>
+              <div class="json-actions">
+                <button id="applyJsonButton" class="button secondary" type="button">JSON 적용</button>
+                <button id="copyStageButton" class="button ghost" type="button">선택 JSON 복사</button>
+              </div>
+            </section>
+          </div>
+
+          <aside class="simulation-column" aria-labelledby="simTitle">
+            <section class="panel simulation-panel">
+              <div class="panel-title"><div><span>SIM</span><h2 id="simTitle">난이도 시뮬레이션</h2></div></div>
+              <p class="sim-description">현재 정렬 엔진으로 플레이를 반복합니다. 보드가 가득 차면 별도 결과로 집계합니다.</p>
+              <div class="sim-controls">
+                <label>가상 플레이어<select id="skillInput"><option value="novice">초보</option><option value="standard" selected>일반</option><option value="expert">숙련</option></select></label>
+                <label>반복 횟수<div class="range-line"><input id="runsInput" type="range" min="50" max="2000" step="50" value="500" /><b id="runsValue">500회</b></div></label>
+                <button id="simulateButton" class="button primary wide" type="button">선택 스테이지 분석</button>
+              </div>
+
+              <div id="simEmpty" class="sim-empty">데이터를 수정한 뒤 분석을 실행해보세요.</div>
+              <div id="simResults" class="sim-results hidden" aria-live="polite">
+                <div class="sim-grade"><span>AI 추정 난이도</span><strong id="simDifficulty">-</strong></div>
+                <div class="stat-grid">
+                  <div><span>클리어율</span><b id="clearRateValue">-</b></div>
+                  <div><span>평균 클리어</span><b id="averageMovesValue">-</b></div>
+                  <div><span>평균 목표 달성</span><b id="averageProgressValue">-</b></div>
+                </div>
+                <div class="outcome-chart" role="img" aria-label="시뮬레이션 결과 비율">
+                  <div id="clearBar" class="outcome clear"></div><div id="limitBar" class="outcome limit"></div><div id="lockedBar" class="outcome locked"></div>
+                </div>
+                <div class="chart-legend">
+                  <span><i class="dot clear"></i>클리어 <b id="clearLegend">0%</b></span>
+                  <span><i class="dot limit"></i>횟수 소진 <b id="limitLegend">0%</b></span>
+                  <span><i class="dot locked"></i>보드 잠김 <b id="lockedLegend">0%</b></span>
+                </div>
+                <p id="simInsight" class="sim-insight"></p>
+                <button id="applyDifficultyButton" class="button ghost wide" type="button">추정 난이도를 설정값에 적용</button>
+              </div>
+            </section>
+
+            <section class="panel all-stage-panel">
+              <div class="panel-title"><div><span>ALL</span><h2>전체 난이도 곡선</h2></div></div>
+              <button id="simulateAllButton" class="button secondary wide" type="button">1~7 전체 분석</button>
+              <div class="table-wrap"><table class="curve-table"><thead><tr><th>ST</th><th>제한</th><th>판당</th><th>클리어</th><th>잠김</th></tr></thead><tbody id="curveTableBody"></tbody></table></div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <div id="toast" class="editor-toast" role="status" aria-live="polite"></div>
+    <script src="engine.js"></script>
+    <script src="stages.js"></script>
+    <script src="simulator.js"></script>
+    <script src="editor.js"></script>
+  </body>
+</html>
