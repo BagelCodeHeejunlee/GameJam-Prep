@@ -22,6 +22,7 @@
     guideClose: $("#guideCloseButton"), guidePlay: $("#guidePlayButton"),
     stageTitle: $("#currentStageTitle"), stageDifficulty: $("#stageDifficulty"),
     stageGoalPreview: $("#stageGoalPreview"), goalProgress: $("#goalProgress"),
+    movesCounter: $("#movesCounter"), movesRemaining: $("#movesRemaining"),
     board: $("#board"), rack: $("#rack"), swap: $("#swapLabel"),
     hint: $("#boardHint"), toast: $("#toast"), sound: $("#soundButton"),
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
@@ -52,7 +53,8 @@
     return {
       board: Array(Engine.BOARD_SIZE ** 2).fill(null),
       rack: [], batch: 0, deckIndex: 0, nextId: 1,
-      completed: 0, completedByType: {}, score: 0, swaps: currentStage.swaps, busy: false,
+      completed: 0, completedByType: {}, score: 0, swaps: currentStage.swaps,
+      movesRemaining: currentStage.moveLimit, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(),
       rotations: Array(Engine.BOARD_SIZE ** 2).fill(0),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
@@ -154,6 +156,8 @@
     renderRack();
     renderGoals();
     elements.swap.textContent = state.swaps;
+    elements.movesRemaining.textContent = state.movesRemaining;
+    elements.movesCounter.classList.toggle("danger", state.movesRemaining <= 3);
     elements.hint.textContent = state.busy ? "케이크를 정렬하고 있어요" : "판을 위로 끌어 빈칸에 놓으세요";
   }
 
@@ -410,7 +414,7 @@
   }
 
   async function placeRackAt(rackIndex, cellIndex) {
-    if (state.busy || state.board[cellIndex]) return;
+    if (state.busy || state.movesRemaining <= 0 || state.board[cellIndex]) return;
     const chosen = state.rack[rackIndex];
     if (!chosen) return;
     const activeSession = sessionId;
@@ -419,6 +423,7 @@
     state.board[cellIndex] = chosen;
     state.rotations[cellIndex] = 0;
     state.rack[rackIndex] = null;
+    state.movesRemaining -= 1;
     state.score += 10;
     state.activeCells = new Set([cellIndex]);
     playTone(245, .08, "sine");
@@ -472,21 +477,24 @@
     state.completeCells.clear();
 
     const goalMet = Stages.isComplete(currentStage, state.completedByType);
-    if (!goalMet && state.rack.every((item) => !item)) refillRack();
+    if (!goalMet && state.movesRemaining > 0 && state.rack.every((item) => !item)) refillRack();
     state.best = Math.max(state.best, state.score);
     localStorage.setItem(BEST_KEY, String(state.best));
     state.busy = false;
     render();
 
     if (goalMet) completeStage();
-    else if (state.board.every(Boolean)) endGame();
+    else if (state.movesRemaining <= 0) endGame("moves");
+    else if (state.board.every(Boolean)) endGame("board");
   }
 
-  function endGame() {
+  function endGame(reason = "moves") {
     resultAction = "retry";
     elements.resultEyebrow.textContent = "STAGE FAILED";
-    elements.resultTitle.textContent = "진열대가 가득 찼어요";
-    elements.resultMessage.textContent = "목표를 완료하기 전에 빈칸이 모두 사라졌어요.";
+    elements.resultTitle.textContent = reason === "board" ? "진열대가 가득 찼어요" : "배치 횟수를 모두 썼어요";
+    elements.resultMessage.textContent = reason === "board"
+      ? "목표를 완료하기 전에 빈칸이 모두 사라졌어요."
+      : "목표에 가까운 색을 먼저 모아 다시 도전해보세요.";
     elements.resultCompleted.textContent = `${state.completed}판`;
     elements.resultScore.textContent = state.score.toLocaleString("ko-KR");
     elements.retry.textContent = "다시 도전";
@@ -497,13 +505,13 @@
 
   function completeStage() {
     state.busy = true;
-    resultAction = currentStage.nextStageId ? "next" : "home";
+    resultAction = "homeAfterClear";
     elements.resultEyebrow.textContent = "STAGE CLEAR";
     elements.resultTitle.textContent = `${currentStage.title} 완료!`;
     elements.resultMessage.textContent = "모든 케이크 목표를 달성했어요.";
     elements.resultCompleted.textContent = `${state.completed}판`;
     elements.resultScore.textContent = state.score.toLocaleString("ko-KR");
-    elements.retry.textContent = currentStage.nextStageId ? "다음 스테이지" : "메인으로";
+    elements.retry.textContent = "메인으로";
     elements.result.classList.remove("hidden");
     playComplete(2);
     elements.retry.focus();
@@ -607,12 +615,8 @@
   }
 
   function handleResultAction() {
-    if (resultAction === "next" && currentStage.nextStageId) {
-      selectStage(currentStage.nextStageId);
-      restart(true);
-      return;
-    }
-    if (resultAction === "home") {
+    if (resultAction === "homeAfterClear") {
+      if (currentStage.nextStageId) selectStage(currentStage.nextStageId);
       restart(false);
       showHome(true);
       return;

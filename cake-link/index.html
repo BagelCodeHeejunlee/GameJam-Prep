@@ -65,8 +65,14 @@
       </header>
 
       <section class="goal-hud" aria-label="스테이지 목표 진행도">
-        <span class="goal-hud-label">목표</span>
-        <div id="goalProgress" class="goal-progress"></div>
+        <div class="goal-hud-main">
+          <span class="goal-hud-label">목표</span>
+          <div id="goalProgress" class="goal-progress"></div>
+        </div>
+        <div id="movesCounter" class="moves-counter" aria-label="남은 배치 횟수">
+          <span>남은 배치</span>
+          <strong id="movesRemaining">0</strong>
+        </div>
       </section>
 
       <section class="game-stage">
