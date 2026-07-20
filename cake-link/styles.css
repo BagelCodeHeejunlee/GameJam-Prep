@@ -113,6 +113,23 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 .editor-link { text-decoration: none; }
 .menu-icon-button:active { transform: scale(.93); }
 .menu-icon-button[aria-pressed="false"] { color: #b6a49a; }
+.debug-reset-button {
+  position: absolute;
+  left: 50%;
+  bottom: max(11px, env(safe-area-inset-bottom));
+  min-height: 27px;
+  padding: 0 11px;
+  border: 1px dashed rgba(178,79,99,.32);
+  border-radius: 999px;
+  color: #a85b69;
+  background: rgba(255,255,255,.42);
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  transform: translateX(-50%);
+}
+.debug-reset-button:active { background: rgba(250,225,229,.8); }
 
 .play-button {
   position: relative;

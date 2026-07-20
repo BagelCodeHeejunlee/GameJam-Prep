@@ -17,6 +17,7 @@
   const $ = (selector) => document.querySelector(selector);
   const elements = {
     home: $("#homeScreen"), gameShell: $("#gameShell"), play: $("#playButton"),
+    debugReset: $("#debugResetButton"),
     homeButton: $("#homeButton"), homeSound: $("#homeSoundButton"),
     guideButton: $("#guideButton"), guide: $("#guideOverlay"),
     guideClose: $("#guideCloseButton"), guidePlay: $("#guidePlayButton"),
@@ -643,11 +644,29 @@
     restart(true);
   }
 
+  function resetDebugData() {
+    const confirmed = window.confirm("스테이지 진행도, 최고 점수, 편집기 저장 데이터를 모두 초기화할까요?");
+    if (!confirmed) return;
+
+    const cakeLinkKeys = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("cakeLink.")) cakeLinkKeys.push(key);
+    }
+    cakeLinkKeys.forEach((key) => localStorage.removeItem(key));
+    currentStage = Stages.getStage(1);
+    resultAction = "retry";
+    restart(false);
+    showHome(true);
+    showToast("케이크 링크 데이터를 초기화했어요");
+  }
+
   elements.restart.addEventListener("click", () => restart(true));
   elements.retry.addEventListener("click", handleResultAction);
   elements.sound.addEventListener("click", toggleSound);
   elements.homeSound.addEventListener("click", toggleSound);
   elements.play.addEventListener("click", startGame);
+  elements.debugReset.addEventListener("click", resetDebugData);
   elements.guidePlay.addEventListener("click", startGame);
   elements.guideButton.addEventListener("click", openGuide);
   elements.guideClose.addEventListener("click", closeGuide);
