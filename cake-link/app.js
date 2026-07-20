@@ -50,9 +50,14 @@
 
   function newState() {
     const random = mulberry32(currentStage.seed);
+    const board = Array(Engine.BOARD_SIZE ** 2).fill(null);
+    let nextId = 1;
+    for (const initial of currentStage.initialPlates) {
+      board[initial.index] = { id: nextId++, pieces: { ...initial.pieces } };
+    }
     return {
-      board: Array(Engine.BOARD_SIZE ** 2).fill(null),
-      rack: [], batch: 0, deckIndex: 0, nextId: 1,
+      board,
+      rack: [], batch: 0, deckIndex: 0, nextId,
       completed: 0, completedByType: {}, score: 0, swaps: currentStage.swaps,
       movesRemaining: currentStage.moveLimit, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(),
@@ -110,11 +115,25 @@
       .join(", ");
   }
 
+  function isPlayableCell(index) {
+    const row = Math.floor(index / Engine.BOARD_SIZE);
+    const column = index % Engine.BOARD_SIZE;
+    return currentStage.boardMask[row]?.[column] === "1";
+  }
+
+  function isBoardFull() {
+    return state.board.every((plateData, index) => !isPlayableCell(index) || Boolean(plateData));
+  }
+
   function renderBoard() {
     elements.board.classList.remove("ready");
+    elements.board.classList.toggle("shaped", currentStage.boardMask.some((row) => row.includes("0")));
     elements.board.innerHTML = state.board.map((plateData, index) => {
       const row = Math.floor(index / 4) + 1;
       const col = index % 4 + 1;
+      if (!isPlayableCell(index)) {
+        return `<div class="cell blocked" role="gridcell" data-cell="${index}" aria-label="${row}행 ${col}열, 사용할 수 없는 칸"></div>`;
+      }
       const classes = ["cell", plateData ? "occupied" : "empty"];
       if (state.activeCells.has(index)) classes.push("active");
       if (state.completeCells.has(index)) classes.push("complete");
@@ -414,7 +433,7 @@
   }
 
   async function placeRackAt(rackIndex, cellIndex) {
-    if (state.busy || state.movesRemaining <= 0 || state.board[cellIndex]) return;
+    if (state.busy || state.movesRemaining <= 0 || !isPlayableCell(cellIndex) || state.board[cellIndex]) return;
     const chosen = state.rack[rackIndex];
     if (!chosen) return;
     const activeSession = sessionId;
@@ -485,7 +504,7 @@
 
     if (goalMet) completeStage();
     else if (state.movesRemaining <= 0) endGame("moves");
-    else if (state.board.every(Boolean)) endGame("board");
+    else if (isBoardFull()) endGame("board");
   }
 
   function endGame(reason = "moves") {
