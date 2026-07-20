@@ -449,6 +449,22 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 .cell.complete .plate-counts { opacity: 0; }
 .cell.emptying .cake-plate { animation: emptyPlateOut 380ms ease-out both; }
 .cell.sorting .plate-counts { opacity: 0; }
+.cell.relaying {
+  z-index: 7;
+  overflow: visible;
+  animation: relayCellPulse 160ms cubic-bezier(.33,0,.2,1) both;
+}
+.cell.portal-relaying::before {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  z-index: 8;
+  border: 3px solid rgba(255,255,255,.92);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(238,117,132,.32), 0 0 18px rgba(238,117,132,.48);
+  pointer-events: none;
+  animation: portalRelayRing 160ms cubic-bezier(.33,0,.2,1) both;
+}
 .cell.transferring, .cell.receiving {
   z-index: 5;
 }
@@ -745,6 +761,15 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 
 @keyframes liftPlate { from { opacity: .25; transform: translate(-50%, -40%) scale(.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes cellPulse { 0%,100%{transform:scale(1)} 45%{transform:scale(1.055);box-shadow:inset 0 0 0 3px rgba(238,117,132,.35),0 8px 18px rgba(103,66,43,.16)} }
+@keyframes relayCellPulse {
+  0%, 100% { transform: scale(1); }
+  20%, 55% { transform: scale(1.045); box-shadow: inset 0 0 0 3px rgba(238,117,132,.52), 0 0 0 6px rgba(238,117,132,.14), 0 9px 20px rgba(103,66,43,.18); }
+}
+@keyframes portalRelayRing {
+  0% { opacity: 0; transform: scale(.72); }
+  24%, 58% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
 @keyframes completePop {
   0%, 42% { opacity: 1; transform: translateY(0) rotate(var(--wheel-rotation, 0deg)) scale(1); }
   55% { opacity: 1; transform: translateY(-8px) rotate(var(--wheel-rotation, 0deg)) scale(1.03); }

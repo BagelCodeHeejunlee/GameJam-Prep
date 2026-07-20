@@ -222,6 +222,27 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
 }
 
 {
+  const occupied = new Set([4, 5, 6, 9]);
+  const route = Motion.findGridRoute({
+    fromIndex: 6,
+    toIndex: 4,
+    columns: 4,
+    cellCount: 16,
+    isPlayable: () => true,
+    isOccupied: (index) => occupied.has(index),
+  });
+  assert.ok(route.length > 3, "opposite arms do not jump two cells through the occupied center");
+  assert.ok(!route.slice(1, -1).some((index) => occupied.has(index)));
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const current = route[index];
+    const rowDistance = Math.abs(Math.floor(previous / 4) - Math.floor(current / 4));
+    const columnDistance = Math.abs(previous % 4 - current % 4);
+    assert.equal(rowDistance + columnDistance, 1, "the opposite-arm detour advances exactly one cell at a time");
+  }
+}
+
+{
   const occupied = new Set([4, 5]);
   assert.deepEqual(
     Motion.findGridRoute({
@@ -234,6 +255,42 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     }),
     [4, 5],
     "adjacent plates still exchange directly even when both endpoints are occupied",
+  );
+}
+
+{
+  assert.deepEqual(
+    Motion.createTransferRoutePlan({
+      emptyRoute: [4, 8, 9],
+      fromIndex: 4,
+      viaIndex: 5,
+      toIndex: 9,
+      maxCells: 5,
+    }),
+    { route: [4, 8, 9], portalRelay: false },
+    "a short empty route is preferred over the occupied center",
+  );
+  assert.deepEqual(
+    Motion.createTransferRoutePlan({
+      emptyRoute: null,
+      fromIndex: 4,
+      viaIndex: 5,
+      toIndex: 9,
+      maxCells: 5,
+    }),
+    { route: [4, 5, 9], portalRelay: true },
+    "a crowded board uses a marked center hand-off",
+  );
+  assert.deepEqual(
+    Motion.createTransferRoutePlan({
+      emptyRoute: [6, 2, 1, 0, 4, 8],
+      fromIndex: 6,
+      viaIndex: 5,
+      toIndex: 4,
+      maxCells: 5,
+    }),
+    { route: [6, 5, 4], portalRelay: true },
+    "an overly long detour is replaced by a two-hop center hand-off",
   );
 }
 
@@ -286,6 +343,52 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     "routed keyframe offsets advance monotonically",
   );
   assert.ok(motion.duration >= 190 && motion.duration <= 280, "a detour stays quick enough for repeated transfers");
+}
+
+{
+  const motion = Motion.createHopFlightMotion({
+    rects: [rect(0, 0, 80), rect(100, 0, 80), rect(100, 100, 80)],
+  });
+  assert.equal(motion.segments.length, 2, "an empty-cell relay is rendered as two separate hops");
+  assert.deepEqual(motion.segments[0].start, { x: 40, y: 40 });
+  assert.deepEqual(motion.segments[0].end, { x: 140, y: 40 });
+  assert.deepEqual(motion.segments[1].start, motion.segments[0].end, "the second hop starts at the relay cell");
+  assert.deepEqual(motion.segments[1].end, { x: 140, y: 140 });
+  assert.ok(motion.holdDuration >= 32 && motion.holdDuration <= 44, "the relay has a short readable pause");
+  assert.equal(
+    motion.duration,
+    motion.segments[0].duration + motion.holdDuration + motion.segments[1].duration,
+    "total hop timing includes exactly one center hand-off pause",
+  );
+  assert.ok(motion.duration >= 190 && motion.duration <= 280, "two hops reuse the existing total flight-time budget");
+  assert.ok(
+    motion.segments.every((segment) => segment.duration >= 60 && segment.duration <= 130),
+    "each one-cell hop stays quick",
+  );
+}
+
+{
+  const motion = Motion.createHopFlightMotion({
+    rects: [rect(0, 0, 80), rect(100, 0, 80), rect(100, 100, 80)],
+    reducedMotion: true,
+  });
+  assert.equal(motion.holdDuration, 0);
+  assert.equal(motion.duration, 1, "reduced motion collapses the whole route into one frame");
+  assert.equal(motion.segments.length, 1);
+  assert.equal(motion.segments[0].duration, 1);
+}
+
+{
+  const motion = Motion.createHopFlightMotion({
+    rects: Array.from({ length: 16 }, (_, index) => rect(index * 100, 0, 80)),
+  });
+  assert.equal(motion.segments.length, 15);
+  assert.ok(motion.segments.every((segment) => segment.duration >= 1));
+  assert.ok(motion.duration <= 280, "even a long empty-cell route stays inside the total timing budget");
+  assert.equal(
+    motion.duration,
+    motion.segments.reduce((sum, segment) => sum + segment.duration, 0) + motion.holdDuration * 14,
+  );
 }
 
 {

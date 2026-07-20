@@ -14,6 +14,7 @@
   const EMPTY_COLOR = "#eee4d6";
   const BEST_KEY = "cakeLink.v1.bestScore";
   const STAGE_KEY = "cakeLink.v1.currentStage";
+  const MAX_VISIBLE_ROUTE_CELLS = 5;
 
   const $ = (selector) => document.querySelector(selector);
   const elements = {
@@ -463,7 +464,23 @@
       const targetLast = targetFirst + transfer.count - 1;
       sourceOffsets.set(sourceKey, sourceOffset + transfer.count);
       targetOffsets.set(targetKey, targetOffset + transfer.count);
-      const route = transferRoute(beforeBoard, transfer.from, transfer.to);
+      // Prefer a short route through empty cells. If a crowded board has no
+      // readable route, use the placed center as a fade-out/fade-in hand-off
+      // instead of drawing extra slices on top of its existing cake.
+      const emptyRoute = transferRoute(beforeBoard, transfer.from, transfer.to);
+      const { route, portalRelay } = Motion.createTransferRoutePlan({
+        emptyRoute,
+        fromIndex: transfer.from,
+        viaIndex: transfer.via,
+        toIndex: transfer.to,
+        maxCells: MAX_VISIBLE_ROUTE_CELLS,
+      });
+      const rowDistance = Math.abs(
+        Math.floor(transfer.from / Engine.BOARD_SIZE) - Math.floor(transfer.to / Engine.BOARD_SIZE),
+      );
+      const columnDistance = Math.abs(
+        (transfer.from % Engine.BOARD_SIZE) - (transfer.to % Engine.BOARD_SIZE),
+      );
       return {
         ...transfer,
         sourceWheel,
@@ -473,6 +490,8 @@
         targetLast,
         targetFirst,
         route,
+        portalRelay,
+        multiHop: Boolean(route?.length > 2 || rowDistance + columnDistance > 1),
         laneOffset: 0,
       };
     });
@@ -614,12 +633,14 @@
     };
   }
 
-  function createTransferVisual(plan, rotations) {
+  function createTransferVisual(plan, rotations, activeSession) {
     if (!plan.sourceWheel || !plan.targetWheel || plan.sourceLast < 0 || plan.targetLast < 0) return null;
     const fromRect = layoutRect(plan.sourceWheel);
     const toRect = layoutRect(plan.targetWheel);
     const rects = routeRects(plan.route, fromRect, toRect, fromRect.width * plan.laneOffset);
-    const flight = Motion.createRoutedFlightMotion({ rects, reducedMotion: reducedMotion() });
+    const flight = plan.multiHop
+      ? Motion.createHopFlightMotion({ rects, reducedMotion: reducedMotion() })
+      : Motion.createRoutedFlightMotion({ rects, reducedMotion: reducedMotion() });
     const layer = createMovingSlice(plan.sourceWheel, plan.sourceLast, plan.count, "flying-transfer");
     setLayerRect(layer, fromRect);
     document.body.appendChild(layer);
@@ -643,15 +664,74 @@
         }));
       },
       fly: async () => {
-        const travel = layer.animate(flight.points.map((point) => ({
-          transform: `translate3d(${point.x - flight.start.x}px, ${point.y - flight.start.y}px, 0)`,
-          offset: point.offset,
-        })), {
-          duration: flight.duration,
-          delay: flight.delay,
-          easing: flight.easing,
-          fill: "forwards",
-        });
+        const travel = async () => {
+          if (flight.segments) {
+            for (let index = 0; index < flight.segments.length; index += 1) {
+              if (activeSession !== sessionId) return;
+              const segment = flight.segments[index];
+              const startTransform = `translate3d(${segment.start.x - flight.start.x}px, ${segment.start.y - flight.start.y}px, 0)`;
+              const endTransform = `translate3d(${segment.end.x - flight.start.x}px, ${segment.end.y - flight.start.y}px, 0)`;
+              const hasPortalSplit = plan.portalRelay && flight.segments.length > 1;
+              const startOpacity = hasPortalSplit && index > 0 ? 0 : 1;
+              const endOpacity = hasPortalSplit && index === 0 ? 0 : 1;
+              const transformAt = (ratio) => `translate3d(${
+                segment.start.x + (segment.end.x - segment.start.x) * ratio - flight.start.x
+              }px, ${
+                segment.start.y + (segment.end.y - segment.start.y) * ratio - flight.start.y
+              }px, 0)`;
+              let hopFrames = [
+                { transform: startTransform, opacity: startOpacity },
+                { transform: endTransform, opacity: endOpacity },
+              ];
+              if (hasPortalSplit && index === 0) {
+                hopFrames = [
+                  { transform: startTransform, opacity: 1, offset: 0 },
+                  { transform: transformAt(.45), opacity: 1, offset: .45 },
+                  { transform: transformAt(.66), opacity: 0, offset: .66 },
+                  { transform: endTransform, opacity: 0, offset: 1 },
+                ];
+              } else if (hasPortalSplit && index === flight.segments.length - 1) {
+                hopFrames = [
+                  { transform: startTransform, opacity: 0, offset: 0 },
+                  { transform: transformAt(.34), opacity: 0, offset: .34 },
+                  { transform: transformAt(.55), opacity: 1, offset: .55 },
+                  { transform: endTransform, opacity: 1, offset: 1 },
+                ];
+              }
+              const hop = layer.animate(hopFrames, {
+                duration: segment.duration,
+                easing: segment.easing,
+                fill: "both",
+              });
+              await hop.finished.catch(() => {});
+              layer.style.transform = endTransform;
+              layer.style.opacity = String(endOpacity);
+              hop.cancel();
+              if (activeSession !== sessionId) return;
+              if (index < flight.segments.length - 1) {
+                const relayIndex = plan.route?.[index + 1];
+                if (Number.isInteger(relayIndex)) {
+                  const relayCell = elements.board.querySelector(`[data-cell="${relayIndex}"]`);
+                  relayCell?.classList.add("relaying");
+                  if (plan.portalRelay) relayCell?.classList.add("portal-relaying");
+                }
+                playTone(470, .025, "sine");
+                await wait(flight.holdDuration);
+              }
+            }
+            return;
+          }
+          const animation = layer.animate(flight.points.map((point) => ({
+            transform: `translate3d(${point.x - flight.start.x}px, ${point.y - flight.start.y}px, 0)`,
+            offset: point.offset,
+          })), {
+            duration: flight.duration,
+            delay: flight.delay,
+            easing: flight.easing,
+            fill: "forwards",
+          });
+          await animation.finished.catch(() => {});
+        };
         const turn = playTimedRotation(
           visual,
           sourceRotation,
@@ -659,7 +739,7 @@
           flight.duration,
           flight.easing,
         );
-        await Promise.all([travel.finished.catch(() => {}), turn]);
+        await Promise.all([travel(), turn]);
       },
     };
   }
@@ -672,7 +752,7 @@
     const rotations = desiredPlateRotations(plans);
     const involved = new Set(transfers.flatMap((transfer) => [transfer.from, transfer.to]));
     const outgoing = new Set(transfers.map((transfer) => transfer.from));
-    const visuals = plans.map((plan) => createTransferVisual(plan, rotations)).filter(Boolean);
+    const visuals = plans.map((plan) => createTransferVisual(plan, rotations, activeSession)).filter(Boolean);
     const preparations = [...involved].map((index) => createPlatePreparation(
       index,
       beforeBoard[index],

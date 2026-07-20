@@ -97,6 +97,11 @@ function applyAnimationBatches(inputBoard, batches) {
   assert.deepEqual(result.board[6].pieces, { blueberry: 4 }, "분리된 B3과 B1은 빈자리가 있는 한 판에 B4로 합쳐져야 한다");
   assert.deepEqual(result.board[1].pieces, { lemon: 3 }, "B가 빠진 혼합 판에는 C3만 남아야 한다");
   assert.deepEqual(result.completed, [5]);
+  assert.equal(
+    Engine.buildAnimationBatches(result.events)[1][0].via,
+    5,
+    "빈칸 경로가 막혀도 중앙판 전달을 표시할 수 있어야 한다",
+  );
   assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
 }
 
@@ -125,6 +130,11 @@ function applyAnimationBatches(inputBoard, batches) {
   assert.deepEqual(result.settledBoard[5].pieces, { berry: 6 });
   assert.deepEqual(result.settledBoard[9].pieces, { berry: 6 });
   assert.deepEqual(result.emptied, [4, 6]);
+  assert.equal(
+    Engine.buildAnimationBatches(result.events).flat()
+      .find((transfer) => transfer.from === 4 && transfer.to === 9).via,
+    5,
+  );
   assert.deepEqual(
     applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)),
     result.settledBoard,

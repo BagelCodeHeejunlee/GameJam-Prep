@@ -178,6 +178,25 @@
     return null;
   }
 
+  function createTransferRoutePlan(options = {}) {
+    const emptyRoute = Array.isArray(options.emptyRoute) ? options.emptyRoute : null;
+    const maxCells = Math.max(2, Math.floor(finite(options.maxCells, 5)));
+    if (emptyRoute && emptyRoute.length >= 2 && emptyRoute.length <= maxCells) {
+      return { route: [...emptyRoute], portalRelay: false };
+    }
+    if (
+      Number.isInteger(options.fromIndex) &&
+      Number.isInteger(options.viaIndex) &&
+      Number.isInteger(options.toIndex)
+    ) {
+      return {
+        route: [options.fromIndex, options.viaIndex, options.toIndex],
+        portalRelay: true,
+      };
+    }
+    return { route: null, portalRelay: false };
+  }
+
   function createRoutedFlightMotion(options = {}) {
     const rects = Array.isArray(options.rects) ? options.rects : [];
     if (rects.length < 2) return createFlightMotion(options);
@@ -244,6 +263,88 @@
       delay: 0,
       easing: reducedMotion ? "linear" : "cubic-bezier(.33,0,.2,1)",
       distance: totalDistance,
+      routeLength: rects.length,
+    };
+  }
+
+  function createHopFlightMotion(options = {}) {
+    const rects = Array.isArray(options.rects) ? options.rects : [];
+    if (rects.length < 2) {
+      return {
+        start: rectCenter(rects[0] || {}),
+        end: rectCenter(rects[0] || {}),
+        segments: [],
+        duration: 0,
+        holdDuration: 0,
+        easing: "linear",
+        distance: 0,
+        routeLength: rects.length,
+      };
+    }
+
+    const centers = rects.map(rectCenter);
+    const reducedMotion = Boolean(options.reducedMotion);
+    let distance = 0;
+    const legs = [];
+    for (let index = 0; index < centers.length - 1; index += 1) {
+      const start = centers[index];
+      const end = centers[index + 1];
+      const segmentDistance = Math.hypot(end.x - start.x, end.y - start.y);
+      distance += segmentDistance;
+      legs.push({ start, end, distance: segmentDistance });
+    }
+    if (reducedMotion) {
+      return {
+        start: centers[0],
+        end: centers.at(-1),
+        segments: [{
+          start: centers[0],
+          end: centers.at(-1),
+          distance,
+          duration: 1,
+          easing: "linear",
+        }],
+        duration: 1,
+        holdDuration: 0,
+        easing: "linear",
+        distance,
+        routeLength: rects.length,
+      };
+    }
+    const referenceDuration = clamp(Math.round(150 + distance * 0.35), 190, 280);
+    const junctionCount = Math.max(0, legs.length - 1);
+    const preferredHold = clamp(Math.round(finite(options.holdDuration, referenceDuration * .18)), 32, 44);
+    const maxHoldWithinBudget = junctionCount > 0
+      ? Math.max(0, Math.floor((referenceDuration - legs.length) / junctionCount))
+      : 0;
+    const holdDuration = Math.min(preferredHold, maxHoldWithinBudget);
+    const holdTotal = holdDuration * junctionCount;
+    const travelBudget = Math.max(legs.length, referenceDuration - holdTotal);
+    let allocatedDuration = 0;
+    const segments = legs.map((leg, index) => {
+      const remainingLegs = legs.length - index - 1;
+      const available = travelBudget - allocatedDuration;
+      const proportional = Math.round(
+        travelBudget * (distance > 0 ? leg.distance / distance : 1 / legs.length),
+      );
+      const duration = index === legs.length - 1
+        ? available
+        : clamp(proportional, 1, available - remainingLegs);
+      allocatedDuration += duration;
+      return {
+        ...leg,
+        duration,
+        easing: "cubic-bezier(.33,0,.2,1)",
+      };
+    });
+    return {
+      start: centers[0],
+      end: centers.at(-1),
+      segments,
+      duration: segments.reduce((sum, segment) => sum + segment.duration, 0) + holdTotal,
+      holdDuration,
+      easing: "cubic-bezier(.33,0,.2,1)",
+      distance,
       routeLength: rects.length,
     };
   }
@@ -380,7 +481,9 @@
 
   return {
     createFlightMotion,
+    createHopFlightMotion,
     createRoutedFlightMotion,
+    createTransferRoutePlan,
     createRotationMotion,
     createSliceGroupGeometry,
     createMatchedGroupRotations,

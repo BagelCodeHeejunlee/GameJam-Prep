@@ -247,13 +247,20 @@
           board[donorIndex].pieces[type] -= count;
           cleanPieces(board[donorIndex]);
           board[collector.index].pieces[type] = (board[collector.index].pieces[type] || 0) + count;
-          events.push({
+          const spreadEvent = {
             kind: "spread",
             source: donorIndex,
             type,
             count,
             moves: [{ type, count, to: collector.index }],
-          });
+          };
+          // Arm-to-arm consolidation is caused by the newly placed center.
+          // Keep that relationship as metadata so a crowded board can show a
+          // clear center hand-off without changing the atomic game result.
+          if (!getNeighbors(donorIndex).includes(collector.index)) {
+            spreadEvent.via = centerIndex;
+          }
+          events.push(spreadEvent);
           touched.add(donorIndex);
           touched.add(collector.index);
           changed = true;
@@ -413,6 +420,7 @@
           to: move.to,
           type: event.type,
           count: move.count,
+          ...(event.via === undefined ? {} : { via: event.via }),
         }))
         : [
           ...event.origins.map((origin) => ({
@@ -433,7 +441,8 @@
         const existing = grouped.find((candidate) =>
           candidate.from === transfer.from &&
           candidate.to === transfer.to &&
-          candidate.type === transfer.type
+          candidate.type === transfer.type &&
+          candidate.via === transfer.via
         );
         if (existing) existing.count += transfer.count;
         else grouped.push({ ...transfer });
