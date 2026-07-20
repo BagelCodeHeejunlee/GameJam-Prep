@@ -7,7 +7,7 @@
   --cocoa: #593c31;
   --cocoa-soft: #8b6d5e;
   --berry: #ee7584;
-  --board-size: min(calc(100vw - 24px), calc(100dvh - 228px), 560px);
+  --board-size: min(calc(100vw - 24px), calc(100dvh - 274px), 560px);
 }
 
 * { box-sizing: border-box; }
@@ -222,9 +222,32 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 }
 .difficulty-label[data-difficulty="보통"] { color: #9a7137; background: #f8edcf; box-shadow: inset 0 0 0 1px rgba(154,113,55,.1); }
 .difficulty-label[data-difficulty="어려움"] { color: #b24f63; background: #fae1e5; box-shadow: inset 0 0 0 1px rgba(178,79,99,.1); }
+.stage-goal-preview {
+  display: flex;
+  min-height: 38px;
+  margin-top: 16px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.goal-chip {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(89,60,49,.09);
+  border-radius: 999px;
+  color: var(--cocoa);
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 5px 12px rgba(89,60,49,.08);
+  font-size: 15px;
+}
+.goal-chip b { font-size: 11px; font-weight: 950; }
 .stage-focus-card .play-button {
   width: min(290px, 100%);
-  margin-top: clamp(25px, 4dvh, 34px);
+  margin-top: clamp(19px, 3dvh, 27px);
   flex: 0 0 auto;
 }
 
@@ -246,6 +269,25 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   justify-content: space-between;
   gap: 12px;
 }
+
+.goal-hud {
+  display: flex;
+  min-height: 43px;
+  margin: 4px 0 0;
+  padding: 5px 9px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid rgba(103,66,43,.09);
+  border-radius: 17px;
+  background: rgba(255,255,255,.58);
+  box-shadow: 0 7px 18px rgba(103,66,43,.07);
+  backdrop-filter: blur(10px);
+}
+.goal-hud-label { color: var(--cocoa-soft); font-size: 9px; font-weight: 950; letter-spacing: .08em; }
+.goal-progress { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.goal-hud .goal-chip { min-height: 29px; padding: 0 10px; box-shadow: none; font-size: 13px; }
 
 .brand, .top-actions, .game-nav { display: flex; align-items: center; }
 .game-nav { gap: 8px; }
@@ -649,7 +691,7 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
 @keyframes modalIn { from{opacity:0;transform:translateY(18px) scale(.96)} to{opacity:1;transform:none} }
 
 @media (max-width: 430px) {
-  :root { --board-size: min(calc(100vw - 20px), calc(100dvh - 215px)); }
+  :root { --board-size: min(calc(100vw - 20px), calc(100dvh - 261px)); }
   .game-shell { padding-right: 9px; padding-left: 9px; }
   .brand-mark { width: 38px; height: 38px; border-radius: 13px; font-size: 21px; }
   .brand h1 { font-size: 19px; }
@@ -666,6 +708,8 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   .play-button { width: min(330px, 91%); border-radius: 21px; }
   .single-stage-home { padding-bottom: 34px; }
   .stage-focus-card { width: min(360px, 94%); padding-right: 22px; padding-left: 22px; }
+  .goal-hud { min-height: 40px; margin-top: 2px; }
+  .goal-hud .goal-chip { padding: 0 8px; }
 }
 
 @media (orientation: landscape) and (max-height: 620px) {
@@ -680,7 +724,8 @@ button:focus-visible { outline: 3px solid rgba(238,117,132,.55); outline-offset:
   }
   .topbar { grid-column: 1 / -1; grid-row: 1; }
   .game-stage { grid-column: 1; grid-row: 2; padding: 3px 0 8px; }
-  .tray-panel { grid-column: 2; grid-row: 2; align-self: center; }
+  .goal-hud { grid-column: 2; grid-row: 2; align-self: start; margin-top: 8px; }
+  .tray-panel { grid-column: 2; grid-row: 2; align-self: end; margin-bottom: 8px; }
   .rack-card, .rack-card.used { min-height: min(32dvh, 120px); }
   .rack-card .cake-plate { width: min(72%, 21dvh, 82px); height: auto; }
   .home-screen { width: min(100%, 920px); }

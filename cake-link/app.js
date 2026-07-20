@@ -2,6 +2,7 @@
   "use strict";
 
   const Engine = window.CakeLinkEngine;
+  const Stages = window.CakeLinkStages;
   const CAKES = {
     berry: { name: "딸기", emoji: "🍓", color: "#f07483" },
     blueberry: { name: "블루베리", emoji: "🫐", color: "#8b78c7" },
@@ -11,20 +12,7 @@
   };
   const EMPTY_COLOR = "#eee4d6";
   const BEST_KEY = "cakeLink.v1.bestScore";
-  const MAX_SWAPS = 3;
-  const STAGE_CONFIG = Object.freeze({
-    1: Object.freeze({ id: 1, title: "스테이지 1", difficulty: "쉬움", seed: 4416 }),
-  });
-  const CURRENT_STAGE_ID = 1;
-  const currentStage = STAGE_CONFIG[CURRENT_STAGE_ID];
-  const STARTER_DECK = [
-    { berry: 3 }, { berry: 2, blueberry: 1 }, { matcha: 3 },
-    { berry: 2, lemon: 1 }, { matcha: 2, choco: 1 }, { blueberry: 3 },
-    { lemon: 3 }, { berry: 1, blueberry: 2 }, { matcha: 2, lemon: 1 },
-    { choco: 3 }, { lemon: 2, berry: 1 }, { blueberry: 2, choco: 1 },
-    { matcha: 3 }, { choco: 2, lemon: 1 }, { berry: 3 },
-    { blueberry: 3 }, { matcha: 2, berry: 1 }, { lemon: 3 },
-  ];
+  const STAGE_KEY = "cakeLink.v1.currentStage";
 
   const $ = (selector) => document.querySelector(selector);
   const elements = {
@@ -33,17 +21,22 @@
     guideButton: $("#guideButton"), guide: $("#guideOverlay"),
     guideClose: $("#guideCloseButton"), guidePlay: $("#guidePlayButton"),
     stageTitle: $("#currentStageTitle"), stageDifficulty: $("#stageDifficulty"),
+    stageGoalPreview: $("#stageGoalPreview"), goalProgress: $("#goalProgress"),
     board: $("#board"), rack: $("#rack"), swap: $("#swapLabel"),
     hint: $("#boardHint"), toast: $("#toast"), sound: $("#soundButton"),
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
-    resultCompleted: $("#resultCompleted"), resultScore: $("#resultScore"),
+    resultEyebrow: $("#resultEyebrow"), resultTitle: $("#resultTitle"),
+    resultMessage: $("#resultMessage"), resultCompleted: $("#resultCompleted"),
+    resultScore: $("#resultScore"),
   };
 
+  let currentStage = Stages.getStage(Number(localStorage.getItem(STAGE_KEY) || 1));
   let state;
   let toastTimer;
   let audioContext;
   let sessionId = 0;
   let dragGesture = null;
+  let resultAction = "retry";
 
   function mulberry32(seed) {
     return function random() {
@@ -59,7 +52,7 @@
     return {
       board: Array(Engine.BOARD_SIZE ** 2).fill(null),
       rack: [], batch: 0, deckIndex: 0, nextId: 1,
-      completed: 0, score: 0, swaps: MAX_SWAPS, busy: false,
+      completed: 0, completedByType: {}, score: 0, swaps: currentStage.swaps, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(),
       rotations: Array(Engine.BOARD_SIZE ** 2).fill(0),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
@@ -71,9 +64,10 @@
   }
 
   function generatedPlate(slot) {
-    if (state.deckIndex < STARTER_DECK.length) return plate(STARTER_DECK[state.deckIndex++]);
+    if (state.deckIndex < currentStage.deck.length) return plate(currentStage.deck[state.deckIndex++]);
     const order = Engine.CAKE_ORDER;
-    const primary = order[(state.batch + Math.floor(slot / 2)) % order.length];
+    const goalTypes = Object.keys(currentStage.goals);
+    const primary = goalTypes[(state.batch + slot) % goalTypes.length];
     const secondary = order[(order.indexOf(primary) + 1 + Math.floor(state.random() * 3)) % order.length];
     const mainCount = 2 + Math.floor(state.random() * 3);
     const pieces = { [primary]: mainCount };
@@ -146,9 +140,23 @@
     });
   }
 
+  function goalMarkup(showProgress) {
+    return Stages.goalEntries(currentStage).map(([type, target]) => {
+      const completed = Math.min(state?.completedByType[type] || 0, target);
+      const count = showProgress ? `${completed}/${target}` : `${target}판`;
+      return `<span class="goal-chip" title="${CAKES[type].name} 케이크 ${target}판"><span aria-hidden="true">${CAKES[type].emoji}</span><b>${count}</b></span>`;
+    }).join("");
+  }
+
+  function renderGoals() {
+    elements.stageGoalPreview.innerHTML = goalMarkup(false);
+    elements.goalProgress.innerHTML = goalMarkup(true);
+  }
+
   function render() {
     renderBoard();
     renderRack();
+    renderGoals();
     elements.swap.textContent = state.swaps;
     elements.hint.textContent = state.busy ? "케이크를 정렬하고 있어요" : "판을 위로 끌어 빈칸에 놓으세요";
   }
@@ -443,6 +451,14 @@
     if (result.completed.length) {
       state.completeCells = new Set(result.completed);
       state.completed += result.completed.length;
+      for (const completedIndex of result.completed) {
+        const completedPlate = result.settledBoard[completedIndex];
+        const completedType = Object.keys(completedPlate?.pieces || {})
+          .find((type) => completedPlate.pieces[type] === Engine.PLATE_CAPACITY);
+        if (completedType) {
+          state.completedByType[completedType] = (state.completedByType[completedType] || 0) + 1;
+        }
+      }
       const combo = result.completed.length;
       state.score += 240 * combo + 90 * Math.max(0, combo - 1);
       playComplete(combo);
@@ -459,20 +475,41 @@
     state.activeCells.clear();
     state.completeCells.clear();
 
-    if (state.rack.every((item) => !item)) refillRack();
+    const goalMet = Stages.isComplete(currentStage, state.completedByType);
+    if (!goalMet && state.rack.every((item) => !item)) refillRack();
     state.best = Math.max(state.best, state.score);
     localStorage.setItem(BEST_KEY, String(state.best));
     state.busy = false;
     render();
 
-    if (state.board.every(Boolean)) endGame();
+    if (goalMet) completeStage();
+    else if (state.board.every(Boolean)) endGame();
   }
 
   function endGame() {
+    resultAction = "retry";
+    elements.resultEyebrow.textContent = "STAGE FAILED";
+    elements.resultTitle.textContent = "진열대가 가득 찼어요";
+    elements.resultMessage.textContent = "목표를 완료하기 전에 빈칸이 모두 사라졌어요.";
     elements.resultCompleted.textContent = `${state.completed}판`;
     elements.resultScore.textContent = state.score.toLocaleString("ko-KR");
+    elements.retry.textContent = "다시 도전";
     elements.result.classList.remove("hidden");
     playTone(190, .25, "triangle");
+    elements.retry.focus();
+  }
+
+  function completeStage() {
+    state.busy = true;
+    resultAction = currentStage.nextStageId ? "next" : "home";
+    elements.resultEyebrow.textContent = "STAGE CLEAR";
+    elements.resultTitle.textContent = `${currentStage.title} 완료!`;
+    elements.resultMessage.textContent = "모든 케이크 목표를 달성했어요.";
+    elements.resultCompleted.textContent = `${state.completed}판`;
+    elements.resultScore.textContent = state.score.toLocaleString("ko-KR");
+    elements.retry.textContent = currentStage.nextStageId ? "다음 스테이지" : "메인으로";
+    elements.result.classList.remove("hidden");
+    playComplete(2);
     elements.retry.focus();
   }
 
@@ -518,6 +555,11 @@
     elements.stageTitle.textContent = currentStage.title;
     elements.stageDifficulty.textContent = currentStage.difficulty;
     elements.stageDifficulty.dataset.difficulty = currentStage.difficulty;
+  }
+
+  function selectStage(stageId) {
+    currentStage = Stages.getStage(stageId);
+    localStorage.setItem(STAGE_KEY, String(currentStage.id));
   }
 
   function restart(announce = true) {
@@ -568,8 +610,22 @@
     elements.guideButton.focus();
   }
 
+  function handleResultAction() {
+    if (resultAction === "next" && currentStage.nextStageId) {
+      selectStage(currentStage.nextStageId);
+      restart(true);
+      return;
+    }
+    if (resultAction === "home") {
+      restart(false);
+      showHome(true);
+      return;
+    }
+    restart(true);
+  }
+
   elements.restart.addEventListener("click", () => restart(true));
-  elements.retry.addEventListener("click", () => restart(true));
+  elements.retry.addEventListener("click", handleResultAction);
   elements.sound.addEventListener("click", toggleSound);
   elements.homeSound.addEventListener("click", toggleSound);
   elements.play.addEventListener("click", startGame);
