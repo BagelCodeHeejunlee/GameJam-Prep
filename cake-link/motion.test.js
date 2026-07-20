@@ -143,6 +143,21 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
 }
 
 {
+  const plateTurn = Motion.createRotationMotion({ current: -30, target: 90 });
+  const attachedTurn = Motion.offsetRotationMotion(plateTurn, 240);
+  assert.equal(attachedTurn.duration, plateTurn.duration);
+  assert.deepEqual(
+    attachedTurn.points.map((point) => point.angle),
+    plateTurn.points.map((point) => point.angle + 240),
+    "a landed slice keeps its plate-relative angle during the next turn",
+  );
+  assert.equal(
+    attachedTurn.points.at(-1).angle - attachedTurn.points[0].angle,
+    plateTurn.points.at(-1).angle - plateTurn.points[0].angle,
+  );
+}
+
+{
   for (let count = 1; count <= 6; count += 1) {
     const group = Motion.createSliceGroupGeometry({ lastSlot: 5, count });
     assert.equal(group.count, count);
@@ -156,6 +171,37 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     { count: 2, firstSlot: 2, lastSlot: 3, maskStart: 90, maskSpan: 120 },
     "a same-color pair keeps its two original neighboring sectors",
   );
+}
+
+{
+  const normalizeAngle = (angle) => (angle % 360 + 360) % 360;
+  for (const direction of [0, 90, 180, 270]) {
+    for (let count = 1; count <= 6; count += 1) {
+      for (let sourceLastSlot = count - 1; sourceLastSlot < 6; sourceLastSlot += 1) {
+        for (let targetLastSlot = count - 1; targetLastSlot < 6; targetLastSlot += 1) {
+          const sourceGroup = Motion.createSliceGroupGeometry({ lastSlot: sourceLastSlot, count });
+          const targetGroup = Motion.createSliceGroupGeometry({ lastSlot: targetLastSlot, count });
+          const alignment = Motion.createMatchedGroupRotations({
+            direction,
+            count,
+            sourceLastSlot,
+            targetLastSlot,
+          });
+          closeTo(
+            normalizeAngle(sourceGroup.maskStart + alignment.sourceRotation),
+            normalizeAngle(targetGroup.maskStart + alignment.targetRotation),
+            "donor and receiver group starts share the same physical angle",
+          );
+          closeTo(
+            normalizeAngle(alignment.physicalMaskStart),
+            normalizeAngle(direction - 30 - (count - 1) * 60),
+            "matched group keeps the donor's absolute angle",
+          );
+          assert.equal(alignment.maskSpan, count * 60);
+        }
+      }
+    }
+  }
 }
 
 console.log("Cake Link motion tests passed");

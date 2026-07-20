@@ -282,32 +282,19 @@
     return slotsFor(plateData).lastIndexOf(type);
   }
 
-  function receivingSlotIndex(plateData, openType) {
-    const slots = slotsFor(plateData);
-    const emptyIndex = slots.findIndex((type) => type === null);
-    if (emptyIndex >= 0) return emptyIndex;
-    if (openType) return slots.findIndex((type) => type === openType);
-    return 0;
+  function receivingFinalSlotIndex(plateData, incomingType, count, displacedType) {
+    const pieces = { ...(plateData?.pieces || {}) };
+    if (displacedType) {
+      pieces[displacedType] = (pieces[displacedType] || 0) - count;
+      if (pieces[displacedType] <= 0) delete pieces[displacedType];
+    }
+    pieces[incomingType] = (pieces[incomingType] || 0) + count;
+    return slotsFor({ pieces }).lastIndexOf(incomingType);
   }
 
-  function rotatePlateToward(index, slotIndex, direction) {
-    if (slotIndex < 0) return Promise.resolve();
-    const current = state.rotations[index] || 0;
-    const desired = direction - slotIndex * 60;
-    const rotation = nearestRotation(current, desired);
-    state.rotations[index] = rotation;
-    const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
-    if (!wheel) return Promise.resolve();
-    wheel.style.setProperty("--wheel-rotation", `${rotation}deg`);
-
-    const turn = Motion.createRotationMotion({
-      current,
-      target: rotation,
-      reducedMotion: reducedMotion(),
-    });
-    if (turn.duration <= 1) return Promise.resolve();
-
-    const animation = wheel.animate(turn.points.map((point) => ({
+  function playRotation(element, turn) {
+    if (!element || turn.duration <= 1) return Promise.resolve();
+    const animation = element.animate(turn.points.map((point) => ({
       transform: `rotate(${point.angle}deg)`,
       offset: point.offset,
       easing: point.easing,
@@ -317,6 +304,37 @@
       fill: "both",
     });
     return animation.finished.catch(() => {}).finally(() => animation.cancel());
+  }
+
+  function rotatePlateTo(index, desired, attachedSlices = []) {
+    const current = state.rotations[index] || 0;
+    const rotation = nearestRotation(current, desired);
+    state.rotations[index] = rotation;
+    const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
+    const turn = Motion.createRotationMotion({
+      current,
+      target: rotation,
+      reducedMotion: reducedMotion(),
+    });
+    const animations = [];
+    if (wheel) {
+      wheel.style.setProperty("--wheel-rotation", `${rotation}deg`);
+      animations.push(playRotation(wheel, turn));
+    }
+
+    for (const slice of attachedSlices) {
+      const visual = slice.querySelector(".moving-slice-visual");
+      if (!visual) continue;
+      const visualCurrent = Number.parseFloat(slice.dataset.visualRotation) || 0;
+      const visualRotation = visualCurrent + rotation - current;
+      slice.dataset.visualRotation = String(visualRotation);
+      visual.style.setProperty("--wheel-rotation", `${visualRotation}deg`);
+      animations.push(playRotation(
+        visual,
+        Motion.offsetRotationMotion(turn, visualCurrent - current),
+      ));
+    }
+    return Promise.all(animations);
   }
 
   function reducedMotion() {
@@ -330,10 +348,16 @@
     cell.classList.add(className);
   }
 
-  async function alignPlates(fromIndex, toIndex, type, receiverOpenType) {
+  async function alignPlates(fromIndex, toIndex, type, count, receiverDisplacedType, attached = {}) {
     const direction = directionDegrees(fromIndex, toIndex);
-    const donorTurn = rotatePlateToward(fromIndex, slotIndexFor(state.board[fromIndex], type), direction);
-    const receiverTurn = rotatePlateToward(toIndex, receivingSlotIndex(state.board[toIndex], receiverOpenType), direction + 180);
+    const alignment = Motion.createMatchedGroupRotations({
+      direction,
+      count,
+      sourceLastSlot: slotIndexFor(state.board[fromIndex], type),
+      targetLastSlot: receivingFinalSlotIndex(state.board[toIndex], type, count, receiverDisplacedType),
+    });
+    const donorTurn = rotatePlateTo(fromIndex, alignment.sourceRotation, attached.from);
+    const receiverTurn = rotatePlateTo(toIndex, alignment.targetRotation, attached.to);
     cueTransferCell(fromIndex, "transferring");
     cueTransferCell(toIndex, "receiving");
     await Promise.all([donorTurn, receiverTurn]);
@@ -364,6 +388,9 @@
     visual.classList.add("moving-slice-visual");
     visual.style.setProperty("--slice-mask-start", `${geometry.maskStart}deg`);
     visual.style.setProperty("--slice-mask-span", `${geometry.maskSpan}deg`);
+    movingSlice.dataset.visualRotation = String(
+      Number.parseFloat(visual.style.getPropertyValue("--wheel-rotation")) || 0,
+    );
     movingSlice.appendChild(visual);
     return movingSlice;
   }
@@ -463,7 +490,7 @@
     for (const group of groups) {
       const step = group[0];
       if (activeSession !== sessionId) return false;
-      await alignPlates(step.from, step.to, step.type, step.displaced?.type || null);
+      await alignPlates(step.from, step.to, step.type, group.length, step.displaced?.type || null);
       if (activeSession !== sessionId) return false;
 
       if (step.displaced) {
@@ -479,7 +506,14 @@
         let outgoingSlices = [];
         try {
           const destinationIsFull = Engine.totalPieces(state.board[step.displaced.to]) >= Engine.PLATE_CAPACITY;
-          await alignPlates(step.displaced.from, step.displaced.to, step.displaced.type, destinationIsFull ? step.type : null);
+          await alignPlates(
+            step.displaced.from,
+            step.displaced.to,
+            step.displaced.type,
+            group.length,
+            destinationIsFull ? step.type : null,
+            { from: heldSlices },
+          );
           if (activeSession !== sessionId) return false;
           const outgoingFlight = flySliceGroup(step.displaced.from, step.displaced.to, step.displaced.type, group.length);
           for (const groupedStep of group) {

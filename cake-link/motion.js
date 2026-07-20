@@ -126,6 +126,35 @@
     };
   }
 
+  function createMatchedGroupRotations(options = {}) {
+    const direction = finite(options.direction);
+    const source = createSliceGroupGeometry({
+      lastSlot: options.sourceLastSlot,
+      count: options.count,
+    });
+    const target = createSliceGroupGeometry({
+      lastSlot: options.targetLastSlot,
+      count: source.count,
+    });
+    return {
+      sourceRotation: direction - source.lastSlot * 60,
+      targetRotation: direction - target.lastSlot * 60,
+      physicalMaskStart: direction - 30 - (source.count - 1) * 60,
+      maskSpan: source.maskSpan,
+    };
+  }
+
+  function offsetRotationMotion(motion, angleOffset = 0) {
+    const offset = finite(angleOffset);
+    return {
+      duration: finite(motion?.duration),
+      points: (motion?.points || []).map((point) => ({
+        ...point,
+        angle: finite(point.angle) + offset,
+      })),
+    };
+  }
+
   function createRotationMotion(options = {}) {
     const current = finite(options.current);
     const target = finite(options.target, current);
@@ -162,5 +191,12 @@
     };
   }
 
-  return { createFlightMotion, createRotationMotion, createSliceGroupGeometry, quadraticPoint };
+  return {
+    createFlightMotion,
+    createRotationMotion,
+    createSliceGroupGeometry,
+    createMatchedGroupRotations,
+    offsetRotationMotion,
+    quadraticPoint,
+  };
 });
