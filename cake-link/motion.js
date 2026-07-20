@@ -60,8 +60,9 @@
     const lanePosition = laneCount === 1 ? 0 : (laneIndex / (laneCount - 1)) * 2 - 1;
     const laneOffset = lanePosition * fan;
 
-    const fromInset = Math.min(from.width, from.height) * 0.27;
-    const toInset = Math.min(to.width, to.height) * 0.27;
+    const edgeInsetRatio = clamp(finite(options.edgeInsetRatio, 0.27), 0, 0.5);
+    const fromInset = Math.min(from.width, from.height) * edgeInsetRatio;
+    const toInset = Math.min(to.width, to.height) * edgeInsetRatio;
     const start = hasTravel ? {
       x: fromCenter.x + unitX * fromInset + perpendicularX * laneOffset,
       y: fromCenter.y + unitY * fromInset + perpendicularY * laneOffset,
@@ -112,6 +113,19 @@
     };
   }
 
+  function createSliceGroupGeometry(options = {}) {
+    const count = clamp(Math.floor(finite(options.count, 1)), 1, 6);
+    const lastSlot = clamp(Math.floor(finite(options.lastSlot, count - 1)), count - 1, 5);
+    const firstSlot = lastSlot - count + 1;
+    return {
+      count,
+      firstSlot,
+      lastSlot,
+      maskStart: -30 + firstSlot * 60,
+      maskSpan: count * 60,
+    };
+  }
+
   function createRotationMotion(options = {}) {
     const current = finite(options.current);
     const target = finite(options.target, current);
@@ -148,5 +162,5 @@
     };
   }
 
-  return { createFlightMotion, createRotationMotion, quadraticPoint };
+  return { createFlightMotion, createRotationMotion, createSliceGroupGeometry, quadraticPoint };
 });

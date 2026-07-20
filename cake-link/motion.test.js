@@ -26,6 +26,18 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
 }
 
 {
+  const motion = Motion.createFlightMotion({
+    fromRect: rect(10, 20, 80),
+    toRect: rect(150, 220, 80),
+    edgeInsetRatio: 0,
+  });
+  assert.deepEqual(motion.start, { x: 50, y: 60 }, "rigid slice group begins at the source wheel center");
+  assert.deepEqual(motion.end, { x: 190, y: 260 }, "rigid slice group ends at the target wheel center");
+  assert.equal(motion.laneOffset, 0);
+  assert.equal(motion.delay, 0);
+}
+
+{
   const motion = Motion.createFlightMotion({ fromRect: rect(0, 0), toRect: rect(0, 200) });
   closeTo(motion.start.y, 77, "vertical start uses a 27% edge inset");
   closeTo(motion.end.y, 223, "vertical end uses a 27% edge inset");
@@ -128,6 +140,22 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
   assert.equal(still.points.at(-1).angle, 45);
   assert.ok(reduced.duration <= 16, "reduced motion rotation completes immediately");
   assert.equal(reduced.points.at(-1).angle, 180);
+}
+
+{
+  for (let count = 1; count <= 6; count += 1) {
+    const group = Motion.createSliceGroupGeometry({ lastSlot: 5, count });
+    assert.equal(group.count, count);
+    assert.equal(group.firstSlot, 6 - count);
+    assert.equal(group.lastSlot, 5);
+    assert.equal(group.maskStart, -30 + (6 - count) * 60);
+    assert.equal(group.maskSpan, count * 60);
+  }
+  assert.deepEqual(
+    Motion.createSliceGroupGeometry({ lastSlot: 3, count: 2 }),
+    { count: 2, firstSlot: 2, lastSlot: 3, maskStart: 90, maskSpan: 120 },
+    "a same-color pair keeps its two original neighboring sectors",
+  );
 }
 
 console.log("Cake Link motion tests passed");

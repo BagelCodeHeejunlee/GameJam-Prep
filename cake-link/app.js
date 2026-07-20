@@ -339,35 +339,59 @@
     await Promise.all([donorTurn, receiverTurn]);
   }
 
-  function createMovingSlice(type, extraClass = "") {
+  function layoutRect(element) {
+    const bounds = element.getBoundingClientRect();
+    const computed = window.getComputedStyle(element);
+    const width = Number.parseFloat(computed.width) || element.offsetWidth || bounds.width;
+    const height = Number.parseFloat(computed.height) || element.offsetHeight || bounds.height;
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+    return {
+      left: centerX - width / 2,
+      top: centerY - height / 2,
+      width,
+      height,
+    };
+  }
+
+  function createMovingSlice(sourceWheel, lastSlot, count) {
+    const geometry = Motion.createSliceGroupGeometry({ lastSlot, count });
     const movingSlice = document.createElement("div");
-    movingSlice.className = `moving-slice${extraClass ? ` ${extraClass}` : ""}`;
-    movingSlice.style.setProperty("--slice-color", CAKES[type].color);
-    movingSlice.dataset.emoji = CAKES[type].emoji;
+    movingSlice.className = "moving-slice";
+    movingSlice.setAttribute("aria-hidden", "true");
+
+    const visual = sourceWheel.cloneNode(false);
+    visual.classList.add("moving-slice-visual");
+    visual.style.setProperty("--slice-mask-start", `${geometry.maskStart}deg`);
+    visual.style.setProperty("--slice-mask-span", `${geometry.maskSpan}deg`);
+    movingSlice.appendChild(visual);
     return movingSlice;
   }
 
-  async function flySlice(fromIndex, toIndex, type, laneIndex = 0, laneCount = 1) {
+  async function flySlice(fromIndex, toIndex, type, count) {
     const fromCell = elements.board.querySelector(`[data-cell="${fromIndex}"]`);
     const toCell = elements.board.querySelector(`[data-cell="${toIndex}"]`);
-    if (!fromCell || !toCell) return;
-    const fromRect = fromCell.getBoundingClientRect();
-    const toRect = toCell.getBoundingClientRect();
+    const sourceWheel = fromCell?.querySelector(".cake-wheel");
+    const targetWheel = toCell?.querySelector(".cake-wheel");
+    if (!sourceWheel || !targetWheel) return;
+    const fromRect = layoutRect(sourceWheel);
+    const toRect = layoutRect(targetWheel);
     const flight = Motion.createFlightMotion({
       fromRect,
       toRect,
-      laneIndex,
-      laneCount,
+      edgeInsetRatio: 0,
       reducedMotion: reducedMotion(),
     });
 
-    const movingSlice = createMovingSlice(type);
-    movingSlice.style.left = `${flight.start.x}px`;
-    movingSlice.style.top = `${flight.start.y}px`;
+    const movingSlice = createMovingSlice(sourceWheel, slotIndexFor(state.board[fromIndex], type), count);
+    movingSlice.style.left = `${fromRect.left}px`;
+    movingSlice.style.top = `${fromRect.top}px`;
+    movingSlice.style.width = `${fromRect.width}px`;
+    movingSlice.style.height = `${fromRect.height}px`;
     document.body.appendChild(movingSlice);
 
     const travel = movingSlice.animate(flight.points.map((point) => ({
-      transform: `translate3d(${point.x - flight.start.x}px, ${point.y - flight.start.y}px, 0) translate(-50%, -50%) rotate(${point.rotation}deg) scale(${point.scale})`,
+      transform: `translate3d(${point.x - flight.start.x}px, ${point.y - flight.start.y}px, 0)`,
       offset: point.offset,
     })), {
       duration: flight.duration,
@@ -380,11 +404,9 @@
   }
 
   async function flySliceGroup(fromIndex, toIndex, type, count) {
-    const arrivals = await Promise.all(Array.from({ length: count }, (_, index) =>
-      flySlice(fromIndex, toIndex, type, index, count)
-    ));
+    const arrival = await flySlice(fromIndex, toIndex, type, count);
     playTone(590, .045, "sine");
-    return arrivals.filter(Boolean);
+    return arrival ? [arrival] : [];
   }
 
   function holdLandedSlices(arrivals) {
