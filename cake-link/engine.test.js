@@ -59,6 +59,34 @@ function applyAnimationBatches(inputBoard, batches) {
 }
 
 {
+  const initial = boardWith([
+    [6, { matcha: 3 }],
+    [9, { blueberry: 1 }],
+    [10, { lemon: 4, matcha: 2 }],
+    [11, { blueberry: 1, lemon: 1 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 10);
+  const batches = Engine.buildAnimationBatches(result.events);
+  const animated = Engine.cloneBoard(initial);
+  for (const batch of batches.slice(0, -1)) {
+    for (const transfer of batch) {
+      animated[transfer.from].pieces[transfer.type] -= transfer.count;
+      if (animated[transfer.from].pieces[transfer.type] === 0) delete animated[transfer.from].pieces[transfer.type];
+    }
+    for (const transfer of batch) {
+      animated[transfer.to].pieces[transfer.type] = (animated[transfer.to].pieces[transfer.type] || 0) + transfer.count;
+    }
+  }
+  assert.equal(Engine.totalPieces(animated[10]), 0, "중앙판이 먼저 완전히 비는 희귀 순서를 재현해야 한다");
+  assert.deepEqual(
+    batches.at(-1),
+    [{ from: 11, to: 9, type: "blueberry", count: 1, via: 10 }],
+    "마지막 조각은 빈칸이 아닌 새로 놓은 중앙판 관계로 전달되어야 한다",
+  );
+  assert.deepEqual(applyAnimationBatches(initial, batches), result.settledBoard);
+}
+
+{
   const result = Engine.resolvePlacement(boardWith([
     [5, { berry: 2, blueberry: 1, lemon: 1 }],
     [1, { berry: 4 }],
@@ -138,7 +166,7 @@ function applyAnimationBatches(inputBoard, batches) {
   assert.deepEqual(
     applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)),
     result.settledBoard,
-    "빈칸을 경유해 보이더라도 논리 결과는 기존의 A6 두 판과 같아야 한다",
+    "중앙판 전달 연출을 사용해도 논리 결과는 기존의 A6 두 판과 같아야 한다",
   );
 }
 

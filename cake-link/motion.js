@@ -181,9 +181,6 @@
   function createTransferRoutePlan(options = {}) {
     const emptyRoute = Array.isArray(options.emptyRoute) ? options.emptyRoute : null;
     const maxCells = Math.max(2, Math.floor(finite(options.maxCells, 5)));
-    if (emptyRoute && emptyRoute.length >= 2 && emptyRoute.length <= maxCells) {
-      return { route: [...emptyRoute], portalRelay: false };
-    }
     if (
       Number.isInteger(options.fromIndex) &&
       Number.isInteger(options.viaIndex) &&
@@ -193,6 +190,9 @@
         route: [options.fromIndex, options.viaIndex, options.toIndex],
         portalRelay: true,
       };
+    }
+    if (emptyRoute && emptyRoute.length >= 2 && emptyRoute.length <= maxCells) {
+      return { route: [...emptyRoute], portalRelay: false };
     }
     return { route: null, portalRelay: false };
   }

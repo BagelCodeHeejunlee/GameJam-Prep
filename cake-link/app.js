@@ -464,10 +464,12 @@
       const targetLast = targetFirst + transfer.count - 1;
       sourceOffsets.set(sourceKey, sourceOffset + transfer.count);
       targetOffsets.set(targetKey, targetOffset + transfer.count);
-      // Prefer a short route through empty cells. If a crowded board has no
-      // readable route, use the placed center as a fade-out/fade-in hand-off
-      // instead of drawing extra slices on top of its existing cake.
-      const emptyRoute = transferRoute(beforeBoard, transfer.from, transfer.to);
+      // Arm-to-arm consolidation always uses the placed center as a visual
+      // hand-off. Empty-cell routes are only a fallback for transfers without
+      // center metadata, so slices never appear to land on unrelated blanks.
+      const emptyRoute = Number.isInteger(transfer.via)
+        ? null
+        : transferRoute(beforeBoard, transfer.from, transfer.to);
       const { route, portalRelay } = Motion.createTransferRoutePlan({
         emptyRoute,
         fromIndex: transfer.from,
@@ -686,15 +688,15 @@
               if (hasPortalSplit && index === 0) {
                 hopFrames = [
                   { transform: startTransform, opacity: 1, offset: 0 },
-                  { transform: transformAt(.45), opacity: 1, offset: .45 },
-                  { transform: transformAt(.66), opacity: 0, offset: .66 },
+                  { transform: transformAt(.12), opacity: 1, offset: .12 },
+                  { transform: transformAt(.28), opacity: 0, offset: .28 },
                   { transform: endTransform, opacity: 0, offset: 1 },
                 ];
               } else if (hasPortalSplit && index === flight.segments.length - 1) {
                 hopFrames = [
                   { transform: startTransform, opacity: 0, offset: 0 },
-                  { transform: transformAt(.34), opacity: 0, offset: .34 },
-                  { transform: transformAt(.55), opacity: 1, offset: .55 },
+                  { transform: transformAt(.72), opacity: 0, offset: .72 },
+                  { transform: transformAt(.88), opacity: 1, offset: .88 },
                   { transform: endTransform, opacity: 1, offset: 1 },
                 ];
               }

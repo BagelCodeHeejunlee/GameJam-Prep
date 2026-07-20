@@ -267,8 +267,8 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
       toIndex: 9,
       maxCells: 5,
     }),
-    { route: [4, 8, 9], portalRelay: false },
-    "a short empty route is preferred over the occupied center",
+    { route: [4, 5, 9], portalRelay: true },
+    "the placed center is preferred over unrelated empty cells",
   );
   assert.deepEqual(
     Motion.createTransferRoutePlan({
@@ -291,6 +291,16 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     }),
     { route: [6, 5, 4], portalRelay: true },
     "an overly long detour is replaced by a two-hop center hand-off",
+  );
+  assert.deepEqual(
+    Motion.createTransferRoutePlan({
+      emptyRoute: [4, 5],
+      fromIndex: 4,
+      toIndex: 5,
+      maxCells: 5,
+    }),
+    { route: [4, 5], portalRelay: false },
+    "a direct transfer without center metadata stays direct",
   );
 }
 
