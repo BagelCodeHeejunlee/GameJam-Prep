@@ -19,52 +19,61 @@
       <div class="home-decoration home-decoration-two" aria-hidden="true"></div>
 
       <header class="home-toolbar">
-        <span class="puzzle-chip"><span aria-hidden="true">✦</span> 4×4 SORT PUZZLE</span>
+        <div class="home-brand" aria-label="케이크 링크">
+          <span aria-hidden="true">🍰</span>
+          <div><strong id="homeTitle">CAKE LINK</strong><small>케이크 정렬 퍼즐</small></div>
+        </div>
         <div class="home-actions">
           <button id="homeSoundButton" class="menu-icon-button" type="button" aria-label="소리 끄기" aria-pressed="true">♪</button>
           <button id="guideButton" class="menu-icon-button" type="button" aria-label="게임 방법 보기">?</button>
         </div>
       </header>
 
-      <div class="home-content">
-        <div class="home-title-block">
-          <span class="home-kicker">SORT · MATCH · BAKE</span>
-          <h1 id="homeTitle"><span>CAKE</span><span>LINK!</span></h1>
-          <p>조각을 모아 완벽한 한 판을 완성하세요</p>
+      <div class="stage-home-content">
+        <div class="stage-heading">
+          <div>
+            <span>CHAPTER 1</span>
+            <h1>달콤한 시작</h1>
+          </div>
+          <div class="chapter-progress" aria-label="챕터 진행도 1 / 12">
+            <span><b>1</b> / 12</span>
+            <i><em></em></i>
+          </div>
         </div>
 
-        <div class="home-puzzle" aria-hidden="true">
-          <span class="floating-fruit fruit-one">🍓</span>
-          <span class="floating-fruit fruit-two">🫐</span>
-          <span class="floating-fruit fruit-three">🍋</span>
-          <div class="home-board">
-            <span class="home-cell empty"></span>
-            <span class="home-cell"><i class="menu-plate menu-berry"></i></span>
-            <span class="home-cell empty"></span>
-            <span class="home-cell"><i class="menu-plate menu-lemon"></i></span>
-            <span class="home-cell"><i class="menu-plate menu-mix"></i></span>
-            <span class="home-cell empty"></span>
-            <span class="home-cell"><i class="menu-plate menu-blue"></i></span>
-            <span class="home-cell empty"></span>
-            <span class="home-cell empty"></span>
-            <span class="home-cell"><i class="menu-plate menu-matcha"></i></span>
-            <span class="home-cell empty"></span>
-            <span class="home-cell"><i class="menu-plate menu-pink-mix"></i></span>
-            <span class="home-cell"><i class="menu-plate menu-choco"></i></span>
-            <span class="home-cell empty"></span>
-            <span class="home-cell"><i class="menu-plate menu-berry"></i></span>
-            <span class="home-cell empty"></span>
+        <div class="stage-map-card">
+          <div class="map-caption"><span>퍼즐 여정</span><small>스테이지를 완료하고 다음 퍼즐을 열어보세요</small></div>
+          <div class="stage-map" role="group" aria-label="스테이지 선택">
+            <i class="stage-link link-1" aria-hidden="true"></i>
+            <i class="stage-link link-2" aria-hidden="true"></i>
+            <i class="stage-link link-3" aria-hidden="true"></i>
+            <i class="stage-link link-4" aria-hidden="true"></i>
+            <i class="stage-link link-5" aria-hidden="true"></i>
+            <i class="stage-link link-6" aria-hidden="true"></i>
+
+            <button class="stage-node active node-1" type="button" data-stage="1" aria-label="현재 스테이지 1">
+              <span>1</span><small>START</small>
+            </button>
+            <button class="stage-node locked node-2" type="button" data-stage="2" aria-label="잠긴 스테이지 2"><span>2</span><small>🔒</small></button>
+            <button class="stage-node locked node-3" type="button" data-stage="3" aria-label="잠긴 스테이지 3"><span>3</span><small>🔒</small></button>
+            <button class="stage-node locked node-4" type="button" data-stage="4" aria-label="잠긴 스테이지 4"><span>4</span><small>🔒</small></button>
+            <button class="stage-node locked node-5" type="button" data-stage="5" aria-label="잠긴 스테이지 5"><span>5</span><small>🔒</small></button>
+            <button class="stage-node locked node-6" type="button" data-stage="6" aria-label="잠긴 스테이지 6"><span>6</span><small>🔒</small></button>
+            <button class="stage-node reward locked node-7" type="button" data-stage="7" aria-label="잠긴 보상 스테이지 7"><span>🎁</span><small>7</small></button>
+
+            <span class="map-fruit map-fruit-one" aria-hidden="true">🍓</span>
+            <span class="map-fruit map-fruit-two" aria-hidden="true">🫐</span>
+            <span class="map-fruit map-fruit-three" aria-hidden="true">🍋</span>
           </div>
-          <span class="home-complete-badge"><b>6</b><small>완성!</small></span>
         </div>
 
         <button id="playButton" class="play-button" type="button">
           <span class="play-symbol" aria-hidden="true">▶</span>
-          <span><strong>플레이</strong><small>케이크 퍼즐 시작하기</small></span>
+          <span><small>현재 퍼즐</small><strong>스테이지 1 플레이</strong></span>
         </button>
       </div>
 
-      <p class="home-footer"><span aria-hidden="true">🍰</span> 같은 조각 6개를 모으면 케이크 완성!</p>
+      <p class="home-footer"><span aria-hidden="true">🍰</span> 다음 스테이지는 스테이지 제작 단계에서 열립니다</p>
     </section>
 
     <main id="gameShell" class="game-shell screen-hidden">

@@ -33,6 +33,7 @@
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
     resultCompleted: $("#resultCompleted"), resultScore: $("#resultScore"),
   };
+  const stageNodes = document.querySelectorAll(".stage-node");
 
   let state;
   let toastTimer;
@@ -561,6 +562,13 @@
   elements.sound.addEventListener("click", toggleSound);
   elements.homeSound.addEventListener("click", toggleSound);
   elements.play.addEventListener("click", startGame);
+  stageNodes.forEach((node) => {
+    node.addEventListener("click", () => {
+      const stageNumber = Number(node.dataset.stage);
+      if (stageNumber === 1) startGame();
+      else showToast(`스테이지 ${stageNumber}은 아직 잠겨 있어요`);
+    });
+  });
   elements.guidePlay.addEventListener("click", startGame);
   elements.guideButton.addEventListener("click", openGuide);
   elements.guideClose.addEventListener("click", closeGuide);
