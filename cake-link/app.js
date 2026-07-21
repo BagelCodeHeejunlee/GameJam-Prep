@@ -66,7 +66,6 @@
       movesRemaining: currentStage.moveLimit, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(), emptyCells: new Set(),
       transitionCells: new Set(),
-      rotations: Array(Engine.BOARD_SIZE ** 2).fill(0),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
     };
   }
@@ -149,7 +148,7 @@
       if (state.emptyCells.has(index)) classes.push("emptying");
       if (state.transitionCells.has(index)) classes.push("sorting");
       const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}` : `${row}행 ${col}열, 빈칸`;
-      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData, state.rotations[index]) : ""}</div>`;
+      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}</div>`;
     }).join("");
   }
 
@@ -276,31 +275,8 @@
     return result;
   }
 
-  function directionDegrees(fromIndex, toIndex) {
-    const fromRow = Math.floor(fromIndex / Engine.BOARD_SIZE);
-    const fromColumn = fromIndex % Engine.BOARD_SIZE;
-    const toRow = Math.floor(toIndex / Engine.BOARD_SIZE);
-    const toColumn = toIndex % Engine.BOARD_SIZE;
-    // CSS conic gradients start at twelve o'clock, while atan2 starts at three.
-    return Math.atan2(toRow - fromRow, toColumn - fromColumn) * 180 / Math.PI + 90;
-  }
-
   function slotIndexFor(plateData, type) {
     return slotsFor(plateData).lastIndexOf(type);
-  }
-
-  function playRotation(element, turn) {
-    if (!element || turn.duration <= 1) return Promise.resolve();
-    const animation = element.animate(turn.points.map((point) => ({
-      transform: `rotate(${point.angle}deg)`,
-      offset: point.offset,
-      easing: point.easing,
-    })), {
-      duration: turn.duration,
-      easing: "linear",
-      fill: "both",
-    });
-    return animation.finished.catch(() => {}).finally(() => animation.cancel());
   }
 
   function reducedMotion() {
@@ -447,7 +423,7 @@
       targetTotals.set(targetKey, (targetTotals.get(targetKey) || 0) + transfer.count);
     }
 
-    const plans = transfers.map((transfer) => {
+    const groupedPlans = transfers.map((transfer) => {
       const fromCell = elements.board.querySelector(`[data-cell="${transfer.from}"]`);
       const toCell = elements.board.querySelector(`[data-cell="${transfer.to}"]`);
       const sourceWheel = fromCell?.querySelector(".cake-wheel");
@@ -497,38 +473,31 @@
         reciprocal: false,
       };
     });
-    for (let first = 0; first < plans.length; first += 1) {
-      for (let second = first + 1; second < plans.length; second += 1) {
-        if (plans[first].from === plans[second].to && plans[first].to === plans[second].from) {
-          plans[first].reciprocal = true;
-          plans[second].reciprocal = true;
+    for (let first = 0; first < groupedPlans.length; first += 1) {
+      for (let second = first + 1; second < groupedPlans.length; second += 1) {
+        if (
+          groupedPlans[first].from === groupedPlans[second].to &&
+          groupedPlans[first].to === groupedPlans[second].from
+        ) {
+          groupedPlans[first].reciprocal = true;
+          groupedPlans[second].reciprocal = true;
         }
       }
     }
-    return plans;
-  }
-
-  function desiredPlateRotations(plans) {
-    const outgoing = new Set(plans.map((plan) => plan.from));
-    const rotations = new Map();
-
-    for (const plan of plans) {
-      if (rotations.has(plan.from)) continue;
-      const firstHop = plan.route?.[1] ?? plan.to;
-      const desired = directionDegrees(plan.from, firstHop) - plan.sourceLast * 60;
-      rotations.set(plan.from, nearestRotation(state.rotations[plan.from] || 0, desired));
-    }
-    for (const plan of plans) {
-      if (outgoing.has(plan.to) || rotations.has(plan.to)) continue;
-      const sourceRotation = rotations.get(plan.from) ?? state.rotations[plan.from] ?? 0;
-      const sourcePhysicalAngle = sourceRotation + plan.sourceLast * 60;
-      const desired = sourcePhysicalAngle - plan.targetLast * 60;
-      rotations.set(plan.to, nearestRotation(state.rotations[plan.to] || 0, desired));
-    }
-    for (const plan of plans) {
-      if (!rotations.has(plan.to)) rotations.set(plan.to, state.rotations[plan.to] || 0);
-    }
-    return rotations;
+    return Motion.orderDisplacedTransfersFirst(groupedPlans).flatMap((plan) =>
+      Motion.createPieceTransferSequence({
+        count: plan.count,
+        sourceFirst: plan.sourceFirst,
+        targetFirst: plan.targetFirst,
+      }).map(({ sourceSlot, targetSlot }) => ({
+        ...plan,
+        count: 1,
+        sourceFirst: sourceSlot,
+        sourceLast: sourceSlot,
+        targetFirst: targetSlot,
+        targetLast: targetSlot,
+      }))
+    );
   }
 
   function playTimedRotation(element, current, target, duration, easing) {
@@ -561,7 +530,7 @@
     return animation.finished.catch(() => {}).finally(() => animation.cancel());
   }
 
-  function createEmptyBackdrop(sourceWheel, rect, currentRotation, desiredRotation) {
+  function createEmptyBackdrop(sourceWheel, rect) {
     const layer = document.createElement("div");
     layer.className = "moving-slice plate-transition-backdrop";
     layer.setAttribute("aria-hidden", "true");
@@ -569,54 +538,39 @@
     const visual = sourceWheel.cloneNode(false);
     visual.classList.add("plate-transition-wheel");
     visual.style.setProperty("--cake-gradient", gradientForSlots(Array(Engine.PLATE_CAPACITY).fill(null)));
+    visual.style.setProperty("--wheel-rotation", "0deg");
     layer.appendChild(visual);
     document.body.appendChild(layer);
-    const target = nearestRotation(currentRotation, desiredRotation);
-    return {
-      layer,
-      start: () => {
-        visual.style.setProperty("--wheel-rotation", `${target}deg`);
-        return playRotation(visual, Motion.createRotationMotion({
-          current: currentRotation,
-          target,
-          reducedMotion: reducedMotion(),
-        }));
-      },
-    };
+    return { layer };
   }
 
-  function createPlatePreparation(index, beforePlate, afterPlate, desiredRotation, hasOutgoing) {
+  function createPlatePreparation(index, beforePlate, afterPlate, hasOutgoing) {
     const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
     if (!wheel) {
       return { index, layers: [], align: () => Promise.resolve(), reflow: () => Promise.resolve() };
     }
     const rect = layoutRect(wheel);
-    const currentRotation = state.rotations[index] || 0;
     const transition = Motion.createSlotTransition({
       beforeSlots: slotsFor(beforePlate),
       afterSlots: slotsFor(afterPlate),
     });
-    const backdrop = createEmptyBackdrop(wheel, rect, currentRotation, desiredRotation);
+    const backdrop = createEmptyBackdrop(wheel, rect);
     const retained = transition.retained.map((group) => {
       const layer = createMovingSlice(wheel, group.fromLast, group.count, "plate-transition-retained");
       setLayerRect(layer, rect);
       document.body.appendChild(layer);
       const visual = layer.querySelector(".moving-slice-visual");
-      const baseRotation = nearestRotation(currentRotation, desiredRotation);
-      const targetRotation = Motion.createSlotReflowRotation({
+      const baseRotation = 0;
+      const targetRotation = nearestRotation(baseRotation, Motion.createSlotReflowRotation({
         baseRotation,
         fromFirst: group.fromFirst,
         toFirst: group.toFirst,
-      });
+      }));
       return {
         layer,
         align: () => {
           visual.style.setProperty("--wheel-rotation", `${baseRotation}deg`);
-          return playRotation(visual, Motion.createRotationMotion({
-            current: currentRotation,
-            target: baseRotation,
-            reducedMotion: reducedMotion(),
-          }));
+          return Promise.resolve();
         },
         reflow: (duration) => playSlotReflow(
           visual,
@@ -630,43 +584,61 @@
     return {
       index,
       layers: [backdrop.layer, ...retained.map((item) => item.layer)],
-      align: () => Promise.all([backdrop.start(), ...retained.map((item) => item.align())]),
+      align: () => Promise.all(retained.map((item) => item.align())),
       reflow: (duration) => Promise.all(retained.map((item) => item.reflow(duration))),
     };
   }
 
-  function createTransferVisual(plan, rotations, activeSession) {
+  function createTransferVisual(plan, activeSession) {
     if (!plan.sourceWheel || !plan.targetWheel || plan.sourceLast < 0 || plan.targetLast < 0) return null;
     const fromRect = layoutRect(plan.sourceWheel);
     const toRect = layoutRect(plan.targetWheel);
     const reciprocalOffset = plan.reciprocal ? Motion.reciprocalLaneOffset(fromRect.width) : 0;
     const rects = routeRects(plan.route, fromRect, toRect, reciprocalOffset);
-    const flight = plan.multiHop
+    let flight = plan.multiHop
       ? Motion.createHopFlightMotion({ rects, reducedMotion: reducedMotion() })
       : Motion.createRoutedFlightMotion({ rects, reducedMotion: reducedMotion() });
     const layer = createMovingSlice(plan.sourceWheel, plan.sourceLast, plan.count, "flying-transfer");
     setLayerRect(layer, fromRect);
     document.body.appendChild(layer);
     const visual = layer.querySelector(".moving-slice-visual");
-    const currentRotation = state.rotations[plan.from] || 0;
-    const sourceRotation = rotations.get(plan.from) ?? currentRotation;
-    const rawLandingRotation = (rotations.get(plan.to) || 0) + (plan.targetFirst - plan.sourceFirst) * 60;
+    const sourceRotation = 0;
+    const rawLandingRotation = Motion.createPieceLandingRotation({
+      sourceSlot: plan.sourceFirst,
+      targetSlot: plan.targetFirst,
+      targetRotation: 0,
+    });
     const landingRotation = nearestRotation(sourceRotation, rawLandingRotation);
+    let launchDelay = 0;
+    layer.dataset.fromCell = String(plan.from);
+    layer.dataset.toCell = String(plan.to);
+    layer.dataset.cakeType = plan.type;
+    layer.dataset.sourceSlot = String(plan.sourceFirst);
+    layer.dataset.targetSlot = String(plan.targetFirst);
     return {
       from: plan.from,
       to: plan.to,
-      duration: flight.duration,
+      sourceSlot: plan.sourceFirst,
+      targetSlot: plan.targetFirst,
+      distance: flight.distance,
+      get duration() { return launchDelay + flight.duration; },
       layer,
+      setTiming: (timing) => {
+        launchDelay = timing.delay;
+        flight = Motion.retimeFlightMotion(flight, timing.duration);
+        layer.dataset.flightDelay = String(launchDelay);
+        layer.dataset.flightDuration = String(flight.duration);
+        layer.dataset.startRotation = String(sourceRotation);
+        layer.dataset.landingRotation = String(landingRotation);
+      },
       align: () => {
         visual.style.setProperty("--wheel-rotation", `${sourceRotation}deg`);
         layer.dataset.visualRotation = String(sourceRotation);
-        return playRotation(visual, Motion.createRotationMotion({
-          current: currentRotation,
-          target: sourceRotation,
-          reducedMotion: reducedMotion(),
-        }));
+        return Promise.resolve();
       },
       fly: async () => {
+        if (launchDelay > 0) await wait(launchDelay);
+        if (activeSession !== sessionId) return;
         const travel = async () => {
           if (flight.segments) {
             for (let index = 0; index < flight.segments.length; index += 1) {
@@ -674,41 +646,17 @@
               const segment = flight.segments[index];
               const startTransform = `translate3d(${segment.start.x - flight.start.x}px, ${segment.start.y - flight.start.y}px, 0)`;
               const endTransform = `translate3d(${segment.end.x - flight.start.x}px, ${segment.end.y - flight.start.y}px, 0)`;
-              const hasPortalSplit = plan.portalRelay && flight.segments.length > 1;
-              const startOpacity = hasPortalSplit && index > 0 ? 0 : 1;
-              const endOpacity = hasPortalSplit && index === 0 ? 0 : 1;
-              const transformAt = (ratio) => `translate3d(${
-                segment.start.x + (segment.end.x - segment.start.x) * ratio - flight.start.x
-              }px, ${
-                segment.start.y + (segment.end.y - segment.start.y) * ratio - flight.start.y
-              }px, 0)`;
-              let hopFrames = [
-                { transform: startTransform, opacity: startOpacity },
-                { transform: endTransform, opacity: endOpacity },
-              ];
-              if (hasPortalSplit && index === 0) {
-                hopFrames = [
-                  { transform: startTransform, opacity: 1, offset: 0 },
-                  { transform: transformAt(.12), opacity: 1, offset: .12 },
-                  { transform: transformAt(.28), opacity: 0, offset: .28 },
-                  { transform: endTransform, opacity: 0, offset: 1 },
-                ];
-              } else if (hasPortalSplit && index === flight.segments.length - 1) {
-                hopFrames = [
-                  { transform: startTransform, opacity: 0, offset: 0 },
-                  { transform: transformAt(.72), opacity: 0, offset: .72 },
-                  { transform: transformAt(.88), opacity: 1, offset: .88 },
-                  { transform: endTransform, opacity: 1, offset: 1 },
-                ];
-              }
-              const hop = layer.animate(hopFrames, {
+              const hop = layer.animate([
+                { transform: startTransform, opacity: 1 },
+                { transform: endTransform, opacity: 1 },
+              ], {
                 duration: segment.duration,
                 easing: segment.easing,
                 fill: "both",
               });
               await hop.finished.catch(() => {});
               layer.style.transform = endTransform;
-              layer.style.opacity = String(endOpacity);
+              layer.style.opacity = "1";
               hop.cancel();
               if (activeSession !== sessionId) return;
               if (index < flight.segments.length - 1) {
@@ -729,7 +677,6 @@
             offset: point.offset,
           })), {
             duration: flight.duration,
-            delay: flight.delay,
             easing: flight.easing,
             fill: "forwards",
           });
@@ -752,15 +699,23 @@
     const afterBoard = Engine.cloneBoard(state.board);
     applyTransfers(afterBoard, transfers);
     const plans = buildTransferPlans(transfers, beforeBoard, afterBoard);
-    const rotations = desiredPlateRotations(plans);
     const involved = new Set(transfers.flatMap((transfer) => [transfer.from, transfer.to]));
     const outgoing = new Set(transfers.map((transfer) => transfer.from));
-    const visuals = plans.map((plan) => createTransferVisual(plan, rotations, activeSession)).filter(Boolean);
+    const visuals = plans.map((plan) => createTransferVisual(plan, activeSession)).filter(Boolean);
+    const baseSchedule = Motion.createPieceFlightSchedule({
+      distances: visuals.map((visual) => visual.distance),
+      reducedMotion: reducedMotion(),
+    });
+    const schedule = Motion.ensurePieceFlightClearance({
+      schedule: baseSchedule,
+      transfers: visuals,
+      reducedMotion: reducedMotion(),
+    });
+    visuals.forEach((visual, index) => visual.setTiming(schedule.pieces[index]));
     const preparations = [...involved].map((index) => createPlatePreparation(
       index,
       beforeBoard[index],
       afterBoard[index],
-      rotations.get(index) ?? state.rotations[index] ?? 0,
       outgoing.has(index),
     ));
     const layers = [
@@ -770,7 +725,6 @@
 
     state.transitionCells = involved;
     state.board = afterBoard;
-    for (const [index, rotation] of rotations) state.rotations[index] = rotation;
     renderBoard();
 
     try {
@@ -779,13 +733,20 @@
         ...visuals.map((visual) => visual.align()),
       ]);
       if (activeSession !== sessionId) return false;
+      await nextPaint();
       await Promise.all([
         ...visuals.map((visual) => visual.fly()),
         ...preparations.map((preparation) => {
           const durations = visuals
             .filter((visual) => visual.from === preparation.index || visual.to === preparation.index)
             .map((visual) => visual.duration);
-          return preparation.reflow(durations.length ? Math.min(...durations) : 1);
+          const incomingDurations = visuals
+            .filter((visual) => visual.to === preparation.index)
+            .map((visual) => visual.duration);
+          const firstArrival = incomingDurations.length
+            ? Math.min(...incomingDurations)
+            : (durations.length ? Math.min(...durations) : 1);
+          return preparation.reflow(reducedMotion() ? 1 : Math.max(1, firstArrival - 24));
         }),
       ]);
       if (activeSession !== sessionId) return false;
@@ -831,7 +792,6 @@
 
     state.busy = true;
     state.board[cellIndex] = chosen;
-    state.rotations[cellIndex] = 0;
     state.rack[rackIndex] = null;
     state.movesRemaining -= 1;
     state.score += 10;
@@ -886,7 +846,6 @@
     }
 
     state.board = result.board;
-    state.board.forEach((plateData, index) => { if (!plateData) state.rotations[index] = 0; });
     state.activeCells.clear();
     state.completeCells.clear();
     state.emptyCells.clear();

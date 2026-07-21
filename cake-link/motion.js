@@ -20,6 +20,139 @@
     return Math.min(4, Math.max(0, finite(cellSize)) * 0.045);
   }
 
+  function createPieceTransferSequence(options = {}) {
+    const count = clamp(Math.floor(finite(options.count)), 0, 6);
+    const sourceFirst = Math.floor(finite(options.sourceFirst));
+    const targetFirst = Math.floor(finite(options.targetFirst));
+    return Array.from({ length: count }, (_, offset) => ({
+      sourceSlot: sourceFirst + offset,
+      targetSlot: targetFirst + offset,
+    }));
+  }
+
+  function orderDisplacedTransfersFirst(plans = []) {
+    const ordered = Array.isArray(plans) ? [...plans] : [];
+    const sourceCells = new Set(ordered.map((plan) => plan.from));
+    const pivot = ordered.find((plan) => sourceCells.has(plan.to))?.to;
+    if (pivot === undefined) return ordered;
+    return [
+      ...ordered.filter((plan) => plan.from === pivot),
+      ...ordered.filter((plan) => plan.from !== pivot),
+    ];
+  }
+
+  function createPieceLandingRotation(options = {}) {
+    const sourceSlot = Math.floor(finite(options.sourceSlot));
+    const targetSlot = Math.floor(finite(options.targetSlot));
+    return finite(options.targetRotation) + (targetSlot - sourceSlot) * 60;
+  }
+
+  function createPieceFlightSchedule(options = {}) {
+    const distances = (Array.isArray(options.distances) ? options.distances : [])
+      .map((distance) => Math.max(0, finite(distance)));
+    if (!distances.length) return { gap: 0, totalDuration: 0, pieces: [] };
+
+    const reducedMotion = Boolean(options.reducedMotion);
+    const gap = reducedMotion
+      ? 0
+      : distances.length <= 6
+        ? 72
+        : Math.max(52, 72 - (distances.length - 6) * 4);
+    const pieces = distances.map((distance, index) => {
+      const delay = reducedMotion ? 0 : index * gap;
+      const duration = reducedMotion ? 1 : clamp(Math.round(275 + distance * 0.45), 330, 430);
+      return { index, distance, delay, duration, endTime: delay + duration };
+    });
+    return {
+      gap,
+      totalDuration: Math.max(...pieces.map((piece) => piece.endTime)),
+      pieces,
+    };
+  }
+
+  function ensurePieceFlightClearance(options = {}) {
+    const schedule = options.schedule || {};
+    const transfers = Array.isArray(options.transfers) ? options.transfers : [];
+    const pieces = (Array.isArray(schedule.pieces) ? schedule.pieces : []).map((piece) => ({ ...piece }));
+    const clearance = options.reducedMotion
+      ? 0
+      : Math.max(0, Math.round(finite(options.clearance, 64)));
+    const departureBySlot = new Map();
+    transfers.forEach((transfer, index) => {
+      departureBySlot.set(`${transfer.from}:${transfer.sourceSlot}`, index);
+    });
+
+    for (let index = 0; index < pieces.length; index += 1) {
+      const transfer = transfers[index];
+      if (!transfer) continue;
+      const blockerIndex = departureBySlot.get(`${transfer.to}:${transfer.targetSlot}`);
+      if (blockerIndex === undefined || blockerIndex === index || !pieces[blockerIndex]) continue;
+      const requiredEnd = pieces[blockerIndex].delay + clearance;
+      const duration = Math.max(pieces[index].duration, requiredEnd - pieces[index].delay);
+      pieces[index].duration = Math.max(options.reducedMotion ? 1 : 0, Math.round(duration));
+      pieces[index].endTime = pieces[index].delay + pieces[index].duration;
+    }
+
+    return {
+      ...schedule,
+      pieces,
+      totalDuration: pieces.length ? Math.max(...pieces.map((piece) => piece.endTime)) : 0,
+    };
+  }
+
+  function allocateDurations(weights, total) {
+    const count = weights.length;
+    if (!count) return [];
+    const budget = Math.max(count, Math.round(finite(total, count)));
+    const weightTotal = weights.reduce((sum, weight) => sum + Math.max(0, finite(weight)), 0);
+    let allocated = 0;
+    return weights.map((weight, index) => {
+      const remaining = count - index - 1;
+      const available = budget - allocated;
+      const proportional = weightTotal > 0
+        ? Math.round(budget * Math.max(0, finite(weight)) / weightTotal)
+        : Math.round(budget / count);
+      const duration = index === count - 1
+        ? available
+        : clamp(proportional, 1, available - remaining);
+      allocated += duration;
+      return duration;
+    });
+  }
+
+  function retimeFlightMotion(motion = {}, duration = motion.duration) {
+    const targetDuration = Math.max(0, Math.round(finite(duration, motion.duration)));
+    if (!Array.isArray(motion.segments)) {
+      return { ...motion, duration: targetDuration, delay: 0 };
+    }
+    if (!motion.segments.length) return { ...motion, duration: targetDuration, holdDuration: 0 };
+
+    const junctionCount = Math.max(0, motion.segments.length - 1);
+    const baseDuration = Math.max(1, finite(motion.duration, 1));
+    const factor = targetDuration / baseDuration;
+    const maxHold = junctionCount > 0
+      ? Math.max(0, Math.floor((targetDuration - motion.segments.length) / junctionCount))
+      : 0;
+    const holdDuration = junctionCount > 0
+      ? clamp(Math.round(finite(motion.holdDuration) * factor), 0, maxHold)
+      : 0;
+    const travelBudget = Math.max(motion.segments.length, targetDuration - holdDuration * junctionCount);
+    const segmentDurations = allocateDurations(
+      motion.segments.map((segment) => segment.distance || segment.duration),
+      travelBudget,
+    );
+    const segments = motion.segments.map((segment, index) => ({
+      ...segment,
+      duration: segmentDurations[index],
+    }));
+    return {
+      ...motion,
+      segments,
+      holdDuration,
+      duration: segments.reduce((sum, segment) => sum + segment.duration, 0) + holdDuration * junctionCount,
+    };
+  }
+
   function normalizeRect(rect) {
     const width = Math.max(0, finite(rect?.width));
     const height = Math.max(0, finite(rect?.height));
@@ -486,6 +619,9 @@
   return {
     createFlightMotion,
     createHopFlightMotion,
+    createPieceFlightSchedule,
+    createPieceLandingRotation,
+    createPieceTransferSequence,
     createRoutedFlightMotion,
     createTransferRoutePlan,
     createRotationMotion,
@@ -494,8 +630,11 @@
     createSlotReflowRotation,
     createSlotTransition,
     findGridRoute,
+    ensurePieceFlightClearance,
     offsetRotationMotion,
+    orderDisplacedTransfersFirst,
     quadraticPoint,
     reciprocalLaneOffset,
+    retimeFlightMotion,
   };
 });

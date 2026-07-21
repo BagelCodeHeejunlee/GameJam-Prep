@@ -7,6 +7,118 @@ const closeTo = (actual, expected, message) => {
 const rect = (left, top, width = 100, height = width) => ({ left, top, width, height });
 
 {
+  assert.deepEqual(
+    Motion.createPieceTransferSequence({ count: 3, sourceFirst: 1, targetFirst: 3 }),
+    [
+      { sourceSlot: 1, targetSlot: 3 },
+      { sourceSlot: 2, targetSlot: 4 },
+      { sourceSlot: 3, targetSlot: 5 },
+    ],
+    "a grouped transfer is expanded into one visual flight per cake slice",
+  );
+  assert.equal(
+    Motion.createPieceTransferSequence({ count: 20, sourceFirst: 0, targetFirst: 0 }).length,
+    6,
+    "a visual sequence never exceeds one full cake",
+  );
+}
+
+{
+  const stageOnePull = [
+    { from: 10, to: 6, type: "berry", count: 2 },
+    { from: 5, to: 6, type: "berry", count: 2 },
+    { from: 6, to: 10, type: "lemon", count: 1 },
+  ];
+  assert.deepEqual(
+    Motion.orderDisplacedTransfersFirst(stageOnePull),
+    [stageOnePull[2], stageOnePull[0], stageOnePull[1]],
+    "the slice displaced from the receiving plate leaves before incoming slices can cover it",
+  );
+  assert.deepEqual(
+    Motion.orderDisplacedTransfersFirst([{ from: 4, to: 5, type: "berry", count: 2 }]),
+    [{ from: 4, to: 5, type: "berry", count: 2 }],
+    "a one-way transfer keeps its original visual order",
+  );
+  assert.deepEqual(stageOnePull.map((plan) => plan.from), [10, 5, 6], "visual ordering is non-mutating");
+}
+
+{
+  assert.deepEqual(
+    Motion.createPieceFlightSchedule(),
+    { gap: 0, totalDuration: 0, pieces: [] },
+    "an empty transfer batch has no visual delay",
+  );
+
+  const sixPieces = Motion.createPieceFlightSchedule({ distances: Array(6).fill(0) });
+  assert.equal(sixPieces.gap, 72);
+  assert.deepEqual(
+    sixPieces.pieces.map((piece) => piece.delay),
+    [0, 72, 144, 216, 288, 360],
+    "six slices launch one at a time with a readable global gap",
+  );
+  assert.ok(
+    sixPieces.pieces.every((piece) => piece.duration === 330),
+    "even a short flight remains slow enough to read",
+  );
+
+  assert.equal(Motion.createPieceFlightSchedule({ distances: Array(7).fill(0) }).gap, 68);
+  assert.equal(Motion.createPieceFlightSchedule({ distances: Array(10).fill(0) }).gap, 56);
+  const twelvePieces = Motion.createPieceFlightSchedule({ distances: Array(12).fill(1000) });
+  assert.equal(twelvePieces.gap, 52);
+  assert.equal(twelvePieces.pieces.at(-1).duration, 430);
+  assert.equal(twelvePieces.totalDuration, 1002, "even twelve staggered slices finish near one second");
+
+  const invalidDistances = Motion.createPieceFlightSchedule({ distances: [NaN, -25, "bad"] });
+  assert.deepEqual(invalidDistances.pieces.map((piece) => piece.distance), [0, 0, 0]);
+  assert.ok(invalidDistances.pieces.every((piece) => piece.duration === 330));
+
+  const reduced = Motion.createPieceFlightSchedule({ distances: [0, 1000, 40], reducedMotion: true });
+  assert.equal(reduced.gap, 0);
+  assert.equal(reduced.totalDuration, 1);
+  assert.ok(reduced.pieces.every((piece) => piece.delay === 0 && piece.duration === 1));
+}
+
+{
+  const base = Motion.createPieceFlightSchedule({ distances: Array(6).fill(0) });
+  const transfers = [
+    { from: 4, to: 5, sourceSlot: 0, targetSlot: 1 },
+    { from: 4, to: 5, sourceSlot: 1, targetSlot: 2 },
+    { from: 4, to: 5, sourceSlot: 2, targetSlot: 3 },
+    { from: 4, to: 5, sourceSlot: 3, targetSlot: 4 },
+    { from: 4, to: 5, sourceSlot: 4, targetSlot: 5 },
+    { from: 5, to: 4, sourceSlot: 1, targetSlot: 0 },
+  ];
+  const safe = Motion.ensurePieceFlightClearance({ schedule: base, transfers });
+  assert.equal(base.pieces[0].duration, 330, "clearance scheduling does not mutate the base timetable");
+  assert.equal(safe.pieces[0].duration, 424);
+  assert.equal(
+    safe.pieces[0].endTime,
+    safe.pieces[5].delay + 64,
+    "an incoming slice cannot land until the old slice in that target sector has visibly departed",
+  );
+
+  const reciprocal = Motion.ensurePieceFlightClearance({
+    schedule: Motion.createPieceFlightSchedule({ distances: [0, 0] }),
+    transfers: [
+      { from: 4, to: 5, sourceSlot: 0, targetSlot: 0 },
+      { from: 5, to: 4, sourceSlot: 0, targetSlot: 0 },
+    ],
+  });
+  assert.ok(reciprocal.pieces[0].endTime >= reciprocal.pieces[1].delay + 64);
+  assert.ok(reciprocal.pieces[1].endTime >= reciprocal.pieces[0].delay + 64);
+
+  const reduced = Motion.ensurePieceFlightClearance({
+    schedule: Motion.createPieceFlightSchedule({ distances: [0, 0], reducedMotion: true }),
+    transfers: [
+      { from: 4, to: 5, sourceSlot: 0, targetSlot: 0 },
+      { from: 5, to: 4, sourceSlot: 0, targetSlot: 0 },
+    ],
+    reducedMotion: true,
+  });
+  assert.ok(reduced.pieces.every((piece) => piece.delay === 0 && piece.duration === 1));
+}
+
+{
   closeTo(Motion.reciprocalLaneOffset(80), 3.6, "reciprocal transfers use the same subtle fan as regular flights");
   closeTo(Motion.reciprocalLaneOffset(200), 4, "reciprocal separation never exceeds four pixels");
   closeTo(Motion.reciprocalLaneOffset(-20), 0, "invalid negative sizes cannot reverse the lane");
@@ -186,6 +298,27 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     { count: 2, firstSlot: 2, lastSlot: 3, maskStart: 90, maskSpan: 120 },
     "a same-color pair keeps its two original neighboring sectors",
   );
+}
+
+{
+  const normalizeAngle = (angle) => (angle % 360 + 360) % 360;
+  for (const targetRotation of [0, 60, -120]) {
+    for (let sourceSlot = 0; sourceSlot < 6; sourceSlot += 1) {
+      for (let targetSlot = 0; targetSlot < 6; targetSlot += 1) {
+        const sourceSlice = Motion.createSliceGroupGeometry({ lastSlot: sourceSlot, count: 1 });
+        const landingRotation = Motion.createPieceLandingRotation({
+          sourceSlot,
+          targetSlot,
+          targetRotation,
+        });
+        closeTo(
+          normalizeAngle(sourceSlice.maskStart + landingRotation),
+          normalizeAngle(-30 + targetSlot * 60 + targetRotation),
+          "a flying slice turns from its source sector into the exact receiving sector",
+        );
+      }
+    }
+  }
 }
 
 {
@@ -390,6 +523,33 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     motion.segments.every((segment) => segment.duration >= 60 && segment.duration <= 130),
     "each one-cell hop stays quick",
   );
+}
+
+{
+  const original = Motion.createRoutedFlightMotion({
+    rects: [rect(0, 0, 80), rect(100, 0, 80)],
+  });
+  const snapshot = structuredClone(original);
+  const retimed = Motion.retimeFlightMotion(original, 370);
+  assert.equal(retimed.duration, 370, "a direct slice flight uses the slower scheduled duration");
+  assert.equal(retimed.delay, 0, "global staggering is the only launch delay");
+  assert.deepEqual(original, snapshot, "retiming does not mutate a shared base motion");
+}
+
+{
+  const original = Motion.createHopFlightMotion({
+    rects: [rect(0, 0, 80), rect(100, 0, 80), rect(100, 100, 80)],
+  });
+  const snapshot = structuredClone(original);
+  const retimed = Motion.retimeFlightMotion(original, 430);
+  assert.equal(retimed.duration, 430, "a relayed flight keeps the exact scheduled total duration");
+  assert.equal(
+    retimed.duration,
+    retimed.segments.reduce((sum, segment) => sum + segment.duration, 0) + retimed.holdDuration,
+    "retimed relay segments and their hand-off pause share one exact budget",
+  );
+  assert.ok(retimed.segments.every((segment) => segment.duration >= 1));
+  assert.deepEqual(original, snapshot, "retiming a relay does not mutate the original route");
 }
 
 {
