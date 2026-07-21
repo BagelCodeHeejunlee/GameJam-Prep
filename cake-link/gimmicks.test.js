@@ -160,6 +160,47 @@ function completedTypes(result) {
 }
 
 {
+  const stage = stageWith({
+    goals: { berry: 1, lemon: 1 },
+    objective: { type: "coloredPlates", targets: { berry: 1, lemon: 1 } },
+  });
+  let turn = Mechanics.resolveTurn(stage, Mechanics.createRuntime(stage), boardWith([
+    [1, {
+      kind: "colored",
+      collectorOnly: true,
+      receiveOnly: true,
+      allowedColor: "berry",
+      pieces: { berry: 5 },
+    }],
+    [5, { berry: 1 }],
+  ]), 5);
+  assert.deepEqual(turn.runtime.collectedColoredPlates, { berry: 1 });
+  assert.deepEqual(turn.specialEvents.find((event) => event.kind === "coloredPlateCollected"), {
+    kind: "coloredPlateCollected",
+    index: 1,
+    type: "berry",
+    progress: 1,
+    target: 1,
+  });
+  assert.equal(Mechanics.goalProgress(stage, { berry: 1 }, turn.runtime), .5);
+  assert.equal(Mechanics.isStageComplete(stage, { berry: 1, lemon: 1 }, turn.runtime), false);
+
+  turn = Mechanics.resolveTurn(stage, turn.runtime, boardWith([
+    [6, {
+      kind: "colored",
+      collectorOnly: true,
+      receiveOnly: true,
+      allowedColor: "lemon",
+      pieces: { lemon: 5 },
+    }],
+    [5, { lemon: 1 }],
+  ]), 5);
+  assert.deepEqual(turn.runtime.collectedColoredPlates, { berry: 1, lemon: 1 });
+  assert.equal(Mechanics.goalProgress(stage, { berry: 1, lemon: 1 }, turn.runtime), 1);
+  assert.equal(Mechanics.isStageComplete(stage, { berry: 1, lemon: 1 }, turn.runtime), true);
+}
+
+{
   const mystery = plate({ pieces: { mystery: 2 }, hiddenColors: ["berry", "lemon"] });
   const reveal = Mechanics.revealPlate(mystery);
   assert.deepEqual(reveal.revealedColors, ["berry", "lemon"]);
@@ -262,16 +303,32 @@ function completedTypes(result) {
   const stage = stageWith({ mechanics: { iceCells: [{ index: 0, layers: 1 }] } });
   const runtime = Mechanics.createRuntime(stage);
   assert.equal(Mechanics.isCellAvailable(stage, runtime, 0, Array(16).fill(null)), false);
-  const turn = Mechanics.resolveTurn(stage, runtime, boardWith([
+  const donorEmptied = Mechanics.resolveTurn(stage, runtime, boardWith([
     [0, { berry: 2 }],
     [5, { berry: 3 }],
     [4, { berry: 3 }],
   ]), 5);
-  assert.deepEqual(turn.board[0].pieces, { berry: 2 }, "a plate embedded in ice cannot send or receive this turn");
-  assert.equal(turn.runtime.iceCells[0], undefined, "an adjacent emptied plate also breaks ice");
-  assert.equal(turn.specialEvents.some((event) => event.kind === "iceBreak" && event.index === 0), true);
-  assert.equal(Engine.isFrozen(turn.board[0]), false, "broken ice activates its embedded plate for the next turn");
-  assert.equal(Mechanics.isCellAvailable(stage, turn.runtime, 0, turn.board), false, "the embedded plate still occupies its cell");
+  assert.deepEqual(donorEmptied.board[0].pieces, { berry: 2 }, "a plate embedded in ice cannot send or receive this turn");
+  assert.equal(donorEmptied.runtime.iceCells[0], 1, "emptying an adjacent donor without making a cake does not break ice");
+  assert.equal(donorEmptied.specialEvents.some((event) => event.kind === "iceBreak"), false);
+  assert.equal(Engine.isFrozen(donorEmptied.board[0]), true);
+
+  const diagonalCompletion = Mechanics.resolveTurn(stage, runtime, boardWith([
+    [0, { berry: 2 }],
+    [5, { lemon: 3 }],
+    [6, { lemon: 3 }],
+  ]), 5);
+  assert.equal(diagonalCompletion.runtime.iceCells[0], 1, "a diagonal cake completion does not break ice");
+
+  const adjacentCompletion = Mechanics.resolveTurn(stage, runtime, boardWith([
+    [0, { berry: 2 }],
+    [4, { matcha: 3 }],
+    [5, { matcha: 3 }],
+  ]), 4);
+  assert.equal(adjacentCompletion.runtime.iceCells[0], undefined, "an orthogonally adjacent cake completion breaks ice");
+  assert.equal(adjacentCompletion.specialEvents.some((event) => event.kind === "iceBreak" && event.index === 0), true);
+  assert.equal(Engine.isFrozen(adjacentCompletion.board[0]), false, "broken ice activates its embedded plate for the next turn");
+  assert.equal(Mechanics.isCellAvailable(stage, adjacentCompletion.runtime, 0, adjacentCompletion.board), false, "the embedded plate still occupies its cell");
 
   const stillFrozenStage = stageWith({ mechanics: { iceCells: [{ index: 5, layers: 2 }] } });
   const frozenTurn = Mechanics.resolveTurn(

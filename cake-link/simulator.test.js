@@ -167,6 +167,16 @@ const coloredBoard = Simulator.createInitialBoard(Stages.getStage(8));
 assert.equal(coloredBoard[5].allowedColor, "berry");
 assert.equal(coloredBoard[5].collectorOnly, true);
 assert.equal(coloredBoard[5].receiveOnly, true);
+const coloredStage = Stages.getStage(8);
+const coloredRuntime = Mechanics.createRuntime(coloredStage);
+assert.deepEqual(coloredRuntime.collectedColoredPlates, {});
+const coloredCompletionBoard = Simulator.createInitialBoard(coloredStage);
+coloredCompletionBoard[4] = { id: 101, pieces: { berry: 4 }, capacity: 6 };
+const coloredCompletionTurn = Mechanics.resolveTurn(coloredStage, coloredRuntime, coloredCompletionBoard, 4);
+assert.equal(coloredCompletionTurn.runtime.collectedColoredPlates.berry, 1);
+assert.ok(coloredCompletionTurn.specialEvents.some((event) =>
+  event.kind === "coloredPlateCollected" && event.type === "berry"
+));
 const iceStage = Stages.getStage(9);
 const iceBoard = Simulator.createInitialBoard(iceStage);
 const iceRuntime = Mechanics.createRuntime(iceStage);
@@ -233,20 +243,11 @@ for (let id = 8; id <= 17; id += 1) {
   );
 }
 
-// Mystery decisions may use the visible '?' count, but never the hidden
-// colors. Changing only those colors must leave the first choice unchanged.
-const mysteryA = JSON.parse(JSON.stringify(Stages.getStage(11)));
-const mysteryB = JSON.parse(JSON.stringify(Stages.getStage(11)));
-mysteryA.openingModifiers = [
-  { hiddenColors: ["berry"] },
-  { hiddenColors: ["lemon"] },
-  { hiddenColors: ["matcha"] },
-];
-mysteryB.openingModifiers = [
-  { hiddenColors: ["choco"] },
-  { hiddenColors: ["choco"] },
-  { hiddenColors: ["choco"] },
-];
+// The initial rack is always fully visible. Mystery generation begins with
+// the fourth supplied plate, after the first three choices have been spent.
+const mysteryStage = JSON.parse(JSON.stringify(Stages.getStage(11)));
+mysteryStage.mechanics.mystery.plateChance = 100;
+mysteryStage.mechanics.mystery.countWeights = { 1: 100 };
 const mysteryOptions = {
   seed: 0x51DECAFE,
   style: "planner",
@@ -254,11 +255,11 @@ const mysteryOptions = {
   traceSupply: true,
   traceDecisions: true,
 };
-const mysteryResultA = Simulator.simulateRun(mysteryA, mysteryOptions);
-const mysteryResultB = Simulator.simulateRun(mysteryB, mysteryOptions);
-assert.deepEqual(mysteryResultA.supplyTrace[0], mysteryResultB.supplyTrace[0]);
-assert.deepEqual(mysteryResultA.decisionTrace[0], mysteryResultB.decisionTrace[0]);
-assert.equal(mysteryResultA.decisionTrace[0].mystery, true);
+const mysteryResult = Simulator.simulateRun(mysteryStage, mysteryOptions);
+assert.ok(mysteryResult.supplyTrace.length >= 4);
+for (const plate of mysteryResult.supplyTrace.slice(0, 3)) assert.equal(plate.mystery || 0, 0);
+assert.ok((mysteryResult.supplyTrace[3].mystery || 0) > 0);
+assert.equal(mysteryResult.decisionTrace[0].mystery, false);
 
 assert.equal(Simulator.difficultyLabel(1), "쉬움");
 assert.equal(Simulator.difficultyLabel(.9), "쉬움");

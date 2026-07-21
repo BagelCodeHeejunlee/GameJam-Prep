@@ -40,6 +40,7 @@
       lockedCells,
       brokenCells: {},
       servedCells: {},
+      collectedColoredPlates: {},
       keyProgress: {},
       frogIndex,
       frogReached,
@@ -57,6 +58,7 @@
       lockedCells: {},
       brokenCells: {},
       servedCells: {},
+      collectedColoredPlates: {},
       keyProgress: {},
       frogIndex: null,
       frogReached: false,
@@ -68,6 +70,7 @@
       lockedCells: { ...(cloned.lockedCells || {}) },
       brokenCells: { ...(cloned.brokenCells || {}) },
       servedCells,
+      collectedColoredPlates: { ...(cloned.collectedColoredPlates || {}) },
       keyProgress: { ...(cloned.keyProgress || {}) },
       servedCount: Math.max(
         0,
@@ -175,18 +178,46 @@
     }
   }
 
-  function breakIce(stage, runtime, removed, specialEvents) {
+  function breakIce(stage, runtime, completionEvents, specialEvents) {
     for (const [rawIndex, rawLayers] of Object.entries(runtime.iceCells || {})) {
       const index = Number(rawIndex);
-      const adjacentRemovals = removed.filter((removedIndex) =>
-        Engine.getNeighbors(index).includes(removedIndex)
+      const adjacentCompletions = completionEvents.filter((event) =>
+        Number.isInteger(event?.index) && Engine.getNeighbors(index).includes(event.index)
       ).length;
-      if (!adjacentRemovals) continue;
+      if (!adjacentCompletions) continue;
       const before = Number(rawLayers) || 0;
-      const after = Math.max(0, before - adjacentRemovals);
+      const after = Math.max(0, before - adjacentCompletions);
       if (after > 0) runtime.iceCells[index] = after;
       else delete runtime.iceCells[index];
       specialEvents.push({ kind: "iceBreak", index, amount: before - after, remaining: after });
+    }
+  }
+
+  function coloredPlateTargets(stage) {
+    const configured = stage?.objective?.type === "coloredPlates"
+      ? stage.objective.targets
+      : mechanicsOf(stage).coloredPlateGoal?.targets;
+    return Object.fromEntries(Object.entries(configured || {})
+      .map(([type, target]) => [type, Math.max(0, Math.floor(Number(target) || 0))])
+      .filter(([, target]) => target > 0));
+  }
+
+  function collectColoredPlates(stage, runtime, completionEvents, specialEvents) {
+    const targets = coloredPlateTargets(stage);
+    for (const event of completionEvents) {
+      if (!event?.collector || !event.type) continue;
+      const type = event.type;
+      runtime.collectedColoredPlates[type] = Math.max(
+        0,
+        Number(runtime.collectedColoredPlates[type]) || 0,
+      ) + 1;
+      specialEvents.push({
+        kind: "coloredPlateCollected",
+        index: event.index,
+        type,
+        progress: runtime.collectedColoredPlates[type],
+        target: targets[type] || 0,
+      });
     }
   }
 
@@ -355,7 +386,8 @@
     }
 
     const aggregate = aggregatePhases(phases);
-    breakIce(stage, runtime, aggregate.removed, specialEvents);
+    breakIce(stage, runtime, aggregate.completionEvents, specialEvents);
+    collectColoredPlates(stage, runtime, aggregate.completionEvents, specialEvents);
     unlockFromCompletions(stage, runtime, aggregate.completionEvents, specialEvents);
     serveOrderCells(stage, runtime, aggregate.completionEvents, specialEvents);
     breakFragileCells(stage, runtime, aggregate.completionEvents, specialEvents);
@@ -400,6 +432,11 @@
       const target = fragileTarget(stage);
       return target > 0 && (Number(runtime.fragileBrokenCount) || 0) >= target;
     }
+    if (objective === "coloredPlates") {
+      return cakeComplete && Object.entries(coloredPlateTargets(stage)).every(([type, target]) =>
+        (Number(runtime.collectedColoredPlates?.[type]) || 0) >= target
+      );
+    }
     return cakeComplete;
   }
 
@@ -420,6 +457,20 @@
       return target
         ? Math.min(1, Math.max(0, Number(runtime.fragileBrokenCount) || 0) / target)
         : 1;
+    }
+    if (objective === "coloredPlates") {
+      const cakeEntries = Object.entries(stage?.goals || {});
+      const cakeTarget = cakeEntries.reduce((sum, [, target]) => sum + Math.max(0, Number(target) || 0), 0);
+      const cakeAchieved = cakeEntries.reduce((sum, [type, target]) =>
+        sum + Math.min(Number(completedByType?.[type]) || 0, Math.max(0, Number(target) || 0)), 0
+      );
+      const plateEntries = Object.entries(coloredPlateTargets(stage));
+      const plateTarget = plateEntries.reduce((sum, [, target]) => sum + target, 0);
+      const plateAchieved = plateEntries.reduce((sum, [type, target]) =>
+        sum + Math.min(Number(runtime.collectedColoredPlates?.[type]) || 0, target), 0
+      );
+      const totalTarget = cakeTarget + plateTarget;
+      return totalTarget ? Math.min(1, (cakeAchieved + plateAchieved) / totalTarget) : 1;
     }
     if (objective === "frog") {
       const frog = mechanicsOf(stage).frog;
@@ -454,5 +505,6 @@
     isStageComplete,
     goalProgress,
     frogDistance,
+    coloredPlateTargets,
   };
 });

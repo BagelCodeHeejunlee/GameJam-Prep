@@ -103,6 +103,11 @@ for (const [position, stage] of stages.entries()) {
     const modifier = stage.openingModifiers[index];
     assertPieceMap(stage, pieces, `첫 하단 판 ${index}`, capacity, modifierCount(modifier));
     for (const color of modifier.hiddenColors || []) assert.ok(stage.colors.includes(color));
+    const generated = Stages.createOpeningPlateData(stage, index, () => 0);
+    if (stage.mechanics?.mystery?.excludeOpeningRack) {
+      assert.equal(generated.pieces.mystery || 0, 0, `${stage.title} 첫 3판에는 미스테리가 나오면 안 된다`);
+      assert.deepEqual(generated.hiddenColors || [], []);
+    }
   });
 
   let rngState = stage.seed;
@@ -121,6 +126,7 @@ for (const [position, stage] of stages.entries()) {
 }
 
 assert.equal(Stages.getStage(17).nextStageId, null);
+assert.equal(Stages.totalGoalCount(Stages.getStage(8)), 10);
 assert.equal(Stages.totalGoalCount(Stages.getStage(10)), 3);
 assert.equal(Stages.totalGoalCount(Stages.getStage(14)), 7);
 assert.equal(Stages.totalGoalCount(Stages.getStage(16)), 3);
@@ -131,9 +137,25 @@ assert.equal(Stages.isComplete(Stages.getStage(14), { orderIndex: 7 }), true);
 assert.equal(Stages.isComplete(Stages.getStage(16), { servedCount: 2 }), false);
 assert.equal(Stages.isComplete(Stages.getStage(16), { servedCount: 3 }), true);
 assert.equal(Stages.isComplete(Stages.getStage(16), { servedCells: { 5: true, 6: true, 9: true } }), true);
+assert.equal(Stages.isComplete(Stages.getStage(8), {
+  berry: 3,
+  lemon: 3,
+  matcha: 2,
+  collectedColoredPlates: { berry: 1 },
+}), false);
+assert.equal(Stages.isComplete(Stages.getStage(8), {
+  berry: 3,
+  lemon: 3,
+  matcha: 2,
+  collectedColoredPlates: { berry: 1, lemon: 1 },
+}), true);
 
 const colored = Stages.getStage(8).initialPlates.filter((plate) => plate.kind === "colored");
 assert.equal(colored.length, 2);
+assert.deepEqual(Stages.getStage(8).objective, {
+  type: "coloredPlates",
+  targets: { berry: 1, lemon: 1 },
+});
 colored.forEach((plate) => {
   assert.equal(plate.collectorOnly, true);
   assert.equal(plate.receiveOnly, true);
@@ -191,13 +213,28 @@ const deterministicRainbow = Stages.createPlateData(
 assert.deepEqual(deterministicRainbow.pieces, { lemon: 2, rainbow: 2 });
 const stageCapacityPlate = Stages.createPlateData(Stages.getStage(12), { berry: 4 });
 assert.equal(stageCapacityPlate.capacity, 8);
-const openingMystery = Stages.createPlateData(
-  Stages.getStage(11),
-  Stages.getStage(11).openingRack[0],
-  Stages.getStage(11).openingModifiers[0],
-);
-assert.deepEqual(openingMystery.pieces, { berry: 2, mystery: 1 });
-assert.deepEqual(openingMystery.hiddenColors, ["berry"]);
+const mysteryStage = Stages.getStage(11);
+assert.equal(mysteryStage.mechanics.mystery.excludeOpeningRack, true);
+assert.deepEqual(mysteryStage.openingRack, [{ berry: 3 }, { lemon: 3 }, { matcha: 3 }]);
+assert.deepEqual(mysteryStage.openingModifiers, [{}, {}, {}]);
+for (let index = 0; index < 3; index += 1) {
+  const openingPlate = Stages.createOpeningPlateData(mysteryStage, index, () => 0);
+  assert.equal(openingPlate.pieces.mystery || 0, 0);
+  assert.equal(openingPlate.hiddenColors, undefined);
+}
+const firstWeightedMystery = Stages.createOpeningPlateData(mysteryStage, 3, () => 0);
+assert.ok((firstWeightedMystery.pieces.mystery || 0) > 0, "4번째 생성부터는 확률에 따라 미스테리가 나올 수 있어야 한다");
+assert.equal(firstWeightedMystery.pieces.mystery, firstWeightedMystery.hiddenColors.length);
+const staleMysteryStage = JSON.parse(JSON.stringify(mysteryStage));
+staleMysteryStage.openingRack[0] = {
+  pieces: { berry: 2, mystery: 1 },
+  hiddenColors: ["lemon"],
+  mystery: 1,
+};
+staleMysteryStage.openingModifiers[0] = { hiddenColors: ["matcha"], mystery: 1 };
+const sanitizedOpening = Stages.createOpeningPlateData(staleMysteryStage, 0, () => 0);
+assert.deepEqual(sanitizedOpening.pieces, { berry: 2 });
+assert.equal(sanitizedOpening.hiddenColors, undefined);
 const openingRainbow = Stages.getStage(15).openingRack.map((pieces, index) =>
   Stages.createPlateData(
     Stages.getStage(15),

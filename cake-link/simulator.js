@@ -272,14 +272,22 @@
   function specialEventValue(result) {
     let value = 0;
     for (const event of result?.specialEvents || []) {
-      const type = String(event.type || event.kind || "").toLowerCase();
+      const type = `${event.kind || ""} ${event.type || ""}`.toLowerCase();
       if (type.includes("unlock") || type.includes("ice")) value += 1;
       if (type.includes("layer")) value += 1.2;
+      if (type.includes("coloredplatecollected")) value += 4;
       if (type.includes("orderserved") || type.includes("service")) value += 4;
       if (type.includes("fragile") || type.includes("break")) value += 4;
       if (type.includes("frog") && (event.reached || type.includes("goal"))) value += 4;
     }
     return value;
+  }
+
+  function coloredPlateCollectionCount(stage, runtime) {
+    const collected = runtime?.collectedColoredPlates || {};
+    return Object.entries(stage?.objective?.targets || {}).reduce((total, [type, target]) =>
+      total + Math.min(Math.max(0, Number(target) || 0), Math.max(0, Number(collected[type]) || 0)), 0
+    );
   }
 
   function evaluateCandidate(stage, beforeCompleted, beforeRuntime, beforeBoard, result) {
@@ -304,6 +312,10 @@
       0,
       (Number(result.runtime?.fragileBrokenCount) || 0) - (Number(beforeRuntime?.fragileBrokenCount) || 0),
     );
+    const coloredPlateCollectionGain = Math.max(
+      0,
+      coloredPlateCollectionCount(stage, result.runtime) - coloredPlateCollectionCount(stage, beforeRuntime),
+    );
     const specialValue = specialEventValue(result);
     return {
       completed: afterCompleted,
@@ -316,8 +328,9 @@
       openedCells,
       serviceGain,
       fragileBreakGain,
+      coloredPlateCollectionGain,
       specialValue,
-      plannerScore: clearBonus + progressGain * 100000 + frogGain * 5200 + openedCells * 4600 + serviceGain * 12000 + specialValue * 1100 + metrics.quality,
+      plannerScore: clearBonus + progressGain * 100000 + frogGain * 5200 + openedCells * 4600 + serviceGain * 12000 + coloredPlateCollectionGain * 12000 + specialValue * 1100 + metrics.quality,
     };
   }
 
@@ -355,6 +368,7 @@
       openedCells: 0,
       serviceGain: 0,
       fragileBreakGain: 0,
+      coloredPlateCollectionGain: 0,
       specialValue: 0,
       plannerScore: heuristic,
     };
@@ -383,7 +397,7 @@
 
   function scoreCandidate(candidate, style) {
     const clearBonus = candidate.clearsStage ? 1000000 : 0;
-    const mechanicScore = candidate.frogGain * 5600 + candidate.openedCells * 4200 + candidate.serviceGain * 12000 + candidate.fragileBreakGain * 12000 + candidate.specialValue * 900;
+    const mechanicScore = candidate.frogGain * 5600 + candidate.openedCells * 4200 + candidate.serviceGain * 12000 + candidate.fragileBreakGain * 12000 + candidate.coloredPlateCollectionGain * 12000 + candidate.specialValue * 900;
     if (style === "goal") {
       return clearBonus +
         candidate.progressGain * 165000 +
@@ -406,6 +420,7 @@
         candidate.openedCells * 7200 +
         candidate.serviceGain * 8500 +
         candidate.fragileBreakGain * 8500 +
+        candidate.coloredPlateCollectionGain * 8500 +
         candidate.frogGain * 2600 -
         candidate.boardMetrics.mixedPenalty * 650;
     }
@@ -422,6 +437,7 @@
         candidate.visible.occupiedNeighbors * 45 +
         candidate.frogGain * 1200 +
         candidate.openedCells * 1400 +
+        candidate.coloredPlateCollectionGain * 6500 +
         (2 - candidate.rackIndex) * 18;
     }
     return candidate.plannerScore;
@@ -508,17 +524,7 @@
     }
 
     function generatedPlate() {
-      let plate;
-      if (generated < stage.openingRack.length) {
-        plate = Stages.createPlateData(
-          stage,
-          stage.openingRack[generated],
-          stage.openingModifiers?.[generated] || {},
-          supplyRandom,
-        );
-      } else {
-        plate = Stages.createWeightedPlateData(stage, supplyRandom);
-      }
+      const plate = Stages.createOpeningPlateData(stage, generated, supplyRandom);
       generated += 1;
       plate.id = nextId++;
       if (supplyTrace) supplyTrace.push(visibleSupply(plate));

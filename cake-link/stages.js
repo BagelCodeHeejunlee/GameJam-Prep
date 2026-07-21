@@ -189,6 +189,7 @@
       seed: 8137,
       moveLimit: 23,
       goals: { berry: 3, lemon: 3, matcha: 2 },
+      objective: { type: "coloredPlates", targets: { berry: 1, lemon: 1 } },
       colors: ["berry", "lemon", "matcha", "choco"],
       boardMask: ["1111", "1111", "1111", "1111"],
       initialPlates: [
@@ -286,17 +287,18 @@
         { index: 10, pieces: { lemon: 2 } },
         { index: 6, pieces: { matcha: 2 } },
       ],
-      openingRack: [{ berry: 2 }, { lemon: 2 }, { matcha: 2 }],
-      openingModifiers: [
-        { hiddenColors: ["berry"] },
-        { hiddenColors: ["lemon"] },
-        { hiddenColors: ["matcha"] },
-      ],
+      openingRack: [{ berry: 3 }, { lemon: 3 }, { matcha: 3 }],
+      openingModifiers: [{}, {}, {}],
       colorWeights: { berry: 34, lemon: 31, matcha: 25, choco: 10 },
       platePatternWeights: { a3: 18, a2b1: 32, a2b2: 22, a1b1c1: 18, a2: 10 },
       gimmick: { id: "mystery", label: "미스테리 조각", icon: "❔" },
       mechanics: {
-        mystery: { plateChance: 30, countWeights: { 1: 80, 2: 20 }, reveal: "onPlace" },
+        mystery: {
+          plateChance: 30,
+          countWeights: { 1: 80, 2: 20 },
+          reveal: "onPlace",
+          excludeOpeningRack: true,
+        },
       },
       nextStageId: 12,
     }),
@@ -501,6 +503,13 @@
       );
       return target > 0 && progress >= target;
     }
+    if (stage.objective?.type === "coloredPlates") {
+      const collected = completedByType.collectedColoredPlates || completedByType._collectedColoredPlates || {};
+      const collectedAll = Object.entries(stage.objective.targets || {})
+        .every(([type, target]) => (Number(collected[type]) || 0) >= (Number(target) || 0));
+      return collectedAll && goalEntries(stage)
+        .every(([type, target]) => (completedByType[type] || 0) >= target);
+    }
     return goalEntries(stage).every(([type, target]) => (completedByType[type] || 0) >= target);
   }
 
@@ -518,6 +527,12 @@
     }
     if (stage.objective?.type === "fragile") {
       return Math.max(0, Math.floor(Number(stage.objective.target) || 0));
+    }
+    if (stage.objective?.type === "coloredPlates") {
+      const cakes = goalEntries(stage).reduce((sum, [, target]) => sum + target, 0);
+      const coloredPlates = Object.values(stage.objective.targets || {})
+        .reduce((sum, target) => sum + Math.max(0, Number(target) || 0), 0);
+      return cakes + coloredPlates;
     }
     return goalEntries(stage).reduce((sum, [, target]) => sum + target, 0);
   }
@@ -656,6 +671,24 @@
     return plate;
   }
 
+  function createOpeningPlateData(stage, index, random = Math.random) {
+    const openingIndex = Math.max(0, Math.floor(Number(index) || 0));
+    if (openingIndex >= (stage.openingRack || []).length) {
+      return createWeightedPlateData(stage, random);
+    }
+
+    const pieces = cloneData(stage.openingRack[openingIndex] || {});
+    const modifiers = cloneData(stage.openingModifiers?.[openingIndex] || {});
+    if (stage.mechanics?.mystery?.excludeOpeningRack) {
+      delete modifiers.hiddenColors;
+      delete modifiers.mystery;
+      delete pieces.hiddenColors;
+      delete pieces.mystery;
+      if (pieces?.pieces) delete pieces.pieces.mystery;
+    }
+    return createPlateData(stage, pieces, modifiers, random);
+  }
+
   return {
     COLOR_IDS,
     STAGES,
@@ -670,5 +703,6 @@
     createPlateData,
     createWeightedPlate,
     createWeightedPlateData,
+    createOpeningPlateData,
   };
 });

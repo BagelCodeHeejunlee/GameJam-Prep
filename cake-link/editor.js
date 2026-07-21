@@ -66,6 +66,17 @@
             mechanics: saved[id].mechanics || base.mechanics,
             openingModifiers: saved[id].openingModifiers || base.openingModifiers,
           };
+          // New built-in mechanic guarantees must also apply to drafts saved
+          // before their flags existed.
+          if (base.mechanics?.mystery?.excludeOpeningRack) {
+            defaults[id].mechanics = {
+              ...defaults[id].mechanics,
+              mystery: {
+                ...(defaults[id].mechanics?.mystery || {}),
+                excludeOpeningRack: true,
+              },
+            };
+          }
           // Stage 16 used to be stored as a breakable-plate objective. Keep
           // existing editor drafts playable after the mechanic became a
           // persistent order station on the board.
@@ -87,6 +98,28 @@
               gimmick: { id: "service", label: "주문대", icon: "🔔" },
               mechanics: { ...mechanics, serviceCells },
             };
+          }
+          // Mystery slices are intentionally withheld from the first three
+          // choices, including drafts saved before this rule was introduced.
+          if (defaults[id].mechanics?.mystery?.excludeOpeningRack) {
+            defaults[id].openingModifiers = defaults[id].openingRack.map((_, index) => {
+              const modifier = { ...(defaults[id].openingModifiers?.[index] || {}) };
+              delete modifier.hiddenColors;
+              delete modifier.mystery;
+              return modifier;
+            });
+            defaults[id].openingRack = defaults[id].openingRack.map((entry) => {
+              if (!entry?.pieces) {
+                const pieces = { ...(entry || {}) };
+                delete pieces.mystery;
+                return pieces;
+              }
+              const plate = deepClone(entry);
+              delete plate.hiddenColors;
+              delete plate.mystery;
+              delete plate.pieces.mystery;
+              return plate;
+            });
           }
           if (key === LEGACY_STORAGE_KEY && Number(id) === 7) defaults[id].nextStageId = 8;
         }
@@ -146,6 +179,9 @@
   function stageGoalSummary(data) {
     if (data.objective?.type === "frog") return `${sum(data.goals)}판 + 개구리`;
     if (data.objective?.type === "ordered") return `${data.mechanics?.orderedGoal?.sequence?.length || 0}단계`;
+    if (data.objective?.type === "coloredPlates") {
+      return `${sum(data.goals)}판 + 색깔 접시 ${sum(data.objective.targets)}개`;
+    }
     if (data.objective?.type === "service") {
       return `주문대 ${data.objective?.target || data.mechanics?.serviceCells?.length || 0}곳`;
     }
@@ -279,6 +315,11 @@
       if (rainbowCount > sum(plate)) {
         errors.push(`첫 하단 ${index + 1}번 무지개 교체 수가 기존 조각 수를 넘습니다.`);
       }
+      if (data.mechanics?.mystery?.excludeOpeningRack && (
+        modifier.hiddenColors?.length || Number(modifier.mystery) > 0 || Number(plate.mystery) > 0
+      )) {
+        errors.push(`첫 하단 ${index + 1}번 판에는 미스테리 조각을 넣을 수 없습니다.`);
+      }
     }
     if (data.openingRack?.length !== 3) errors.push("첫 하단 판은 정확히 3개여야 합니다.");
     if (!Array.isArray(data.openingModifiers) || data.openingModifiers.length !== data.openingRack?.length) {
@@ -342,6 +383,29 @@
       if (target < 1) errors.push("주문대 목표는 1곳 이상이어야 합니다.");
       if (target > serviceCount) errors.push("주문대 목표가 지정된 주문대 수보다 많습니다.");
       if (serviceCount !== serviceIndexes.length) errors.push("같은 칸에 주문대가 중복 지정되어 있습니다.");
+    }
+    if (data.objective?.type === "coloredPlates") {
+      const targets = data.objective.targets || {};
+      const coloredCounts = (data.initialPlates || []).reduce((counts, plate) => {
+        if (plate.kind === "colored" && plate.allowedColor) {
+          counts[plate.allowedColor] = (counts[plate.allowedColor] || 0) + 1;
+        }
+        return counts;
+      }, {});
+      if (!Object.keys(targets).length) errors.push("색깔 접시 목표 색과 개수가 필요합니다.");
+      for (const [color, rawTarget] of Object.entries(targets)) {
+        const target = Math.floor(Number(rawTarget) || 0);
+        if (!data.colors.includes(color)) errors.push(`색깔 접시 목표에 미등장 색 ${color}가 있습니다.`);
+        if (target < 1) errors.push(`${color} 색깔 접시 목표는 1개 이상이어야 합니다.`);
+        if (target > (coloredCounts[color] || 0)) errors.push(`${color} 색깔 접시 목표가 배치된 접시 수보다 많습니다.`);
+        for (const plate of (data.initialPlates || []).filter((candidate) =>
+          candidate.kind === "colored" && candidate.allowedColor === color
+        )) {
+          if (sum(plate.pieces) >= (Number(plate.capacity) || plateCapacity)) {
+            errors.push(`${plate.index}번 ${color} 색깔 접시는 시작 시 용량보다 적은 조각이 있어야 합니다.`);
+          }
+        }
+      }
     }
     if (data.objective?.type === "fragile") {
       const target = Math.floor(Number(data.objective.target) || 0);
@@ -587,17 +651,17 @@
     const id = data.gimmick?.id;
     if (!id) return "기본 정렬 규칙만 사용하는 스테이지입니다.";
     const descriptions = {
-      colored: "옆에 새로 놓은 판에서 지정 색을 먼저 가져가며, 완성 전에는 내보내지 않는 고정 수집 접시입니다.",
-      ice: `얼음 속 시작 판 ${(data.mechanics?.iceCells || []).length}개가 보이며, 인접 판 제거 후 사용할 수 있습니다.`,
+      colored: `옆에 새로 놓은 판에서 지정 색을 먼저 가져가며, 완성 전에는 내보내지 않는 고정 수집 접시입니다. 색깔 접시 완성 ${sum(data.objective?.targets)}개도 별도 목표로 집계합니다.`,
+      ice: `얼음 속 시작 판 ${(data.mechanics?.iceCells || []).length}개가 보이며, 얼음의 상·하·좌·우 인접 칸에서 케이크를 완성하면 깨진 뒤 사용할 수 있습니다.`,
       frog: `개구리가 ${data.mechanics?.frog?.startIndex ?? "?"}번에서 ${data.mechanics?.frog?.goalIndex ?? "?"}번 칸으로 이동한 뒤 사라집니다. 개구리가 없는 목표 칸에는 판을 놓을 수 있습니다.`,
-      mystery: `생성 판의 ${data.mechanics?.mystery?.plateChance || 0}%에 미스테리 조각이 들어갈 수 있습니다.`,
+      mystery: `첫 하단 3판에는 나오지 않고, 4번째 생성 판부터 ${data.mechanics?.mystery?.plateChance || 0}%에 미스테리 조각이 들어갈 수 있습니다.`,
       capacity8: "같은 색 조각 8개를 모아야 한 판이 완성됩니다.",
       locks: `색깔별 완성 횟수에 따라 잠긴 칸 ${(data.mechanics?.locks || []).length}개를 단계적으로 엽니다.`,
       ordered: `지정된 ${(data.mechanics?.orderedGoal?.sequence || []).length}개 색 순서대로 완성합니다.`,
       rainbow: `생성 판의 ${data.mechanics?.rainbow?.plateChance || 0}%에서 기존 조각 1~2개가 자동 완성용 무지개 조각으로 바뀝니다.`,
       service: `주문대 ${(data.mechanics?.serviceCells || []).length}곳에서 각각 케이크를 한 판씩 완성해 주문을 채웁니다. 완료한 칸도 계속 사용할 수 있습니다.`,
       fragile: `완성하면 판 자체가 깨지는 위치 ${(data.mechanics?.fragileCells || []).length}개가 있습니다. 목표는 ${data.mechanics?.fragileGoal?.target || data.objective?.target || 0}개 깨기입니다.`,
-      layered: `위층을 먼저 완성해야 아래층을 사용할 수 있는 판 ${data.initialPlates.filter((plate) => plate.layers?.length).length}개가 있습니다.`,
+      layered: `위층을 먼저 완성해야 아래층을 사용할 수 있는 판 ${data.initialPlates.filter((plate) => plate.layers?.length).length}개가 있습니다. 위층은 접시 중앙에 작게 올라가 아래층이 보입니다.`,
     };
     return descriptions[id] || "JSON에 설정된 스테이지 기믹을 사용합니다.";
   }

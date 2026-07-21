@@ -104,9 +104,11 @@
   function generatedPlate(slot) {
     if (state.deckIndex < currentStage.openingRack.length) {
       const index = state.deckIndex++;
-      const spec = Stages.createPlateData
-        ? Stages.createPlateData(currentStage, currentStage.openingRack[index], currentStage.openingModifiers?.[index], state.random)
-        : { pieces: currentStage.openingRack[index] };
+      const spec = Stages.createOpeningPlateData
+        ? Stages.createOpeningPlateData(currentStage, index, state.random)
+        : Stages.createPlateData
+          ? Stages.createPlateData(currentStage, currentStage.openingRack[index], currentStage.openingModifiers?.[index], state.random)
+          : { pieces: currentStage.openingRack[index] };
       return plate(spec);
     }
     const spec = Stages.createWeightedPlateData
@@ -251,6 +253,17 @@
     );
   }
 
+  function coloredPlateGoalEntries(stage = currentStage) {
+    if (stage?.objective?.type !== "coloredPlates") return [];
+    return Object.entries(stage.objective.targets || {})
+      .filter(([type, target]) => CAKES[type] && Number(target) > 0)
+      .map(([type, target]) => [type, Math.max(1, Math.floor(Number(target)))]);
+  }
+
+  function collectedColoredPlateCount(type, runtime = state?.mechanics) {
+    return Math.max(0, Math.floor(Number(runtime?.collectedColoredPlates?.[type]) || 0));
+  }
+
   function gimmickPresentation(stage = currentStage) {
     if (isServiceStage(stage)) return { label: "주문대", icon: "🛎️" };
     return stage?.gimmick || {};
@@ -314,8 +327,9 @@
       const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}${serviceDescription}${iceLocked ? ", 반투명 얼음 안에 갇혀 있어 현재 사용할 수 없음" : ""}${goalDescription}`
         : `${row}행 ${col}열, ${reason || `빈칸${serviceDescription}${goalDescription}${frogGoal ? ", 판을 놓을 수 있음" : ""}`}`;
       const fixtures = [
-        serviceConfigured ? `<span class="cell-fixture service-station-pad" aria-hidden="true"><span class="service-station-label"><i></i><b>${serviceServed ? "완료" : "주문대"}</b></span></span>` : "",
+        serviceConfigured ? `<span class="cell-fixture service-station-pad" aria-hidden="true"><span class="service-station-label"><i></i></span></span>` : "",
         effectClass === "order-served" ? `<span class="order-served-burst" aria-hidden="true"><i>✓</i><b>주문 완료!</b></span>` : "",
+        effectClass === "colored-plate-collected" ? `<span class="colored-plate-collected-burst" aria-hidden="true"><i>✓</i></span>` : "",
         frogGoal ? `<span class="frog-goal" aria-hidden="true"></span>` : "",
         iceLocked ? `<span class="cell-fixture ice-cover" aria-hidden="true"></span>` : "",
         keyLocked ? `<span class="cell-fixture lock-cover" aria-hidden="true">${keyColor ? `<i class="lock-key-dot" style="--key-color:${CAKES[keyColor]?.color || "#999"}"></i>` : ""}${lockCountLabel}</span>` : "",
@@ -352,6 +366,16 @@
       const count = showProgress ? `${completed}/${target}` : `${target}판`;
       return `<span class="goal-chip" title="${CAKES[type].name} 케이크 ${target}판"><span aria-hidden="true">${CAKES[type].emoji}</span><b>${count}</b></span>`;
     });
+    const coloredPlateGoals = coloredPlateGoalEntries();
+    if (coloredPlateGoals.length) {
+      const title = coloredPlateGoals.map(([type, target]) => `${CAKES[type].name} 색깔 접시 ${target}개`).join(", ");
+      const items = coloredPlateGoals.map(([type, target]) => {
+        const completed = Math.min(target, collectedColoredPlateCount(type));
+        const count = showProgress ? `${completed}/${target}` : `${target}`;
+        return `<span class="colored-plate-goal-item"><span class="colored-plate-goal-icon" style="--goal-plate-color:${CAKES[type].color}" aria-hidden="true"><i>${CAKES[type].emoji}</i></span><em>${count}</em></span>`;
+      }).join("");
+      chips.push(`<span class="goal-chip colored-plate-goal-chip" title="${title} 모으기">${items}</span>`);
+    }
     if (hasServiceGoal()) {
       const target = Math.max(1, Math.floor(Number(currentStage.objective.target) || 1));
       const completed = Math.min(target, servedOrderCount());
@@ -1130,6 +1154,7 @@
       iceBreak: "ice-breaking", iceBroken: "ice-breaking", unlock: "unlocking",
       "ice-break": "ice-breaking", lockOpen: "unlocking",
       orderServed: "order-served", "order-served": "order-served",
+      coloredPlateCollected: "colored-plate-collected", "colored-plate-collected": "colored-plate-collected",
     };
     for (const event of terrainEvents) {
       const indexes = event.indexes || [event.index ?? event.to].filter(Number.isInteger);
@@ -1147,6 +1172,30 @@
         const target = Math.max(1, Number(servedEvent.target) || Number(currentStage.objective?.target) || 1);
         playTone(progress >= target ? 880 : 720, .12, "sine");
         showToast(progress >= target ? "모든 주문을 완료했어요!" : `주문 ${Math.min(progress, target)}/${target} 완료!`);
+      } else {
+        const collectedEvents = terrainEvents.filter((event) =>
+          event.kind === "coloredPlateCollected" || event.kind === "colored-plate-collected"
+        );
+        if (collectedEvents.length) {
+          const event = collectedEvents.at(-1);
+          const type = event.color || event.cakeType || event.plateColor || event.type;
+          const cake = CAKES[type];
+          const target = coloredPlateGoalEntries().find(([goalType]) => goalType === type)?.[1] || Number(event.target) || 1;
+          const progress = Math.min(target, Math.max(1,
+            Number(event.progress) || collectedColoredPlateCount(type, nextRuntime)
+          ));
+          const allCollected = coloredPlateGoalEntries().every(([goalType, goalTarget]) =>
+            collectedColoredPlateCount(goalType, nextRuntime) >= goalTarget
+          );
+          playTone(allCollected ? 880 : 720, .12, "sine");
+          if (collectedEvents.length > 1) {
+            showToast(`색깔 접시 ${collectedEvents.length}개 수집!`);
+          } else if (cake) {
+            showToast(allCollected ? "색깔 접시 목표를 완료했어요!" : `${cake.name} 접시 ${progress}/${target} 수집!`);
+          } else {
+            showToast("색깔 접시를 수집했어요!");
+          }
+        }
       }
       await wait(reducedMotion() ? 0 : 360);
       if (activeSession !== sessionId) return false;
