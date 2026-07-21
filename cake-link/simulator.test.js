@@ -12,9 +12,7 @@ function assertAggregate(result, expectedRuns) {
   assert.ok(result.lockedRate >= 0 && result.lockedRate <= 1);
   assert.ok(result.limitRate >= 0 && result.limitRate <= 1);
   assert.ok(result.averageProgress >= 0 && result.averageProgress <= 1);
-  assert.ok(Number.isFinite(result.averageSwapsUsed));
-  assert.ok(result.averageSwapsUsed >= 0);
-  assert.ok(result.averageSwapsUsed <= 3);
+  assert.equal(Object.hasOwn(result, "averageSwapsUsed"), false);
   if (result.averageClearMoves !== null) assert.ok(Number.isFinite(result.averageClearMoves));
   if (result.medianClearMoves !== null) assert.ok(Number.isFinite(result.medianClearMoves));
 }
@@ -24,8 +22,7 @@ function assertRun(result, stage) {
   assert.ok(Number.isInteger(result.movesUsed));
   assert.ok(result.movesUsed >= 0 && result.movesUsed <= stage.moveLimit);
   assert.ok(result.progress >= 0 && result.progress <= 1);
-  assert.ok(Number.isInteger(result.swapsUsed));
-  assert.ok(result.swapsUsed >= 0 && result.swapsUsed <= stage.swaps);
+  assert.equal(Object.hasOwn(result, "swapsUsed"), false);
 }
 
 assert.deepEqual(Simulator.PLAYER_STYLE_IDS, STYLE_IDS);
@@ -122,6 +119,22 @@ Simulator.simulateStage(mutableStage, {
   skill: "novice",
 });
 assert.equal(JSON.stringify(mutableStage), stageSnapshot);
+
+// Swap-ticket settings belong to the real game and must not affect simulations.
+const noSwapStage = JSON.parse(JSON.stringify(Stages.getStage(5)));
+const manySwapStage = JSON.parse(JSON.stringify(noSwapStage));
+noSwapStage.swaps = 0;
+manySwapStage.swaps = 999;
+const swapIndependentOptions = {
+  runs: 12,
+  seed: 0x51A9,
+  style: "goal",
+  skill: "standard",
+};
+assert.deepEqual(
+  Simulator.simulateStage(noSwapStage, swapIndependentOptions),
+  Simulator.simulateStage(manySwapStage, swapIndependentOptions),
+);
 
 // The comparison run count is a total budget shared as evenly as possible.
 const comparisonOptions = {

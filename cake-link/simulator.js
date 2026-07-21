@@ -294,31 +294,6 @@
     return ranked[Math.min(rank, ranked.length - 1)].candidate;
   }
 
-  function shouldSwapLastPlate(candidates, stage, board, style, skill, random) {
-    if (!candidates.length) return false;
-    const best = [...candidates].sort((a, b) =>
-      scoreCandidate(b, style) - scoreCandidate(a, style) ||
-      a.cellIndex - b.cellIndex
-    )[0];
-    const freeBefore = playableIndexes(stage).filter((index) => !board[index]).length;
-    let poorFit = false;
-    if (style === "goal") {
-      poorFit = best.progressGain <= 0 && best.visible.goalPieces === 0;
-    } else if (style === "space") {
-      poorFit = best.result.emptied.length === 0 &&
-        best.boardMetrics.free < freeBefore &&
-        best.visible.matchingPieces === 0;
-    } else if (style === "instinct") {
-      poorFit = best.visible.matchingPieces === 0 && best.visible.goalCompletionPotential === 0;
-    } else {
-      poorFit = best.progressGain <= 0 &&
-        best.visible.matchingPieces === 0 &&
-        best.visible.goalPieces === 0;
-    }
-    if (!poorFit || skill === "expert") return poorFit;
-    return random() < (skill === "standard" ? .68 : .34);
-  }
-
   function simulateRun(stage, options = {}) {
     const style = normalizeStyle(options.style);
     const skill = normalizeSkill(options.skill);
@@ -332,11 +307,6 @@
     let rack = [];
     let completed = {};
     let moves = 0;
-    const configuredSwaps = Number(stage.swaps);
-    let swapsRemaining = Number.isFinite(configuredSwaps)
-      ? Math.max(0, Math.floor(configuredSwaps))
-      : 0;
-    let swapsUsed = 0;
     const supplyTrace = options.traceSupply ? [] : null;
 
     function finish(result) {
@@ -344,7 +314,6 @@
         ...result,
         style,
         skill,
-        swapsUsed,
         ...(supplyTrace ? { supplyTrace } : {}),
       };
     }
@@ -389,18 +358,6 @@
         return finish({ outcome: "locked", movesUsed: moves, completed, progress: goalProgress(stage, completed) });
       }
 
-      const remainingRackIndexes = rack.flatMap((plate, index) => plate ? [index] : []);
-      if (swapsRemaining > 0 && remainingRackIndexes.length === 1) {
-        const rackIndex = remainingRackIndexes[0];
-        const rackCandidates = candidates.filter((candidate) => candidate.rackIndex === rackIndex);
-        if (shouldSwapLastPlate(rackCandidates, stage, board, style, skill, decisionRandom)) {
-          rack[rackIndex] = generatedPlate();
-          swapsRemaining -= 1;
-          swapsUsed += 1;
-          continue;
-        }
-      }
-
       const chosen = chooseCandidate(candidates, { style, skill }, decisionRandom);
       board = chosen.result.board;
       completed = chosen.completed;
@@ -433,7 +390,6 @@
     const outcomes = { clear: 0, limit: 0, locked: 0 };
     const clearMoves = [];
     let totalProgress = 0;
-    let totalSwapsUsed = 0;
 
     for (let run = 0; run < runs; run += 1) {
       const result = simulateRun(stage, {
@@ -443,7 +399,6 @@
       });
       outcomes[result.outcome] += 1;
       totalProgress += result.progress;
-      totalSwapsUsed += result.swapsUsed;
       if (result.outcome === "clear") clearMoves.push(result.movesUsed);
     }
 
@@ -458,7 +413,6 @@
       lockedRate: outcomes.locked / runs,
       limitRate: outcomes.limit / runs,
       averageProgress: totalProgress / runs,
-      averageSwapsUsed: totalSwapsUsed / runs,
       averageClearMoves: clearMoves.length
         ? clearMoves.reduce((sum, value) => sum + value, 0) / clearMoves.length
         : null,
