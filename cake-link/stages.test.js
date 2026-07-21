@@ -29,7 +29,9 @@ function sum(values) {
 }
 
 function modifierCount(modifier = {}) {
-  return (modifier.hiddenColors?.length || 0) + Number(modifier.rainbow || 0);
+  // Mystery slices are additional hidden pieces. Rainbow modifiers replace
+  // existing normal slices, so they do not increase the rack plate total.
+  return modifier.hiddenColors?.length || 0;
 }
 
 function assertPieceMap(stage, pieces, label, capacity = Stages.stageCapacity(stage), extra = 0) {
@@ -121,30 +123,71 @@ for (const [position, stage] of stages.entries()) {
 assert.equal(Stages.getStage(17).nextStageId, null);
 assert.equal(Stages.totalGoalCount(Stages.getStage(10)), 3);
 assert.equal(Stages.totalGoalCount(Stages.getStage(14)), 7);
+assert.equal(Stages.totalGoalCount(Stages.getStage(16)), 3);
 assert.equal(Stages.isComplete(Stages.getStage(10), { frogReached: true }), false);
 assert.equal(Stages.isComplete(Stages.getStage(10), { frogReached: true, berry: 2 }), true);
 assert.equal(Stages.isComplete(Stages.getStage(14), { orderIndex: 6 }), false);
 assert.equal(Stages.isComplete(Stages.getStage(14), { orderIndex: 7 }), true);
+assert.equal(Stages.isComplete(Stages.getStage(16), { fragileBrokenCount: 2 }), false);
+assert.equal(Stages.isComplete(Stages.getStage(16), { fragileBrokenCount: 3 }), true);
 
 const colored = Stages.getStage(8).initialPlates.filter((plate) => plate.kind === "colored");
 assert.equal(colored.length, 2);
 colored.forEach((plate) => {
-  assert.equal(plate.receiveOnly, undefined);
+  assert.equal(plate.collectorOnly, true);
+  assert.equal(plate.receiveOnly, true);
   assert.deepEqual(Object.keys(plate.pieces), [plate.allowedColor]);
 });
 assert.deepEqual(Stages.getStage(9).mechanics.iceCells.map((cell) => cell.index), [5, 10]);
-assert.deepEqual(Stages.getStage(10).mechanics.frog, { id: "main", startIndex: 0, goalIndex: 15, tieOrder: "URDL" });
+for (const iceIndex of [5, 10]) {
+  const frozenPlate = Stages.getStage(9).initialPlates.find((plate) => plate.index === iceIndex);
+  assert.ok(frozenPlate, `얼음 ${iceIndex}번 칸 안에는 시작 판이 보여야 한다`);
+  assert.ok(sum(frozenPlate.pieces) > 0, `얼음 ${iceIndex}번 칸 안에는 시작 조각이 있어야 한다`);
+}
+assert.deepEqual(Stages.getStage(10).mechanics.frog, {
+  id: "main",
+  startIndex: 0,
+  goalIndex: 15,
+  tieOrder: "URDL",
+  vanishOnGoal: true,
+});
 assert.equal(Stages.getStage(12).rules.capacity, 8);
 assert.equal(Stages.getStage(13).mechanics.locks.length, 4);
+assert.deepEqual(
+  Stages.getStage(13).mechanics.locks.map(({ keyId, color, count }) => ({ keyId, color, count })),
+  [
+    { keyId: "berry-key-1", color: "berry", count: 1 },
+    { keyId: "berry-key-2", color: "berry", count: 2 },
+    { keyId: "lemon-key-1", color: "lemon", count: 1 },
+    { keyId: "lemon-key-2", color: "lemon", count: 2 },
+  ],
+);
 assert.deepEqual(Stages.getStage(14).mechanics.orderedGoal.sequence, ["berry", "lemon", "matcha", "berry", "lemon", "matcha", "berry"]);
-assert.equal(Stages.getStage(16).mechanics.fragileCells.length, 4);
+assert.deepEqual(Stages.getStage(16).goals, {});
+assert.deepEqual(Stages.getStage(16).objective, { type: "fragile", target: 3 });
+assert.equal(Stages.getStage(16).gimmick.label, "깨지는 판");
+assert.equal(Stages.getStage(16).mechanics.fragileCells.length, 3);
 assert.equal(Stages.getStage(17).initialPlates.filter((plate) => plate.kind === "layered").length, 2);
 
 const explicitMystery = Stages.createPlateData({ berry: 2 }, { hiddenColors: ["lemon"] });
 assert.deepEqual(explicitMystery.pieces, { berry: 2, mystery: 1 });
 assert.deepEqual(explicitMystery.hiddenColors, ["lemon"]);
 const explicitRainbow = Stages.createPlateData({ berry: 4 }, { rainbow: 2 });
-assert.deepEqual(explicitRainbow.pieces, { berry: 4, rainbow: 2 });
+assert.deepEqual(explicitRainbow.pieces, { berry: 2, rainbow: 2 });
+assert.throws(
+  () => Stages.createPlateData({ berry: 1 }, { rainbow: 2 }),
+  /무지개 교체 수 2개가 일반 조각 1개보다 많습니다/,
+);
+const embeddedRainbow = Stages.createPlateData({ pieces: { berry: 4, rainbow: 2 } });
+assert.deepEqual(embeddedRainbow.pieces, { berry: 4, rainbow: 2 });
+const sourceLevelRainbow = Stages.createPlateData({ pieces: { berry: 4 }, rainbow: 2 });
+assert.deepEqual(sourceLevelRainbow.pieces, { berry: 2, rainbow: 2 });
+const deterministicRainbow = Stages.createPlateData(
+  { berry: 2, lemon: 2 },
+  { rainbow: 2 },
+  () => 0,
+);
+assert.deepEqual(deterministicRainbow.pieces, { lemon: 2, rainbow: 2 });
 const stageCapacityPlate = Stages.createPlateData(Stages.getStage(12), { berry: 4 });
 assert.equal(stageCapacityPlate.capacity, 8);
 const openingMystery = Stages.createPlateData(
@@ -154,5 +197,18 @@ const openingMystery = Stages.createPlateData(
 );
 assert.deepEqual(openingMystery.pieces, { berry: 2, mystery: 1 });
 assert.deepEqual(openingMystery.hiddenColors, ["berry"]);
+const openingRainbow = Stages.getStage(15).openingRack.map((pieces, index) =>
+  Stages.createPlateData(
+    Stages.getStage(15),
+    pieces,
+    Stages.getStage(15).openingModifiers[index],
+    () => 0,
+  ).pieces
+);
+assert.deepEqual(openingRainbow, [
+  { berry: 4, rainbow: 2 },
+  { lemon: 5, rainbow: 1 },
+  { matcha: 4, rainbow: 1 },
+]);
 
 console.log("Cake Link stage tests passed");

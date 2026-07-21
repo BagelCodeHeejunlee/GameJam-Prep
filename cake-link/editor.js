@@ -124,6 +124,9 @@
   function stageGoalSummary(data) {
     if (data.objective?.type === "frog") return `${sum(data.goals)}판 + 개구리`;
     if (data.objective?.type === "ordered") return `${data.mechanics?.orderedGoal?.sequence?.length || 0}단계`;
+    if (["fragile", "breakPlates"].includes(data.objective?.type)) {
+      return `깨지는 판 ${data.mechanics?.fragileGoal?.target || data.objective?.target || 0}개`;
+    }
     return `${sum(data.goals)}판`;
   }
 
@@ -132,7 +135,9 @@
   }
 
   function specialPieceCount(modifier = {}) {
-    return (modifier.hiddenColors?.length || 0) + Number(modifier.rainbow || 0);
+    // Mystery pieces are additional hidden slices in the current data model.
+    // Rainbow modifiers replace normal slices and therefore add no capacity.
+    return modifier.hiddenColors?.length || 0;
   }
 
   function playableCount(data = stage()) {
@@ -149,7 +154,7 @@
     if (initial?.kind === "layered" || initial?.layers?.length) return { icon: "Ⅱ", label: "이층 케이크" };
     if (data.mechanics?.iceCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "❄", label: "얼음 판" };
     if (data.mechanics?.locks?.some((lock) => Number(lock.index) === index)) return { icon: "🔒", label: "잠긴 칸" };
-    if (data.mechanics?.fragileCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "◇", label: "깨지는 받침대" };
+    if (data.mechanics?.fragileCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "💥", label: "깨지는 판" };
     if (Number(data.mechanics?.frog?.startIndex) === index) return { icon: "🐸", label: "개구리 시작" };
     if (Number(data.mechanics?.frog?.goalIndex) === index) return { icon: "🏁", label: "개구리 목표" };
     return null;
@@ -224,6 +229,9 @@
       if (initial.allowedColor && Object.keys(initial.pieces || {}).some((color) => color !== initial.allowedColor)) {
         errors.push(`${initial.index}번 색깔 접시에 다른 색 조각이 있습니다.`);
       }
+      if (initial.kind === "colored" && (!initial.collectorOnly || !initial.receiveOnly)) {
+        errors.push(`${initial.index}번 색깔 접시는 고정 수집·받기 전용이어야 합니다.`);
+      }
       for (const layer of initial.layers || []) {
         if (sum(layer.pieces) > (layer.capacity || plateCapacity)) errors.push(`${initial.index}번 아래층이 용량을 넘습니다.`);
         for (const color of Object.keys(layer.pieces || {})) {
@@ -240,6 +248,10 @@
       }
       for (const color of modifier.hiddenColors || []) {
         if (!data.colors.includes(color)) errors.push(`첫 하단 ${index + 1}번 미스테리 실제 색이 등장 색에 없습니다.`);
+      }
+      const rainbowCount = Math.max(0, Math.floor(Number(modifier.rainbow) || 0));
+      if (rainbowCount > sum(plate)) {
+        errors.push(`첫 하단 ${index + 1}번 무지개 교체 수가 기존 조각 수를 넘습니다.`);
       }
     }
     if (data.openingRack?.length !== 3) errors.push("첫 하단 판은 정확히 3개여야 합니다.");
@@ -267,7 +279,19 @@
       const row = Math.floor(cell.index / 4);
       const column = cell.index % 4;
       if (!Number.isInteger(cell.index) || data.boardMask[row]?.[column] !== "1") errors.push(`${cell.type} 칸 위치가 보드 밖이거나 막혀 있습니다.`);
-      if (initialIndexes.has(cell.index)) errors.push(`${cell.index}번 칸에 시작 판과 ${cell.type} 기믹이 겹칩니다.`);
+      // 얼음은 시작 판과 조각을 안에 가둬 보여주는 기믹이므로 겹침을
+      // 허용한다. 잠긴 칸은 열리기 전까지 판 자체가 없어야 한다.
+      if (cell.type === "잠금" && initialIndexes.has(cell.index)) {
+        errors.push(`${cell.index}번 칸에 시작 판과 ${cell.type} 기믹이 겹칩니다.`);
+      }
+    }
+    const initialByIndex = new Map((data.initialPlates || []).map((initial) => [initial.index, initial]));
+    for (const entry of data.mechanics?.iceCells || []) {
+      const index = Number.isInteger(entry) ? entry : Number(entry?.index);
+      const initial = initialByIndex.get(index);
+      if (!initial || sum(initial.pieces) <= 0) {
+        errors.push(`${index}번 얼음 안에는 조각이 있는 시작 판이 필요합니다.`);
+      }
     }
     const frog = data.mechanics?.frog;
     if (frog) {
@@ -275,7 +299,7 @@
         const row = Math.floor(index / 4);
         const column = index % 4;
         if (!Number.isInteger(index) || data.boardMask[row]?.[column] !== "1") errors.push(`개구리 ${label} 칸이 보드 밖이거나 막혀 있습니다.`);
-        if (initialIndexes.has(index)) errors.push(`개구리 ${label} 칸에 시작 판이 있습니다.`);
+        if (label === "시작" && initialIndexes.has(index)) errors.push(`개구리 ${label} 칸에 시작 판이 있습니다.`);
       }
       if (frog.startIndex === frog.goalIndex) errors.push("개구리 시작과 목표 칸은 달라야 합니다.");
     }
@@ -283,6 +307,17 @@
     if (data.gimmick?.id === "ordered" && (!Array.isArray(sequence) || !sequence.length)) errors.push("순서 목표 색 목록이 필요합니다.");
     for (const color of sequence || []) {
       if (!data.colors.includes(color)) errors.push(`순서 목표에 미등장 색 ${color}가 있습니다.`);
+    }
+    if (data.objective?.type === "fragile") {
+      const target = Math.floor(Number(data.objective.target) || 0);
+      const fragileCount = (data.mechanics?.fragileCells || []).length;
+      if (target < 1) errors.push("깨지는 판 목표는 1개 이상이어야 합니다.");
+      if (target > fragileCount) errors.push("깨지는 판 목표가 지정된 깨지는 판 수보다 많습니다.");
+    }
+    for (const lock of data.mechanics?.locks || []) {
+      if (!Number.isInteger(Number(lock.count)) || Number(lock.count) < 1) {
+        errors.push(`${lock.index}번 잠금의 필요 완성 횟수는 1 이상의 정수여야 합니다.`);
+      }
     }
     return errors;
   }
@@ -517,15 +552,15 @@
     const id = data.gimmick?.id;
     if (!id) return "기본 정렬 규칙만 사용하는 스테이지입니다.";
     const descriptions = {
-      colored: "지정된 색의 조각만 올라갈 수 있는 색깔 접시가 배치되어 있습니다.",
-      ice: `얼음 칸 ${(data.mechanics?.iceCells || []).length}개가 인접 판 제거 후 열립니다.`,
-      frog: `개구리가 ${data.mechanics?.frog?.startIndex ?? "?"}번에서 ${data.mechanics?.frog?.goalIndex ?? "?"}번 칸으로 이동합니다.`,
+      colored: "옆에 새로 놓은 판에서 지정 색을 먼저 가져가며, 완성 전에는 내보내지 않는 고정 수집 접시입니다.",
+      ice: `얼음 속 시작 판 ${(data.mechanics?.iceCells || []).length}개가 보이며, 인접 판 제거 후 사용할 수 있습니다.`,
+      frog: `개구리가 ${data.mechanics?.frog?.startIndex ?? "?"}번에서 ${data.mechanics?.frog?.goalIndex ?? "?"}번 칸으로 이동한 뒤 사라집니다. 개구리가 없는 목표 칸에는 판을 놓을 수 있습니다.`,
       mystery: `생성 판의 ${data.mechanics?.mystery?.plateChance || 0}%에 미스테리 조각이 들어갈 수 있습니다.`,
       capacity8: "같은 색 조각 8개를 모아야 한 판이 완성됩니다.",
-      locks: `완성 색 조건으로 잠긴 칸 ${(data.mechanics?.locks || []).length}개를 엽니다.`,
+      locks: `색깔별 완성 횟수에 따라 잠긴 칸 ${(data.mechanics?.locks || []).length}개를 단계적으로 엽니다.`,
       ordered: `지정된 ${(data.mechanics?.orderedGoal?.sequence || []).length}개 색 순서대로 완성합니다.`,
-      rainbow: `생성 판의 ${data.mechanics?.rainbow?.plateChance || 0}%에 자동 완성용 무지개 조각이 들어갈 수 있습니다.`,
-      fragile: `완성 후 사라지는 받침대 ${(data.mechanics?.fragileCells || []).length}개가 있습니다.`,
+      rainbow: `생성 판의 ${data.mechanics?.rainbow?.plateChance || 0}%에서 기존 조각 1~2개가 자동 완성용 무지개 조각으로 바뀝니다.`,
+      fragile: `완성하면 판 자체가 깨지는 위치 ${(data.mechanics?.fragileCells || []).length}개가 있습니다. 목표는 ${data.mechanics?.fragileGoal?.target || data.objective?.target || 0}개 깨기입니다.`,
       layered: `위층을 먼저 완성해야 아래층을 사용할 수 있는 판 ${data.initialPlates.filter((plate) => plate.layers?.length).length}개가 있습니다.`,
     };
     return descriptions[id] || "JSON에 설정된 스테이지 기믹을 사용합니다.";

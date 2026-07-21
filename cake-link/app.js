@@ -16,6 +16,7 @@
   };
   const PIECE_ORDER = [...Engine.CAKE_ORDER, "rainbow"];
   const EMPTY_COLOR = "#eee4d6";
+  const RAINBOW_COLORS = ["#ef6678", "#f59d51", "#f4d45d", "#74bd74", "#61aade", "#9577d5"];
   const BEST_KEY = "cakeLink.v1.bestScore";
   const STAGE_KEY = "cakeLink.v1.currentStage";
   const MAX_VISIBLE_ROUTE_CELLS = 5;
@@ -136,8 +137,27 @@
     const angle = 360 / Math.max(1, slots.length);
     return `conic-gradient(from ${-angle / 2}deg, ${slots.map((type, index) => {
       const start = index * angle;
+      if (type === "rainbow") {
+        const stripeAngle = angle / RAINBOW_COLORS.length;
+        return RAINBOW_COLORS.map((color, stripeIndex) => {
+          const stripeStart = start + stripeIndex * stripeAngle;
+          const stripeEnd = stripeStart + stripeAngle;
+          return `${color} ${stripeStart}deg ${stripeEnd}deg`;
+        }).join(", ");
+      }
       return `${type ? CAKES[type]?.color || EMPTY_COLOR : EMPTY_COLOR} ${start}deg ${start + angle}deg`;
     }).join(", ")})`;
+  }
+
+  function sliceMarks(slots) {
+    const angle = 360 / Math.max(1, slots.length);
+    return slots.map((type, index) => {
+      if (type !== "mystery") return "";
+      const radians = (index * angle * Math.PI) / 180;
+      const x = 50 + Math.sin(radians) * 31;
+      const y = 50 - Math.cos(radians) * 31;
+      return `<span class="mystery-slice-mark" style="--mark-x:${x.toFixed(3)}%;--mark-y:${y.toFixed(3)}%">?</span>`;
+    }).join("");
   }
 
   function singlePlateMarkup(plateData, rotation = 0, className = "", active = true) {
@@ -150,24 +170,26 @@
     const capacity = Engine.capacityOf ? Engine.capacityOf(plateData) : Engine.PLATE_CAPACITY;
     const emptyClass = Engine.totalPieces(plateData) ? "" : " empty-plate";
     const colorClass = plateData?.allowedColor ? " color-plate" : "";
+    const collectorClass = plateData?.collectorOnly ? " collector-plate" : "";
     const accent = plateData?.allowedColor ? CAKES[plateData.allowedColor]?.color : null;
     const mysteryCount = plateData?.hiddenColors?.length || 0;
-    return `<div class="cake-plate${emptyClass}${colorClass}${className ? ` ${className}` : ""}"${accent ? ` style="--plate-accent:${accent}"` : ""} aria-hidden="true">
-      <div class="cake-wheel" data-capacity="${capacity}" data-active-layer="${active}" style="--cake-gradient:${gradient};--wheel-rotation:${rotation}deg;--slice-angle:${360 / capacity}deg"></div>
+    return `<div class="cake-plate${emptyClass}${colorClass}${collectorClass}${className ? ` ${className}` : ""}"${accent ? ` style="--plate-accent:${accent}"` : ""} aria-hidden="true">
+      <div class="cake-wheel" data-capacity="${capacity}" data-active-layer="${active}" style="--cake-gradient:${gradient};--wheel-rotation:${rotation}deg;--slice-angle:${360 / capacity}deg">${sliceMarks(slots)}</div>
       <div class="plate-counts">${counts}</div>
       ${plateData?.allowedColor ? `<span class="plate-color-badge">${CAKES[plateData.allowedColor]?.emoji || "●"}</span>` : ""}
+      ${plateData?.collectorOnly ? `<span class="collector-badge" title="인접한 판에서 같은 색 조각을 모아요">⇣</span>` : ""}
       ${capacity === 8 ? `<span class="capacity-badge">8</span>` : ""}
       ${mysteryCount ? `<span class="mystery-count">?${mysteryCount}</span>` : ""}
       ${plateData?.pieces?.rainbow ? `<span class="rainbow-count">🌈${plateData.pieces.rainbow}</span>` : ""}
     </div>`;
   }
 
-  function plateMarkup(plateData, rotation = 0) {
+  function plateMarkup(plateData, rotation = 0, className = "") {
     if (plateData?.layers?.length) {
       const lower = { ...plateData.layers[0], id: plateData.id };
-      return `<div class="layered-cake-plate">${singlePlateMarkup(lower, rotation, "layer-bottom", false)}${singlePlateMarkup(plateData, rotation, "layer-top", true)}</div>`;
+      return `<div class="layered-cake-plate${className ? ` ${className}` : ""}">${singlePlateMarkup(lower, rotation, "layer-bottom", false)}${singlePlateMarkup(plateData, rotation, "layer-top", true)}</div>`;
     }
-    return singlePlateMarkup(plateData, rotation);
+    return singlePlateMarkup(plateData, rotation, className);
   }
 
   function plateLabel(plateData) {
@@ -175,8 +197,14 @@
       .filter(([type, count]) => type !== "mystery" && count > 0)
       .map(([type, count]) => `${CAKES[type]?.name || type} ${count}개`);
     if (plateData.hiddenColors?.length) visible.push(`미스테리 ${plateData.hiddenColors.length}개`);
-    if (plateData.allowedColor) visible.push(`${CAKES[plateData.allowedColor]?.name || plateData.allowedColor} 전용 접시`);
-    if (plateData.receiveOnly) visible.push("받기 전용");
+    if (plateData.collectorOnly) {
+      const colorName = CAKES[plateData.allowedColor]?.name || plateData.allowedColor || "지정 색깔";
+      visible.push(`${colorName} 고정 수집 접시`);
+      visible.push(`인접하게 놓은 판의 ${colorName} 조각만 가져오며 조각을 내보내지 않음`);
+    } else {
+      if (plateData.allowedColor) visible.push(`${CAKES[plateData.allowedColor]?.name || plateData.allowedColor} 전용 접시`);
+      if (plateData.receiveOnly) visible.push("받기 전용");
+    }
     if ((Engine.capacityOf?.(plateData) || Engine.PLATE_CAPACITY) === 8) visible.push("8조각 완성 판");
     if (plateData.layers?.length) visible.push("이층 케이크");
     return visible.join(", ");
@@ -211,10 +239,14 @@
       }
       const iceLocked = runtimeHas(state.mechanics.iceCells, index);
       const keyLocked = runtimeHas(state.mechanics.lockedCells, index);
-      const collapsed = runtimeHas(state.mechanics.brokenCells, index);
+      const fragileConfigured = configHasIndex(currentStage.mechanics?.fragileCells, index);
+      const fragileConsumed = fragileConfigured && runtimeHas(state.mechanics.brokenCells, index);
+      const collapsed = !fragileConfigured && runtimeHas(state.mechanics.brokenCells, index);
       const hasFrog = state.mechanics.frogIndex === index;
-      const frogGoal = currentStage.mechanics?.frog?.goalIndex === index;
-      const fragile = configHasIndex(currentStage.mechanics?.fragileCells, index) && !collapsed;
+      const frogIsActive = Number.isInteger(state.mechanics.frogIndex) && !state.mechanics.frogReached;
+      const frogGoal = frogIsActive && currentStage.mechanics?.frog?.goalIndex === index;
+      const fragile = fragileConfigured && !fragileConsumed;
+      const collector = Boolean(plateData?.collectorOnly);
       const dropAllowed = !plateData && Mechanics.isCellAvailable(currentStage, state.mechanics, index, state.board);
       const classes = ["cell", plateData ? "occupied" : "empty"];
       if (state.activeCells.has(index)) classes.push("active");
@@ -226,28 +258,35 @@
       if (collapsed) classes.push("collapsed");
       if (fragile) classes.push("fragile");
       if (hasFrog) classes.push("frog-cell");
+      if (frogGoal) classes.push("frog-goal-cell");
+      if (collector) classes.push("collector-cell");
       const effectClass = state.effectCells.get(index);
       if (effectClass) classes.push(effectClass);
       const lock = currentStage.mechanics?.locks?.find((item) =>
         item.index === index || item.indexes?.includes(index)
       );
       const keyColor = lock?.keyColor || lock?.color || lock?.trigger?.color;
+      const lockCount = Math.max(1, Math.floor(Number(lock?.count || lock?.required || lock?.tier) || 1));
+      const keyId = lock?.keyId || `${lock?.color || "any"}:${lockCount}`;
+      const lockProgress = Math.min(lockCount, Math.max(0, Number(state.mechanics.keyProgress?.[keyId]) || 0));
+      const lockCountLabel = lockCount > 1 ? `<b class="lock-count-badge">${lockProgress}/${lockCount}</b>` : "";
       const reason = iceLocked ? "얼음을 먼저 깨야 해요"
-        : keyLocked ? "열쇠 조건을 먼저 완료해야 해요"
+        : keyLocked ? (lockCount > 1 ? `열쇠 조건 ${lockProgress}/${lockCount} 완료` : "열쇠 조건을 먼저 완료해야 해요")
           : collapsed ? "깨진 받침대는 사용할 수 없어요"
             : hasFrog ? "개구리가 있는 칸이에요"
-              : frogGoal ? "개구리 목표 칸이에요"
-                : plateData ? "이미 접시가 있어요" : "";
-      const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}`
-        : `${row}행 ${col}열, ${reason || "빈칸"}`;
+              : plateData ? "이미 접시가 있어요" : "";
+      const goalDescription = frogGoal ? ", 개구리 목표 칸" : "";
+      const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}${fragile ? ", 완성하면 접시가 깨져 목표에 집계" : ""}${iceLocked ? ", 반투명 얼음 안에 갇혀 있어 현재 사용할 수 없음" : ""}${goalDescription}`
+        : `${row}행 ${col}열, ${reason || `빈칸${goalDescription}${frogGoal ? ", 판을 놓을 수 있음" : ""}`}`;
       const fixtures = [
-        fragile ? `<span class="cell-fixture fragile-cracks" aria-hidden="true"></span>` : "",
+        fragile && plateData ? `<span class="fragile-plate-cracks" aria-hidden="true"></span>` : "",
+        effectClass === "crumbling" ? `<span class="plate-break-burst" aria-hidden="true"><i></i><i></i><i></i><i></i></span>` : "",
         frogGoal ? `<span class="frog-goal" aria-hidden="true"></span>` : "",
         iceLocked ? `<span class="cell-fixture ice-cover" aria-hidden="true"></span>` : "",
-        keyLocked ? `<span class="cell-fixture lock-cover" aria-hidden="true">${keyColor ? `<i class="lock-key-dot" style="--key-color:${CAKES[keyColor]?.color || "#999"}"></i>` : ""}</span>` : "",
+        keyLocked ? `<span class="cell-fixture lock-cover" aria-hidden="true">${keyColor ? `<i class="lock-key-dot" style="--key-color:${CAKES[keyColor]?.color || "#999"}"></i>` : ""}${lockCountLabel}</span>` : "",
         hasFrog ? `<span class="frog-token" aria-hidden="true"></span>` : "",
       ].join("");
-      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" data-drop-allowed="${dropAllowed}" data-block-reason="${reason}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}${fixtures}</div>`;
+      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" data-drop-allowed="${dropAllowed}" data-block-reason="${reason}" aria-label="${label}">${plateData ? plateMarkup(plateData, 0, fragile ? "fragile-plate" : "") : ""}${fixtures}</div>`;
     }).join("");
   }
 
@@ -273,11 +312,17 @@
         return `${index ? `<i class="sequence-arrow">›</i>` : ""}<span class="sequence-chip${className}">${CAKES[type]?.emoji || "?"}</span>`;
       }).join("")}${sequence.length > visible.length ? `<b>+${sequence.length - visible.length}</b>` : ""}</span>`;
     }
-    const chips = Stages.goalEntries(currentStage).map(([type, target]) => {
+    const chips = Stages.goalEntries(currentStage).filter(([type]) => CAKES[type]).map(([type, target]) => {
       const completed = Math.min(state?.completedByType[type] || 0, target);
       const count = showProgress ? `${completed}/${target}` : `${target}판`;
       return `<span class="goal-chip" title="${CAKES[type].name} 케이크 ${target}판"><span aria-hidden="true">${CAKES[type].emoji}</span><b>${count}</b></span>`;
     });
+    if (currentStage.objective?.type === "fragile") {
+      const target = Math.max(1, Math.floor(Number(currentStage.objective.target) || 1));
+      const completed = Math.min(target, Math.max(0, Number(state?.mechanics?.fragileBrokenCount) || 0));
+      const count = showProgress ? `${completed}/${target}` : `${target}개`;
+      chips.push(`<span class="goal-chip fragile-goal-chip" title="접시 ${target}개 깨기"><span class="broken-plate-goal-icon" aria-hidden="true"></span><b>${count}</b></span>`);
+    }
     if (currentStage.mechanics?.frog) {
       const reached = Boolean(state?.mechanics?.frogReached);
       const distance = state ? Mechanics.frogDistance(currentStage, state.mechanics, state.board) : null;
@@ -325,6 +370,7 @@
       startY: event.clientY,
       moved: false,
       targetCell: null,
+      collectorPreviewCell: null,
     };
     card.setPointerCapture?.(event.pointerId);
     card.classList.add("dragging");
@@ -346,8 +392,9 @@
     const candidate = hoveredCell?.dataset.dropAllowed === "true" ? hoveredCell : null;
     dragGesture.targetCell = candidate ? Number(candidate.dataset.cell) : null;
     candidate?.classList.add("drop-target");
+    const collectorSummary = updateCollectorPreview(dragGesture.targetCell);
     elements.hint.textContent = candidate
-      ? "여기에 놓을까요?"
+      ? collectorSummary || "여기에 놓을까요?"
       : hoveredCell?.dataset.blockReason || "판을 빈칸 위까지 끌어주세요";
   }
 
@@ -373,6 +420,7 @@
 
   function clearDrag() {
     if (!dragGesture) return;
+    clearCollectorPreview();
     document.querySelector(".cell.drop-target")?.classList.remove("drop-target");
     dragGesture.card.classList.remove("dragging");
     dragGesture.ghost.remove();
@@ -380,6 +428,93 @@
     document.body.classList.remove("is-dragging");
     elements.board.classList.remove("ready");
     elements.hint.textContent = "판을 위로 끌어 빈칸에 놓으세요";
+  }
+
+  function collectorPullPreview(centerIndex) {
+    if (!Number.isInteger(centerIndex) || !dragGesture) return [];
+    const source = state.rack[dragGesture.rackIndex];
+    if (!source || source.receiveOnly) return [];
+    const neighborOrder = Engine.getNeighbors(centerIndex);
+    const byType = new Map();
+    neighborOrder.forEach((index, directionOrder) => {
+      const collector = state.board[index];
+      const type = collector?.allowedColor;
+      if (
+        !collector?.collectorOnly || collector.kind !== "colored" || !type ||
+        runtimeHas(state.mechanics.iceCells, index) || Engine.isFrozen?.(collector) ||
+        !(source.pieces?.[type] > 0)
+      ) return;
+      const free = Math.max(0, (Engine.capacityOf?.(collector) || Engine.PLATE_CAPACITY) - Engine.totalPieces(collector));
+      if (!free) return;
+      if (!byType.has(type)) byType.set(type, []);
+      byType.get(type).push({ index, type, free, deficit: free, directionOrder });
+    });
+
+    const previews = [];
+    for (const [type, collectors] of byType) {
+      let remaining = source.pieces[type] || 0;
+      collectors.sort((first, second) =>
+        first.deficit - second.deficit || first.directionOrder - second.directionOrder
+      );
+      for (const collector of collectors) {
+        if (remaining <= 0) break;
+        const count = Math.min(remaining, collector.free);
+        if (count <= 0) continue;
+        previews.push({ index: collector.index, type, count });
+        remaining -= count;
+      }
+    }
+    return previews;
+  }
+
+  function clearCollectorPreview() {
+    document.querySelectorAll(".cell.collector-preview-target").forEach((cell) => {
+      cell.classList.remove("collector-preview-target");
+      cell.style.removeProperty("--collector-preview-color");
+      if (cell.dataset.baseAriaLabel) {
+        cell.setAttribute("aria-label", cell.dataset.baseAriaLabel);
+        delete cell.dataset.baseAriaLabel;
+      }
+    });
+    document.querySelectorAll(".collector-preview-bubble, .collector-drag-preview").forEach((item) => item.remove());
+    document.querySelector(".cell.collector-source-preview")?.classList.remove("collector-source-preview");
+    if (dragGesture) dragGesture.collectorPreviewCell = null;
+  }
+
+  function updateCollectorPreview(centerIndex) {
+    if (!dragGesture) return "";
+    if (dragGesture.collectorPreviewCell === centerIndex) {
+      return dragGesture.collectorPreviewSummary || "";
+    }
+    clearCollectorPreview();
+    dragGesture.collectorPreviewCell = centerIndex;
+    dragGesture.collectorPreviewSummary = "";
+    const previews = collectorPullPreview(centerIndex);
+    if (!previews.length) return "";
+
+    const sourceCell = elements.board.querySelector(`.cell[data-cell="${centerIndex}"]`);
+    sourceCell?.classList.add("collector-source-preview");
+    for (const preview of previews) {
+      const target = elements.board.querySelector(`.cell[data-cell="${preview.index}"]`);
+      if (!target) continue;
+      target.classList.add("collector-preview-target");
+      target.dataset.baseAriaLabel = target.getAttribute("aria-label") || "";
+      const colorName = CAKES[preview.type]?.name || preview.type;
+      target.style.setProperty("--collector-preview-color", CAKES[preview.type]?.color || "#999");
+      target.setAttribute("aria-label", `${target.dataset.baseAriaLabel}, 여기에 놓으면 ${colorName} ${preview.count}개 수집 예정`);
+      target.insertAdjacentHTML("beforeend", `<span class="collector-preview-bubble" style="--preview-color:${CAKES[preview.type]?.color || "#999"}" aria-hidden="true"><b>+${preview.count}</b>${CAKES[preview.type]?.emoji || "●"}</span>`);
+    }
+
+    const totals = [];
+    for (const type of PIECE_ORDER) {
+      const count = previews.filter((preview) => preview.type === type)
+        .reduce((sum, preview) => sum + preview.count, 0);
+      if (count) totals.push(`${CAKES[type]?.emoji || "●"}${count}`);
+    }
+    const summary = `${totals.join(" · ")} 조각이 색깔 접시로 이동해요`;
+    dragGesture.collectorPreviewSummary = summary;
+    dragGesture.ghost.insertAdjacentHTML("beforeend", `<span class="collector-drag-preview" aria-hidden="true">${totals.join(" · ")} → 수집</span>`);
+    return summary;
   }
 
   function nearestRotation(current, desired) {
@@ -982,18 +1117,27 @@
     renderBoard();
     if (frogMove) {
       const targetFrog = elements.board.querySelector(`.cell[data-cell="${frogMove.to}"] .frog-token`);
-      const targetRect = targetFrog?.getBoundingClientRect();
+      const targetCell = elements.board.querySelector(`.cell[data-cell="${frogMove.to}"]`);
+      const targetBounds = targetFrog?.getBoundingClientRect() || targetCell?.getBoundingClientRect();
+      const targetRect = targetBounds && sourceRect ? {
+        left: targetBounds.left + (targetBounds.width - sourceRect.width) / 2,
+        top: targetBounds.top + (targetBounds.height - sourceRect.height) / 2,
+      } : null;
       if (movingFrog && sourceRect && targetRect && !reducedMotion()) {
         movingFrog.classList.add("moving-frog");
         movingFrog.style.left = `${sourceRect.left}px`;
         movingFrog.style.top = `${sourceRect.top}px`;
         movingFrog.style.width = `${sourceRect.width}px`;
         movingFrog.style.height = `${sourceRect.height}px`;
-        targetFrog.style.visibility = "hidden";
+        if (targetFrog) targetFrog.style.visibility = "hidden";
         document.body.appendChild(movingFrog);
         await nextPaint();
         movingFrog.style.transform = `translate3d(${targetRect.left - sourceRect.left}px, ${targetRect.top - sourceRect.top}px, 0)`;
         await wait(300);
+        if (frogMove.reached) {
+          movingFrog.classList.add("frog-vanishing");
+          await wait(150);
+        }
         movingFrog.remove();
         if (activeSession !== sessionId) return false;
       }

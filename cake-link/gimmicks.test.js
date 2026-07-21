@@ -71,6 +71,95 @@ function completedTypes(result) {
 }
 
 {
+  const collector = plate({
+    kind: "colored",
+    collectorOnly: true,
+    receiveOnly: true,
+    allowedColor: "berry",
+    pieces: { berry: 5 },
+  });
+  assert.equal(Engine.canReceive(collector, "berry"), false, "collectors never receive through ordinary sorting");
+  assert.equal(Engine.canGive(collector, "berry"), false, "collectors never donate through ordinary sorting");
+
+  const stage = stageWith({ goals: { berry: 1, lemon: 1 } });
+  const turn = Mechanics.resolveTurn(stage, Mechanics.createRuntime(stage), boardWith([
+    [1, collector],
+    [4, { lemon: 4 }],
+    [5, { berry: 1, lemon: 2 }],
+  ]), 5);
+  assert.equal(turn.phases.length, 2, "collector intake resolves before ordinary local sorting");
+  assert.deepEqual(turn.phases[0].events, [{
+    kind: "collector",
+    target: 1,
+    type: "berry",
+    count: 1,
+    origins: [{ index: 5, count: 1 }],
+    displaced: {},
+    spread: [],
+  }]);
+  assert.deepEqual(completedTypes(turn), ["berry", "lemon"]);
+  assert.equal(turn.board[1], null);
+  assert.equal(turn.board[5], null);
+}
+
+{
+  const collector = (count) => ({
+    kind: "colored",
+    collectorOnly: true,
+    receiveOnly: true,
+    allowedColor: "berry",
+    pieces: { berry: count },
+  });
+  const closestFirst = Engine.resolveColoredCollectors(boardWith([
+    [1, collector(5)], // up: one short
+    [6, collector(4)], // right: two short
+    [5, { berry: 3 }],
+  ]), 5);
+  assert.deepEqual(closestFirst.events.map((event) => [event.target, event.count]), [[1, 1], [6, 2]]);
+  assert.deepEqual(closestFirst.completed, [1, 6]);
+  assert.deepEqual(closestFirst.emptied, [5]);
+  assert.equal(closestFirst.board.filter(Boolean).length, 0);
+
+  const directionTie = Engine.resolveColoredCollectors(boardWith([
+    [1, collector(4)],
+    [6, collector(4)],
+    [5, { berry: 2 }],
+  ]), 5);
+  assert.deepEqual(directionTie.events.map((event) => event.target), [1], "U wins a U/R/D/L deficit tie");
+  assert.equal(directionTie.board[1], null);
+  assert.deepEqual(directionTie.board[6].pieces, { berry: 4 });
+  assert.equal(directionTie.board[5], null, "an emptied newly placed plate is removed");
+
+  const protectedLayer = Engine.resolveColoredCollectors(boardWith([
+    [1, collector(5)],
+    [5, {
+      pieces: { berry: 1 },
+      receiveOnly: true,
+      layers: [{ pieces: { lemon: 3 }, receiveOnly: true }],
+    }],
+  ]), 5);
+  assert.deepEqual(protectedLayer.events, [], "a receive-only upper layer cannot be drained by a collector");
+  assert.deepEqual(protectedLayer.board[5].pieces, { berry: 1 });
+}
+
+{
+  const inertCollector = plate({
+    kind: "colored",
+    collectorOnly: true,
+    receiveOnly: true,
+    allowedColor: "berry",
+    pieces: { berry: 2 },
+  });
+  const ordinary = Engine.resolvePlacement(boardWith([
+    [5, inertCollector],
+    [4, { berry: 4 }],
+  ]), 4);
+  assert.deepEqual(ordinary.events, [], "ordinary sorting cannot interact with a colored collector");
+  assert.deepEqual(ordinary.board[5].pieces, { berry: 2 });
+  assert.deepEqual(ordinary.board[4].pieces, { berry: 4 });
+}
+
+{
   const mystery = plate({ pieces: { mystery: 2 }, hiddenColors: ["berry", "lemon"] });
   const reveal = Mechanics.revealPlate(mystery);
   assert.deepEqual(reveal.revealedColors, ["berry", "lemon"]);
@@ -174,12 +263,26 @@ function completedTypes(result) {
   const runtime = Mechanics.createRuntime(stage);
   assert.equal(Mechanics.isCellAvailable(stage, runtime, 0, Array(16).fill(null)), false);
   const turn = Mechanics.resolveTurn(stage, runtime, boardWith([
+    [0, { berry: 2 }],
     [5, { berry: 3 }],
     [4, { berry: 3 }],
   ]), 5);
+  assert.deepEqual(turn.board[0].pieces, { berry: 2 }, "a plate embedded in ice cannot send or receive this turn");
   assert.equal(turn.runtime.iceCells[0], undefined, "an adjacent emptied plate also breaks ice");
   assert.equal(turn.specialEvents.some((event) => event.kind === "iceBreak" && event.index === 0), true);
-  assert.equal(Mechanics.isCellAvailable(stage, turn.runtime, 0, turn.board), true);
+  assert.equal(Engine.isFrozen(turn.board[0]), false, "broken ice activates its embedded plate for the next turn");
+  assert.equal(Mechanics.isCellAvailable(stage, turn.runtime, 0, turn.board), false, "the embedded plate still occupies its cell");
+
+  const stillFrozenStage = stageWith({ mechanics: { iceCells: [{ index: 5, layers: 2 }] } });
+  const frozenTurn = Mechanics.resolveTurn(
+    stillFrozenStage,
+    Mechanics.createRuntime(stillFrozenStage),
+    boardWith([[5, { berry: 2 }], [4, { berry: 3 }]]),
+    4,
+  );
+  assert.deepEqual(frozenTurn.board[5].pieces, { berry: 2 });
+  assert.deepEqual(frozenTurn.board[4].pieces, { berry: 3 });
+  assert.equal(Engine.isFrozen(frozenTurn.board[5]), true);
 }
 
 {
@@ -200,6 +303,31 @@ function completedTypes(result) {
 
 {
   const stage = stageWith({
+    mechanics: {
+      locks: [
+        { index: 5, keyId: "berry-key-1", color: "berry", count: 1 },
+        { index: 9, keyId: "berry-key-2", color: "berry", count: 2 },
+      ],
+    },
+  });
+  let runtime = Mechanics.createRuntime(stage);
+  let turn = Mechanics.resolveTurn(stage, runtime, boardWith([
+    [1, { berry: 3 }],
+    [2, { berry: 3 }],
+  ]), 1);
+  assert.equal(turn.runtime.lockedCells[5], undefined, "the first berry completion opens tier one");
+  assert.equal(turn.runtime.lockedCells[9], true, "tier two stays locked after one completion");
+
+  runtime = turn.runtime;
+  turn = Mechanics.resolveTurn(stage, runtime, boardWith([
+    [1, { berry: 3 }],
+    [2, { berry: 3 }],
+  ]), 1);
+  assert.equal(turn.runtime.lockedCells[9], undefined, "the second berry completion opens tier two");
+}
+
+{
+  const stage = stageWith({
     mechanics: { fragileCells: [{ index: 5 }, { index: 4 }] },
   });
   const turn = Mechanics.resolveTurn(stage, Mechanics.createRuntime(stage), boardWith([
@@ -207,7 +335,40 @@ function completedTypes(result) {
     [4, { berry: 3 }],
   ]), 5);
   assert.equal(turn.runtime.brokenCells[5], true, "a completion breaks its fragile cell");
+  assert.equal(turn.runtime.fragileBrokenCount, 1);
+  assert.deepEqual(turn.specialEvents.find((event) => event.kind === "fragileBreak"), {
+    kind: "fragileBreak",
+    index: 5,
+    progress: 1,
+    target: 2,
+  });
   assert.equal(turn.runtime.brokenCells[4], undefined, "merely emptying a donor does not break its cell");
+  assert.equal(
+    Mechanics.isCellAvailable(stage, turn.runtime, 5, turn.board),
+    true,
+    "the plate breaks, but its board cell remains reusable",
+  );
+}
+
+{
+  const stage = stageWith({
+    goals: {},
+    objective: { type: "fragile", target: 2 },
+    mechanics: { fragileCells: [{ index: 5 }, { index: 10 }] },
+  });
+  const first = Mechanics.resolveTurn(stage, Mechanics.createRuntime(stage), boardWith([
+    [5, { berry: 3 }],
+    [4, { berry: 3 }],
+  ]), 5);
+  assert.equal(Mechanics.goalProgress(stage, {}, first.runtime), .5);
+  assert.equal(Mechanics.isStageComplete(stage, {}, first.runtime), false);
+  const second = Mechanics.resolveTurn(stage, first.runtime, boardWith([
+    [10, { lemon: 3 }],
+    [9, { lemon: 3 }],
+  ]), 10);
+  assert.equal(second.runtime.fragileBrokenCount, 2);
+  assert.equal(Mechanics.goalProgress(stage, {}, second.runtime), 1);
+  assert.equal(Mechanics.isStageComplete(stage, {}, second.runtime), true);
 }
 
 {
@@ -218,7 +379,7 @@ function completedTypes(result) {
   let runtime = Mechanics.createRuntime(stage);
   let board = boardWith([[0, { berry: 1 }]]);
   assert.equal(Mechanics.isCellAvailable(stage, runtime, 5, board), false);
-  assert.equal(Mechanics.isCellAvailable(stage, runtime, 7, board), false, "the frog goal is reserved");
+  assert.equal(Mechanics.isCellAvailable(stage, runtime, 7, board), true, "an empty frog goal stays playable");
   assert.equal(Mechanics.frogDistance(stage, runtime, board), 2);
 
   let turn = Mechanics.resolveTurn(stage, runtime, board, 0);
@@ -230,8 +391,10 @@ function completedTypes(result) {
   board = turn.board;
   board[15] = plate({ berry: 1 });
   turn = Mechanics.resolveTurn(stage, runtime, board, 15);
-  assert.equal(turn.runtime.frogIndex, 7);
+  assert.equal(turn.runtime.frogIndex, null, "the frog disappears after reaching its goal");
   assert.equal(turn.runtime.frogReached, true);
+  assert.equal(Mechanics.frogDistance(stage, turn.runtime, turn.board), 0);
+  assert.equal(Mechanics.isCellAvailable(stage, turn.runtime, 7, turn.board), true);
   assert.equal(Mechanics.isStageComplete(stage, {}, turn.runtime), true);
 
   const combinedStage = stageWith({
@@ -239,10 +402,36 @@ function completedTypes(result) {
     objective: { type: "frog" },
     mechanics: { frog: { startIndex: 5, goalIndex: 7 } },
   });
-  const combinedRuntime = { ...Mechanics.createRuntime(combinedStage), frogIndex: 7, frogReached: true };
+  const combinedRuntime = { ...Mechanics.createRuntime(combinedStage), frogIndex: null, frogReached: true };
   assert.equal(Mechanics.goalProgress(combinedStage, {}, combinedRuntime), .5);
   assert.equal(Mechanics.goalProgress(combinedStage, { berry: 1 }, combinedRuntime), 1);
   assert.equal(Mechanics.isStageComplete(combinedStage, {}, combinedRuntime), false);
+}
+
+{
+  const stage = stageWith({
+    objective: { type: "frog" },
+    mechanics: { frog: { startIndex: 0, goalIndex: 3 } },
+  });
+  let runtime = Mechanics.createRuntime(stage);
+  let board = boardWith([
+    [3, { berry: 1 }],
+    [15, { choco: 1 }],
+  ]);
+
+  let turn = Mechanics.resolveTurn(stage, runtime, board, 15);
+  assert.equal(turn.runtime.frogIndex, 1, "the frog approaches an occupied goal");
+  turn = Mechanics.resolveTurn(stage, turn.runtime, turn.board, 15);
+  assert.equal(turn.runtime.frogIndex, 2);
+  const waiting = Mechanics.resolveTurn(stage, turn.runtime, turn.board, 15);
+  assert.equal(waiting.runtime.frogIndex, 2, "the frog waits beside an occupied goal");
+  assert.equal(waiting.specialEvents.some((event) => event.kind === "frogMove"), false);
+
+  board = Engine.cloneBoard(waiting.board);
+  board[3] = null;
+  turn = Mechanics.resolveTurn(stage, waiting.runtime, board, 15);
+  assert.equal(turn.runtime.frogIndex, null);
+  assert.equal(turn.runtime.frogReached, true, "the frog enters and vanishes once the goal is empty");
 }
 
 {

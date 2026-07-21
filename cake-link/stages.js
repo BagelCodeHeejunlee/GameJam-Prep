@@ -197,12 +197,16 @@
           pieces: { berry: 2 },
           kind: "colored",
           allowedColor: "berry",
+          collectorOnly: true,
+          receiveOnly: true,
         },
         {
           index: 10,
           pieces: { lemon: 2 },
           kind: "colored",
           allowedColor: "lemon",
+          collectorOnly: true,
+          receiveOnly: true,
         },
         { index: 6, pieces: { matcha: 2 } },
       ],
@@ -224,6 +228,8 @@
       initialPlates: [
         { index: 1, pieces: { berry: 3 } },
         { index: 4, pieces: { berry: 2 } },
+        { index: 5, pieces: { berry: 1 } },
+        { index: 10, pieces: { lemon: 1 } },
         { index: 11, pieces: { lemon: 3 } },
         { index: 14, pieces: { lemon: 2 } },
       ],
@@ -256,7 +262,13 @@
       gimmick: { id: "frog", label: "개구리", icon: "🐸" },
       objective: { type: "frog", frogId: "main" },
       mechanics: {
-        frog: { id: "main", startIndex: 0, goalIndex: 15, tieOrder: "URDL" },
+        frog: {
+          id: "main",
+          startIndex: 0,
+          goalIndex: 15,
+          tieOrder: "URDL",
+          vanishOnGoal: true,
+        },
       },
       nextStageId: 11,
     }),
@@ -330,10 +342,10 @@
       gimmick: { id: "locks", label: "열쇠와 잠긴 칸", icon: "🔐" },
       mechanics: {
         locks: [
-          { index: 5, keyId: "berry-key", color: "berry", count: 1 },
-          { index: 9, keyId: "berry-key", color: "berry", count: 1 },
-          { index: 6, keyId: "lemon-key", color: "lemon", count: 1 },
-          { index: 10, keyId: "lemon-key", color: "lemon", count: 1 },
+          { index: 5, keyId: "berry-key-1", color: "berry", count: 1 },
+          { index: 9, keyId: "berry-key-2", color: "berry", count: 2 },
+          { index: 6, keyId: "lemon-key-1", color: "lemon", count: 1 },
+          { index: 10, keyId: "lemon-key-2", color: "lemon", count: 2 },
         ],
       },
       nextStageId: 14,
@@ -370,7 +382,7 @@
       title: "스테이지 15",
       difficulty: "보통",
       seed: 15817,
-      moveLimit: 27,
+      moveLimit: 26,
       goals: { berry: 4, lemon: 3, matcha: 3 },
       colors: ["berry", "lemon", "matcha", "choco"],
       boardMask: ["1111", "1111", "1111", "1111"],
@@ -379,7 +391,7 @@
         { index: 6, pieces: { lemon: 2 } },
         { index: 10, pieces: { matcha: 2 } },
       ],
-      openingRack: [{ berry: 4 }, { lemon: 5 }, { matcha: 4 }],
+      openingRack: [{ berry: 6 }, { lemon: 6 }, { matcha: 5 }],
       openingModifiers: [{ rainbow: 2 }, { rainbow: 1 }, { rainbow: 1 }],
       colorWeights: { berry: 36, lemon: 28, matcha: 26, choco: 10 },
       platePatternWeights: { a3: 18, a2b1: 30, a2b2: 24, a1b1c1: 18, a2: 10 },
@@ -394,8 +406,9 @@
       title: "스테이지 16",
       difficulty: "보통",
       seed: 16381,
-      moveLimit: 30,
-      goals: { berry: 3, lemon: 3, matcha: 3 },
+      moveLimit: 18,
+      goals: {},
+      objective: { type: "fragile", target: 3 },
       colors: ["berry", "lemon", "matcha", "choco"],
       boardMask: ["1111", "1111", "1111", "1111"],
       initialPlates: [
@@ -406,13 +419,12 @@
       openingRack: [{ berry: 3 }, { lemon: 3 }, { matcha: 3 }],
       colorWeights: { berry: 33, lemon: 31, matcha: 26, choco: 10 },
       platePatternWeights: { a3: 18, a2b1: 30, a2b2: 24, a1b1c1: 18, a2: 10 },
-      gimmick: { id: "fragile", label: "깨지는 받침대", icon: "◇" },
+      gimmick: { id: "fragile", label: "깨지는 판", icon: "💥" },
       mechanics: {
         fragileCells: [
           { index: 5, uses: 1 },
           { index: 6, uses: 1 },
           { index: 9, uses: 1 },
-          { index: 10, uses: 1 },
         ],
       },
       nextStageId: 17,
@@ -468,6 +480,16 @@
     if (stage.objective?.type === "ordered" && sequence?.length) {
       return Number(completedByType.orderIndex ?? completedByType._orderIndex ?? 0) >= sequence.length;
     }
+    if (stage.objective?.type === "fragile") {
+      const target = Math.max(0, Math.floor(Number(stage.objective.target) || 0));
+      const progress = Number(
+        completedByType.fragileBrokenCount ??
+        completedByType._fragileBrokenCount ??
+        completedByType.fragileBreaks ??
+        0
+      );
+      return target > 0 && progress >= target;
+    }
     return goalEntries(stage).every(([type, target]) => (completedByType[type] || 0) >= target);
   }
 
@@ -477,6 +499,9 @@
     }
     if (stage.objective?.type === "ordered") {
       return stage.mechanics?.orderedGoal?.sequence?.length || 0;
+    }
+    if (stage.objective?.type === "fragile") {
+      return Math.max(0, Math.floor(Number(stage.objective.target) || 0));
     }
     return goalEntries(stage).reduce((sum, [, target]) => sum + target, 0);
   }
@@ -530,7 +555,9 @@
     const stage = hasStage ? stageOrPieces : null;
     const pieces = hasStage ? piecesOrModifiers : stageOrPieces;
     const modifiers = hasStage ? (modifiersOrRandom || {}) : (piecesOrModifiers || {});
-    const random = hasStage && typeof maybeRandom === "function" ? maybeRandom : Math.random;
+    const random = hasStage
+      ? (typeof maybeRandom === "function" ? maybeRandom : Math.random)
+      : (typeof modifiersOrRandom === "function" ? modifiersOrRandom : Math.random);
     const source = pieces?.pieces ? pieces : { pieces: pieces || {} };
     const plate = {
       ...cloneData(source),
@@ -550,8 +577,19 @@
       delete plate.hiddenColors;
       delete plate.pieces.mystery;
     }
-    const rainbow = Number(modifiers.rainbow ?? source.rainbow ?? source.pieces?.rainbow ?? 0);
-    if (rainbow > 0) plate.pieces.rainbow = Math.floor(rainbow);
+    const embeddedRainbow = Math.max(0, Math.floor(Number(source.pieces?.rainbow) || 0));
+    const replacementRainbow = Math.max(0, Math.floor(Number(modifiers.rainbow ?? source.rainbow) || 0));
+    if (replacementRainbow > 0) {
+      const available = Object.entries(plate.pieces).reduce((total, [type, amount]) =>
+        total + (COLOR_IDS.includes(type) ? Math.max(0, Number(amount) || 0) : 0), 0
+      );
+      if (replacementRainbow > available) {
+        throw new RangeError(`무지개 교체 수 ${replacementRainbow}개가 일반 조각 ${available}개보다 많습니다.`);
+      }
+      takeRandomSlices(plate.pieces, replacementRainbow, random);
+    }
+    const rainbow = embeddedRainbow + replacementRainbow;
+    if (rainbow > 0) plate.pieces.rainbow = rainbow;
     else delete plate.pieces.rainbow;
     delete plate.rainbow;
     return plate;

@@ -27,18 +27,148 @@
     return Object.values(plate.pieces || {}).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
   }
 
+  function isFrozen(plate) {
+    return Boolean(plate?.frozen);
+  }
+
+  function isCollector(plate) {
+    return Boolean(plate?.collectorOnly);
+  }
+
   function cloneBoard(board) {
     return board.map((plate) => plate ? deepClone(plate) : null);
   }
 
   function canReceive(plate, type, targetType = type) {
-    if (!plate || totalPieces(plate) >= capacityOf(plate)) return false;
+    if (!plate || isFrozen(plate) || isCollector(plate) || totalPieces(plate) >= capacityOf(plate)) return false;
     const resolvedType = targetType === RAINBOW_TYPE ? type : targetType;
     return !plate.allowedColor || plate.allowedColor === resolvedType;
   }
 
   function canGive(plate, type) {
-    return Boolean(plate && !plate.receiveOnly && (plate.pieces?.[type] || 0) > 0);
+    return Boolean(
+      plate &&
+      !isFrozen(plate) &&
+      !isCollector(plate) &&
+      !plate.receiveOnly &&
+      (plate.pieces?.[type] || 0) > 0
+    );
+  }
+
+  // Colored collectors are deliberately resolved outside ordinary sorting.
+  // Only the plate placed this turn can feed adjacent collectors, which keeps
+  // the mechanic predictable and prevents a collector from becoming a free
+  // general-purpose sorting slot.
+  function resolveColoredCollectors(inputBoard, placedIndex) {
+    const board = cloneBoard(inputBoard);
+    const source = board[placedIndex];
+    const neighborOrder = getNeighbors(placedIndex);
+    const collectorIndexes = neighborOrder.filter((index) => {
+      const plate = board[index];
+      return Boolean(
+        plate?.collectorOnly &&
+        plate.kind === "colored" &&
+        plate.allowedColor &&
+        !isFrozen(plate) &&
+        totalPieces(plate) < capacityOf(plate)
+      );
+    });
+    const emptyResult = {
+      board,
+      settledBoard: cloneBoard(board),
+      events: [],
+      completionEvents: [],
+      completed: [],
+      emptied: [],
+      removed: [],
+      revealed: [],
+      mysteryRevealed: [],
+      layerRevealed: [],
+      safetyLimitReached: false,
+      didResolve: false,
+    };
+    if (
+      !source ||
+      !collectorIndexes.length ||
+      isFrozen(source) ||
+      isCollector(source) ||
+      source.receiveOnly
+    ) return emptyResult;
+
+    const mysteryRevealed = [];
+    if (source.hiddenColors?.length && source.pieces?.[MYSTERY_TYPE]) {
+      const reveal = revealPlate(source);
+      board[placedIndex] = reveal.plate;
+      if (reveal.didReveal) mysteryRevealed.push(placedIndex);
+    }
+
+    collectorIndexes.sort((a, b) => {
+      const deficitA = capacityOf(board[a]) - totalPieces(board[a]);
+      const deficitB = capacityOf(board[b]) - totalPieces(board[b]);
+      return deficitA - deficitB || neighborOrder.indexOf(a) - neighborOrder.indexOf(b);
+    });
+
+    const events = [];
+    const completed = [];
+    const completionEvents = [];
+    for (const targetIndex of collectorIndexes) {
+      const target = board[targetIndex];
+      const type = target.allowedColor;
+      const available = Math.max(0, Number(board[placedIndex]?.pieces?.[type]) || 0);
+      const free = capacityOf(target) - totalPieces(target);
+      const count = Math.min(available, free);
+      if (count <= 0) continue;
+
+      board[placedIndex].pieces[type] -= count;
+      cleanPieces(board[placedIndex]);
+      target.pieces[type] = (target.pieces[type] || 0) + count;
+      events.push({
+        kind: "collector",
+        target: targetIndex,
+        type,
+        count,
+        origins: [{ index: placedIndex, count }],
+        displaced: {},
+        spread: [],
+      });
+
+      if (isComplete(target)) {
+        completed.push(targetIndex);
+        completionEvents.push({
+          index: targetIndex,
+          type,
+          capacity: capacityOf(target),
+          layered: false,
+          removed: true,
+          collector: true,
+        });
+      }
+    }
+
+    const emptied = totalPieces(board[placedIndex]) === 0 &&
+      !board[placedIndex]?.layers?.length &&
+      !completed.includes(placedIndex)
+      ? [placedIndex]
+      : [];
+    completed.sort((a, b) => a - b);
+    const removed = [...new Set([...completed, ...emptied])].sort((a, b) => a - b);
+    const settledBoard = cloneBoard(board);
+    for (const index of removed) board[index] = null;
+
+    return {
+      board,
+      settledBoard,
+      events,
+      completionEvents,
+      completed,
+      emptied,
+      removed,
+      revealed: [],
+      mysteryRevealed,
+      layerRevealed: [],
+      safetyLimitReached: false,
+      didResolve: events.length > 0 || mysteryRevealed.length > 0,
+    };
   }
 
   function revealPlate(inputPlate) {
@@ -105,7 +235,7 @@
 
   function choosePullType(board, index, locked, received = new Set()) {
     const plate = board[index];
-    if (!plate) return null;
+    if (!plate || isFrozen(plate) || isCollector(plate)) return null;
     const capacity = capacityOf(plate);
     const free = capacity - totalPieces(plate);
     const candidateTypes = [...new Set([
@@ -273,7 +403,12 @@
       changed = false;
       passes += 1;
       const localIndexes = localOrder.filter((index) =>
-        board[index] && totalPieces(board[index]) > 0 && !locked.has(index) && !isComplete(board[index])
+        board[index] &&
+        !isFrozen(board[index]) &&
+        !isCollector(board[index]) &&
+        totalPieces(board[index]) > 0 &&
+        !locked.has(index) &&
+        !isComplete(board[index])
       );
       const colorTotals = Object.fromEntries(CAKE_ORDER.map((type) => [
         type,
@@ -376,6 +511,8 @@
     const target = board[index];
     if (
       !target ||
+      isFrozen(target) ||
+      isCollector(target) ||
       locked.has(index) ||
       (target.allowedColor && target.allowedColor !== type)
     ) return null;
@@ -456,7 +593,12 @@
 
     while (changed) {
       changed = false;
-      const availableIndexes = localOrder.filter((index) => board[index] && !locked.has(index));
+      const availableIndexes = localOrder.filter((index) =>
+        board[index] &&
+        !isFrozen(board[index]) &&
+        !isCollector(board[index]) &&
+        !locked.has(index)
+      );
       const candidates = [];
 
       for (const index of availableIndexes) {
@@ -580,7 +722,7 @@
     events.push(...rainbow.events);
 
     for (const index of [placedIndex, ...getNeighbors(placedIndex)]) {
-      if (isComplete(board[index])) locked.add(index);
+      if (!isFrozen(board[index]) && !isCollector(board[index]) && isComplete(board[index])) locked.add(index);
     }
 
     const completed = [];
@@ -733,6 +875,8 @@
     capacityOf,
     totalPieces,
     cloneBoard,
+    isFrozen,
+    isCollector,
     canReceive,
     canGive,
     revealPlate,
@@ -741,6 +885,7 @@
     completionType,
     choosePullType,
     consolidateLocalColors,
+    resolveColoredCollectors,
     resolveRainbowCompletions,
     resolvePlacement,
     buildAnimationBatches,

@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const Stages = require("./stages.js");
 const Simulator = require("./simulator.js");
+const Mechanics = require("./mechanics.js");
 
 const STYLE_IDS = ["planner", "goal", "space", "instinct"];
 const SKILL_IDS = ["novice", "standard", "expert"];
@@ -164,12 +165,45 @@ assert.deepEqual(
 // Initial boards retain mechanic metadata and inherit each stage's capacity.
 const coloredBoard = Simulator.createInitialBoard(Stages.getStage(8));
 assert.equal(coloredBoard[5].allowedColor, "berry");
-assert.equal(coloredBoard[5].receiveOnly, undefined);
+assert.equal(coloredBoard[5].collectorOnly, true);
+assert.equal(coloredBoard[5].receiveOnly, true);
+const iceStage = Stages.getStage(9);
+const iceBoard = Simulator.createInitialBoard(iceStage);
+const iceRuntime = Mechanics.createRuntime(iceStage);
+assert.deepEqual(iceBoard[5].pieces, { berry: 1 });
+assert.deepEqual(iceBoard[10].pieces, { lemon: 1 });
+assert.equal(Mechanics.isCellAvailable(iceStage, iceRuntime, 5, iceBoard), false);
+const isolatedFrozenBoard = Array(16).fill(null);
+isolatedFrozenBoard[5] = { id: 1, pieces: { berry: 1 }, capacity: 6 };
+isolatedFrozenBoard[6] = { id: 2, pieces: { berry: 2 }, capacity: 6 };
+const frozenTurn = Mechanics.resolveTurn(iceStage, iceRuntime, isolatedFrozenBoard, 6);
+assert.deepEqual(frozenTurn.board[5].pieces, { berry: 1 }, "얼음 속 판은 깨지기 전까지 조각을 주고받지 않는다");
+assert.deepEqual(frozenTurn.board[6].pieces, { berry: 2 });
 const capacityBoard = Simulator.createInitialBoard(Stages.getStage(12));
 assert.equal(capacityBoard[5].capacity, 8);
 const layeredBoard = Simulator.createInitialBoard(Stages.getStage(17));
 assert.equal(layeredBoard[5].receiveOnly, true);
 assert.deepEqual(layeredBoard[5].layers[0].pieces, { lemon: 3 });
+
+const fragileStage = Stages.getStage(16);
+const fragileRuntime = { ...Mechanics.createRuntime(fragileStage), fragileBrokenCount: 2 };
+assert.equal(Simulator.goalProgress(fragileStage, {}, fragileRuntime), 2 / 3);
+assert.equal(Mechanics.isCellAvailable(fragileStage, fragileRuntime, 5, Array(16).fill(null)), true);
+
+// The destination is an ordinary usable cell whenever the frog itself is not
+// standing there. Reaching it removes the frog, so the same cell immediately
+// becomes available for a plate again.
+const frogStage = Stages.getStage(10);
+const emptyFrogBoard = Array(16).fill(null);
+const travellingFrog = Mechanics.createRuntime(frogStage);
+assert.equal(Mechanics.isCellAvailable(frogStage, travellingFrog, 15, emptyFrogBoard), true);
+const arrivingFrog = { ...travellingFrog, frogIndex: 14 };
+const arrivalBoard = [...emptyFrogBoard];
+arrivalBoard[1] = { id: 1, pieces: { choco: 1 }, capacity: 6 };
+const arrivalTurn = Mechanics.resolveTurn(frogStage, arrivingFrog, arrivalBoard, 1);
+assert.equal(arrivalTurn.runtime.frogReached, true);
+assert.equal(arrivalTurn.runtime.frogIndex, null, "목표에 도착한 개구리는 보드에서 사라진다");
+assert.equal(Mechanics.isCellAvailable(frogStage, arrivalTurn.runtime, 15, arrivalTurn.board), true);
 
 // Every single-gimmick stage must be runnable through the shared mechanic turn
 // reducer. Exact balance is calibrated separately with canonical 100-run jobs.
