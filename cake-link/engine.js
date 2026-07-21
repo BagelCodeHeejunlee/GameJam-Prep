@@ -45,6 +45,13 @@
     return `${index}:${type}`;
   }
 
+  function displaceableOtherPieces(plate, index, keepType, received) {
+    return Object.entries(plate?.pieces || {}).reduce((sum, [type, count]) => {
+      if (type === keepType || received.has(receivedKey(index, type))) return sum;
+      return sum + count;
+    }, 0);
+  }
+
   function choosePullType(board, index, locked, received = new Set()) {
     const plate = board[index];
     if (!plate) return null;
@@ -55,10 +62,11 @@
         return sum + (board[neighborIndex].pieces[type] || 0);
       }, 0);
       const own = plate.pieces[type] || 0;
-      const completionPossible = own + incoming >= PLATE_CAPACITY;
-      const movable = completionPossible
-        ? Math.min(incoming, PLATE_CAPACITY - own)
-        : Math.min(incoming, free);
+      const availableRoom = free + displaceableOtherPieces(plate, index, type, received);
+      const completionPossible = own + Math.min(incoming, availableRoom) >= PLATE_CAPACITY;
+      const movable = free > 0 || completionPossible
+        ? Math.min(incoming, PLATE_CAPACITY - own, availableRoom)
+        : 0;
       return { type, incoming, own, total: own + incoming, movable };
     }).filter((candidate) => candidate.movable > 0 && candidate.own < PLATE_CAPACITY);
 
@@ -71,11 +79,15 @@
     return candidates[0]?.type || null;
   }
 
-  function removeOtherPieces(plate, keepType, amount) {
+  function removeOtherPieces(plate, keepType, amount, index, received) {
     let remaining = amount;
     const removed = {};
     const types = Object.keys(plate.pieces)
-      .filter((type) => type !== keepType && plate.pieces[type] > 0)
+      .filter((type) =>
+        type !== keepType &&
+        plate.pieces[type] > 0 &&
+        !received.has(receivedKey(index, type))
+      )
       .sort((a, b) => plate.pieces[a] - plate.pieces[b] || CAKE_ORDER.indexOf(a) - CAKE_ORDER.indexOf(b));
 
     for (const type of types) {
@@ -136,7 +148,11 @@
     const neighborOrder = getNeighbors(sourceIndex);
 
     for (const type of CAKE_ORDER) {
-      if (type === keepType || !source.pieces[type]) continue;
+      if (
+        type === keepType ||
+        !source.pieces[type] ||
+        received.has(receivedKey(sourceIndex, type))
+      ) continue;
       let remaining = source.pieces[type];
       const matching = neighborOrder
         .filter((index) =>
@@ -173,7 +189,7 @@
     return { events, recipients, touched };
   }
 
-  function consolidateLocalColors(board, centerIndex, locked) {
+  function consolidateLocalColors(board, centerIndex, locked, received = new Set()) {
     const events = [];
     const touched = new Set();
     const localOrder = [centerIndex, ...getNeighbors(centerIndex)];
@@ -181,8 +197,9 @@
     let changed = true;
     let passes = 0;
 
-    // After the primary pull, moving one color can open room that lets another
-    // split color consolidate. Repeat only inside the placed plate's local cross.
+    // Moving one color can open room that lets another split color consolidate.
+    // Each activation stays inside its own local cross; resolvePlacement then
+    // activates every plate changed by these transfers as the next chain link.
     while (changed && passes < CAKE_ORDER.length * 2) {
       changed = false;
       passes += 1;
@@ -201,13 +218,19 @@
         const holders = localIndexes.filter((index) => board[index]?.pieces[type] > 0 && !locked.has(index));
         if (holders.length < 2) continue;
 
-        const total = holders.reduce((sum, index) => sum + board[index].pieces[type], 0);
         const collectors = holders.map((index) => {
           const own = board[index].pieces[type];
           const free = PLATE_CAPACITY - totalPieces(board[index]);
-          const resultCount = own + Math.min(total - own, free);
+          const incoming = holders.reduce((sum, donorIndex) => {
+            if (
+              donorIndex === index ||
+              received.has(receivedKey(donorIndex, type))
+            ) return sum;
+            return sum + board[donorIndex].pieces[type];
+          }, 0);
+          const resultCount = own + Math.min(incoming, free);
           const otherPieces = totalPieces(board[index]) - own;
-          return { index, own, free, resultCount, otherPieces };
+          return { index, own, free, incoming, resultCount, otherPieces };
         }).filter((candidate) => candidate.free > 0 && candidate.resultCount > candidate.own);
         collectors.sort((a, b) =>
           b.resultCount - a.resultCount ||
@@ -220,20 +243,32 @@
         if (assignedIndex !== undefined && holders.includes(assignedIndex) && !locked.has(assignedIndex)) {
           const own = board[assignedIndex].pieces[type];
           const free = PLATE_CAPACITY - totalPieces(board[assignedIndex]);
+          const incoming = holders.reduce((sum, donorIndex) => {
+            if (
+              donorIndex === assignedIndex ||
+              received.has(receivedKey(donorIndex, type))
+            ) return sum;
+            return sum + board[donorIndex].pieces[type];
+          }, 0);
           collector = {
             index: assignedIndex,
             own,
             free,
-            resultCount: own + Math.min(total - own, free),
+            incoming,
+            resultCount: own + Math.min(incoming, free),
             otherPieces: totalPieces(board[assignedIndex]) - own,
           };
+          if (collector.free <= 0 || collector.resultCount <= collector.own) collector = null;
         } else if (collectors[0]) {
           collector = collectors[0];
           collectorByType.set(type, collector.index);
         }
         if (!collector) continue;
 
-        const donors = holders.filter((index) => index !== collector.index).sort((a, b) => {
+        const donors = holders.filter((index) =>
+          index !== collector.index &&
+          !received.has(receivedKey(index, type))
+        ).sort((a, b) => {
           const otherA = totalPieces(board[a]) - board[a].pieces[type];
           const otherB = totalPieces(board[b]) - board[b].pieces[type];
           return otherB - otherA || board[b].pieces[type] - board[a].pieces[type] || localOrder.indexOf(a) - localOrder.indexOf(b);
@@ -247,6 +282,7 @@
           board[donorIndex].pieces[type] -= count;
           cleanPieces(board[donorIndex]);
           board[collector.index].pieces[type] = (board[collector.index].pieces[type] || 0) + count;
+          received.add(receivedKey(collector.index, type));
           const spreadEvent = {
             kind: "spread",
             source: donorIndex,
@@ -290,16 +326,17 @@
     ]));
     const supply = sourceIndexes.reduce((sum, sourceIndex) => sum + board[sourceIndex].pieces[type], 0);
     const free = PLATE_CAPACITY - totalPieces(target);
-    const completionPossible = target.pieces[type] + supply >= PLATE_CAPACITY;
-    // A newly placed plate with at least one free slot gathers the chosen type
+    const availableRoom = free + displaceableOtherPieces(target, index, type, received);
+    const completionPossible = target.pieces[type] + Math.min(supply, availableRoom) >= PLATE_CAPACITY;
+    // An active plate with at least one free slot gathers the chosen type
     // up to six pieces, even when that means moving its other types aside.
     // A plate that started full may exchange pieces only to complete six.
     const wanted = free > 0 || completionPossible
-      ? Math.min(supply, PLATE_CAPACITY - target.pieces[type])
+      ? Math.min(supply, PLATE_CAPACITY - target.pieces[type], availableRoom)
       : 0;
     if (wanted <= 0) return null;
 
-    const displaced = removeOtherPieces(target, type, Math.max(0, wanted - free));
+    const displaced = removeOtherPieces(target, type, Math.max(0, wanted - free), index, received);
     let remaining = wanted;
     const origins = [];
 
@@ -340,29 +377,111 @@
     };
   }
 
+  function eventTransfers(event) {
+    if (event.kind === "spread") {
+      return event.moves.map((move) => ({
+        from: event.source,
+        to: move.to,
+        type: event.type,
+        count: move.count,
+        ...(event.via === undefined ? {} : { via: event.via }),
+      }));
+    }
+    return [
+      ...event.origins.map((origin) => ({
+        from: origin.index,
+        to: event.target,
+        type: event.type,
+        count: origin.count,
+      })),
+      ...event.spread.map((move) => ({
+        from: event.target,
+        to: move.to,
+        type: move.type,
+        count: move.count,
+      })),
+    ];
+  }
+
   function resolvePlacement(inputBoard, placedIndex) {
     const board = cloneBoard(inputBoard);
     const locked = new Set();
     const events = [];
     const received = new Set();
+    const revisions = Array(board.length).fill(0);
+    const processedRevisions = Array(board.length).fill(-1);
+    const pending = new Set();
+    const queue = [];
+    const initialPieceCount = board.reduce((sum, plate) => sum + totalPieces(plate), 0);
+    const maxActivations = initialPieceCount * 2 + board.length + 1;
+    let activations = 0;
+    let localSafetyLimitReached = false;
 
-    // Only the newly placed plate initiates sorting. Its four direct neighbors
-    // may receive pieces, but they do not start another pull from a second ring.
-    const type = choosePullType(board, placedIndex, locked, received);
-    const result = type ? pullType(board, placedIndex, type, locked, received) : null;
-    if (result) {
-      events.push(...result.events);
+    const enqueue = (index) => {
+      if (!board[index] || locked.has(index)) return;
+      if (pending.has(index)) return;
+      pending.add(index);
+      queue.push(index);
+    };
 
-      const uniqueTouched = [...new Set(result.touched)];
-      for (const touchedIndex of uniqueTouched) {
-        if (isComplete(board[touchedIndex])) locked.add(touchedIndex);
+    const markCompleted = (indexes) => {
+      for (const index of indexes) {
+        if (isComplete(board[index])) locked.add(index);
       }
-    }
+    };
 
-    const consolidation = consolidateLocalColors(board, placedIndex, locked);
-    events.push(...consolidation.events);
-    for (const touchedIndex of consolidation.touched) {
-      if (isComplete(board[touchedIndex])) locked.add(touchedIndex);
+    const scheduleChangedPlates = (newEvents, centerIndex) => {
+      const transfers = newEvents.flatMap(eventTransfers);
+      const changed = new Set();
+      const receivers = [];
+      const sources = [];
+
+      for (const transfer of transfers) {
+        changed.add(transfer.from);
+        changed.add(transfer.to);
+        if (!receivers.includes(transfer.to)) receivers.push(transfer.to);
+        if (!sources.includes(transfer.from)) sources.push(transfer.from);
+      }
+      for (const index of changed) revisions[index] += 1;
+
+      // Continue the visible wave outwards before reconsidering its current
+      // center. Every changed plate uses the same total-count color priority.
+      for (const index of receivers) {
+        if (index !== centerIndex) enqueue(index);
+      }
+      for (const index of sources) {
+        if (index !== centerIndex) enqueue(index);
+      }
+      if (changed.has(centerIndex)) enqueue(centerIndex);
+    };
+
+    revisions[placedIndex] = 1;
+    enqueue(placedIndex);
+
+    while (queue.length && activations < maxActivations) {
+      const index = queue.shift();
+      pending.delete(index);
+      if (!board[index] || locked.has(index)) continue;
+      if (processedRevisions[index] >= revisions[index]) continue;
+      processedRevisions[index] = revisions[index];
+      activations += 1;
+
+      const activationEvents = [];
+      const type = choosePullType(board, index, locked, received);
+      const result = type ? pullType(board, index, type, locked, received) : null;
+      if (result) {
+        events.push(...result.events);
+        activationEvents.push(...result.events);
+        markCompleted(new Set(result.touched));
+      }
+
+      const consolidation = consolidateLocalColors(board, index, locked, received);
+      events.push(...consolidation.events);
+      activationEvents.push(...consolidation.events);
+      markCompleted(consolidation.touched);
+      localSafetyLimitReached ||= consolidation.safetyLimitReached;
+
+      if (activationEvents.length) scheduleChangedPlates(activationEvents, index);
     }
 
     const completed = [...locked].sort((a, b) => a - b);
@@ -373,7 +492,14 @@
     const settledBoard = cloneBoard(board);
     for (const index of [...completed, ...emptied]) board[index] = null;
 
-    return { board, settledBoard, events, completed, emptied, safetyLimitReached: consolidation.safetyLimitReached };
+    return {
+      board,
+      settledBoard,
+      events,
+      completed,
+      emptied,
+      safetyLimitReached: localSafetyLimitReached || queue.length > 0,
+    };
   }
 
   function buildAnimationSteps(events) {
@@ -414,28 +540,7 @@
 
   function buildAnimationBatches(events) {
     return events.map((event) => {
-      const transfers = event.kind === "spread"
-        ? event.moves.map((move) => ({
-          from: event.source,
-          to: move.to,
-          type: event.type,
-          count: move.count,
-          ...(event.via === undefined ? {} : { via: event.via }),
-        }))
-        : [
-          ...event.origins.map((origin) => ({
-            from: origin.index,
-            to: event.target,
-            type: event.type,
-            count: origin.count,
-          })),
-          ...event.spread.map((move) => ({
-            from: event.target,
-            to: move.to,
-            type: move.type,
-            count: move.count,
-          })),
-        ];
+      const transfers = eventTransfers(event);
       const grouped = [];
       for (const transfer of transfers) {
         const existing = grouped.find((candidate) =>

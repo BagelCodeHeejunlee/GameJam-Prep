@@ -25,6 +25,12 @@ function applyAnimationBatches(inputBoard, batches) {
   const board = Engine.cloneBoard(inputBoard);
   for (const batch of batches) {
     for (const transfer of batch) {
+      assert.ok(board[transfer.from], `출발 판 ${transfer.from}이 있어야 한다`);
+      assert.ok(board[transfer.to], `도착 판 ${transfer.to}이 있어야 한다`);
+      assert.ok(
+        (board[transfer.from].pieces[transfer.type] || 0) >= transfer.count,
+        `${transfer.from}번 판에 이동할 ${transfer.type} 조각이 충분해야 한다`,
+      );
       board[transfer.from].pieces[transfer.type] -= transfer.count;
       if (board[transfer.from].pieces[transfer.type] === 0) delete board[transfer.from].pieces[transfer.type];
     }
@@ -36,6 +42,55 @@ function applyAnimationBatches(inputBoard, batches) {
     }
   }
   return board;
+}
+function colorTotals(board) {
+  return Object.fromEntries(Engine.CAKE_ORDER.map((type) => [
+    type,
+    board.reduce((sum, plateData) => sum + (plateData?.pieces[type] || 0), 0),
+  ]));
+}
+function assertChainInvariants(initial, result, label) {
+  const batches = Engine.buildAnimationBatches(result.events);
+  const replay = Engine.cloneBoard(initial);
+  const completed = new Set();
+  const received = new Set();
+
+  assert.equal(result.safetyLimitReached, false, `${label}: 연쇄 안전 제한에 닿으면 안 된다`);
+  assert.deepEqual(colorTotals(result.settledBoard), colorTotals(initial), `${label}: 색깔별 조각 수가 보존되어야 한다`);
+
+  for (const batch of batches) {
+    for (const transfer of batch) {
+      const direct = Engine.getNeighbors(transfer.from).includes(transfer.to);
+      const relayed = transfer.via !== undefined &&
+        Engine.getNeighbors(transfer.from).includes(transfer.via) &&
+        Engine.getNeighbors(transfer.via).includes(transfer.to);
+      assert.ok(direct || relayed, `${label}: 모든 이동은 한 칸 또는 현재 중심판을 경유해야 한다`);
+      assert.equal(completed.has(transfer.from), false, `${label}: 완성 판은 다시 조각을 주면 안 된다`);
+      assert.equal(completed.has(transfer.to), false, `${label}: 완성 판은 다시 조각을 받으면 안 된다`);
+      assert.equal(
+        received.has(`${transfer.from}:${transfer.type}`),
+        false,
+        `${label}: 한 번 도착한 색이 다시 출발하면 안 된다`,
+      );
+      assert.ok(replay[transfer.from] && replay[transfer.to], `${label}: 이동 양쪽에 판이 있어야 한다`);
+      assert.ok(
+        (replay[transfer.from].pieces[transfer.type] || 0) >= transfer.count,
+        `${label}: 출발 판의 조각 수가 충분해야 한다`,
+      );
+      replay[transfer.from].pieces[transfer.type] -= transfer.count;
+      if (!replay[transfer.from].pieces[transfer.type]) delete replay[transfer.from].pieces[transfer.type];
+    }
+    for (const transfer of batch) {
+      replay[transfer.to].pieces[transfer.type] = (replay[transfer.to].pieces[transfer.type] || 0) + transfer.count;
+      received.add(`${transfer.to}:${transfer.type}`);
+    }
+    for (let index = 0; index < replay.length; index += 1) {
+      assert.ok(!replay[index] || Engine.totalPieces(replay[index]) <= Engine.PLATE_CAPACITY, `${label}: 판은 6조각을 넘으면 안 된다`);
+      if (Engine.isComplete(replay[index])) completed.add(index);
+    }
+  }
+
+  assert.deepEqual(replay, result.settledBoard, `${label}: 애니메이션 재생 결과가 엔진 결과와 같아야 한다`);
 }
 
 {
@@ -240,18 +295,73 @@ function applyAnimationBatches(inputBoard, batches) {
     [7, { blueberry: 3 }],
   ]);
   const result = Engine.resolvePlacement(initial, 5);
-  assert.equal(result.board[4], null);
-  assert.deepEqual(result.board[5].pieces, { berry: 4 });
-  assert.deepEqual(result.board[6].pieces, { blueberry: 3 }, "인접 판은 새 판의 B2까지만 받아야 한다");
-  assert.deepEqual(result.board[7].pieces, { blueberry: 3 }, "인접 판의 이웃인 두 번째 칸은 연계되면 안 된다");
-  assert.ok(result.events.every((event) =>
-    event.source !== 7 &&
-    event.target !== 7 &&
-    !event.origins?.some((origin) => origin.index === 7) &&
-    !event.moves?.some((move) => move.to === 7) &&
-    !event.spread?.some((move) => move.to === 7)
-  ));
-  assert.deepEqual(applyAnimationSteps(initial, Engine.buildAnimationSteps(result.events)), result.settledBoard);
+  assert.deepEqual(Engine.buildAnimationBatches(result.events), [
+    [{ from: 4, to: 5, type: "berry", count: 2 }],
+    [{ from: 5, to: 6, type: "blueberry", count: 2 }],
+    [{ from: 7, to: 6, type: "blueberry", count: 3 }],
+  ], "B2를 받은 6번 판이 새 중심이 되어 7번 판의 B3까지 연쇄로 받아야 한다");
+  assert.deepEqual(result.settledBoard[5].pieces, { berry: 4 });
+  assert.deepEqual(result.settledBoard[6].pieces, { blueberry: 6 });
+  assert.deepEqual(result.completed, [6]);
+  assert.deepEqual(result.emptied, [4, 7]);
+  assertChainInvariants(initial, result, "한 칸 바깥 수신판 연쇄");
+}
+
+{
+  const initial = boardWith([
+    [4, { berry: 2 }],
+    [5, { berry: 2, blueberry: 2 }],
+    [6, { blueberry: 1 }],
+    [7, { blueberry: 3, lemon: 1 }],
+    [11, { lemon: 5 }],
+    [12, { matcha: 2 }],
+    [13, { matcha: 3 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(Engine.buildAnimationBatches(result.events).slice(0, 4), [
+    [{ from: 4, to: 5, type: "berry", count: 2 }],
+    [{ from: 5, to: 6, type: "blueberry", count: 2 }],
+    [{ from: 7, to: 6, type: "blueberry", count: 3 }],
+    [{ from: 11, to: 7, type: "lemon", count: 5 }],
+  ], "조각을 준 7번 판도 새 중심이 되어 다음 레몬 완성을 이어가야 한다");
+  assert.deepEqual(result.completed, [6, 7]);
+  assert.deepEqual(result.emptied, [4, 11]);
+  assert.deepEqual(result.settledBoard[12].pieces, { matcha: 2 }, "연쇄와 떨어진 판은 정렬되면 안 된다");
+  assert.deepEqual(result.settledBoard[13].pieces, { matcha: 3 }, "연쇄와 떨어진 판은 정렬되면 안 된다");
+  assertChainInvariants(initial, result, "주는 판까지 이어지는 다단 연쇄");
+}
+
+{
+  const initial = boardWith([
+    [2, { lemon: 2 }],
+    [4, { berry: 2 }],
+    [5, { berry: 2, blueberry: 2 }],
+    [6, { blueberry: 1 }],
+    [10, { lemon: 2 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(
+    Engine.buildAnimationBatches(result.events).at(-1),
+    [{ from: 10, to: 2, type: "lemon", count: 2, via: 6 }],
+    "두 팔 사이 이동은 최초 배치 칸이 아니라 실제 연쇄 중심인 6번 판을 경유해야 한다",
+  );
+  assertChainInvariants(initial, result, "연쇄 중심 경유 경로");
+}
+
+{
+  const initial = boardWith([
+    [2, { lemon: 4 }],
+    [4, { berry: 2 }],
+    [5, { berry: 2, blueberry: 2 }],
+    [6, { blueberry: 1, lemon: 1 }],
+  ]);
+  const result = Engine.resolvePlacement(initial, 5);
+  assert.deepEqual(Engine.buildAnimationBatches(result.events).slice(0, 3), [
+    [{ from: 4, to: 5, type: "berry", count: 2 }],
+    [{ from: 5, to: 6, type: "blueberry", count: 2 }],
+    [{ from: 2, to: 6, type: "lemon", count: 2 }],
+  ], "연쇄 중심도 방금 받은 색이 아니라 주변 합계가 더 많은 색을 먼저 정렬해야 한다");
+  assertChainInvariants(initial, result, "연쇄 중심의 전체 합계 우선순위");
 }
 
 {
@@ -278,6 +388,43 @@ function applyAnimationBatches(inputBoard, batches) {
 {
   const neighbors = Engine.getNeighbors(5);
   assert.deepEqual(neighbors, [1, 6, 9, 4], "우선순위는 상, 우, 하, 좌여야 한다");
+}
+
+{
+  let seed = 0xC0FFEE;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+  const types = Engine.CAKE_ORDER.slice(0, 4);
+
+  for (let caseIndex = 0; caseIndex < 2000; caseIndex += 1) {
+    const initial = Array(16).fill(null);
+    const occupied = [];
+    for (let index = 0; index < initial.length; index += 1) {
+      if (random() >= 0.62) continue;
+      const count = 1 + Math.floor(random() * Engine.PLATE_CAPACITY);
+      const pieces = {};
+      for (let pieceIndex = 0; pieceIndex < count; pieceIndex += 1) {
+        const type = types[Math.floor(random() * types.length)];
+        pieces[type] = (pieces[type] || 0) + 1;
+      }
+      if (count === Engine.PLATE_CAPACITY && Object.keys(pieces).length === 1) {
+        const onlyType = Object.keys(pieces)[0];
+        pieces[onlyType] -= 1;
+        pieces[types[(types.indexOf(onlyType) + 1) % types.length]] = 1;
+      }
+      initial[index] = plate(pieces, index + 1);
+      occupied.push(index);
+    }
+    if (!occupied.length) {
+      caseIndex -= 1;
+      continue;
+    }
+    const placedIndex = occupied[Math.floor(random() * occupied.length)];
+    const result = Engine.resolvePlacement(initial, placedIndex);
+    assertChainInvariants(initial, result, `결정론적 연쇄 퍼즈 ${caseIndex}`);
+  }
 }
 
 console.log("Cake Link engine tests passed");
