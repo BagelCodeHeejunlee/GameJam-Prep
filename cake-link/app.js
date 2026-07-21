@@ -494,14 +494,14 @@
         route,
         portalRelay,
         multiHop: Boolean(route?.length > 2 || rowDistance + columnDistance > 1),
-        laneOffset: 0,
+        reciprocal: false,
       };
     });
     for (let first = 0; first < plans.length; first += 1) {
       for (let second = first + 1; second < plans.length; second += 1) {
         if (plans[first].from === plans[second].to && plans[first].to === plans[second].from) {
-          plans[first].laneOffset = .55;
-          plans[second].laneOffset = .55;
+          plans[first].reciprocal = true;
+          plans[second].reciprocal = true;
         }
       }
     }
@@ -639,7 +639,8 @@
     if (!plan.sourceWheel || !plan.targetWheel || plan.sourceLast < 0 || plan.targetLast < 0) return null;
     const fromRect = layoutRect(plan.sourceWheel);
     const toRect = layoutRect(plan.targetWheel);
-    const rects = routeRects(plan.route, fromRect, toRect, fromRect.width * plan.laneOffset);
+    const reciprocalOffset = plan.reciprocal ? Motion.reciprocalLaneOffset(fromRect.width) : 0;
+    const rects = routeRects(plan.route, fromRect, toRect, reciprocalOffset);
     const flight = plan.multiHop
       ? Motion.createHopFlightMotion({ rects, reducedMotion: reducedMotion() })
       : Motion.createRoutedFlightMotion({ rects, reducedMotion: reducedMotion() });

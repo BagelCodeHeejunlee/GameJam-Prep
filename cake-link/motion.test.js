@@ -7,6 +7,21 @@ const closeTo = (actual, expected, message) => {
 const rect = (left, top, width = 100, height = width) => ({ left, top, width, height });
 
 {
+  closeTo(Motion.reciprocalLaneOffset(80), 3.6, "reciprocal transfers use the same subtle fan as regular flights");
+  closeTo(Motion.reciprocalLaneOffset(200), 4, "reciprocal separation never exceeds four pixels");
+  closeTo(Motion.reciprocalLaneOffset(-20), 0, "invalid negative sizes cannot reverse the lane");
+
+  const lane = Motion.reciprocalLaneOffset(80);
+  const downward = Motion.createRoutedFlightMotion({
+    rects: [rect(0, 0, 80), rect(-lane, 100, 80), rect(0, 200, 80)],
+  });
+  assert.ok(
+    downward.points.every((point) => Math.abs(point.x - 40) <= 4),
+    "a downward reciprocal transfer stays inside the source-to-target corridor",
+  );
+}
+
+{
   const motion = Motion.createFlightMotion({
     fromRect: rect(0, 0),
     toRect: rect(200, 0),

@@ -16,6 +16,10 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function reciprocalLaneOffset(cellSize) {
+    return Math.min(4, Math.max(0, finite(cellSize)) * 0.045);
+  }
+
   function normalizeRect(rect) {
     const width = Math.max(0, finite(rect?.width));
     const height = Math.max(0, finite(rect?.height));
@@ -56,7 +60,7 @@
       to.height || Infinity
     );
     const usableCellSize = Number.isFinite(smallestCell) ? smallestCell : 0;
-    const fan = Math.min(4, usableCellSize * 0.045);
+    const fan = reciprocalLaneOffset(usableCellSize);
     const lanePosition = laneCount === 1 ? 0 : (laneIndex / (laneCount - 1)) * 2 - 1;
     const laneOffset = lanePosition * fan;
 
@@ -492,5 +496,6 @@
     findGridRoute,
     offsetRotationMotion,
     quadraticPoint,
+    reciprocalLaneOffset,
   };
 });

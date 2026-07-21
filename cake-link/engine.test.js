@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const Engine = require("./engine.js");
+const Stages = require("./stages.js");
 
 function plate(pieces, id = Math.random()) { return { id, pieces: { ...pieces } }; }
 function boardWith(entries) {
@@ -35,6 +36,26 @@ function applyAnimationBatches(inputBoard, batches) {
     }
   }
   return board;
+}
+
+{
+  // Stage 1 reproduction: place the middle opening plate (A2B1) in cell 6,
+  // between the two initial A2 plates at cells 5 and 10.
+  const stage = Stages.getStage(1);
+  const initial = boardWith(stage.initialPlates.map((item) => [item.index, item.pieces]));
+  initial[6] = plate(stage.openingRack[1], 100);
+  const result = Engine.resolvePlacement(initial, 6);
+  const batches = Engine.buildAnimationBatches(result.events);
+
+  assert.deepEqual(batches, [[
+    { from: 10, to: 6, type: "berry", count: 2 },
+    { from: 5, to: 6, type: "berry", count: 2 },
+    { from: 6, to: 10, type: "lemon", count: 1 },
+  ]], "노랑 조각은 새 판에서 바로 아래 기본 판으로 한 칸만 이동해야 한다");
+  assert.deepEqual(result.settledBoard[6].pieces, { berry: 6 });
+  assert.deepEqual(result.settledBoard[10].pieces, { lemon: 1 });
+  assert.equal(result.completed.includes(6), true);
+  assert.equal(result.emptied.includes(5), true);
 }
 
 {
