@@ -3,6 +3,7 @@
 
   const Engine = window.CakeLinkEngine;
   const Stages = window.CakeLinkStages;
+  const Mechanics = window.CakeLinkMechanics;
   const Motion = window.CakeLinkMotion;
   const CAKES = {
     berry: { name: "딸기", emoji: "🍓", color: "#f07483" },
@@ -10,7 +11,10 @@
     lemon: { name: "레몬", emoji: "🍋", color: "#f2c85a" },
     matcha: { name: "말차", emoji: "🍵", color: "#79a86d" },
     choco: { name: "초코", emoji: "🍫", color: "#8b5945" },
+    rainbow: { name: "무지개", emoji: "🌈", color: "#dda6d1" },
+    mystery: { name: "미스테리", emoji: "?", color: "#c8b8d8" },
   };
+  const PIECE_ORDER = [...Engine.CAKE_ORDER, "rainbow"];
   const EMPTY_COLOR = "#eee4d6";
   const BEST_KEY = "cakeLink.v1.bestScore";
   const STAGE_KEY = "cakeLink.v1.currentStage";
@@ -19,14 +23,16 @@
   const $ = (selector) => document.querySelector(selector);
   const elements = {
     home: $("#homeScreen"), gameShell: $("#gameShell"), play: $("#playButton"),
-    debugReset: $("#debugResetButton"),
+    debugReset: $("#debugResetButton"), debugStage: $("#debugStageSelect"),
     homeButton: $("#homeButton"), homeSound: $("#homeSoundButton"),
     guideButton: $("#guideButton"), guide: $("#guideOverlay"),
     guideClose: $("#guideCloseButton"), guidePlay: $("#guidePlayButton"),
+    guideCapacityNumber: $("#guideCapacityNumber"), guideCapacityText: $("#guideCapacityText"),
     stageTitle: $("#currentStageTitle"), stageDifficulty: $("#stageDifficulty"),
+    stageGimmick: $("#stageGimmickPreview"),
     stageGoalPreview: $("#stageGoalPreview"), goalProgress: $("#goalProgress"),
     movesCounter: $("#movesCounter"), movesRemaining: $("#movesRemaining"),
-    board: $("#board"), rack: $("#rack"), swap: $("#swapLabel"),
+    board: $("#board"), rack: $("#rack"),
     hint: $("#boardHint"), toast: $("#toast"), sound: $("#soundButton"),
     restart: $("#restartButton"), result: $("#resultOverlay"), retry: $("#retryButton"),
     resultEyebrow: $("#resultEyebrow"), resultTitle: $("#resultTitle"),
@@ -57,30 +63,56 @@
     const board = Array(Engine.BOARD_SIZE ** 2).fill(null);
     let nextId = 1;
     for (const initial of currentStage.initialPlates) {
-      board[initial.index] = { id: nextId++, pieces: { ...initial.pieces } };
+      board[initial.index] = plateFromSpec(initial, nextId++);
     }
     return {
       board,
       rack: [], batch: 0, deckIndex: 0, nextId,
-      completed: 0, completedByType: {}, score: 0, swaps: currentStage.swaps,
+      completed: 0, completedByType: {}, score: 0,
       movesRemaining: currentStage.moveLimit, busy: false,
       sound: true, random, activeCells: new Set(), completeCells: new Set(), emptyCells: new Set(),
-      transitionCells: new Set(),
+      transitionCells: new Set(), effectCells: new Map(), mechanics: Mechanics.createRuntime(currentStage),
       best: Number(localStorage.getItem(BEST_KEY) || 0),
     };
   }
 
-  function plate(pieces) {
-    return { id: state.nextId++, pieces: { ...pieces } };
+  function cloneLayer(layer) {
+    return {
+      ...layer,
+      capacity: layer?.capacity || Stages.stageCapacity?.(currentStage) || Engine.PLATE_CAPACITY,
+      pieces: { ...(layer?.pieces || {}) },
+    };
+  }
+
+  function plateFromSpec(spec, id) {
+    const normalized = spec?.pieces ? spec : { pieces: spec || {} };
+    return {
+      ...normalized,
+      id,
+      capacity: normalized.capacity || Stages.stageCapacity?.(currentStage) || Engine.PLATE_CAPACITY,
+      pieces: { ...(normalized.pieces || {}) },
+      ...(normalized.layers ? { layers: normalized.layers.map(cloneLayer) } : {}),
+      ...(normalized.hiddenColors ? { hiddenColors: [...normalized.hiddenColors] } : {}),
+    };
+  }
+
+  function plate(spec) {
+    return plateFromSpec(spec, state.nextId++);
   }
 
   function generatedPlate(slot) {
     if (state.deckIndex < currentStage.openingRack.length) {
-      return plate(currentStage.openingRack[state.deckIndex++]);
+      const index = state.deckIndex++;
+      const spec = Stages.createPlateData
+        ? Stages.createPlateData(currentStage, currentStage.openingRack[index], currentStage.openingModifiers?.[index], state.random)
+        : { pieces: currentStage.openingRack[index] };
+      return plate(spec);
     }
-    const pieces = Stages.createWeightedPlate(currentStage, state.random);
+    const spec = Stages.createWeightedPlateData
+      ? Stages.createWeightedPlateData(currentStage, state.random)
+      : { pieces: Stages.createWeightedPlate(currentStage, state.random) };
     state.deckIndex += 1;
-    return plate(pieces);
+    return plate(spec);
   }
 
   function refillRack(announce = true) {
@@ -91,36 +123,63 @@
 
   function slotsFor(plateData) {
     const slots = [];
-    for (const type of Engine.CAKE_ORDER) {
+    for (const type of PIECE_ORDER) {
       for (let count = 0; count < (plateData?.pieces[type] || 0); count += 1) slots.push(type);
     }
-    while (slots.length < Engine.PLATE_CAPACITY) slots.push(null);
-    return slots.slice(0, Engine.PLATE_CAPACITY);
+    for (let count = 0; count < (plateData?.hiddenColors?.length || 0); count += 1) slots.push("mystery");
+    const capacity = Engine.capacityOf ? Engine.capacityOf(plateData) : Engine.PLATE_CAPACITY;
+    while (slots.length < capacity) slots.push(null);
+    return slots.slice(0, capacity);
   }
 
   function gradientForSlots(slots) {
-    return `conic-gradient(from -30deg, ${slots.map((type, index) => {
-      const start = index * 60;
-      return `${type ? CAKES[type].color : EMPTY_COLOR} ${start}deg ${start + 60}deg`;
+    const angle = 360 / Math.max(1, slots.length);
+    return `conic-gradient(from ${-angle / 2}deg, ${slots.map((type, index) => {
+      const start = index * angle;
+      return `${type ? CAKES[type]?.color || EMPTY_COLOR : EMPTY_COLOR} ${start}deg ${start + angle}deg`;
     }).join(", ")})`;
   }
 
-  function plateMarkup(plateData, rotation = 0) {
+  function singlePlateMarkup(plateData, rotation = 0, className = "", active = true) {
     const slots = slotsFor(plateData);
     const gradient = gradientForSlots(slots);
     const counts = Object.entries(plateData?.pieces || {})
       .filter(([, count]) => count > 0)
-      .map(([type, count]) => `<span title="${CAKES[type].name} ${count}개">${CAKES[type].emoji}${count}</span>`)
+      .map(([type, count]) => `<span title="${CAKES[type]?.name || type} ${count}개">${CAKES[type]?.emoji || "?"}${count}</span>`)
       .join("");
+    const capacity = Engine.capacityOf ? Engine.capacityOf(plateData) : Engine.PLATE_CAPACITY;
     const emptyClass = Engine.totalPieces(plateData) ? "" : " empty-plate";
-    return `<div class="cake-plate${emptyClass}" aria-hidden="true"><div class="cake-wheel" style="--cake-gradient:${gradient};--wheel-rotation:${rotation}deg"></div><div class="plate-counts">${counts}</div></div>`;
+    const colorClass = plateData?.allowedColor ? " color-plate" : "";
+    const accent = plateData?.allowedColor ? CAKES[plateData.allowedColor]?.color : null;
+    const mysteryCount = plateData?.hiddenColors?.length || 0;
+    return `<div class="cake-plate${emptyClass}${colorClass}${className ? ` ${className}` : ""}"${accent ? ` style="--plate-accent:${accent}"` : ""} aria-hidden="true">
+      <div class="cake-wheel" data-capacity="${capacity}" data-active-layer="${active}" style="--cake-gradient:${gradient};--wheel-rotation:${rotation}deg;--slice-angle:${360 / capacity}deg"></div>
+      <div class="plate-counts">${counts}</div>
+      ${plateData?.allowedColor ? `<span class="plate-color-badge">${CAKES[plateData.allowedColor]?.emoji || "●"}</span>` : ""}
+      ${capacity === 8 ? `<span class="capacity-badge">8</span>` : ""}
+      ${mysteryCount ? `<span class="mystery-count">?${mysteryCount}</span>` : ""}
+      ${plateData?.pieces?.rainbow ? `<span class="rainbow-count">🌈${plateData.pieces.rainbow}</span>` : ""}
+    </div>`;
+  }
+
+  function plateMarkup(plateData, rotation = 0) {
+    if (plateData?.layers?.length) {
+      const lower = { ...plateData.layers[0], id: plateData.id };
+      return `<div class="layered-cake-plate">${singlePlateMarkup(lower, rotation, "layer-bottom", false)}${singlePlateMarkup(plateData, rotation, "layer-top", true)}</div>`;
+    }
+    return singlePlateMarkup(plateData, rotation);
   }
 
   function plateLabel(plateData) {
-    return Object.entries(plateData.pieces)
-      .filter(([, count]) => count > 0)
-      .map(([type, count]) => `${CAKES[type].name} ${count}개`)
-      .join(", ");
+    const visible = Object.entries(plateData.pieces || {})
+      .filter(([type, count]) => type !== "mystery" && count > 0)
+      .map(([type, count]) => `${CAKES[type]?.name || type} ${count}개`);
+    if (plateData.hiddenColors?.length) visible.push(`미스테리 ${plateData.hiddenColors.length}개`);
+    if (plateData.allowedColor) visible.push(`${CAKES[plateData.allowedColor]?.name || plateData.allowedColor} 전용 접시`);
+    if (plateData.receiveOnly) visible.push("받기 전용");
+    if ((Engine.capacityOf?.(plateData) || Engine.PLATE_CAPACITY) === 8) visible.push("8조각 완성 판");
+    if (plateData.layers?.length) visible.push("이층 케이크");
+    return visible.join(", ");
   }
 
   function isPlayableCell(index) {
@@ -129,8 +188,16 @@
     return currentStage.boardMask[row]?.[column] === "1";
   }
 
+  function runtimeHas(collection, index) {
+    return Array.isArray(collection) ? collection.includes(index) : Boolean(collection?.[index]);
+  }
+
+  function configHasIndex(entries, index) {
+    return (entries || []).some((entry) => (Number.isInteger(entry) ? entry : entry?.index) === index);
+  }
+
   function isBoardFull() {
-    return state.board.every((plateData, index) => !isPlayableCell(index) || Boolean(plateData));
+    return Mechanics.legalPlacementIndexes(currentStage, state.mechanics, state.board).length === 0;
   }
 
   function renderBoard() {
@@ -142,37 +209,82 @@
       if (!isPlayableCell(index)) {
         return `<div class="cell blocked" role="gridcell" data-cell="${index}" aria-label="${row}행 ${col}열, 사용할 수 없는 칸"></div>`;
       }
+      const iceLocked = runtimeHas(state.mechanics.iceCells, index);
+      const keyLocked = runtimeHas(state.mechanics.lockedCells, index);
+      const collapsed = runtimeHas(state.mechanics.brokenCells, index);
+      const hasFrog = state.mechanics.frogIndex === index;
+      const frogGoal = currentStage.mechanics?.frog?.goalIndex === index;
+      const fragile = configHasIndex(currentStage.mechanics?.fragileCells, index) && !collapsed;
+      const dropAllowed = !plateData && Mechanics.isCellAvailable(currentStage, state.mechanics, index, state.board);
       const classes = ["cell", plateData ? "occupied" : "empty"];
       if (state.activeCells.has(index)) classes.push("active");
       if (state.completeCells.has(index)) classes.push("complete");
       if (state.emptyCells.has(index)) classes.push("emptying");
       if (state.transitionCells.has(index)) classes.push("sorting");
-      const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}` : `${row}행 ${col}열, 빈칸`;
-      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}</div>`;
+      if (iceLocked) classes.push("ice-locked");
+      if (keyLocked) classes.push("key-locked");
+      if (collapsed) classes.push("collapsed");
+      if (fragile) classes.push("fragile");
+      if (hasFrog) classes.push("frog-cell");
+      const effectClass = state.effectCells.get(index);
+      if (effectClass) classes.push(effectClass);
+      const lock = currentStage.mechanics?.locks?.find((item) =>
+        item.index === index || item.indexes?.includes(index)
+      );
+      const keyColor = lock?.keyColor || lock?.color || lock?.trigger?.color;
+      const reason = iceLocked ? "얼음을 먼저 깨야 해요"
+        : keyLocked ? "열쇠 조건을 먼저 완료해야 해요"
+          : collapsed ? "깨진 받침대는 사용할 수 없어요"
+            : hasFrog ? "개구리가 있는 칸이에요"
+              : frogGoal ? "개구리 목표 칸이에요"
+                : plateData ? "이미 접시가 있어요" : "";
+      const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}`
+        : `${row}행 ${col}열, ${reason || "빈칸"}`;
+      const fixtures = [
+        fragile ? `<span class="cell-fixture fragile-cracks" aria-hidden="true"></span>` : "",
+        frogGoal ? `<span class="frog-goal" aria-hidden="true"></span>` : "",
+        iceLocked ? `<span class="cell-fixture ice-cover" aria-hidden="true"></span>` : "",
+        keyLocked ? `<span class="cell-fixture lock-cover" aria-hidden="true">${keyColor ? `<i class="lock-key-dot" style="--key-color:${CAKES[keyColor]?.color || "#999"}"></i>` : ""}</span>` : "",
+        hasFrog ? `<span class="frog-token" aria-hidden="true"></span>` : "",
+      ].join("");
+      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" data-drop-allowed="${dropAllowed}" data-block-reason="${reason}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}${fixtures}</div>`;
     }).join("");
   }
 
   function renderRack() {
     elements.rack.innerHTML = state.rack.map((plateData, index) => {
       if (!plateData) return `<div class="rack-card used" aria-label="사용한 자리"><span>사용 완료</span></div>`;
-      return `<div class="rack-card" role="group" data-rack="${index}" aria-label="${plateLabel(plateData)} 판. 빈칸으로 끌어서 놓으세요.">${plateMarkup(plateData)}<button class="swap-button" type="button" data-swap="${index}" ${state.swaps <= 0 || state.busy ? "disabled" : ""} aria-label="이 판 교체">↻</button></div>`;
+      return `<div class="rack-card" role="group" data-rack="${index}" aria-label="${plateLabel(plateData)} 판. 빈칸으로 끌어서 놓으세요.">${plateMarkup(plateData)}</div>`;
     }).join("");
 
     elements.rack.querySelectorAll(".rack-card[data-rack]").forEach((card) => {
       card.addEventListener("pointerdown", (event) => beginDrag(event, Number(card.dataset.rack), card));
     });
-    elements.rack.querySelectorAll(".swap-button").forEach((button) => {
-      button.addEventListener("pointerdown", (event) => event.stopPropagation());
-      button.addEventListener("click", (event) => { event.stopPropagation(); swapPlate(Number(button.dataset.swap)); });
-    });
   }
 
   function goalMarkup(showProgress) {
-    return Stages.goalEntries(currentStage).map(([type, target]) => {
+    const sequence = currentStage.mechanics?.orderedGoal?.sequence || currentStage.objective?.sequence;
+    if (sequence?.length) {
+      const cursor = showProgress ? state?.mechanics?.orderIndex || 0 : 0;
+      const visible = sequence.length <= 5 ? sequence : sequence.slice(Math.max(0, cursor - 1), cursor + 3);
+      return `<span class="goal-sequence" title="순서대로 케이크 완성">${visible.map((type, index) => {
+        const actualIndex = sequence.length <= 5 ? index : Math.max(0, cursor - 1) + index;
+        const className = actualIndex < cursor ? " done" : actualIndex === cursor ? " current" : "";
+        return `${index ? `<i class="sequence-arrow">›</i>` : ""}<span class="sequence-chip${className}">${CAKES[type]?.emoji || "?"}</span>`;
+      }).join("")}${sequence.length > visible.length ? `<b>+${sequence.length - visible.length}</b>` : ""}</span>`;
+    }
+    const chips = Stages.goalEntries(currentStage).map(([type, target]) => {
       const completed = Math.min(state?.completedByType[type] || 0, target);
       const count = showProgress ? `${completed}/${target}` : `${target}판`;
       return `<span class="goal-chip" title="${CAKES[type].name} 케이크 ${target}판"><span aria-hidden="true">${CAKES[type].emoji}</span><b>${count}</b></span>`;
-    }).join("");
+    });
+    if (currentStage.mechanics?.frog) {
+      const reached = Boolean(state?.mechanics?.frogReached);
+      const distance = state ? Mechanics.frogDistance(currentStage, state.mechanics, state.board) : null;
+      const count = showProgress ? (reached ? "도착!" : Number.isFinite(distance) ? `${distance}칸` : "대기") : "목표 도착";
+      chips.push(`<span class="goal-chip" title="개구리를 목표 칸까지 이동"><span aria-hidden="true">🐸</span><b>${count}</b></span>`);
+    }
+    return chips.join("");
   }
 
   function renderGoals() {
@@ -184,7 +296,6 @@
     renderBoard();
     renderRack();
     renderGoals();
-    elements.swap.textContent = state.swaps;
     elements.movesRemaining.textContent = state.movesRemaining;
     elements.movesCounter.classList.toggle("danger", state.movesRemaining <= 3);
     elements.hint.textContent = state.busy ? "케이크를 정렬하고 있어요" : "판을 위로 끌어 빈칸에 놓으세요";
@@ -231,10 +342,13 @@
     dragGesture.ghost.style.top = `${ghostY}px`;
 
     document.querySelector(".cell.drop-target")?.classList.remove("drop-target");
-    const candidate = document.elementFromPoint(ghostX, ghostY)?.closest(".cell.empty");
+    const hoveredCell = document.elementFromPoint(ghostX, ghostY)?.closest(".cell");
+    const candidate = hoveredCell?.dataset.dropAllowed === "true" ? hoveredCell : null;
     dragGesture.targetCell = candidate ? Number(candidate.dataset.cell) : null;
     candidate?.classList.add("drop-target");
-    elements.hint.textContent = candidate ? "여기에 놓을까요?" : "판을 빈칸 위까지 끌어주세요";
+    elements.hint.textContent = candidate
+      ? "여기에 놓을까요?"
+      : hoveredCell?.dataset.blockReason || "판을 빈칸 위까지 끌어주세요";
   }
 
   function moveDrag(event) {
@@ -306,7 +420,8 @@
   }
 
   function createMovingSlice(sourceWheel, lastSlot, count, className = "") {
-    const geometry = Motion.createSliceGroupGeometry({ lastSlot, count });
+    const capacity = Number(sourceWheel?.dataset.capacity) || Engine.PLATE_CAPACITY;
+    const geometry = Motion.createSliceGroupGeometry({ lastSlot, count, capacity });
     const movingSlice = document.createElement("div");
     movingSlice.className = `moving-slice ${className}`.trim();
     movingSlice.setAttribute("aria-hidden", "true");
@@ -405,7 +520,7 @@
     }
     for (const transfer of transfers) {
       for (let count = 0; count < transfer.count; count += 1) {
-        addOnePiece(board, transfer.to, transfer.type);
+        addOnePiece(board, transfer.to, transfer.targetType || transfer.asType || transfer.type);
       }
     }
   }
@@ -417,8 +532,9 @@
     const targetOffsets = new Map();
     const slotKey = (index, type) => `${index}:${type}`;
     for (const transfer of transfers) {
+      const targetType = transfer.targetType || transfer.asType || transfer.type;
       const sourceKey = slotKey(transfer.from, transfer.type);
-      const targetKey = slotKey(transfer.to, transfer.type);
+      const targetKey = slotKey(transfer.to, targetType);
       sourceTotals.set(sourceKey, (sourceTotals.get(sourceKey) || 0) + transfer.count);
       targetTotals.set(targetKey, (targetTotals.get(targetKey) || 0) + transfer.count);
     }
@@ -426,12 +542,13 @@
     const groupedPlans = transfers.map((transfer) => {
       const fromCell = elements.board.querySelector(`[data-cell="${transfer.from}"]`);
       const toCell = elements.board.querySelector(`[data-cell="${transfer.to}"]`);
-      const sourceWheel = fromCell?.querySelector(".cake-wheel");
-      const targetWheel = toCell?.querySelector(".cake-wheel");
+      const sourceWheel = fromCell?.querySelector('.cake-wheel[data-active-layer="true"]') || fromCell?.querySelector(".cake-wheel");
+      const targetWheel = toCell?.querySelector('.cake-wheel[data-active-layer="true"]') || toCell?.querySelector(".cake-wheel");
+      const targetType = transfer.targetType || transfer.asType || transfer.type;
       const sourceKey = slotKey(transfer.from, transfer.type);
-      const targetKey = slotKey(transfer.to, transfer.type);
+      const targetKey = slotKey(transfer.to, targetType);
       const sourceBlockLast = slotIndexFor(beforeBoard[transfer.from], transfer.type);
-      const targetBlockLast = slotIndexFor(afterBoard[transfer.to], transfer.type);
+      const targetBlockLast = slotIndexFor(afterBoard[transfer.to], targetType);
       const sourceOffset = sourceOffsets.get(sourceKey) || 0;
       const targetOffset = targetOffsets.get(targetKey) || 0;
       const sourceFirst = sourceBlockLast - sourceTotals.get(sourceKey) + 1 + sourceOffset;
@@ -461,6 +578,9 @@
       );
       return {
         ...transfer,
+        targetType,
+        sourceCapacity: Engine.capacityOf ? Engine.capacityOf(beforeBoard[transfer.from]) : Engine.PLATE_CAPACITY,
+        targetCapacity: Engine.capacityOf ? Engine.capacityOf(afterBoard[transfer.to]) : Engine.PLATE_CAPACITY,
         sourceWheel,
         targetWheel,
         sourceLast,
@@ -489,6 +609,8 @@
         count: plan.count,
         sourceFirst: plan.sourceFirst,
         targetFirst: plan.targetFirst,
+        sourceCapacity: plan.sourceCapacity,
+        targetCapacity: plan.targetCapacity,
       }).map(({ sourceSlot, targetSlot }) => ({
         ...plan,
         count: 1,
@@ -530,14 +652,14 @@
     return animation.finished.catch(() => {}).finally(() => animation.cancel());
   }
 
-  function createEmptyBackdrop(sourceWheel, rect) {
+  function createEmptyBackdrop(sourceWheel, rect, capacity = Engine.PLATE_CAPACITY) {
     const layer = document.createElement("div");
     layer.className = "moving-slice plate-transition-backdrop";
     layer.setAttribute("aria-hidden", "true");
     setLayerRect(layer, rect);
     const visual = sourceWheel.cloneNode(false);
     visual.classList.add("plate-transition-wheel");
-    visual.style.setProperty("--cake-gradient", gradientForSlots(Array(Engine.PLATE_CAPACITY).fill(null)));
+    visual.style.setProperty("--cake-gradient", gradientForSlots(Array(capacity).fill(null)));
     visual.style.setProperty("--wheel-rotation", "0deg");
     layer.appendChild(visual);
     document.body.appendChild(layer);
@@ -545,7 +667,8 @@
   }
 
   function createPlatePreparation(index, beforePlate, afterPlate, hasOutgoing) {
-    const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
+    const wheel = elements.board.querySelector(`[data-cell="${index}"] .cake-wheel[data-active-layer="true"]`)
+      || elements.board.querySelector(`[data-cell="${index}"] .cake-wheel`);
     if (!wheel) {
       return { index, layers: [], align: () => Promise.resolve(), reflow: () => Promise.resolve() };
     }
@@ -554,7 +677,7 @@
       beforeSlots: slotsFor(beforePlate),
       afterSlots: slotsFor(afterPlate),
     });
-    const backdrop = createEmptyBackdrop(wheel, rect);
+    const backdrop = createEmptyBackdrop(wheel, rect, Engine.capacityOf ? Engine.capacityOf(beforePlate) : Engine.PLATE_CAPACITY);
     const retained = transition.retained.map((group) => {
       const layer = createMovingSlice(wheel, group.fromLast, group.count, "plate-transition-retained");
       setLayerRect(layer, rect);
@@ -565,6 +688,7 @@
         baseRotation,
         fromFirst: group.fromFirst,
         toFirst: group.toFirst,
+        capacity: Engine.capacityOf ? Engine.capacityOf(beforePlate) : Engine.PLATE_CAPACITY,
       }));
       return {
         layer,
@@ -590,6 +714,7 @@
   }
 
   function createTransferVisual(plan, activeSession) {
+    if (plan.from === plan.to) return null;
     if (!plan.sourceWheel || !plan.targetWheel || plan.sourceLast < 0 || plan.targetLast < 0) return null;
     const fromRect = layoutRect(plan.sourceWheel);
     const toRect = layoutRect(plan.targetWheel);
@@ -607,12 +732,14 @@
       sourceSlot: plan.sourceFirst,
       targetSlot: plan.targetFirst,
       targetRotation: 0,
+      sourceCapacity: plan.sourceCapacity,
+      targetCapacity: plan.targetCapacity,
     });
     const landingRotation = nearestRotation(sourceRotation, rawLandingRotation);
     let launchDelay = 0;
     layer.dataset.fromCell = String(plan.from);
     layer.dataset.toCell = String(plan.to);
-    layer.dataset.cakeType = plan.type;
+    layer.dataset.cakeType = plan.targetType || plan.type;
     layer.dataset.sourceSlot = String(plan.sourceFirst);
     layer.dataset.targetSlot = String(plan.targetFirst);
     return {
@@ -775,82 +902,170 @@
     return true;
   }
 
-  function swapPlate(index) {
-    if (state.busy || state.swaps <= 0 || !state.rack[index]) return;
-    state.swaps -= 1;
-    state.rack[index] = generatedPlate(index);
-    playTone(330, .08, "triangle");
-    showToast("새로운 판으로 교체했어요");
-    render();
+  function completionType(record, phase) {
+    if (record?.type || record?.color) return record.type || record.color;
+    const plateData = phase?.settledBoard?.[record?.index];
+    const capacity = Engine.capacityOf ? Engine.capacityOf(plateData) : Engine.PLATE_CAPACITY;
+    return Object.keys(plateData?.pieces || {}).find((type) => plateData.pieces[type] === capacity) || null;
+  }
+
+  async function playResolutionPhase(phase, activeSession) {
+    if (phase.events?.length) {
+      const animationFinished = await animateResolution(phase.events, activeSession);
+      if (!animationFinished || activeSession !== sessionId) return [];
+    }
+    state.board = phase.settledBoard || phase.board;
+    state.activeCells.clear();
+    const records = phase.completionEvents || (phase.completed || []).map((index) => ({ index }));
+    const completedIndexes = records.map((record) => record.index);
+    state.completeCells = new Set(completedIndexes);
+    state.emptyCells = new Set(phase.emptied || []);
+
+    if (records.length) {
+      playTone(510, .09, "sine");
+      render();
+      const combo = records.length;
+      playComplete(combo);
+      showToast(combo > 1 ? `${combo}판 연쇄 완성!` : "케이크 한 판 완성!");
+      await wait(reducedMotion() ? 0 : 520);
+      if (activeSession !== sessionId) return [];
+    } else if (phase.emptied?.length) {
+      render();
+      showToast("빈 판이 정리됐어요");
+      await wait(reducedMotion() ? 0 : 300);
+      if (activeSession !== sessionId) return [];
+    }
+
+    state.board = phase.board;
+    state.completeCells.clear();
+    state.emptyCells.clear();
+    const promotedLayers = phase.layerRevealed || [];
+    if (promotedLayers.length) {
+      for (const index of promotedLayers) state.effectCells.set(index, "layer-promoting");
+      renderBoard();
+      showToast("아래층 케이크가 열렸어요");
+      await wait(reducedMotion() ? 0 : 340);
+      promotedLayers.forEach((index) => state.effectCells.delete(index));
+    }
+    return records.map((record) => ({ ...record, type: completionType(record, phase) })).filter((record) => record.type);
+  }
+
+  async function animateSpecialEvents(events, nextRuntime, activeSession) {
+    const passiveKinds = new Set([
+      "frogMove", "frog-move", "mysteryReveal", "mystery-reveal",
+      "layerOpen", "layer-open", "orderProgress", "order-progress",
+    ]);
+    const terrainEvents = (events || []).filter((event) => !passiveKinds.has(event.kind));
+    const classByKind = {
+      iceBreak: "ice-breaking", iceBroken: "ice-breaking", unlock: "unlocking",
+      "ice-break": "ice-breaking", lockOpen: "unlocking", fragileBreak: "crumbling",
+      cellBreak: "crumbling", "cell-break": "crumbling",
+    };
+    for (const event of terrainEvents) {
+      const indexes = event.indexes || [event.index ?? event.to].filter(Number.isInteger);
+      indexes.forEach((index) => state.effectCells.set(index, classByKind[event.kind] || "gimmick-pulse"));
+    }
+    if (terrainEvents.length) {
+      renderBoard();
+      await wait(reducedMotion() ? 0 : 360);
+      if (activeSession !== sessionId) return false;
+      state.effectCells.clear();
+    }
+
+    const frogMove = (events || []).find((event) => event.kind === "frogMove" || event.kind === "frog-move");
+    const sourceFrog = frogMove
+      ? elements.board.querySelector(`.cell[data-cell="${frogMove.from}"] .frog-token`)
+      : null;
+    const sourceRect = sourceFrog?.getBoundingClientRect();
+    const movingFrog = sourceFrog?.cloneNode(true);
+    state.mechanics = nextRuntime;
+    renderBoard();
+    if (frogMove) {
+      const targetFrog = elements.board.querySelector(`.cell[data-cell="${frogMove.to}"] .frog-token`);
+      const targetRect = targetFrog?.getBoundingClientRect();
+      if (movingFrog && sourceRect && targetRect && !reducedMotion()) {
+        movingFrog.classList.add("moving-frog");
+        movingFrog.style.left = `${sourceRect.left}px`;
+        movingFrog.style.top = `${sourceRect.top}px`;
+        movingFrog.style.width = `${sourceRect.width}px`;
+        movingFrog.style.height = `${sourceRect.height}px`;
+        targetFrog.style.visibility = "hidden";
+        document.body.appendChild(movingFrog);
+        await nextPaint();
+        movingFrog.style.transform = `translate3d(${targetRect.left - sourceRect.left}px, ${targetRect.top - sourceRect.top}px, 0)`;
+        await wait(300);
+        movingFrog.remove();
+        if (activeSession !== sessionId) return false;
+      }
+      state.effectCells.set(frogMove.to, "frog-arrived");
+      renderBoard();
+      playTone(frogMove.reached ? 780 : 430, .1, "sine");
+      await wait(reducedMotion() ? 0 : 320);
+      state.effectCells.delete(frogMove.to);
+      if (frogMove.reached) showToast("개구리가 목표에 도착했어요!");
+    }
+    return activeSession === sessionId;
   }
 
   async function placeRackAt(rackIndex, cellIndex) {
-    if (state.busy || state.movesRemaining <= 0 || !isPlayableCell(cellIndex) || state.board[cellIndex]) return;
+    if (
+      state.busy || state.movesRemaining <= 0 || state.board[cellIndex] ||
+      !Mechanics.isCellAvailable(currentStage, state.mechanics, cellIndex, state.board)
+    ) return;
     const chosen = state.rack[rackIndex];
     if (!chosen) return;
     const activeSession = sessionId;
+    const revealResult = Mechanics.revealPlate(chosen);
+    const placedPlate = revealResult?.plate || revealResult;
+    const revealedCount = revealResult?.types?.length || revealResult?.revealedColors?.length || (Array.isArray(revealResult?.revealed) ? revealResult.revealed.length : 0);
 
     state.busy = true;
-    state.board[cellIndex] = chosen;
+    state.board[cellIndex] = placedPlate;
     state.rack[rackIndex] = null;
     state.movesRemaining -= 1;
     state.score += 10;
     state.activeCells = new Set([cellIndex]);
     playTone(245, .08, "sine");
     render();
-    await wait(120);
+    if (revealedCount) {
+      showToast(`미스테리 조각 ${revealedCount}개 공개!`);
+      await wait(reducedMotion() ? 0 : 300);
+    } else {
+      await wait(120);
+    }
     if (activeSession !== sessionId) return;
 
-    let result;
+    let turn;
     try {
-      result = Engine.resolvePlacement(state.board, cellIndex);
+      turn = Mechanics.resolveTurn(currentStage, state.mechanics, state.board, cellIndex);
     } catch (error) {
       console.error(error);
-      result = { board: state.board, settledBoard: state.board, events: [], completed: [], emptied: [] };
+      const fallback = Engine.resolvePlacement(state.board, cellIndex);
+      turn = { board: fallback.board, runtime: state.mechanics, phases: [fallback], specialEvents: [] };
     }
 
-    if (result.events.length) {
-      const animationFinished = await animateResolution(result.events, activeSession);
-      if (!animationFinished || activeSession !== sessionId) return;
-      state.board = result.settledBoard;
-      state.activeCells.clear();
-      playTone(510, .09, "sine");
-      renderBoard();
-      await wait(45);
-    }
-
-    state.emptyCells = new Set(result.emptied);
-    if (result.completed.length) {
-      state.completeCells = new Set(result.completed);
-      state.completed += result.completed.length;
-      for (const completedIndex of result.completed) {
-        const completedPlate = result.settledBoard[completedIndex];
-        const completedType = Object.keys(completedPlate?.pieces || {})
-          .find((type) => completedPlate.pieces[type] === Engine.PLATE_CAPACITY);
-        if (completedType) {
-          state.completedByType[completedType] = (state.completedByType[completedType] || 0) + 1;
-        }
-      }
-      const combo = result.completed.length;
-      state.score += 240 * combo + 90 * Math.max(0, combo - 1);
-      playComplete(combo);
-      render();
-      showToast(combo > 1 ? `${combo}판 연쇄 완성!` : "케이크 한 판 완성!");
-      await wait(reducedMotion() ? 0 : 520);
+    const completionRecords = [];
+    for (const phase of turn.phases || []) {
+      const records = await playResolutionPhase(phase, activeSession);
       if (activeSession !== sessionId) return;
-    } else if (result.emptied.length) {
-      render();
-      showToast("빈 판이 정리됐어요");
-      await wait(reducedMotion() ? 0 : 380);
-      if (activeSession !== sessionId) return;
+      completionRecords.push(...records);
     }
 
-    state.board = result.board;
+    state.board = turn.board;
     state.activeCells.clear();
     state.completeCells.clear();
     state.emptyCells.clear();
+    for (const record of completionRecords) {
+      state.completed += 1;
+      state.completedByType[record.type] = (state.completedByType[record.type] || 0) + 1;
+    }
+    if (completionRecords.length) {
+      state.score += 240 * completionRecords.length + 90 * Math.max(0, completionRecords.length - 1);
+    }
+    const effectsFinished = await animateSpecialEvents(turn.specialEvents, turn.runtime, activeSession);
+    if (!effectsFinished) return;
 
-    const goalMet = Stages.isComplete(currentStage, state.completedByType);
+    const goalMet = Mechanics.isStageComplete(currentStage, state.completedByType, state.mechanics);
     if (!goalMet && state.movesRemaining > 0 && state.rack.every((item) => !item)) refillRack();
     state.best = Math.max(state.best, state.score);
     localStorage.setItem(BEST_KEY, String(state.best));
@@ -882,7 +1097,7 @@
     resultAction = "homeAfterClear";
     elements.resultEyebrow.textContent = "STAGE CLEAR";
     elements.resultTitle.textContent = `${currentStage.title} 완료!`;
-    elements.resultMessage.textContent = "모든 케이크 목표를 달성했어요.";
+    elements.resultMessage.textContent = "스테이지 목표를 모두 달성했어요.";
     elements.resultCompleted.textContent = `${state.completed}판`;
     elements.resultScore.textContent = state.score.toLocaleString("ko-KR");
     elements.retry.textContent = "메인으로";
@@ -933,6 +1148,15 @@
     elements.stageTitle.textContent = currentStage.title;
     elements.stageDifficulty.textContent = currentStage.difficulty;
     elements.stageDifficulty.dataset.difficulty = currentStage.difficulty;
+    if (elements.stageGimmick) {
+      const label = currentStage.gimmick?.label;
+      elements.stageGimmick.textContent = label ? `${currentStage.gimmick.icon || "✦"} ${label}` : "";
+      elements.stageGimmick.classList.toggle("hidden", !label);
+    }
+    if (elements.debugStage) elements.debugStage.value = String(currentStage.id);
+    const capacity = Stages.stageCapacity?.(currentStage) || Engine.PLATE_CAPACITY;
+    if (elements.guideCapacityNumber) elements.guideCapacityNumber.textContent = capacity;
+    if (elements.guideCapacityText) elements.guideCapacityText.textContent = `${capacity}개`;
   }
 
   function selectStage(stageId) {
@@ -942,7 +1166,7 @@
 
   function restart(announce = true) {
     clearDrag();
-    document.querySelectorAll(".moving-slice").forEach((slice) => slice.remove());
+    document.querySelectorAll(".moving-slice, .moving-frog").forEach((movingElement) => movingElement.remove());
     sessionId += 1;
     const sound = state?.sound ?? true;
     state = newState();
@@ -1016,6 +1240,22 @@
     showToast("케이크 링크 데이터를 초기화했어요");
   }
 
+  function setupDebugStageSelect() {
+    if (!elements.debugStage) return;
+    elements.debugStage.innerHTML = Object.values(Stages.STAGES).map((stage) => {
+      const suffix = stage.gimmick?.label ? ` · ${stage.gimmick.label}` : "";
+      return `<option value="${stage.id}">${stage.id}${suffix}</option>`;
+    }).join("");
+    elements.debugStage.value = String(currentStage.id);
+    elements.debugStage.addEventListener("change", () => {
+      selectStage(Number(elements.debugStage.value));
+      resultAction = "retry";
+      restart(false);
+      showHome(true);
+      showToast(`${currentStage.title}로 이동했어요`);
+    });
+  }
+
   elements.restart.addEventListener("click", () => restart(true));
   elements.retry.addEventListener("click", handleResultAction);
   elements.sound.addEventListener("click", toggleSound);
@@ -1041,6 +1281,7 @@
   });
   window.addEventListener("blur", clearDrag);
 
+  setupDebugStageSelect();
   restart(false);
   showHome();
 })();

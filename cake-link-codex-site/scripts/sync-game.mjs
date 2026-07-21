@@ -7,6 +7,7 @@ const runtimeFiles = [
   "editor.html",
   "app.js",
   "engine.js",
+  "mechanics.js",
   "stages.js",
   "motion.js",
   "simulator.js",

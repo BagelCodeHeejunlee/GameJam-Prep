@@ -8,6 +8,7 @@ test("syncs the complete playable Cake Link runtime", async () => {
   const index = await readFile(new URL("public/game/index.html", projectRoot), "utf8");
   assert.match(index, /CAKE LINK/);
   assert.match(index, /engine\.js/);
+  assert.match(index, /mechanics\.js/);
   assert.match(index, /motion\.js/);
   assert.match(index, /app\.js/);
 
@@ -16,6 +17,7 @@ test("syncs the complete playable Cake Link runtime", async () => {
     "editor.js",
     "editor.css",
     "simulator.js",
+    "mechanics.js",
     "stages.js",
     "styles.css",
     "og.png",

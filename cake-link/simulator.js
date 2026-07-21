@@ -1,10 +1,14 @@
 (function (root, factory) {
   if (typeof module === "object" && module.exports) {
-    module.exports = factory(require("./engine.js"), require("./stages.js"));
+    module.exports = factory(
+      require("./engine.js"),
+      require("./stages.js"),
+      require("./mechanics.js"),
+    );
   } else {
-    root.CakeLinkSimulator = factory(root.CakeLinkEngine, root.CakeLinkStages);
+    root.CakeLinkSimulator = factory(root.CakeLinkEngine, root.CakeLinkStages, root.CakeLinkMechanics);
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (Engine, Stages) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (Engine, Stages, Mechanics) {
   "use strict";
 
   const PLAYER_STYLES = Object.freeze({
@@ -21,7 +25,7 @@
     space: Object.freeze({
       id: "space",
       label: "공간 관리",
-      description: "빈칸을 확보하고 혼합 판을 줄여 보드가 막히지 않는 수를 우선합니다.",
+      description: "빈칸과 해제될 칸을 확보하고 혼합 판을 줄이는 수를 우선합니다.",
     }),
     instinct: Object.freeze({
       id: "instinct",
@@ -76,44 +80,104 @@
   function createInitialBoard(stage) {
     const board = Array(Engine.BOARD_SIZE ** 2).fill(null);
     stage.initialPlates.forEach((initial, position) => {
-      board[initial.index] = { id: -(position + 1), pieces: { ...initial.pieces } };
+      const { index, ...plateData } = initial;
+      board[index] = {
+        ...Stages.createPlateData(stage, plateData),
+        id: -(position + 1),
+      };
     });
     return board;
   }
 
-  function completedTypes(result) {
+  function plateCapacity(stage, plate) {
+    return Number(plate?.capacity || Stages.stageCapacity(stage));
+  }
+
+  function normalPieceEntries(plate) {
+    return Object.entries(plate?.pieces || {}).filter(([type, count]) =>
+      Stages.COLOR_IDS.includes(type) && count > 0
+    );
+  }
+
+  function plateTotal(plate) {
+    return Object.values(plate?.pieces || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+  }
+
+  function completionTypes(result) {
+    if (Array.isArray(result?.completionEvents)) {
+      return result.completionEvents.map((event) => event.type).filter(Boolean);
+    }
     const types = [];
-    for (const index of result.completed) {
-      const plate = result.settledBoard[index];
-      const type = Object.keys(plate?.pieces || {})
-        .find((candidate) => plate.pieces[candidate] === Engine.PLATE_CAPACITY);
+    for (const index of result?.completed || []) {
+      const plate = result.settledBoard?.[index];
+      const capacity = plateCapacity({ rules: { capacity: Engine.PLATE_CAPACITY } }, plate);
+      const type = normalPieceEntries(plate).find(([, count]) => count === capacity)?.[0];
       if (type) types.push(type);
     }
     return types;
   }
 
-  function goalProgress(stage, completed) {
-    const target = Stages.totalGoalCount(stage);
-    const achieved = Stages.goalEntries(stage)
-      .reduce((sum, [type, count]) => sum + Math.min(completed[type] || 0, count), 0);
-    return target ? achieved / target : 1;
+  function addCompletions(completed, result) {
+    const next = { ...completed };
+    for (const type of completionTypes(result)) next[type] = (next[type] || 0) + 1;
+    return next;
   }
 
-  function boardMetrics(stage, board, completed) {
+  function goalProgress(stage, completed, runtime = null) {
+    const activeRuntime = runtime || Mechanics.createRuntime(stage);
+    return Mechanics.goalProgress(stage, completed || {}, activeRuntime);
+  }
+
+  function orderedNeed(stage, runtime, color) {
+    const sequence = stage.mechanics?.orderedGoal?.sequence || [];
+    if (!sequence.length) return null;
+    const index = Number(runtime?.orderIndex || 0);
+    if (sequence[index] === color) return 2;
+    if (sequence.slice(index + 1, index + 3).includes(color)) return .55;
+    return 0;
+  }
+
+  function goalNeed(stage, completed, runtime, color) {
+    const ordered = orderedNeed(stage, runtime, color);
+    if (ordered !== null) return ordered;
+    return Math.max(0, (stage.goals[color] || 0) - (completed[color] || 0));
+  }
+
+  function safeLegalIndexes(stage, runtime, board) {
+    return Mechanics.legalPlacementIndexes(stage, runtime, board) || [];
+  }
+
+  function blockedFeatureCount(runtime = {}) {
+    const ice = Object.values(runtime.iceCells || {}).filter((layers) => Number(layers) > 0).length;
+    const locked = Array.isArray(runtime.lockedCells)
+      ? runtime.lockedCells.length
+      : Object.values(runtime.lockedCells || {}).filter(Boolean).length;
+    const broken = Array.isArray(runtime.brokenCells)
+      ? runtime.brokenCells.length
+      : Object.values(runtime.brokenCells || {}).filter(Boolean).length;
+    return ice + locked + broken;
+  }
+
+  function boardMetrics(stage, board, completed, runtime) {
     let concentration = 0;
     let mixedPenalty = 0;
     let occupied = 0;
     let adjacency = 0;
+    let lowerLayerValue = 0;
 
     for (const index of playableIndexes(stage)) {
       const plate = board[index];
       if (!plate) continue;
       occupied += 1;
-      const entries = Object.entries(plate.pieces).filter(([, count]) => count > 0);
+      const entries = normalPieceEntries(plate);
       mixedPenalty += Math.max(0, entries.length - 1);
       for (const [type, count] of entries) {
-        const needed = Math.max(0, (stage.goals[type] || 0) - (completed[type] || 0));
-        concentration += count * count * (needed ? 1.45 : .35);
+        const needed = goalNeed(stage, completed, runtime, type);
+        concentration += count * count * (needed ? 1.45 + Math.min(needed, 2) * .12 : .35);
+      }
+      for (const layer of plate.layers || []) {
+        lowerLayerValue += normalPieceEntries(layer)
+          .reduce((sum, [type, count]) => sum + count * (goalNeed(stage, completed, runtime, type) ? 1 : .2), 0);
       }
       for (const neighbor of Engine.getNeighbors(index)) {
         if (neighbor <= index || !board[neighbor]) continue;
@@ -123,7 +187,7 @@
       }
     }
 
-    const free = playableIndexes(stage).length - occupied;
+    const free = safeLegalIndexes(stage, runtime, board).length;
     const congestionPenalty = free <= 1 ? 180 : free === 2 ? 60 : 0;
     return {
       concentration,
@@ -131,33 +195,42 @@
       occupied,
       adjacency,
       free,
+      blocked: blockedFeatureCount(runtime),
+      lowerLayerValue,
       congestionPenalty,
-      quality: concentration * 4 + adjacency * 7 + free * 12 - mixedPenalty * 9 - congestionPenalty,
+      quality: concentration * 4 + adjacency * 7 + free * 12 + lowerLayerValue * 1.5 - mixedPenalty * 9 - congestionPenalty,
     };
   }
 
-  function visiblePlacementMetrics(stage, board, rackPlate, cellIndex, completed) {
+  function visiblePlacementMetrics(stage, board, rackPlate, cellIndex, completed, runtime) {
     const occupiedNeighbors = Engine.getNeighbors(cellIndex).filter((index) => board[index]);
+    const capacity = plateCapacity(stage, rackPlate);
+    const rainbow = Number(rackPlate.pieces?.rainbow || 0);
+    const mystery = Number(rackPlate.pieces?.mystery || 0);
     let matchingPieces = 0;
     let matchingColors = 0;
     let completionPotential = 0;
     let goalCompletionPotential = 0;
     let goalPieces = 0;
+    let coloredPlateFit = 0;
 
-    for (const [type, count] of Object.entries(rackPlate.pieces)) {
+    for (const [type, count] of normalPieceEntries(rackPlate)) {
       const surrounding = occupiedNeighbors.reduce(
         (sum, index) => sum + (board[index]?.pieces[type] || 0),
         0,
       );
       if (surrounding > 0) {
         matchingColors += 1;
-        matchingPieces += Math.min(Engine.PLATE_CAPACITY - count, surrounding);
+        matchingPieces += Math.min(capacity - count, surrounding);
       }
-      const needed = Math.max(0, (stage.goals[type] || 0) - (completed[type] || 0));
-      if (needed > 0) goalPieces += count;
-      if (count + surrounding >= Engine.PLATE_CAPACITY) {
+      const needed = goalNeed(stage, completed, runtime, type);
+      if (needed > 0) goalPieces += count * Math.min(needed, 2);
+      if (count + surrounding + rainbow >= capacity) {
         completionPotential += 1;
         if (needed > 0) goalCompletionPotential += 1;
+      }
+      for (const neighbor of occupiedNeighbors) {
+        if (board[neighbor]?.allowedColor === type) coloredPlateFit += count;
       }
     }
 
@@ -168,50 +241,119 @@
       goalCompletionPotential,
       goalPieces,
       occupiedNeighbors: occupiedNeighbors.length,
+      coloredPlateFit,
+      rainbow,
+      mystery,
     };
   }
 
-  function evaluateCandidate(stage, beforeCompleted, result) {
-    const afterCompleted = { ...beforeCompleted };
-    const completionTypes = completedTypes(result);
-    for (const type of completionTypes) {
-      afterCompleted[type] = (afterCompleted[type] || 0) + 1;
+  function finiteDistance(value) {
+    return Number.isFinite(value) ? value : 100;
+  }
+
+  function specialEventValue(result) {
+    let value = 0;
+    for (const event of result?.specialEvents || []) {
+      const type = String(event.type || event.kind || "").toLowerCase();
+      if (type.includes("unlock") || type.includes("ice")) value += 1;
+      if (type.includes("layer")) value += 1.2;
+      if (type.includes("fragile") || type.includes("break")) value -= .7;
+      if (type.includes("frog") && (event.reached || type.includes("goal"))) value += 4;
     }
-    const beforeProgress = goalProgress(stage, beforeCompleted);
-    const afterProgress = goalProgress(stage, afterCompleted);
+    return value;
+  }
+
+  function evaluateCandidate(stage, beforeCompleted, beforeRuntime, beforeBoard, result) {
+    const afterCompleted = addCompletions(beforeCompleted, result);
+    const beforeProgress = goalProgress(stage, beforeCompleted, beforeRuntime);
+    const afterProgress = goalProgress(stage, afterCompleted, result.runtime);
     const progressGain = afterProgress - beforeProgress;
-    const clearsStage = Stages.isComplete(stage, afterCompleted);
+    const clearsStage = Mechanics.isStageComplete(stage, afterCompleted, result.runtime);
     const clearBonus = clearsStage ? 1000000 : 0;
-    const metrics = boardMetrics(stage, result.board, afterCompleted);
-    const goalCompletions = completionTypes.filter((type) =>
-      (beforeCompleted[type] || 0) < (stage.goals[type] || 0)
-    ).length;
+    const metrics = boardMetrics(stage, result.board, afterCompleted, result.runtime);
+    const types = completionTypes(result);
+    const goalCompletions = types.filter((type) => goalNeed(stage, beforeCompleted, beforeRuntime, type) > 0).length;
+    const beforeFrog = finiteDistance(Mechanics.frogDistance(stage, beforeRuntime, beforeBoard));
+    const afterFrog = finiteDistance(Mechanics.frogDistance(stage, result.runtime, result.board));
+    const frogGain = beforeFrog - afterFrog;
+    const openedCells = Math.max(0, blockedFeatureCount(beforeRuntime) - blockedFeatureCount(result.runtime));
+    const brokenCells = Math.max(0, blockedFeatureCount(result.runtime) - blockedFeatureCount(beforeRuntime));
+    const specialValue = specialEventValue(result);
     return {
       completed: afterCompleted,
-      completionTypes,
+      completionTypes: types,
       goalCompletions,
       progressGain,
       clearsStage,
       boardMetrics: metrics,
-      plannerScore: clearBonus + progressGain * 100000 + metrics.quality,
+      frogGain,
+      openedCells,
+      brokenCells,
+      specialValue,
+      plannerScore: clearBonus + progressGain * 100000 + frogGain * 5200 + openedCells * 4600 + specialValue * 1100 + metrics.quality,
     };
   }
 
-  function resolveCandidate(stage, board, rackPlate, cellIndex, completed) {
-    const visible = visiblePlacementMetrics(stage, board, rackPlate, cellIndex, completed);
+  function hasMystery(plate) {
+    return Number(plate?.pieces?.mystery || 0) > 0;
+  }
+
+  function visibleUnknownCandidate(stage, runtime, board, rackPlate, cellIndex, completed, visible) {
+    const projectedBoard = Engine.cloneBoard(board);
+    projectedBoard[cellIndex] = {
+      ...rackPlate,
+      pieces: { ...rackPlate.pieces },
+      hiddenColors: undefined,
+    };
+    const metrics = boardMetrics(stage, projectedBoard, completed, runtime);
+    const heuristic =
+      visible.goalCompletionPotential * 6400 +
+      visible.goalPieces * 390 +
+      visible.matchingPieces * 150 +
+      visible.coloredPlateFit * 300 +
+      visible.mystery * 90 +
+      metrics.quality;
+    return {
+      result: null,
+      uncertain: true,
+      completed: { ...completed },
+      completionTypes: [],
+      goalCompletions: 0,
+      progressGain: 0,
+      clearsStage: false,
+      boardMetrics: metrics,
+      frogGain: 0,
+      openedCells: 0,
+      brokenCells: 0,
+      specialValue: 0,
+      plannerScore: heuristic,
+    };
+  }
+
+  function resolveCandidate(stage, runtime, board, rackPlate, cellIndex, completed) {
+    const visible = visiblePlacementMetrics(stage, board, rackPlate, cellIndex, completed, runtime);
+    if (hasMystery(rackPlate)) {
+      return { visible, ...visibleUnknownCandidate(stage, runtime, board, rackPlate, cellIndex, completed, visible) };
+    }
     const placedBoard = Engine.cloneBoard(board);
-    placedBoard[cellIndex] = { id: rackPlate.id, pieces: { ...rackPlate.pieces } };
+    placedBoard[cellIndex] = Stages.createPlateData(stage, rackPlate);
     let result;
     try {
-      result = Engine.resolvePlacement(placedBoard, cellIndex);
+      result = Mechanics.resolveTurn(stage, Mechanics.cloneRuntime(runtime), placedBoard, cellIndex);
     } catch (_) {
       return null;
     }
-    return { result, visible, ...evaluateCandidate(stage, completed, result) };
+    return {
+      result,
+      visible,
+      uncertain: false,
+      ...evaluateCandidate(stage, completed, runtime, board, result),
+    };
   }
 
   function scoreCandidate(candidate, style) {
     const clearBonus = candidate.clearsStage ? 1000000 : 0;
+    const mechanicScore = candidate.frogGain * 5600 + candidate.openedCells * 4200 + candidate.specialValue * 900 - candidate.brokenCells * 1000;
     if (style === "goal") {
       return clearBonus +
         candidate.progressGain * 165000 +
@@ -219,6 +361,8 @@
         candidate.visible.goalCompletionPotential * 6500 +
         candidate.visible.goalPieces * 420 +
         candidate.visible.matchingPieces * 110 +
+        candidate.visible.coloredPlateFit * 450 +
+        mechanicScore +
         candidate.boardMetrics.quality * .2;
     }
     if (style === "space") {
@@ -226,7 +370,10 @@
         candidate.progressGain * 42000 +
         candidate.boardMetrics.quality * 5 +
         candidate.boardMetrics.free * 900 +
-        candidate.result.emptied.length * 2600 -
+        (candidate.result?.emptied?.length || 0) * 2600 +
+        candidate.openedCells * 7200 +
+        candidate.frogGain * 2600 -
+        candidate.brokenCells * 3800 -
         candidate.boardMetrics.mixedPenalty * 650;
     }
     if (style === "instinct") {
@@ -236,7 +383,10 @@
         candidate.visible.matchingPieces * 950 +
         candidate.visible.matchingColors * 480 +
         candidate.visible.goalPieces * 170 +
+        candidate.visible.coloredPlateFit * 600 +
         candidate.visible.occupiedNeighbors * 45 +
+        candidate.frogGain * 1200 +
+        candidate.openedCells * 1400 +
         (2 - candidate.rackIndex) * 18;
     }
     return candidate.plannerScore;
@@ -272,9 +422,7 @@
   function chooseCandidate(candidates, options, random) {
     const style = normalizeStyle(options?.style);
     const skill = normalizeSkill(options?.skill);
-    const considered = style === "instinct"
-      ? instinctRackPool(candidates, skill, random)
-      : candidates;
+    const considered = style === "instinct" ? instinctRackPool(candidates, skill, random) : candidates;
     const ranked = considered.map((candidate) => ({
       candidate,
       score: scoreCandidate(candidate, style),
@@ -294,20 +442,25 @@
     return ranked[Math.min(rank, ranked.length - 1)].candidate;
   }
 
+  function visibleSupply(plate) {
+    return { ...plate.pieces };
+  }
+
   function simulateRun(stage, options = {}) {
     const style = normalizeStyle(options.style);
     const skill = normalizeSkill(options.skill);
     const seed = options.seed ?? stage.seed;
     const supplyRandom = createRandom(seed);
     const decisionRandom = createRandom((seed ^ 0x9E3779B9) >>> 0);
-    const playable = playableIndexes(stage);
     let nextId = 1;
     let generated = 0;
     let board = createInitialBoard(stage);
+    let runtime = Mechanics.createRuntime(stage);
     let rack = [];
     let completed = {};
     let moves = 0;
     const supplyTrace = options.traceSupply ? [] : null;
+    const decisionTrace = options.traceDecisions ? [] : null;
 
     function finish(result) {
       return {
@@ -315,16 +468,25 @@
         style,
         skill,
         ...(supplyTrace ? { supplyTrace } : {}),
+        ...(decisionTrace ? { decisionTrace } : {}),
       };
     }
 
     function generatedPlate() {
-      const pieces = generated < stage.openingRack.length
-        ? stage.openingRack[generated]
-        : Stages.createWeightedPlate(stage, supplyRandom);
+      let plate;
+      if (generated < stage.openingRack.length) {
+        plate = Stages.createPlateData(
+          stage,
+          stage.openingRack[generated],
+          stage.openingModifiers?.[generated] || {},
+          supplyRandom,
+        );
+      } else {
+        plate = Stages.createWeightedPlateData(stage, supplyRandom);
+      }
       generated += 1;
-      const plate = { id: nextId++, pieces: { ...pieces } };
-      if (supplyTrace) supplyTrace.push({ ...plate.pieces });
+      plate.id = nextId++;
+      if (supplyTrace) supplyTrace.push(visibleSupply(plate));
       return plate;
     }
 
@@ -335,13 +497,13 @@
     refillRack();
 
     while (moves < stage.moveLimit) {
-      if (Stages.isComplete(stage, completed)) {
+      if (Mechanics.isStageComplete(stage, completed, runtime)) {
         return finish({ outcome: "clear", movesUsed: moves, completed, progress: 1 });
       }
 
-      const emptyCells = playable.filter((index) => !board[index]);
+      const emptyCells = safeLegalIndexes(stage, runtime, board);
       if (!emptyCells.length) {
-        return finish({ outcome: "locked", movesUsed: moves, completed, progress: goalProgress(stage, completed) });
+        return finish({ outcome: "locked", movesUsed: moves, completed, progress: goalProgress(stage, completed, runtime) });
       }
 
       const candidates = [];
@@ -349,29 +511,50 @@
       for (let rackIndex = 0; rackIndex < rack.length; rackIndex += 1) {
         if (!rack[rackIndex]) continue;
         for (const cellIndex of emptyCells) {
-          const candidate = resolveCandidate(stage, board, rack[rackIndex], cellIndex, completed);
+          const candidate = resolveCandidate(stage, runtime, board, rack[rackIndex], cellIndex, completed);
           if (candidate) candidates.push({ ...candidate, rackIndex, cellIndex, order: order++ });
         }
       }
 
       if (!candidates.length) {
-        return finish({ outcome: "locked", movesUsed: moves, completed, progress: goalProgress(stage, completed) });
+        return finish({ outcome: "locked", movesUsed: moves, completed, progress: goalProgress(stage, completed, runtime) });
       }
 
       const chosen = chooseCandidate(candidates, { style, skill }, decisionRandom);
-      board = chosen.result.board;
-      completed = chosen.completed;
+      if (decisionTrace) {
+        decisionTrace.push({
+          rackIndex: chosen.rackIndex,
+          cellIndex: chosen.cellIndex,
+          mystery: hasMystery(rack[chosen.rackIndex]),
+        });
+      }
+
+      let result = chosen.result;
+      if (chosen.uncertain) {
+        const revealed = Mechanics.revealPlate(rack[chosen.rackIndex]);
+        const placedBoard = Engine.cloneBoard(board);
+        placedBoard[chosen.cellIndex] = revealed.plate;
+        try {
+          result = Mechanics.resolveTurn(stage, Mechanics.cloneRuntime(runtime), placedBoard, chosen.cellIndex);
+        } catch (_) {
+          return finish({ outcome: "locked", movesUsed: moves, completed, progress: goalProgress(stage, completed, runtime) });
+        }
+      }
+
+      board = result.board;
+      runtime = result.runtime;
+      completed = addCompletions(completed, result);
       rack[chosen.rackIndex] = null;
       moves += 1;
-      if (rack.every((plate) => !plate)) refillRack();
+      if (rack.every((plate) => !plate) && !Mechanics.isStageComplete(stage, completed, runtime)) refillRack();
     }
 
-    const cleared = Stages.isComplete(stage, completed);
+    const cleared = Mechanics.isStageComplete(stage, completed, runtime);
     return finish({
       outcome: cleared ? "clear" : "limit",
       movesUsed: moves,
       completed,
-      progress: cleared ? 1 : goalProgress(stage, completed),
+      progress: cleared ? 1 : goalProgress(stage, completed, runtime),
     });
   }
 
@@ -439,12 +622,7 @@
       });
     });
 
-    return {
-      runs,
-      skill,
-      styleOrder: [...PLAYER_STYLE_IDS],
-      results,
-    };
+    return { runs, skill, styleOrder: [...PLAYER_STYLE_IDS], results };
   }
 
   return {

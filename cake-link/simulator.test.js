@@ -120,7 +120,7 @@ Simulator.simulateStage(mutableStage, {
 });
 assert.equal(JSON.stringify(mutableStage), stageSnapshot);
 
-// Swap-ticket settings belong to the real game and must not affect simulations.
+// Legacy swap-ticket fields are ignored because the game no longer uses exchanges.
 const noSwapStage = JSON.parse(JSON.stringify(Stages.getStage(5)));
 const manySwapStage = JSON.parse(JSON.stringify(noSwapStage));
 noSwapStage.swaps = 0;
@@ -160,6 +160,71 @@ assert.deepEqual(
   Simulator.simulateStyles(Stages.getStage(2), comparisonOptions),
   comparison,
 );
+
+// Initial boards retain mechanic metadata and inherit each stage's capacity.
+const coloredBoard = Simulator.createInitialBoard(Stages.getStage(8));
+assert.equal(coloredBoard[5].allowedColor, "berry");
+assert.equal(coloredBoard[5].receiveOnly, undefined);
+const capacityBoard = Simulator.createInitialBoard(Stages.getStage(12));
+assert.equal(capacityBoard[5].capacity, 8);
+const layeredBoard = Simulator.createInitialBoard(Stages.getStage(17));
+assert.equal(layeredBoard[5].receiveOnly, true);
+assert.deepEqual(layeredBoard[5].layers[0].pieces, { lemon: 3 });
+
+// Every single-gimmick stage must be runnable through the shared mechanic turn
+// reducer. Exact balance is calibrated separately with canonical 100-run jobs.
+for (let id = 8; id <= 17; id += 1) {
+  const stage = Stages.getStage(id);
+  const result = Simulator.simulateRun(stage, {
+    seed: 0x600DCAFE + id,
+    style: "planner",
+    skill: "expert",
+  });
+  assertRun(result, stage);
+}
+
+// Canonical expert balance contract for the ten one-gimmick test stages.
+// These deterministic 100-run samples are the values shown in STAGE_DATA.md.
+for (let id = 8; id <= 17; id += 1) {
+  const stage = Stages.getStage(id);
+  const result = Simulator.simulateStage(stage, {
+    runs: 100,
+    seed: stage.seed,
+    style: "planner",
+    skill: "expert",
+  });
+  assert.ok(
+    result.clearRate >= .70 && result.clearRate <= .90,
+    `${stage.title} 숙련자 100회 클리어율 ${(result.clearRate * 100).toFixed(0)}%가 70~90% 범위를 벗어났다`,
+  );
+}
+
+// Mystery decisions may use the visible '?' count, but never the hidden
+// colors. Changing only those colors must leave the first choice unchanged.
+const mysteryA = JSON.parse(JSON.stringify(Stages.getStage(11)));
+const mysteryB = JSON.parse(JSON.stringify(Stages.getStage(11)));
+mysteryA.openingModifiers = [
+  { hiddenColors: ["berry"] },
+  { hiddenColors: ["lemon"] },
+  { hiddenColors: ["matcha"] },
+];
+mysteryB.openingModifiers = [
+  { hiddenColors: ["choco"] },
+  { hiddenColors: ["choco"] },
+  { hiddenColors: ["choco"] },
+];
+const mysteryOptions = {
+  seed: 0x51DECAFE,
+  style: "planner",
+  skill: "expert",
+  traceSupply: true,
+  traceDecisions: true,
+};
+const mysteryResultA = Simulator.simulateRun(mysteryA, mysteryOptions);
+const mysteryResultB = Simulator.simulateRun(mysteryB, mysteryOptions);
+assert.deepEqual(mysteryResultA.supplyTrace[0], mysteryResultB.supplyTrace[0]);
+assert.deepEqual(mysteryResultA.decisionTrace[0], mysteryResultB.decisionTrace[0]);
+assert.equal(mysteryResultA.decisionTrace[0].mystery, true);
 
 assert.equal(Simulator.difficultyLabel(1), "쉬움");
 assert.equal(Simulator.difficultyLabel(.9), "쉬움");

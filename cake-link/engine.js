@@ -8,18 +8,69 @@
   const BOARD_SIZE = 4;
   const PLATE_CAPACITY = 6;
   const CAKE_ORDER = ["berry", "blueberry", "lemon", "matcha", "choco"];
+  const RAINBOW_TYPE = "rainbow";
+  const MYSTERY_TYPE = "mystery";
+
+  function deepClone(value) {
+    if (Array.isArray(value)) return value.map(deepClone);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, deepClone(item)]));
+  }
+
+  function capacityOf(plate) {
+    const capacity = Number(plate?.capacity);
+    return Number.isInteger(capacity) && capacity > 0 ? capacity : PLATE_CAPACITY;
+  }
 
   function totalPieces(plate) {
     if (!plate) return 0;
-    return Object.values(plate.pieces).reduce((sum, count) => sum + count, 0);
+    return Object.values(plate.pieces || {}).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
   }
 
   function cloneBoard(board) {
-    return board.map((plate) => plate ? { ...plate, pieces: { ...plate.pieces } } : null);
+    return board.map((plate) => plate ? deepClone(plate) : null);
+  }
+
+  function canReceive(plate, type, targetType = type) {
+    if (!plate || totalPieces(plate) >= capacityOf(plate)) return false;
+    const resolvedType = targetType === RAINBOW_TYPE ? type : targetType;
+    return !plate.allowedColor || plate.allowedColor === resolvedType;
+  }
+
+  function canGive(plate, type) {
+    return Boolean(plate && !plate.receiveOnly && (plate.pieces?.[type] || 0) > 0);
+  }
+
+  function revealPlate(inputPlate) {
+    if (!inputPlate) return { plate: null, revealed: [], revealedColors: [], types: [], didReveal: false };
+    const plate = deepClone(inputPlate);
+    const hidden = Array.isArray(plate.hiddenColors) ? [...plate.hiddenColors] : [];
+    let remaining = Math.max(0, Number(plate.pieces?.[MYSTERY_TYPE]) || 0);
+    const types = [];
+    const waiting = [];
+    for (const type of hidden) {
+      if (remaining <= 0 || !CAKE_ORDER.includes(type)) {
+        waiting.push(type);
+        continue;
+      }
+      plate.pieces[type] = (plate.pieces[type] || 0) + 1;
+      remaining -= 1;
+      types.push(type);
+    }
+    if (remaining > 0) plate.pieces[MYSTERY_TYPE] = remaining;
+    else delete plate.pieces[MYSTERY_TYPE];
+    plate.hiddenColors = waiting;
+    return {
+      plate,
+      revealed: types,
+      revealedColors: types,
+      types,
+      didReveal: types.length > 0,
+    };
   }
 
   function cleanPieces(plate) {
-    for (const [type, count] of Object.entries(plate.pieces)) {
+    for (const [type, count] of Object.entries(plate.pieces || {})) {
       if (count <= 0) delete plate.pieces[type];
     }
   }
@@ -36,9 +87,16 @@
   }
 
   function isComplete(plate) {
-    if (!plate || totalPieces(plate) !== PLATE_CAPACITY) return false;
+    const capacity = capacityOf(plate);
+    if (!plate || totalPieces(plate) !== capacity) return false;
     const types = Object.keys(plate.pieces).filter((type) => plate.pieces[type] > 0);
-    return types.length === 1 && plate.pieces[types[0]] === PLATE_CAPACITY;
+    return types.length === 1 && CAKE_ORDER.includes(types[0]) && plate.pieces[types[0]] === capacity;
+  }
+
+  function completionType(plate) {
+    return isComplete(plate)
+      ? Object.keys(plate.pieces).find((type) => plate.pieces[type] === capacityOf(plate)) || null
+      : null;
   }
 
   function receivedKey(index, type) {
@@ -48,19 +106,30 @@
   function choosePullType(board, index, locked, received = new Set()) {
     const plate = board[index];
     if (!plate) return null;
-    const free = PLATE_CAPACITY - totalPieces(plate);
-    const candidates = Object.keys(plate.pieces).map((type) => {
+    const capacity = capacityOf(plate);
+    const free = capacity - totalPieces(plate);
+    const candidateTypes = [...new Set([
+      ...Object.keys(plate.pieces || {}),
+      ...(plate.allowedColor ? [plate.allowedColor] : []),
+    ])].filter((type) =>
+      CAKE_ORDER.includes(type) && (!plate.allowedColor || plate.allowedColor === type)
+    );
+    const candidates = candidateTypes.map((type) => {
       const incoming = getNeighbors(index).reduce((sum, neighborIndex) => {
-        if (locked.has(neighborIndex) || !board[neighborIndex] || received.has(receivedKey(neighborIndex, type))) return sum;
+        if (
+          locked.has(neighborIndex) ||
+          !canGive(board[neighborIndex], type) ||
+          received.has(receivedKey(neighborIndex, type))
+        ) return sum;
         return sum + (board[neighborIndex].pieces[type] || 0);
       }, 0);
       const own = plate.pieces[type] || 0;
-      const completionPossible = own + incoming >= PLATE_CAPACITY;
+      const completionPossible = own + incoming >= capacity;
       const movable = completionPossible
-        ? Math.min(incoming, PLATE_CAPACITY - own)
+        ? Math.min(incoming, capacity - own)
         : Math.min(incoming, free);
       return { type, incoming, own, total: own + incoming, movable };
-    }).filter((candidate) => candidate.movable > 0 && candidate.own < PLATE_CAPACITY);
+    }).filter((candidate) => candidate.movable > 0 && candidate.own < capacity);
 
     candidates.sort((a, b) =>
       b.total - a.total ||
@@ -90,7 +159,8 @@
   }
 
   function addToPlate(plate, type, count) {
-    const accepted = Math.min(count, PLATE_CAPACITY - totalPieces(plate));
+    if (!canReceive(plate, type)) return 0;
+    const accepted = Math.min(count, capacityOf(plate) - totalPieces(plate));
     if (accepted > 0) plate.pieces[type] = (plate.pieces[type] || 0) + accepted;
     return accepted;
   }
@@ -105,11 +175,25 @@
       if (!remaining) continue;
 
       const matching = neighborOrder
-        .filter((index) => !locked.has(index) && board[index]?.pieces[type] > 0 && totalPieces(board[index]) < PLATE_CAPACITY)
+        .filter((index) =>
+          !locked.has(index) &&
+          board[index]?.pieces[type] > 0 &&
+          canReceive(board[index], type)
+        )
         .sort((a, b) => board[b].pieces[type] - board[a].pieces[type] || neighborOrder.indexOf(a) - neighborOrder.indexOf(b));
       const fallback = origins.map((origin) => origin.index)
-        .filter((index, position, list) => list.indexOf(index) === position && !locked.has(index) && board[index] && !matching.includes(index));
-      const lastResort = neighborOrder.filter((index) => !locked.has(index) && board[index] && !matching.includes(index) && !fallback.includes(index));
+        .filter((index, position, list) =>
+          list.indexOf(index) === position &&
+          !locked.has(index) &&
+          canReceive(board[index], type) &&
+          !matching.includes(index)
+        );
+      const lastResort = neighborOrder.filter((index) =>
+        !locked.has(index) &&
+        canReceive(board[index], type) &&
+        !matching.includes(index) &&
+        !fallback.includes(index)
+      );
 
       for (const destination of [...matching, ...fallback, ...lastResort]) {
         if (remaining <= 0) break;
@@ -135,6 +219,8 @@
     const touched = [sourceIndex];
     const neighborOrder = getNeighbors(sourceIndex);
 
+    if (!source || source.receiveOnly) return { events, recipients, touched };
+
     for (const type of CAKE_ORDER) {
       if (type === keepType || !source.pieces[type]) continue;
       let remaining = source.pieces[type];
@@ -142,7 +228,7 @@
         .filter((index) =>
           !locked.has(index) &&
           board[index]?.pieces[type] > 0 &&
-          totalPieces(board[index]) < PLATE_CAPACITY
+          canReceive(board[index], type)
         )
         .sort((a, b) => board[b].pieces[type] - board[a].pieces[type] || neighborOrder.indexOf(a) - neighborOrder.indexOf(b));
       const moves = [];
@@ -199,13 +285,20 @@
 
       for (const type of colorOrder) {
         const holders = localIndexes.filter((index) => board[index]?.pieces[type] > 0 && !locked.has(index));
-        if (holders.length < 2) continue;
+        const donors = holders.filter((index) => canGive(board[index], type));
+        const collectorIndexes = localIndexes.filter((index) =>
+          !locked.has(index) &&
+          canReceive(board[index], type) &&
+          (board[index]?.pieces[type] > 0 || board[index]?.allowedColor === type)
+        );
+        if (!donors.length || !collectorIndexes.length) continue;
 
-        const total = holders.reduce((sum, index) => sum + board[index].pieces[type], 0);
-        const collectors = holders.map((index) => {
-          const own = board[index].pieces[type];
-          const free = PLATE_CAPACITY - totalPieces(board[index]);
-          const resultCount = own + Math.min(total - own, free);
+        const total = donors.reduce((sum, index) => sum + board[index].pieces[type], 0);
+        const collectors = collectorIndexes.map((index) => {
+          const own = board[index].pieces[type] || 0;
+          const free = capacityOf(board[index]) - totalPieces(board[index]);
+          const donorSupply = total - (canGive(board[index], type) ? own : 0);
+          const resultCount = own + Math.min(donorSupply, free);
           const otherPieces = totalPieces(board[index]) - own;
           return { index, own, free, resultCount, otherPieces };
         }).filter((candidate) => candidate.free > 0 && candidate.resultCount > candidate.own);
@@ -217,14 +310,20 @@
         );
         let collector = null;
         const assignedIndex = collectorByType.get(type);
-        if (assignedIndex !== undefined && holders.includes(assignedIndex) && !locked.has(assignedIndex)) {
-          const own = board[assignedIndex].pieces[type];
-          const free = PLATE_CAPACITY - totalPieces(board[assignedIndex]);
+        if (
+          assignedIndex !== undefined &&
+          !locked.has(assignedIndex) &&
+          board[assignedIndex] &&
+          (board[assignedIndex].pieces[type] > 0 || board[assignedIndex].allowedColor === type)
+        ) {
+          const own = board[assignedIndex].pieces[type] || 0;
+          const free = capacityOf(board[assignedIndex]) - totalPieces(board[assignedIndex]);
+          const donorSupply = total - (canGive(board[assignedIndex], type) ? own : 0);
           collector = {
             index: assignedIndex,
             own,
             free,
-            resultCount: own + Math.min(total - own, free),
+            resultCount: own + Math.min(donorSupply, free),
             otherPieces: totalPieces(board[assignedIndex]) - own,
           };
         } else if (collectors[0]) {
@@ -233,14 +332,14 @@
         }
         if (!collector) continue;
 
-        const donors = holders.filter((index) => index !== collector.index).sort((a, b) => {
+        const sortedDonors = donors.filter((index) => index !== collector.index).sort((a, b) => {
           const otherA = totalPieces(board[a]) - board[a].pieces[type];
           const otherB = totalPieces(board[b]) - board[b].pieces[type];
           return otherB - otherA || board[b].pieces[type] - board[a].pieces[type] || localOrder.indexOf(a) - localOrder.indexOf(b);
         });
 
-        for (const donorIndex of donors) {
-          const free = PLATE_CAPACITY - totalPieces(board[collector.index]);
+        for (const donorIndex of sortedDonors) {
+          const free = capacityOf(board[collector.index]) - totalPieces(board[collector.index]);
           if (free <= 0) break;
           const count = Math.min(board[donorIndex].pieces[type], free);
           if (count <= 0) continue;
@@ -275,11 +374,15 @@
 
   function pullType(board, index, type, locked, received) {
     const target = board[index];
-    if (!target || locked.has(index) || !target.pieces[type]) return null;
+    if (
+      !target ||
+      locked.has(index) ||
+      (target.allowedColor && target.allowedColor !== type)
+    ) return null;
 
     const sourceIndexes = getNeighbors(index).filter((neighborIndex) =>
       !locked.has(neighborIndex) &&
-      board[neighborIndex]?.pieces[type] > 0 &&
+      canGive(board[neighborIndex], type) &&
       !received.has(receivedKey(neighborIndex, type))
     );
     // A source plate may contain several cake types. Pulling one matching type
@@ -289,13 +392,18 @@
       Object.fromEntries(Object.entries(board[sourceIndex].pieces).filter(([sourceType]) => sourceType !== type)),
     ]));
     const supply = sourceIndexes.reduce((sum, sourceIndex) => sum + board[sourceIndex].pieces[type], 0);
-    const free = PLATE_CAPACITY - totalPieces(target);
-    const completionPossible = target.pieces[type] + supply >= PLATE_CAPACITY;
+    const capacity = capacityOf(target);
+    const own = target.pieces[type] || 0;
+    const free = capacity - totalPieces(target);
+    const completionPossible = own + supply >= capacity;
+    const displaceable = CAKE_ORDER.reduce((sum, candidate) =>
+      candidate === type ? sum : sum + (target.pieces[candidate] || 0), 0
+    );
     // A newly placed plate with at least one free slot gathers the chosen type
-    // up to six pieces, even when that means moving its other types aside.
-    // A plate that started full may exchange pieces only to complete six.
+    // up to its capacity, even when that means moving its other types aside.
+    // A plate that started full may exchange pieces only to complete a cake.
     const wanted = free > 0 || completionPossible
-      ? Math.min(supply, PLATE_CAPACITY - target.pieces[type])
+      ? Math.min(supply, capacity - own, free + displaceable)
       : 0;
     if (wanted <= 0) return null;
 
@@ -340,11 +448,112 @@
     };
   }
 
+  function resolveRainbowCompletions(board, centerIndex, locked) {
+    const events = [];
+    const touched = new Set();
+    const localOrder = [centerIndex, ...getNeighbors(centerIndex)];
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+      const availableIndexes = localOrder.filter((index) => board[index] && !locked.has(index));
+      const candidates = [];
+
+      for (const index of availableIndexes) {
+        const plate = board[index];
+        for (const type of CAKE_ORDER) {
+          const own = plate.pieces[type] || 0;
+          if (own <= 0 || (plate.allowedColor && plate.allowedColor !== type)) continue;
+          const incompatible = Object.entries(plate.pieces).some(([pieceType, count]) =>
+            count > 0 && pieceType !== type && pieceType !== RAINBOW_TYPE
+          );
+          if (incompatible) continue;
+          const deficit = capacityOf(plate) - own;
+          if (deficit <= 0) continue;
+          const ownRainbow = plate.pieces[RAINBOW_TYPE] || 0;
+          const externalRainbow = availableIndexes.reduce((sum, sourceIndex) => {
+            if (sourceIndex === index || !canGive(board[sourceIndex], RAINBOW_TYPE)) return sum;
+            return sum + (board[sourceIndex].pieces[RAINBOW_TYPE] || 0);
+          }, 0);
+          if (ownRainbow + externalRainbow < deficit) continue;
+          candidates.push({ index, type, own, deficit });
+        }
+      }
+
+      candidates.sort((a, b) =>
+        a.deficit - b.deficit ||
+        b.own - a.own ||
+        CAKE_ORDER.indexOf(a.type) - CAKE_ORDER.indexOf(b.type) ||
+        localOrder.indexOf(a.index) - localOrder.indexOf(b.index)
+      );
+      const candidate = candidates[0];
+      if (!candidate) break;
+
+      const moves = [];
+      let remaining = candidate.deficit;
+      const sources = [candidate.index, ...availableIndexes.filter((index) => index !== candidate.index)];
+      for (const sourceIndex of sources) {
+        if (remaining <= 0) break;
+        const source = board[sourceIndex];
+        if (!source?.pieces[RAINBOW_TYPE]) continue;
+        if (sourceIndex !== candidate.index && !canGive(source, RAINBOW_TYPE)) continue;
+        const count = Math.min(source.pieces[RAINBOW_TYPE], remaining);
+        source.pieces[RAINBOW_TYPE] -= count;
+        cleanPieces(source);
+        board[candidate.index].pieces[candidate.type] =
+          (board[candidate.index].pieces[candidate.type] || 0) + count;
+        moves.push({
+          from: sourceIndex,
+          to: candidate.index,
+          type: RAINBOW_TYPE,
+          targetType: candidate.type,
+          count,
+        });
+        touched.add(sourceIndex);
+        touched.add(candidate.index);
+        remaining -= count;
+      }
+
+      if (remaining > 0) throw new Error(`무지개 조각 ${remaining}개의 이동 출발지가 없습니다.`);
+      events.push({
+        kind: "wildcard",
+        target: candidate.index,
+        type: RAINBOW_TYPE,
+        targetType: candidate.type,
+        count: candidate.deficit,
+        moves,
+      });
+      locked.add(candidate.index);
+      changed = true;
+    }
+
+    return { events, touched: [...touched] };
+  }
+
+  function promoteLayer(plate) {
+    if (!plate?.layers?.length) return false;
+    const [nextLayer, ...remainingLayers] = plate.layers;
+    plate.pieces = deepClone(nextLayer.pieces || {});
+    plate.layers = deepClone(remainingLayers);
+    for (const key of ["capacity", "allowedColor", "receiveOnly"]) delete plate[key];
+    if (nextLayer.capacity !== undefined) plate.capacity = nextLayer.capacity;
+    if (nextLayer.allowedColor !== undefined) plate.allowedColor = nextLayer.allowedColor;
+    if (nextLayer.receiveOnly !== undefined) plate.receiveOnly = nextLayer.receiveOnly;
+    return true;
+  }
+
   function resolvePlacement(inputBoard, placedIndex) {
     const board = cloneBoard(inputBoard);
     const locked = new Set();
     const events = [];
     const received = new Set();
+    const mysteryRevealed = [];
+
+    if (board[placedIndex]?.hiddenColors?.length && board[placedIndex]?.pieces?.[MYSTERY_TYPE]) {
+      const reveal = revealPlate(board[placedIndex]);
+      board[placedIndex] = reveal.plate;
+      if (reveal.didReveal) mysteryRevealed.push(placedIndex);
+    }
 
     // Only the newly placed plate initiates sorting. Its four direct neighbors
     // may receive pieces, but they do not start another pull from a second ring.
@@ -365,20 +574,80 @@
       if (isComplete(board[touchedIndex])) locked.add(touchedIndex);
     }
 
-    const completed = [...locked].sort((a, b) => a - b);
+    // Rainbow slices never participate in ordinary sorting. Once all normal
+    // movement has settled, they fill only an exact remaining deficit.
+    const rainbow = resolveRainbowCompletions(board, placedIndex, locked);
+    events.push(...rainbow.events);
+
+    for (const index of [placedIndex, ...getNeighbors(placedIndex)]) {
+      if (isComplete(board[index])) locked.add(index);
+    }
+
+    const completed = [];
+    const completionEvents = [];
+    const layerRevealed = [];
+    for (const index of locked) {
+      const plate = board[index];
+      const type = completionType(plate);
+      if (!type) continue;
+      const layered = Boolean(plate.layers?.length);
+      completionEvents.push({
+        index,
+        type,
+        capacity: capacityOf(plate),
+        layered,
+        removed: !layered,
+      });
+      if (layered) layerRevealed.push(index);
+      else completed.push(index);
+    }
+    completed.sort((a, b) => a - b);
     const emptied = [];
     for (let index = 0; index < board.length; index += 1) {
-      if (board[index] && totalPieces(board[index]) === 0) emptied.push(index);
+      if (
+        board[index] &&
+        totalPieces(board[index]) === 0 &&
+        !board[index].receiveOnly &&
+        !board[index].layers?.length
+      ) emptied.push(index);
     }
     const settledBoard = cloneBoard(board);
+    for (const index of layerRevealed) promoteLayer(board[index]);
     for (const index of [...completed, ...emptied]) board[index] = null;
+    const removed = [...new Set([...completed, ...emptied])].sort((a, b) => a - b);
 
-    return { board, settledBoard, events, completed, emptied, safetyLimitReached: consolidation.safetyLimitReached };
+    return {
+      board,
+      settledBoard,
+      events,
+      completionEvents,
+      completed,
+      emptied,
+      removed,
+      revealed: layerRevealed,
+      mysteryRevealed,
+      layerRevealed,
+      safetyLimitReached: consolidation.safetyLimitReached,
+    };
   }
 
   function buildAnimationSteps(events) {
     const steps = [];
     for (const event of events) {
+      if (event.kind === "wildcard") {
+        for (const move of event.moves) {
+          for (let count = 0; count < move.count; count += 1) {
+            steps.push({
+              from: move.from,
+              to: move.to,
+              type: move.type,
+              targetType: move.targetType,
+              displaced: null,
+            });
+          }
+        }
+        continue;
+      }
       if (event.kind === "spread") {
         for (const move of event.moves) {
           for (let count = 0; count < move.count; count += 1) {
@@ -414,7 +683,9 @@
 
   function buildAnimationBatches(events) {
     return events.map((event) => {
-      const transfers = event.kind === "spread"
+      const transfers = event.kind === "wildcard"
+        ? event.moves.map((move) => ({ ...move }))
+        : event.kind === "spread"
         ? event.moves.map((move) => ({
           from: event.source,
           to: move.to,
@@ -442,6 +713,7 @@
           candidate.from === transfer.from &&
           candidate.to === transfer.to &&
           candidate.type === transfer.type &&
+          candidate.targetType === transfer.targetType &&
           candidate.via === transfer.via
         );
         if (existing) existing.count += transfer.count;
@@ -455,12 +727,21 @@
     BOARD_SIZE,
     PLATE_CAPACITY,
     CAKE_ORDER,
+    RAINBOW_TYPE,
+    MYSTERY_TYPE,
+    deepClone,
+    capacityOf,
     totalPieces,
     cloneBoard,
+    canReceive,
+    canGive,
+    revealPlate,
     getNeighbors,
     isComplete,
+    completionType,
     choosePullType,
     consolidateLocalColors,
+    resolveRainbowCompletions,
     resolvePlacement,
     buildAnimationBatches,
     buildAnimationSteps,

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#fff8ef" />
     <meta name="description" content="케이크 링크 스테이지 데이터 편집 및 난이도 시뮬레이션" />
     <title>케이크 링크 · 스테이지 랩</title>
-    <link rel="stylesheet" href="editor.css" />
+    <link rel="stylesheet" href="editor.css?v=20260721-gimmicks2" />
   </head>
   <body>
     <header class="lab-header">
@@ -45,7 +45,6 @@
                 <label>인덱스<input id="stageIdInput" type="number" min="1" readonly /></label>
                 <label>난이도<select id="difficultyInput"><option>쉬움</option><option>보통</option><option>어려움</option><option>매우 어려움</option></select></label>
                 <label>횟수 제한<input id="moveLimitInput" type="number" min="1" max="99" /></label>
-                <label>교체권<input id="swapsInput" type="number" min="0" max="20" /></label>
                 <label>랜덤 시드<input id="seedInput" type="number" min="1" /></label>
                 <label>다음 스테이지<input id="nextStageInput" type="number" min="1" placeholder="없음" /></label>
               </div>
@@ -95,8 +94,17 @@
               <button id="addPatternButton" class="button ghost small" type="button">+ 패턴 추가</button>
             </section>
 
+            <section class="panel" aria-labelledby="mechanicsTitle">
+              <div class="panel-title"><div><span>06</span><h2 id="mechanicsTitle">스테이지 기믹</h2></div><small>기믹 데이터 직접 편집</small></div>
+              <div id="mechanicsSummary" class="mechanics-summary"></div>
+              <textarea id="mechanicsJsonEditor" class="json-editor mechanics-json-editor" spellcheck="false" aria-label="스테이지 기믹 JSON"></textarea>
+              <div class="json-actions">
+                <button id="applyMechanicsButton" class="button secondary" type="button">기믹 JSON 적용</button>
+              </div>
+            </section>
+
             <section class="panel" aria-labelledby="jsonTitle">
-              <div class="panel-title"><div><span>06</span><h2 id="jsonTitle">선택 스테이지 JSON</h2></div></div>
+              <div class="panel-title"><div><span>07</span><h2 id="jsonTitle">선택 스테이지 전체 JSON</h2></div></div>
               <textarea id="jsonEditor" class="json-editor" spellcheck="false" aria-label="선택 스테이지 JSON"></textarea>
               <div class="json-actions">
                 <button id="applyJsonButton" class="button secondary" type="button">JSON 적용</button>
@@ -151,7 +159,7 @@
 
             <section class="panel all-stage-panel">
               <div class="panel-title"><div><span>ALL</span><h2>전체 난이도 곡선</h2></div><small id="curveProfile">꼼꼼 계산 · 일반 기준</small></div>
-              <button id="simulateAllButton" class="button secondary wide" type="button">선택 프로필로 1~7 분석</button>
+              <button id="simulateAllButton" class="button secondary wide" type="button">선택 프로필로 1~17 분석</button>
               <div class="table-wrap"><table class="curve-table"><thead><tr><th>ST</th><th>제한</th><th>판당</th><th>클리어</th><th>잠김</th></tr></thead><tbody id="curveTableBody"></tbody></table></div>
             </section>
           </aside>
@@ -160,9 +168,10 @@
     </div>
 
     <div id="toast" class="editor-toast" role="status" aria-live="polite"></div>
-    <script src="engine.js"></script>
-    <script src="stages.js"></script>
-    <script src="simulator.js"></script>
-    <script src="editor.js"></script>
+    <script src="engine.js?v=20260721-gimmicks2"></script>
+    <script src="stages.js?v=20260721-gimmicks2"></script>
+    <script src="mechanics.js?v=20260721-gimmicks2"></script>
+    <script src="simulator.js?v=20260721-gimmicks2"></script>
+    <script src="editor.js?v=20260721-gimmicks2"></script>
   </body>
 </html>

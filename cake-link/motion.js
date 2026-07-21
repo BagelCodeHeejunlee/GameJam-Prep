@@ -16,12 +16,33 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function optionalCapacity(value) {
+    const capacity = Math.floor(Number(value));
+    return Number.isFinite(capacity) && capacity > 0 ? capacity : null;
+  }
+
+  function capacity(value, fallback = 6) {
+    return optionalCapacity(value) || fallback;
+  }
+
+  function angleStep(value, slotCapacity = 6) {
+    return Number.isFinite(Number(value)) ? Number(value) : 360 / capacity(slotCapacity);
+  }
+
   function reciprocalLaneOffset(cellSize) {
     return Math.min(4, Math.max(0, finite(cellSize)) * 0.045);
   }
 
   function createPieceTransferSequence(options = {}) {
-    const count = clamp(Math.floor(finite(options.count)), 0, 6);
+    const sharedCapacity = optionalCapacity(options.capacity);
+    const sourceCapacity = capacity(options.sourceCapacity, sharedCapacity || 6);
+    const targetCapacity = capacity(options.targetCapacity, sharedCapacity || 6);
+    const transferCapacity = Math.min(
+      sourceCapacity,
+      targetCapacity,
+      sharedCapacity || Infinity,
+    );
+    const count = clamp(Math.floor(finite(options.count)), 0, transferCapacity);
     const sourceFirst = Math.floor(finite(options.sourceFirst));
     const targetFirst = Math.floor(finite(options.targetFirst));
     return Array.from({ length: count }, (_, offset) => ({
@@ -44,7 +65,21 @@
   function createPieceLandingRotation(options = {}) {
     const sourceSlot = Math.floor(finite(options.sourceSlot));
     const targetSlot = Math.floor(finite(options.targetSlot));
-    return finite(options.targetRotation) + (targetSlot - sourceSlot) * 60;
+    const sharedCapacity = capacity(options.capacity);
+    const sharedAngleStep = Number.isFinite(Number(options.angleStep))
+      ? Number(options.angleStep)
+      : null;
+    const sourceAngleStep = Number.isFinite(Number(options.sourceAngleStep))
+      ? Number(options.sourceAngleStep)
+      : sharedAngleStep ?? 360 / capacity(options.sourceCapacity, sharedCapacity);
+    const targetAngleStep = Number.isFinite(Number(options.targetAngleStep))
+      ? Number(options.targetAngleStep)
+      : sharedAngleStep ?? 360 / capacity(options.targetCapacity, sharedCapacity);
+    const targetRotation = finite(options.targetRotation);
+    if (sourceAngleStep === targetAngleStep) {
+      return targetRotation + (targetSlot - sourceSlot) * targetAngleStep;
+    }
+    return targetRotation + targetSlot * targetAngleStep - sourceSlot * sourceAngleStep;
   }
 
   function createPieceFlightSchedule(options = {}) {
@@ -535,36 +570,49 @@
     const baseRotation = finite(options.baseRotation);
     const fromFirst = Math.floor(finite(options.fromFirst));
     const toFirst = Math.floor(finite(options.toFirst));
-    return baseRotation + (toFirst - fromFirst) * 60;
+    const step = angleStep(options.angleStep, options.capacity);
+    return baseRotation + (toFirst - fromFirst) * step;
   }
 
   function createSliceGroupGeometry(options = {}) {
-    const count = clamp(Math.floor(finite(options.count, 1)), 1, 6);
-    const lastSlot = clamp(Math.floor(finite(options.lastSlot, count - 1)), count - 1, 5);
+    const slotCapacity = capacity(options.capacity);
+    const step = angleStep(options.angleStep, slotCapacity);
+    const count = clamp(Math.floor(finite(options.count, 1)), 1, slotCapacity);
+    const lastSlot = clamp(
+      Math.floor(finite(options.lastSlot, count - 1)),
+      count - 1,
+      slotCapacity - 1,
+    );
     const firstSlot = lastSlot - count + 1;
     return {
       count,
       firstSlot,
       lastSlot,
-      maskStart: -30 + firstSlot * 60,
-      maskSpan: count * 60,
+      maskStart: -step / 2 + firstSlot * step,
+      maskSpan: count * step,
     };
   }
 
   function createMatchedGroupRotations(options = {}) {
     const direction = finite(options.direction);
+    const slotCapacity = capacity(options.capacity);
+    const step = angleStep(options.angleStep, slotCapacity);
     const source = createSliceGroupGeometry({
       lastSlot: options.sourceLastSlot,
       count: options.count,
+      capacity: slotCapacity,
+      angleStep: step,
     });
     const target = createSliceGroupGeometry({
       lastSlot: options.targetLastSlot,
       count: source.count,
+      capacity: slotCapacity,
+      angleStep: step,
     });
     return {
-      sourceRotation: direction - source.lastSlot * 60,
-      targetRotation: direction - target.lastSlot * 60,
-      physicalMaskStart: direction - 30 - (source.count - 1) * 60,
+      sourceRotation: direction - source.lastSlot * step,
+      targetRotation: direction - target.lastSlot * step,
+      physicalMaskStart: direction - step / 2 - (source.count - 1) * step,
       maskSpan: source.maskSpan,
     };
   }

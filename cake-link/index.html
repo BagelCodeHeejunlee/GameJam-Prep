@@ -11,7 +11,7 @@
     <meta property="og:url" content="https://bagelcodeheejunlee.github.io/GameJam-Prep/cake-link/" />
     <meta property="og:image" content="https://bagelcodeheejunlee.github.io/GameJam-Prep/cake-link/og.png" />
     <title>케이크 링크</title>
-    <link rel="stylesheet" href="styles.css?v=20260721-piece-stagger" />
+    <link rel="stylesheet" href="styles.css?v=20260721-gimmicks2" />
   </head>
   <body class="menu-open">
     <section id="homeScreen" class="home-screen" aria-labelledby="homeTitle">
@@ -36,6 +36,7 @@
           <span class="current-stage-label">CURRENT STAGE</span>
           <h1 id="currentStageTitle">스테이지 1</h1>
           <span id="stageDifficulty" class="difficulty-label" data-difficulty="쉬움">쉬움</span>
+          <span id="stageGimmickPreview" class="stage-gimmick-preview hidden"></span>
           <div id="stageGoalPreview" class="stage-goal-preview" aria-label="스테이지 목표"></div>
 
           <button id="playButton" class="play-button" type="button">
@@ -44,7 +45,13 @@
           </button>
         </section>
       </div>
-      <button id="debugResetButton" class="debug-reset-button" type="button">DEBUG · 데이터 초기화</button>
+      <div class="debug-tools" aria-label="디버그 도구">
+        <label class="debug-stage-picker">
+          <span>DEBUG · STAGE</span>
+          <select id="debugStageSelect" aria-label="바로 테스트할 스테이지 선택"></select>
+        </label>
+        <button id="debugResetButton" class="debug-reset-button" type="button">데이터 초기화</button>
+      </div>
     </section>
 
     <main id="gameShell" class="game-shell screen-hidden">
@@ -83,10 +90,6 @@
       <section class="tray-panel" aria-label="놓을 수 있는 케이크 판">
         <div class="tray-heading">
           <p id="boardHint">판을 위로 끌어 빈칸에 놓으세요</p>
-          <div class="swap-count" title="판 교체 가능 횟수">
-            <span aria-hidden="true">↻</span>
-            <strong id="swapLabel">3</strong>
-          </div>
         </div>
         <div id="rack" class="rack"></div>
       </section>
@@ -116,15 +119,16 @@
         <div class="guide-steps">
           <div><span>1</span><b>판을 끌어 놓기</b><p>하단의 케이크 판을 4×4 보드 빈칸으로 끌어주세요.</p></div>
           <div><span>2</span><b>같은 조각 모으기</b><p>새 판과 상하좌우의 같은 조각이 한곳으로 정렬돼요.</p></div>
-          <div><span>6</span><b>한 판 완성하기</b><p>같은 조각 6개가 모이면 완성된 판이 사라져요.</p></div>
+          <div><span id="guideCapacityNumber">6</span><b>한 판 완성하기</b><p>같은 조각 <strong id="guideCapacityText">6개</strong>가 모이면 완성된 판이 사라져요.</p></div>
         </div>
         <button id="guidePlayButton" class="primary-button" type="button">바로 플레이</button>
       </section>
     </div>
 
-    <script src="engine.js?v=20260721-reciprocal-lane"></script>
-    <script src="stages.js"></script>
-    <script src="motion.js?v=20260721-piece-stagger"></script>
-    <script src="app.js?v=20260721-piece-stagger"></script>
+    <script src="engine.js?v=20260721-gimmicks2"></script>
+    <script src="stages.js?v=20260721-gimmicks2"></script>
+    <script src="mechanics.js?v=20260721-gimmicks2"></script>
+    <script src="motion.js?v=20260721-gimmicks2"></script>
+    <script src="app.js?v=20260721-gimmicks2"></script>
   </body>
 </html>

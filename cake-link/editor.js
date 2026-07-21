@@ -3,7 +3,8 @@
 
   const Stages = window.CakeLinkStages;
   const Simulator = window.CakeLinkSimulator;
-  const STORAGE_KEY = "cakeLink.stageEditor.v1";
+  const STORAGE_KEY = "cakeLink.stageEditor.v2";
+  const LEGACY_STORAGE_KEY = "cakeLink.stageEditor.v1";
   const COLORS = [
     { id: "berry", name: "딸기", emoji: "🍓", color: "#e86e81" },
     { id: "lemon", name: "레몬", emoji: "🍋", color: "#d6a934" },
@@ -14,7 +15,7 @@
   const COLOR_BY_ID = Object.fromEntries(COLORS.map((color) => [color.id, color]));
   const sourceStages = deepClone(Stages.STAGES);
   let drafts = loadDrafts();
-  let selectedId = 1;
+  let selectedId = Number(Object.keys(sourceStages)[0] || 1);
   let selectedCell = 0;
   let lastResult = null;
   let lastComparison = null;
@@ -23,12 +24,14 @@
   const $ = (selector) => document.querySelector(selector);
   const elements = {
     stageList: $("#stageList"), savedState: $("#savedState"), title: $("#editorTitle"), validation: $("#validationSummary"),
-    stageId: $("#stageIdInput"), difficulty: $("#difficultyInput"), moveLimit: $("#moveLimitInput"), swaps: $("#swapsInput"),
+    stageId: $("#stageIdInput"), difficulty: $("#difficultyInput"), moveLimit: $("#moveLimitInput"),
     seed: $("#seedInput"), nextStage: $("#nextStageInput"), totalGoals: $("#totalGoalsValue"), movesPerGoal: $("#movesPerGoalValue"),
     playableCells: $("#playableCellsValue"), colorBody: $("#colorTableBody"), colorTotal: $("#colorWeightTotal"),
     board: $("#boardEditor"), cellLabel: $("#selectedCellLabel"), cellActive: $("#cellActiveInput"),
     initialInputs: $("#initialPieceInputs"), initialCapacity: $("#initialCapacity"), opening: $("#openingRackEditor"),
     patternBody: $("#patternTableBody"), patternTotal: $("#patternWeightTotal"), addPattern: $("#addPatternButton"),
+    mechanicsSummary: $("#mechanicsSummary"), mechanicsJson: $("#mechanicsJsonEditor"),
+    applyMechanics: $("#applyMechanicsButton"),
     json: $("#jsonEditor"), applyJson: $("#applyJsonButton"), copyStage: $("#copyStageButton"),
     reset: $("#resetStageButton"), save: $("#saveButton"), copyAll: $("#copyAllButton"), toast: $("#toast"),
     style: $("#styleInput"), skill: $("#skillInput"), styleDescription: $("#styleDescription"),
@@ -48,11 +51,27 @@
   }
 
   function loadDrafts() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (saved && Object.keys(saved).length === 7) return saved;
-    } catch (_) { /* Invalid saved data falls back to source. */ }
-    return deepClone(sourceStages);
+    const defaults = deepClone(sourceStages);
+    for (const key of [STORAGE_KEY, LEGACY_STORAGE_KEY]) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(key));
+        if (!saved || typeof saved !== "object") continue;
+        for (const id of Object.keys(defaults)) {
+          if (!saved[id] || typeof saved[id] !== "object") continue;
+          const base = defaults[id];
+          defaults[id] = {
+            ...base,
+            ...saved[id],
+            rules: { ...base.rules, ...(saved[id].rules || {}) },
+            mechanics: saved[id].mechanics || base.mechanics,
+            openingModifiers: saved[id].openingModifiers || base.openingModifiers,
+          };
+          if (key === LEGACY_STORAGE_KEY && Number(id) === 7) defaults[id].nextStageId = 8;
+        }
+        return defaults;
+      } catch (_) { /* Invalid saved data falls through to the next source. */ }
+    }
+    return defaults;
   }
 
   function stage() {
@@ -99,7 +118,21 @@
   }
 
   function goalCount(data = stage()) {
-    return sum(data.goals);
+    return Stages.totalGoalCount(data);
+  }
+
+  function stageGoalSummary(data) {
+    if (data.objective?.type === "frog") return `${sum(data.goals)}판 + 개구리`;
+    if (data.objective?.type === "ordered") return `${data.mechanics?.orderedGoal?.sequence?.length || 0}단계`;
+    return `${sum(data.goals)}판`;
+  }
+
+  function capacity(data = stage()) {
+    return Stages.stageCapacity?.(data) || Number(data.rules?.capacity) || 6;
+  }
+
+  function specialPieceCount(modifier = {}) {
+    return (modifier.hiddenColors?.length || 0) + Number(modifier.rainbow || 0);
   }
 
   function playableCount(data = stage()) {
@@ -108,6 +141,28 @@
 
   function initialAt(index, data = stage()) {
     return data.initialPlates.find((plate) => plate.index === index) || null;
+  }
+
+  function featureAt(index, data = stage()) {
+    const initial = initialAt(index, data);
+    if (initial?.kind === "colored" || initial?.allowedColor) return { icon: "●", label: "색깔 접시" };
+    if (initial?.kind === "layered" || initial?.layers?.length) return { icon: "Ⅱ", label: "이층 케이크" };
+    if (data.mechanics?.iceCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "❄", label: "얼음 판" };
+    if (data.mechanics?.locks?.some((lock) => Number(lock.index) === index)) return { icon: "🔒", label: "잠긴 칸" };
+    if (data.mechanics?.fragileCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "◇", label: "깨지는 받침대" };
+    if (Number(data.mechanics?.frog?.startIndex) === index) return { icon: "🐸", label: "개구리 시작" };
+    if (Number(data.mechanics?.frog?.goalIndex) === index) return { icon: "🏁", label: "개구리 목표" };
+    return null;
+  }
+
+  function mechanicsPayload(data = stage()) {
+    return {
+      gimmick: data.gimmick || null,
+      rules: data.rules || { capacity: 6 },
+      ...(data.objective ? { objective: data.objective } : {}),
+      mechanics: data.mechanics || {},
+      openingModifiers: data.openingModifiers || data.openingRack.map(() => ({})),
+    };
   }
 
   function setCellActive(index, active) {
@@ -134,7 +189,9 @@
 
   function validateStage(data) {
     const errors = [];
+    const plateCapacity = capacity(data);
     if (!Number.isInteger(data.moveLimit) || data.moveLimit < 1) errors.push("횟수 제한은 1 이상이어야 합니다.");
+    if (![6, 8].includes(plateCapacity)) errors.push("케이크 완성 조각 수는 6 또는 8이어야 합니다.");
     const validBoard = Array.isArray(data.boardMask) && data.boardMask.length === 4 && data.boardMask.every((row) => /^[01]{4}$/.test(row));
     if (!validBoard) errors.push("보드 모양은 4×4여야 합니다.");
     if (!data.colors?.length) errors.push("등장 색이 하나 이상 필요합니다.");
@@ -151,33 +208,81 @@
     for (const color of Object.keys(data.goals || {})) {
       if (!data.colors.includes(color)) errors.push(`목표색 ${color}가 등장 색에 없습니다.`);
     }
+    const initialIndexes = new Set();
     for (const initial of data.initialPlates || []) {
       const row = Math.floor(initial.index / 4);
       const column = initial.index % 4;
+      if (!Number.isInteger(initial.index) || initial.index < 0 || initial.index >= 16) errors.push("시작 판 위치는 0~15여야 합니다.");
+      if (initialIndexes.has(initial.index)) errors.push(`${initial.index}번 시작 판 위치가 중복됩니다.`);
+      initialIndexes.add(initial.index);
       if (data.boardMask[row]?.[column] !== "1") errors.push(`${initial.index}번 시작 판이 막힌 칸에 있습니다.`);
-      if (sum(initial.pieces) > 6) errors.push(`${initial.index}번 시작 판이 6조각을 넘습니다.`);
-      for (const color of Object.keys(initial.pieces)) {
+      if (sum(initial.pieces) > (initial.capacity || plateCapacity)) errors.push(`${initial.index}번 시작 판이 ${initial.capacity || plateCapacity}조각을 넘습니다.`);
+      for (const color of Object.keys(initial.pieces || {})) {
         if (!data.colors.includes(color)) errors.push(`${initial.index}번 시작 판에 미등장 색 ${color}가 있습니다.`);
+      }
+      if (initial.allowedColor && !data.colors.includes(initial.allowedColor)) errors.push(`${initial.index}번 색깔 접시의 색이 등장 색에 없습니다.`);
+      if (initial.allowedColor && Object.keys(initial.pieces || {}).some((color) => color !== initial.allowedColor)) {
+        errors.push(`${initial.index}번 색깔 접시에 다른 색 조각이 있습니다.`);
+      }
+      for (const layer of initial.layers || []) {
+        if (sum(layer.pieces) > (layer.capacity || plateCapacity)) errors.push(`${initial.index}번 아래층이 용량을 넘습니다.`);
+        for (const color of Object.keys(layer.pieces || {})) {
+          if (!data.colors.includes(color)) errors.push(`${initial.index}번 아래층에 미등장 색 ${color}가 있습니다.`);
+        }
       }
     }
     for (const [index, plate] of (data.openingRack || []).entries()) {
-      if (sum(plate) < 1 || sum(plate) > 6) errors.push(`첫 하단 ${index + 1}번 판은 1~6조각이어야 합니다.`);
+      const modifier = data.openingModifiers?.[index] || {};
+      const plateCount = sum(plate) + specialPieceCount(modifier);
+      if (plateCount < 1 || plateCount > plateCapacity) errors.push(`첫 하단 ${index + 1}번 판은 1~${plateCapacity}조각이어야 합니다.`);
       for (const color of Object.keys(plate)) {
         if (!data.colors.includes(color)) errors.push(`첫 하단 ${index + 1}번 판에 미등장 색 ${color}가 있습니다.`);
       }
+      for (const color of modifier.hiddenColors || []) {
+        if (!data.colors.includes(color)) errors.push(`첫 하단 ${index + 1}번 미스테리 실제 색이 등장 색에 없습니다.`);
+      }
     }
     if (data.openingRack?.length !== 3) errors.push("첫 하단 판은 정확히 3개여야 합니다.");
+    if (!Array.isArray(data.openingModifiers) || data.openingModifiers.length !== data.openingRack?.length) {
+      errors.push("첫 하단 판과 특수 조각 설정 수가 같아야 합니다.");
+    }
 
     for (const pattern of Object.keys(data.platePatternWeights || {})) {
-      if (!/^(?:[a-z][1-6])+$/.test(pattern)) {
+      if (!/^(?:[a-z][1-8])+$/.test(pattern)) {
         errors.push(`${pattern} 패턴 표기가 올바르지 않습니다.`);
         continue;
       }
       const parsed = Stages.parsePlatePattern(pattern);
       const letterCount = (pattern.match(/[a-z]/g) || []).length;
       if (Object.keys(parsed).length !== letterCount) errors.push(`${pattern}에 같은 문자가 반복됩니다.`);
-      if (sum(parsed) > 6) errors.push(`${pattern}은 6조각을 넘습니다.`);
+      if (sum(parsed) > plateCapacity) errors.push(`${pattern}은 ${plateCapacity}조각을 넘습니다.`);
       if (Object.keys(parsed).length > data.colors.length) errors.push(`${pattern}에 배정할 등장 색이 부족합니다.`);
+    }
+
+    const cells = [
+      ...(data.mechanics?.iceCells || []).map((cell) => ({ type: "얼음", index: Number(cell.index ?? cell) })),
+      ...(data.mechanics?.locks || []).map((cell) => ({ type: "잠금", index: Number(cell.index) })),
+    ];
+    for (const cell of cells) {
+      const row = Math.floor(cell.index / 4);
+      const column = cell.index % 4;
+      if (!Number.isInteger(cell.index) || data.boardMask[row]?.[column] !== "1") errors.push(`${cell.type} 칸 위치가 보드 밖이거나 막혀 있습니다.`);
+      if (initialIndexes.has(cell.index)) errors.push(`${cell.index}번 칸에 시작 판과 ${cell.type} 기믹이 겹칩니다.`);
+    }
+    const frog = data.mechanics?.frog;
+    if (frog) {
+      for (const [label, index] of [["시작", frog.startIndex], ["목표", frog.goalIndex]]) {
+        const row = Math.floor(index / 4);
+        const column = index % 4;
+        if (!Number.isInteger(index) || data.boardMask[row]?.[column] !== "1") errors.push(`개구리 ${label} 칸이 보드 밖이거나 막혀 있습니다.`);
+        if (initialIndexes.has(index)) errors.push(`개구리 ${label} 칸에 시작 판이 있습니다.`);
+      }
+      if (frog.startIndex === frog.goalIndex) errors.push("개구리 시작과 목표 칸은 달라야 합니다.");
+    }
+    const sequence = data.mechanics?.orderedGoal?.sequence;
+    if (data.gimmick?.id === "ordered" && (!Array.isArray(sequence) || !sequence.length)) errors.push("순서 목표 색 목록이 필요합니다.");
+    for (const color of sequence || []) {
+      if (!data.colors.includes(color)) errors.push(`순서 목표에 미등장 색 ${color}가 있습니다.`);
     }
     return errors;
   }
@@ -216,7 +321,7 @@
   function renderStageList() {
     elements.stageList.innerHTML = Object.values(drafts).map((data) => `
       <button class="stage-select${data.id === selectedId ? " active" : ""}" type="button" data-stage="${data.id}">
-        <span><b>스테이지 ${data.id}</b><small>${data.difficulty} · ${goalCount(data)}판</small></span><em>${data.moveLimit}</em>
+        <span><b>스테이지 ${data.id}</b><small>${data.difficulty} · ${stageGoalSummary(data)}${data.gimmick ? ` · ${data.gimmick.label}` : ""}</small></span><em>${data.moveLimit}</em>
       </button>
     `).join("");
     elements.stageList.querySelectorAll("[data-stage]").forEach((button) => {
@@ -235,7 +340,6 @@
     elements.stageId.value = data.id;
     elements.difficulty.value = data.difficulty;
     elements.moveLimit.value = data.moveLimit;
-    elements.swaps.value = data.swaps;
     elements.seed.value = data.seed;
     elements.nextStage.value = data.nextStageId ?? "";
   }
@@ -262,9 +366,15 @@
           stage().colors = stage().colors.filter((value) => value !== color);
           delete stage().colorWeights[color];
           delete stage().goals[color];
-          stage().initialPlates.forEach((plate) => delete plate.pieces[color]);
+          stage().initialPlates.forEach((plate) => {
+            delete plate.pieces[color];
+            plate.layers?.forEach((layer) => delete layer.pieces[color]);
+          });
           stage().initialPlates = stage().initialPlates.filter((plate) => sum(plate.pieces) > 0);
           stage().openingRack.forEach((plate) => delete plate[color]);
+          stage().openingModifiers?.forEach((modifier) => {
+            if (modifier.hiddenColors) modifier.hiddenColors = modifier.hiddenColors.filter((value) => value !== color);
+          });
         }
         markChanged();
         renderAll();
@@ -307,7 +417,8 @@
       const column = index % 4;
       const active = data.boardMask[row][column] === "1";
       const initial = initialAt(index);
-      return `<button class="board-cell${active ? "" : " blocked"}${selectedCell === index ? " selected" : ""}" type="button" data-cell="${index}" role="gridcell" aria-label="${index}번 칸, ${active ? "사용" : "막힘"}"><b>${index}</b>${active ? piecesMarkup(initial?.pieces) : "×"}</button>`;
+      const feature = featureAt(index, data);
+      return `<button class="board-cell${active ? "" : " blocked"}${feature ? " featured" : ""}${selectedCell === index ? " selected" : ""}" type="button" data-cell="${index}" role="gridcell" aria-label="${index}번 칸, ${active ? "사용" : "막힘"}${feature ? `, ${feature.label}` : ""}"><b>${index}</b>${feature ? `<i class="cell-feature" title="${feature.label}">${feature.icon}</i>` : ""}${active ? piecesMarkup(initial?.pieces) : "×"}</button>`;
     }).join("");
     elements.board.querySelectorAll("[data-cell]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -326,14 +437,14 @@
     elements.cellLabel.textContent = `${selectedCell}번 칸`;
     elements.cellActive.checked = active;
     elements.initialInputs.innerHTML = COLORS.map((color) => `
-      <label><span>${color.emoji} ${color.name}</span><input type="number" min="0" max="6" step="1" value="${initial?.pieces[color.id] || 0}" data-initial-color="${color.id}" ${active && stage().colors.includes(color.id) ? "" : "disabled"}></label>
+      <label><span>${color.emoji} ${color.name}</span><input type="number" min="0" max="${capacity()}" step="1" value="${initial?.pieces[color.id] || 0}" data-initial-color="${color.id}" ${active && stage().colors.includes(color.id) ? "" : "disabled"}></label>
     `).join("");
     const count = sum(initial?.pieces);
-    elements.initialCapacity.textContent = `${count} / 6`;
-    elements.initialCapacity.classList.toggle("over", count > 6);
+    elements.initialCapacity.textContent = `${count} / ${capacity()}`;
+    elements.initialCapacity.classList.toggle("over", count > capacity());
     elements.initialInputs.querySelectorAll("[data-initial-color]").forEach((input) => {
       input.addEventListener("change", () => {
-        setInitialPiece(selectedCell, input.dataset.initialColor, Math.max(0, Math.min(6, Number(input.value) || 0)));
+        setInitialPiece(selectedCell, input.dataset.initialColor, Math.max(0, Math.min(capacity(), Number(input.value) || 0)));
         markChanged();
         renderBoard();
         renderCellInspector();
@@ -344,13 +455,13 @@
   function renderOpeningRack() {
     elements.opening.innerHTML = stage().openingRack.map((plate, plateIndex) => `
       <div class="opening-row"><b>${plateIndex + 1}번 판</b>${COLORS.map((color) => `
-        <label>${color.emoji} ${color.name}<input type="number" min="0" max="6" step="1" value="${plate[color.id] || 0}" data-opening-index="${plateIndex}" data-opening-color="${color.id}" ${stage().colors.includes(color.id) ? "" : "disabled"}></label>
+        <label>${color.emoji} ${color.name}<input type="number" min="0" max="${capacity()}" step="1" value="${plate[color.id] || 0}" data-opening-index="${plateIndex}" data-opening-color="${color.id}" ${stage().colors.includes(color.id) ? "" : "disabled"}></label>
       `).join("")}</div>
     `).join("");
     elements.opening.querySelectorAll("[data-opening-index]").forEach((input) => {
       input.addEventListener("change", () => {
         const plate = stage().openingRack[Number(input.dataset.openingIndex)];
-        const value = Math.max(0, Math.min(6, Number(input.value) || 0));
+        const value = Math.max(0, Math.min(capacity(), Number(input.value) || 0));
         if (value) plate[input.dataset.openingColor] = value;
         else delete plate[input.dataset.openingColor];
         markChanged();
@@ -402,6 +513,31 @@
     });
   }
 
+  function mechanicDescription(data = stage()) {
+    const id = data.gimmick?.id;
+    if (!id) return "기본 정렬 규칙만 사용하는 스테이지입니다.";
+    const descriptions = {
+      colored: "지정된 색의 조각만 올라갈 수 있는 색깔 접시가 배치되어 있습니다.",
+      ice: `얼음 칸 ${(data.mechanics?.iceCells || []).length}개가 인접 판 제거 후 열립니다.`,
+      frog: `개구리가 ${data.mechanics?.frog?.startIndex ?? "?"}번에서 ${data.mechanics?.frog?.goalIndex ?? "?"}번 칸으로 이동합니다.`,
+      mystery: `생성 판의 ${data.mechanics?.mystery?.plateChance || 0}%에 미스테리 조각이 들어갈 수 있습니다.`,
+      capacity8: "같은 색 조각 8개를 모아야 한 판이 완성됩니다.",
+      locks: `완성 색 조건으로 잠긴 칸 ${(data.mechanics?.locks || []).length}개를 엽니다.`,
+      ordered: `지정된 ${(data.mechanics?.orderedGoal?.sequence || []).length}개 색 순서대로 완성합니다.`,
+      rainbow: `생성 판의 ${data.mechanics?.rainbow?.plateChance || 0}%에 자동 완성용 무지개 조각이 들어갈 수 있습니다.`,
+      fragile: `완성 후 사라지는 받침대 ${(data.mechanics?.fragileCells || []).length}개가 있습니다.`,
+      layered: `위층을 먼저 완성해야 아래층을 사용할 수 있는 판 ${data.initialPlates.filter((plate) => plate.layers?.length).length}개가 있습니다.`,
+    };
+    return descriptions[id] || "JSON에 설정된 스테이지 기믹을 사용합니다.";
+  }
+
+  function renderMechanics() {
+    const data = stage();
+    const label = data.gimmick?.label || "기본 규칙";
+    elements.mechanicsSummary.innerHTML = `<b>${label}</b><span>${mechanicDescription(data)}</span><em>${capacity(data)}조각 완성</em>`;
+    elements.mechanicsJson.value = JSON.stringify(mechanicsPayload(data), null, 2);
+  }
+
   function syncSummary() {
     const data = stage();
     const totalGoals = goalCount(data);
@@ -440,6 +576,7 @@
     renderCellInspector();
     renderOpeningRack();
     renderPatterns();
+    renderMechanics();
     syncSummary();
     syncJson();
     updateProfileCopy();
@@ -573,7 +710,7 @@
     const results = {};
     try {
       for (const data of Object.values(drafts)) {
-        elements.simulateAll.textContent = `${data.id}/7 분석 중…`;
+        elements.simulateAll.textContent = `${data.id}/${Object.keys(drafts).length} 분석 중…`;
         await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
         results[data.id] = Simulator.simulateStage(deepClone(data), {
           runs: Number(elements.runs.value),
@@ -593,7 +730,6 @@
   }
 
   bindBasicInput(elements.moveLimit, "moveLimit", (value) => Math.max(1, Number(value) || 1));
-  bindBasicInput(elements.swaps, "swaps", (value) => Math.max(0, Number(value) || 0));
   bindBasicInput(elements.seed, "seed", (value) => Math.max(1, Number(value) || 1));
   bindBasicInput(elements.nextStage, "nextStageId", (value) => value === "" ? null : Math.max(1, Number(value) || 1));
   elements.difficulty.addEventListener("change", () => {
@@ -668,8 +804,25 @@
     }
   }
 
-  elements.copyAll.addEventListener("click", () => copyText(JSON.stringify(drafts, null, 2), "1~7 전체 JSON을 복사했어요."));
+  elements.copyAll.addEventListener("click", () => copyText(JSON.stringify(drafts, null, 2), `1~${Object.keys(drafts).length} 전체 JSON을 복사했어요.`));
   elements.copyStage.addEventListener("click", () => copyText(JSON.stringify(stage(), null, 2), "선택 스테이지 JSON을 복사했어요."));
+  elements.applyMechanics.addEventListener("click", () => {
+    try {
+      const parsed = JSON.parse(elements.mechanicsJson.value);
+      if (!parsed || typeof parsed !== "object" || !parsed.rules || !parsed.mechanics) throw new Error("mechanics schema");
+      stage().gimmick = parsed.gimmick || null;
+      stage().rules = parsed.rules;
+      stage().mechanics = parsed.mechanics;
+      if (parsed.objective) stage().objective = parsed.objective;
+      else delete stage().objective;
+      stage().openingModifiers = parsed.openingModifiers || stage().openingRack.map(() => ({}));
+      markChanged();
+      renderAll();
+      showToast("기믹 JSON을 적용했어요.");
+    } catch (_) {
+      showToast("기믹 JSON 문법과 필수 필드를 확인해주세요.");
+    }
+  });
   elements.applyJson.addEventListener("click", () => {
     try {
       const parsed = JSON.parse(elements.json.value);
@@ -678,6 +831,10 @@
       }
       parsed.id = selectedId;
       parsed.title ||= `스테이지 ${selectedId}`;
+      parsed.gimmick ||= null;
+      parsed.rules ||= { capacity: 6 };
+      parsed.mechanics ||= {};
+      parsed.openingModifiers ||= parsed.openingRack.map(() => ({}));
       drafts[selectedId] = parsed;
       markChanged();
       renderAll();

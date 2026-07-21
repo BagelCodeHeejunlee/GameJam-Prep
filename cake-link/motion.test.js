@@ -21,6 +21,28 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     6,
     "a visual sequence never exceeds one full cake",
   );
+  assert.deepEqual(
+    Motion.createPieceTransferSequence({
+      count: 8,
+      sourceFirst: 0,
+      targetFirst: 0,
+      sourceCapacity: 8,
+      targetCapacity: 8,
+    }),
+    Array.from({ length: 8 }, (_, slot) => ({ sourceSlot: slot, targetSlot: slot })),
+    "an eight-slot cake can animate all eight slices",
+  );
+  assert.equal(
+    Motion.createPieceTransferSequence({
+      count: 8,
+      sourceFirst: 0,
+      targetFirst: 0,
+      capacity: 8,
+      targetCapacity: 6,
+    }).length,
+    6,
+    "a transfer respects the smaller endpoint capacity",
+  );
 }
 
 {
@@ -298,6 +320,11 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     { count: 2, firstSlot: 2, lastSlot: 3, maskStart: 90, maskSpan: 120 },
     "a same-color pair keeps its two original neighboring sectors",
   );
+  assert.deepEqual(
+    Motion.createSliceGroupGeometry({ lastSlot: 7, count: 3, capacity: 8 }),
+    { count: 3, firstSlot: 5, lastSlot: 7, maskStart: 202.5, maskSpan: 135 },
+    "an eight-slot group uses 45-degree sectors",
+  );
 }
 
 {
@@ -319,6 +346,28 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
       }
     }
   }
+  assert.equal(
+    Motion.createPieceLandingRotation({
+      sourceSlot: 1,
+      targetSlot: 6,
+      targetRotation: 15,
+      sourceCapacity: 8,
+      targetCapacity: 8,
+    }),
+    240,
+    "an eight-slot slice lands using the capacity-derived 45-degree step",
+  );
+  assert.equal(
+    Motion.createPieceLandingRotation({
+      sourceSlot: 3,
+      targetSlot: 5,
+      targetRotation: 10,
+      sourceAngleStep: 60,
+      targetAngleStep: 45,
+    }),
+    55,
+    "source and target sector sizes can differ during a landing",
+  );
 }
 
 {
@@ -350,6 +399,22 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
       }
     }
   }
+  assert.deepEqual(
+    Motion.createMatchedGroupRotations({
+      direction: 90,
+      count: 3,
+      sourceLastSlot: 7,
+      targetLastSlot: 4,
+      capacity: 8,
+    }),
+    {
+      sourceRotation: -225,
+      targetRotation: -90,
+      physicalMaskStart: -22.5,
+      maskSpan: 135,
+    },
+    "matched eight-slot groups align on their shared physical 45-degree sectors",
+  );
 }
 
 {
@@ -630,6 +695,16 @@ const rect = (left, top, width = 100, height = width) => ({ left, top, width, he
     Motion.createSlotReflowRotation({ baseRotation: 30, fromFirst: 5, toFirst: 1 }),
     -210,
     "a retained group moving four slots backward keeps the full -240 degree path",
+  );
+  assert.equal(
+    Motion.createSlotReflowRotation({ baseRotation: 30, fromFirst: 1, toFirst: 7, capacity: 8 }),
+    300,
+    "an eight-slot retained group reflows in 45-degree increments",
+  );
+  assert.equal(
+    Motion.createSlotReflowRotation({ baseRotation: 30, fromFirst: 1, toFirst: 3, angleStep: 30 }),
+    90,
+    "an explicit angle step overrides the capacity-derived sector size",
   );
 }
 
