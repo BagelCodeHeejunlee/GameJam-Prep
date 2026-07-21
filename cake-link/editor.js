@@ -66,6 +66,28 @@
             mechanics: saved[id].mechanics || base.mechanics,
             openingModifiers: saved[id].openingModifiers || base.openingModifiers,
           };
+          // Stage 16 used to be stored as a breakable-plate objective. Keep
+          // existing editor drafts playable after the mechanic became a
+          // persistent order station on the board.
+          if (Number(id) === 16 && (
+            defaults[id].objective?.type === "fragile" ||
+            defaults[id].gimmick?.id === "fragile" ||
+            defaults[id].mechanics?.fragileCells?.length
+          )) {
+            const { fragileCells, fragileGoal, ...mechanics } = defaults[id].mechanics || {};
+            const serviceCells = (fragileCells?.length ? fragileCells : base.mechanics?.serviceCells || [])
+              .map((entry) => ({ index: Number(Number.isInteger(entry) ? entry : entry?.index) }))
+              .filter((entry) => Number.isInteger(entry.index));
+            defaults[id] = {
+              ...defaults[id],
+              objective: {
+                type: "service",
+                target: Math.max(1, Math.floor(Number(defaults[id].objective?.target || fragileGoal?.target) || serviceCells.length || 1)),
+              },
+              gimmick: { id: "service", label: "주문대", icon: "🔔" },
+              mechanics: { ...mechanics, serviceCells },
+            };
+          }
           if (key === LEGACY_STORAGE_KEY && Number(id) === 7) defaults[id].nextStageId = 8;
         }
         return defaults;
@@ -124,6 +146,9 @@
   function stageGoalSummary(data) {
     if (data.objective?.type === "frog") return `${sum(data.goals)}판 + 개구리`;
     if (data.objective?.type === "ordered") return `${data.mechanics?.orderedGoal?.sequence?.length || 0}단계`;
+    if (data.objective?.type === "service") {
+      return `주문대 ${data.objective?.target || data.mechanics?.serviceCells?.length || 0}곳`;
+    }
     if (["fragile", "breakPlates"].includes(data.objective?.type)) {
       return `깨지는 판 ${data.mechanics?.fragileGoal?.target || data.objective?.target || 0}개`;
     }
@@ -154,6 +179,7 @@
     if (initial?.kind === "layered" || initial?.layers?.length) return { icon: "Ⅱ", label: "이층 케이크" };
     if (data.mechanics?.iceCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "❄", label: "얼음 판" };
     if (data.mechanics?.locks?.some((lock) => Number(lock.index) === index)) return { icon: "🔒", label: "잠긴 칸" };
+    if (data.mechanics?.serviceCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "🔔", label: "주문대" };
     if (data.mechanics?.fragileCells?.some((cell) => Number(cell.index ?? cell) === index)) return { icon: "💥", label: "깨지는 판" };
     if (Number(data.mechanics?.frog?.startIndex) === index) return { icon: "🐸", label: "개구리 시작" };
     if (Number(data.mechanics?.frog?.goalIndex) === index) return { icon: "🏁", label: "개구리 목표" };
@@ -274,6 +300,7 @@
     const cells = [
       ...(data.mechanics?.iceCells || []).map((cell) => ({ type: "얼음", index: Number(cell.index ?? cell) })),
       ...(data.mechanics?.locks || []).map((cell) => ({ type: "잠금", index: Number(cell.index) })),
+      ...(data.mechanics?.serviceCells || []).map((cell) => ({ type: "주문대", index: Number(cell.index ?? cell) })),
     ];
     for (const cell of cells) {
       const row = Math.floor(cell.index / 4);
@@ -307,6 +334,14 @@
     if (data.gimmick?.id === "ordered" && (!Array.isArray(sequence) || !sequence.length)) errors.push("순서 목표 색 목록이 필요합니다.");
     for (const color of sequence || []) {
       if (!data.colors.includes(color)) errors.push(`순서 목표에 미등장 색 ${color}가 있습니다.`);
+    }
+    if (data.objective?.type === "service") {
+      const target = Math.floor(Number(data.objective.target) || 0);
+      const serviceIndexes = (data.mechanics?.serviceCells || []).map((cell) => Number(cell.index ?? cell));
+      const serviceCount = new Set(serviceIndexes).size;
+      if (target < 1) errors.push("주문대 목표는 1곳 이상이어야 합니다.");
+      if (target > serviceCount) errors.push("주문대 목표가 지정된 주문대 수보다 많습니다.");
+      if (serviceCount !== serviceIndexes.length) errors.push("같은 칸에 주문대가 중복 지정되어 있습니다.");
     }
     if (data.objective?.type === "fragile") {
       const target = Math.floor(Number(data.objective.target) || 0);
@@ -560,6 +595,7 @@
       locks: `색깔별 완성 횟수에 따라 잠긴 칸 ${(data.mechanics?.locks || []).length}개를 단계적으로 엽니다.`,
       ordered: `지정된 ${(data.mechanics?.orderedGoal?.sequence || []).length}개 색 순서대로 완성합니다.`,
       rainbow: `생성 판의 ${data.mechanics?.rainbow?.plateChance || 0}%에서 기존 조각 1~2개가 자동 완성용 무지개 조각으로 바뀝니다.`,
+      service: `주문대 ${(data.mechanics?.serviceCells || []).length}곳에서 각각 케이크를 한 판씩 완성해 주문을 채웁니다. 완료한 칸도 계속 사용할 수 있습니다.`,
       fragile: `완성하면 판 자체가 깨지는 위치 ${(data.mechanics?.fragileCells || []).length}개가 있습니다. 목표는 ${data.mechanics?.fragileGoal?.target || data.objective?.target || 0}개 깨기입니다.`,
       layered: `위층을 먼저 완성해야 아래층을 사용할 수 있는 판 ${data.initialPlates.filter((plate) => plate.layers?.length).length}개가 있습니다.`,
     };

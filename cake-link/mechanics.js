@@ -39,30 +39,41 @@
       iceCells,
       lockedCells,
       brokenCells: {},
+      servedCells: {},
       keyProgress: {},
       frogIndex,
       frogReached,
       orderIndex: 0,
       fragileBrokenCount: 0,
+      servedCount: 0,
     };
   }
 
   function cloneRuntime(runtime) {
     const cloned = Engine.deepClone(runtime || {});
+    const servedCells = { ...(cloned.servedCells || {}) };
     return {
       iceCells: {},
       lockedCells: {},
       brokenCells: {},
+      servedCells: {},
       keyProgress: {},
       frogIndex: null,
       frogReached: false,
       orderIndex: 0,
       fragileBrokenCount: 0,
+      servedCount: 0,
       ...cloned,
       iceCells: { ...(cloned.iceCells || {}) },
       lockedCells: { ...(cloned.lockedCells || {}) },
       brokenCells: { ...(cloned.brokenCells || {}) },
+      servedCells,
       keyProgress: { ...(cloned.keyProgress || {}) },
+      servedCount: Math.max(
+        0,
+        Number(cloned.servedCount) || 0,
+        Object.values(servedCells).filter(Boolean).length,
+      ),
     };
   }
 
@@ -204,6 +215,32 @@
       .filter(Number.isInteger).length;
   }
 
+  function serviceTarget(stage) {
+    const configured = Math.floor(Number(stage?.objective?.target));
+    if (Number.isInteger(configured) && configured > 0) return configured;
+    return (mechanicsOf(stage).serviceCells || [])
+      .map(indexOfEntry)
+      .filter(Number.isInteger).length;
+  }
+
+  function serveOrderCells(stage, runtime, completionEvents, specialEvents) {
+    const serviceIndexes = new Set((mechanicsOf(stage).serviceCells || [])
+      .map(indexOfEntry)
+      .filter(Number.isInteger));
+    for (const event of completionEvents) {
+      if (!serviceIndexes.has(event.index) || runtime.servedCells[event.index]) continue;
+      runtime.servedCells[event.index] = true;
+      runtime.servedCount = Math.max(0, Number(runtime.servedCount) || 0) + 1;
+      specialEvents.push({
+        kind: "orderServed",
+        index: event.index,
+        type: event.type,
+        progress: runtime.servedCount,
+        target: serviceTarget(stage),
+      });
+    }
+  }
+
   function advanceOrderedGoal(stage, runtime, completionEvents, specialEvents) {
     const sequence = mechanicsOf(stage).orderedGoal?.sequence || [];
     for (const event of completionEvents) {
@@ -320,6 +357,7 @@
     const aggregate = aggregatePhases(phases);
     breakIce(stage, runtime, aggregate.removed, specialEvents);
     unlockFromCompletions(stage, runtime, aggregate.completionEvents, specialEvents);
+    serveOrderCells(stage, runtime, aggregate.completionEvents, specialEvents);
     breakFragileCells(stage, runtime, aggregate.completionEvents, specialEvents);
     advanceOrderedGoal(stage, runtime, aggregate.completionEvents, specialEvents);
     moveFrog(stage, runtime, board, specialEvents);
@@ -354,6 +392,10 @@
       const length = mechanicsOf(stage).orderedGoal?.sequence?.length || 0;
       return runtime.orderIndex >= length;
     }
+    if (objective === "service") {
+      const target = serviceTarget(stage);
+      return target > 0 && (Number(runtime.servedCount) || 0) >= target;
+    }
     if (objective === "fragile") {
       const target = fragileTarget(stage);
       return target > 0 && (Number(runtime.fragileBrokenCount) || 0) >= target;
@@ -366,6 +408,12 @@
     if (objective === "ordered") {
       const length = mechanicsOf(stage).orderedGoal?.sequence?.length || 0;
       return length ? Math.min(1, runtime.orderIndex / length) : 1;
+    }
+    if (objective === "service") {
+      const target = serviceTarget(stage);
+      return target
+        ? Math.min(1, Math.max(0, Number(runtime.servedCount) || 0) / target)
+        : 1;
     }
     if (objective === "fragile") {
       const target = fragileTarget(stage);

@@ -20,7 +20,7 @@ const EXPECTED_GIMMICKS = {
   13: "locks",
   14: "ordered",
   15: "rainbow",
-  16: "fragile",
+  16: "service",
   17: "layered",
 };
 
@@ -128,8 +128,9 @@ assert.equal(Stages.isComplete(Stages.getStage(10), { frogReached: true }), fals
 assert.equal(Stages.isComplete(Stages.getStage(10), { frogReached: true, berry: 2 }), true);
 assert.equal(Stages.isComplete(Stages.getStage(14), { orderIndex: 6 }), false);
 assert.equal(Stages.isComplete(Stages.getStage(14), { orderIndex: 7 }), true);
-assert.equal(Stages.isComplete(Stages.getStage(16), { fragileBrokenCount: 2 }), false);
-assert.equal(Stages.isComplete(Stages.getStage(16), { fragileBrokenCount: 3 }), true);
+assert.equal(Stages.isComplete(Stages.getStage(16), { servedCount: 2 }), false);
+assert.equal(Stages.isComplete(Stages.getStage(16), { servedCount: 3 }), true);
+assert.equal(Stages.isComplete(Stages.getStage(16), { servedCells: { 5: true, 6: true, 9: true } }), true);
 
 const colored = Stages.getStage(8).initialPlates.filter((plate) => plate.kind === "colored");
 assert.equal(colored.length, 2);
@@ -164,9 +165,9 @@ assert.deepEqual(
 );
 assert.deepEqual(Stages.getStage(14).mechanics.orderedGoal.sequence, ["berry", "lemon", "matcha", "berry", "lemon", "matcha", "berry"]);
 assert.deepEqual(Stages.getStage(16).goals, {});
-assert.deepEqual(Stages.getStage(16).objective, { type: "fragile", target: 3 });
-assert.equal(Stages.getStage(16).gimmick.label, "깨지는 판");
-assert.equal(Stages.getStage(16).mechanics.fragileCells.length, 3);
+assert.deepEqual(Stages.getStage(16).objective, { type: "service", target: 3 });
+assert.equal(Stages.getStage(16).gimmick.label, "주문대");
+assert.deepEqual(Stages.getStage(16).mechanics.serviceCells.map((cell) => cell.index), [5, 6, 9]);
 assert.equal(Stages.getStage(17).initialPlates.filter((plate) => plate.kind === "layered").length, 2);
 
 const explicitMystery = Stages.createPlateData({ berry: 2 }, { hiddenColors: ["lemon"] });

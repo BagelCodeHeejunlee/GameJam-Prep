@@ -224,6 +224,38 @@
     return (entries || []).some((entry) => (Number.isInteger(entry) ? entry : entry?.index) === index);
   }
 
+  function serviceCellEntries(stage = currentStage) {
+    if (stage?.mechanics?.serviceCells?.length) return stage.mechanics.serviceCells;
+    if (stage?.objective?.type === "fragile") return stage?.mechanics?.fragileCells || [];
+    return [];
+  }
+
+  function isServiceStage(stage = currentStage) {
+    return stage?.objective?.type === "service" || serviceCellEntries(stage).length > 0;
+  }
+
+  function hasServiceGoal(stage = currentStage) {
+    return ["service", "fragile"].includes(stage?.objective?.type);
+  }
+
+  function isServedCell(index) {
+    return runtimeHas(state?.mechanics?.servedCells, index) ||
+      (currentStage.objective?.type === "fragile" && runtimeHas(state?.mechanics?.brokenCells, index));
+  }
+
+  function servedOrderCount() {
+    return Math.max(
+      0,
+      Number(state?.mechanics?.servedCount) || 0,
+      currentStage.objective?.type === "fragile" ? Number(state?.mechanics?.fragileBrokenCount) || 0 : 0
+    );
+  }
+
+  function gimmickPresentation(stage = currentStage) {
+    if (isServiceStage(stage)) return { label: "주문대", icon: "🛎️" };
+    return stage?.gimmick || {};
+  }
+
   function isBoardFull() {
     return Mechanics.legalPlacementIndexes(currentStage, state.mechanics, state.board).length === 0;
   }
@@ -239,13 +271,12 @@
       }
       const iceLocked = runtimeHas(state.mechanics.iceCells, index);
       const keyLocked = runtimeHas(state.mechanics.lockedCells, index);
-      const fragileConfigured = configHasIndex(currentStage.mechanics?.fragileCells, index);
-      const fragileConsumed = fragileConfigured && runtimeHas(state.mechanics.brokenCells, index);
-      const collapsed = !fragileConfigured && runtimeHas(state.mechanics.brokenCells, index);
+      const serviceConfigured = configHasIndex(serviceCellEntries(), index);
+      const serviceServed = serviceConfigured && isServedCell(index);
+      const collapsed = !serviceConfigured && runtimeHas(state.mechanics.brokenCells, index);
       const hasFrog = state.mechanics.frogIndex === index;
       const frogIsActive = Number.isInteger(state.mechanics.frogIndex) && !state.mechanics.frogReached;
       const frogGoal = frogIsActive && currentStage.mechanics?.frog?.goalIndex === index;
-      const fragile = fragileConfigured && !fragileConsumed;
       const collector = Boolean(plateData?.collectorOnly);
       const dropAllowed = !plateData && Mechanics.isCellAvailable(currentStage, state.mechanics, index, state.board);
       const classes = ["cell", plateData ? "occupied" : "empty"];
@@ -256,7 +287,8 @@
       if (iceLocked) classes.push("ice-locked");
       if (keyLocked) classes.push("key-locked");
       if (collapsed) classes.push("collapsed");
-      if (fragile) classes.push("fragile");
+      if (serviceConfigured) classes.push("service-station");
+      if (serviceServed) classes.push("service-served");
       if (hasFrog) classes.push("frog-cell");
       if (frogGoal) classes.push("frog-goal-cell");
       if (collector) classes.push("collector-cell");
@@ -272,21 +304,24 @@
       const lockCountLabel = lockCount > 1 ? `<b class="lock-count-badge">${lockProgress}/${lockCount}</b>` : "";
       const reason = iceLocked ? "얼음을 먼저 깨야 해요"
         : keyLocked ? (lockCount > 1 ? `열쇠 조건 ${lockProgress}/${lockCount} 완료` : "열쇠 조건을 먼저 완료해야 해요")
-          : collapsed ? "깨진 받침대는 사용할 수 없어요"
+          : collapsed ? "사용할 수 없는 칸이에요"
             : hasFrog ? "개구리가 있는 칸이에요"
               : plateData ? "이미 접시가 있어요" : "";
       const goalDescription = frogGoal ? ", 개구리 목표 칸" : "";
-      const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}${fragile ? ", 완성하면 접시가 깨져 목표에 집계" : ""}${iceLocked ? ", 반투명 얼음 안에 갇혀 있어 현재 사용할 수 없음" : ""}${goalDescription}`
-        : `${row}행 ${col}열, ${reason || `빈칸${goalDescription}${frogGoal ? ", 판을 놓을 수 있음" : ""}`}`;
+      const serviceDescription = serviceConfigured
+        ? serviceServed ? ", 주문을 완료한 주문대, 다시 사용할 수 있음" : ", 이 자리에서 케이크를 완성하면 주문 처리"
+        : "";
+      const label = plateData ? `${row}행 ${col}열, ${plateLabel(plateData)}${serviceDescription}${iceLocked ? ", 반투명 얼음 안에 갇혀 있어 현재 사용할 수 없음" : ""}${goalDescription}`
+        : `${row}행 ${col}열, ${reason || `빈칸${serviceDescription}${goalDescription}${frogGoal ? ", 판을 놓을 수 있음" : ""}`}`;
       const fixtures = [
-        fragile && plateData ? `<span class="fragile-plate-cracks" aria-hidden="true"></span>` : "",
-        effectClass === "crumbling" ? `<span class="plate-break-burst" aria-hidden="true"><i></i><i></i><i></i><i></i></span>` : "",
+        serviceConfigured ? `<span class="cell-fixture service-station-pad" aria-hidden="true"><span class="service-station-label"><i></i><b>${serviceServed ? "완료" : "주문대"}</b></span></span>` : "",
+        effectClass === "order-served" ? `<span class="order-served-burst" aria-hidden="true"><i>✓</i><b>주문 완료!</b></span>` : "",
         frogGoal ? `<span class="frog-goal" aria-hidden="true"></span>` : "",
         iceLocked ? `<span class="cell-fixture ice-cover" aria-hidden="true"></span>` : "",
         keyLocked ? `<span class="cell-fixture lock-cover" aria-hidden="true">${keyColor ? `<i class="lock-key-dot" style="--key-color:${CAKES[keyColor]?.color || "#999"}"></i>` : ""}${lockCountLabel}</span>` : "",
         hasFrog ? `<span class="frog-token" aria-hidden="true"></span>` : "",
       ].join("");
-      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" data-drop-allowed="${dropAllowed}" data-block-reason="${reason}" aria-label="${label}">${plateData ? plateMarkup(plateData, 0, fragile ? "fragile-plate" : "") : ""}${fixtures}</div>`;
+      return `<div class="${classes.join(" ")}" role="gridcell" data-cell="${index}" data-drop-allowed="${dropAllowed}" data-block-reason="${reason}" aria-label="${label}">${plateData ? plateMarkup(plateData) : ""}${fixtures}</div>`;
     }).join("");
   }
 
@@ -317,11 +352,11 @@
       const count = showProgress ? `${completed}/${target}` : `${target}판`;
       return `<span class="goal-chip" title="${CAKES[type].name} 케이크 ${target}판"><span aria-hidden="true">${CAKES[type].emoji}</span><b>${count}</b></span>`;
     });
-    if (currentStage.objective?.type === "fragile") {
+    if (hasServiceGoal()) {
       const target = Math.max(1, Math.floor(Number(currentStage.objective.target) || 1));
-      const completed = Math.min(target, Math.max(0, Number(state?.mechanics?.fragileBrokenCount) || 0));
-      const count = showProgress ? `${completed}/${target}` : `${target}개`;
-      chips.push(`<span class="goal-chip fragile-goal-chip" title="접시 ${target}개 깨기"><span class="broken-plate-goal-icon" aria-hidden="true"></span><b>${count}</b></span>`);
+      const completed = Math.min(target, servedOrderCount());
+      const count = showProgress ? `주문 ${completed}/${target}` : `주문대 ${target}곳에서 완성`;
+      chips.push(`<span class="goal-chip service-goal-chip" title="주문대 ${target}곳에서 케이크 완성"><span class="service-goal-icon" aria-hidden="true"></span><b>${count}</b></span>`);
     }
     if (currentStage.mechanics?.frog) {
       const reached = Boolean(state?.mechanics?.frogReached);
@@ -1093,15 +1128,26 @@
     const terrainEvents = (events || []).filter((event) => !passiveKinds.has(event.kind));
     const classByKind = {
       iceBreak: "ice-breaking", iceBroken: "ice-breaking", unlock: "unlocking",
-      "ice-break": "ice-breaking", lockOpen: "unlocking", fragileBreak: "crumbling",
-      cellBreak: "crumbling", "cell-break": "crumbling",
+      "ice-break": "ice-breaking", lockOpen: "unlocking",
+      orderServed: "order-served", "order-served": "order-served",
     };
     for (const event of terrainEvents) {
       const indexes = event.indexes || [event.index ?? event.to].filter(Number.isInteger);
-      indexes.forEach((index) => state.effectCells.set(index, classByKind[event.kind] || "gimmick-pulse"));
+      const legacyServiceEvent = isServiceStage() && ["fragileBreak", "cellBreak", "cell-break"].includes(event.kind);
+      const effectClass = legacyServiceEvent ? "order-served" : classByKind[event.kind] || "gimmick-pulse";
+      indexes.forEach((index) => state.effectCells.set(index, effectClass));
     }
     if (terrainEvents.length) {
       renderBoard();
+      const servedEvent = [...terrainEvents].reverse().find((event) =>
+        ["orderServed", "order-served", "fragileBreak"].includes(event.kind)
+      );
+      if (servedEvent && isServiceStage()) {
+        const progress = Math.max(1, Number(servedEvent.progress) || servedOrderCount() + 1);
+        const target = Math.max(1, Number(servedEvent.target) || Number(currentStage.objective?.target) || 1);
+        playTone(progress >= target ? 880 : 720, .12, "sine");
+        showToast(progress >= target ? "모든 주문을 완료했어요!" : `주문 ${Math.min(progress, target)}/${target} 완료!`);
+      }
       await wait(reducedMotion() ? 0 : 360);
       if (activeSession !== sessionId) return false;
       state.effectCells.clear();
@@ -1293,8 +1339,9 @@
     elements.stageDifficulty.textContent = currentStage.difficulty;
     elements.stageDifficulty.dataset.difficulty = currentStage.difficulty;
     if (elements.stageGimmick) {
-      const label = currentStage.gimmick?.label;
-      elements.stageGimmick.textContent = label ? `${currentStage.gimmick.icon || "✦"} ${label}` : "";
+      const gimmick = gimmickPresentation();
+      const label = gimmick.label;
+      elements.stageGimmick.textContent = label ? `${gimmick.icon || "✦"} ${label}` : "";
       elements.stageGimmick.classList.toggle("hidden", !label);
     }
     if (elements.debugStage) elements.debugStage.value = String(currentStage.id);
@@ -1387,7 +1434,8 @@
   function setupDebugStageSelect() {
     if (!elements.debugStage) return;
     elements.debugStage.innerHTML = Object.values(Stages.STAGES).map((stage) => {
-      const suffix = stage.gimmick?.label ? ` · ${stage.gimmick.label}` : "";
+      const gimmick = gimmickPresentation(stage);
+      const suffix = gimmick.label ? ` · ${gimmick.label}` : "";
       return `<option value="${stage.id}">${stage.id}${suffix}</option>`;
     }).join("");
     elements.debugStage.value = String(currentStage.id);

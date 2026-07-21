@@ -328,6 +328,46 @@ function completedTypes(result) {
 
 {
   const stage = stageWith({
+    goals: {},
+    objective: { type: "service", target: 2 },
+    mechanics: { serviceCells: [{ index: 5 }, { index: 10 }] },
+  });
+  let turn = Mechanics.resolveTurn(stage, Mechanics.createRuntime(stage), boardWith([
+    [5, { berry: 3 }],
+    [4, { berry: 3 }],
+  ]), 5);
+  assert.deepEqual(turn.runtime.servedCells, { 5: true });
+  assert.equal(turn.runtime.servedCount, 1);
+  assert.deepEqual(turn.specialEvents.find((event) => event.kind === "orderServed"), {
+    kind: "orderServed",
+    index: 5,
+    type: "berry",
+    progress: 1,
+    target: 2,
+  });
+  assert.equal(turn.runtime.brokenCells[5], undefined, "serving an order does not break the cell");
+  assert.equal(Mechanics.isCellAvailable(stage, turn.runtime, 5, turn.board), true, "a served station stays reusable");
+  assert.equal(Mechanics.goalProgress(stage, {}, turn.runtime), .5);
+
+  turn = Mechanics.resolveTurn(stage, turn.runtime, boardWith([
+    [5, { lemon: 3 }],
+    [4, { lemon: 3 }],
+  ]), 5);
+  assert.equal(turn.runtime.servedCount, 1, "the same service cell only counts once");
+  assert.equal(turn.specialEvents.some((event) => event.kind === "orderServed"), false);
+
+  turn = Mechanics.resolveTurn(stage, turn.runtime, boardWith([
+    [10, { matcha: 3 }],
+    [9, { matcha: 3 }],
+  ]), 10);
+  assert.deepEqual(turn.runtime.servedCells, { 5: true, 10: true });
+  assert.equal(turn.runtime.servedCount, 2);
+  assert.equal(Mechanics.goalProgress(stage, {}, turn.runtime), 1);
+  assert.equal(Mechanics.isStageComplete(stage, {}, turn.runtime), true);
+}
+
+{
+  const stage = stageWith({
     mechanics: { fragileCells: [{ index: 5 }, { index: 4 }] },
   });
   const turn = Mechanics.resolveTurn(stage, Mechanics.createRuntime(stage), boardWith([

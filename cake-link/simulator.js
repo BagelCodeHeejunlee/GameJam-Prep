@@ -138,7 +138,7 @@
   }
 
   function goalNeed(stage, completed, runtime, color) {
-    if (stage?.objective?.type === "fragile") return 0;
+    if (["service", "fragile"].includes(stage?.objective?.type)) return 0;
     const ordered = orderedNeed(stage, runtime, color);
     if (ordered !== null) return ordered;
     return Math.max(0, (stage.goals[color] || 0) - (completed[color] || 0));
@@ -211,7 +211,15 @@
     let goalCompletionPotential = 0;
     let goalPieces = 0;
     let coloredPlateFit = 0;
+    let servicePlateFit = 0;
     let fragilePlateFit = 0;
+
+    const serviceIndexes = new Set((stage.mechanics?.serviceCells || []).map((entry) =>
+      Number(Number.isInteger(entry) ? entry : entry?.index)
+    ));
+    const fragileIndexes = new Set((stage.mechanics?.fragileCells || []).map((entry) =>
+      Number(Number.isInteger(entry) ? entry : entry?.index)
+    ));
 
     for (const [type, count] of normalPieceEntries(rackPlate)) {
       const surrounding = occupiedNeighbors.reduce(
@@ -228,12 +236,15 @@
         completionPotential += 1;
         if (needed > 0) goalCompletionPotential += 1;
       }
+      if (serviceIndexes.has(cellIndex) && !runtime?.servedCells?.[cellIndex]) {
+        servicePlateFit += Math.min(capacity, count + surrounding + rainbow);
+      }
       for (const neighbor of occupiedNeighbors) {
         if (board[neighbor]?.allowedColor === type) coloredPlateFit += count;
-        const fragile = (stage.mechanics?.fragileCells || []).some((entry) =>
-          Number(Number.isInteger(entry) ? entry : entry?.index) === neighbor
-        );
-        if (fragile && !runtime?.brokenCells?.[neighbor]) {
+        if (serviceIndexes.has(neighbor) && !runtime?.servedCells?.[neighbor]) {
+          servicePlateFit += Math.min(count, Math.max(0, capacity - Number(board[neighbor]?.pieces?.[type] || 0)));
+        }
+        if (fragileIndexes.has(neighbor) && !runtime?.brokenCells?.[neighbor]) {
           fragilePlateFit += Math.min(count, Math.max(0, capacity - Number(board[neighbor]?.pieces?.[type] || 0)));
         }
       }
@@ -247,6 +258,7 @@
       goalPieces,
       occupiedNeighbors: occupiedNeighbors.length,
       coloredPlateFit,
+      servicePlateFit,
       fragilePlateFit,
       rainbow,
       mystery,
@@ -263,6 +275,7 @@
       const type = String(event.type || event.kind || "").toLowerCase();
       if (type.includes("unlock") || type.includes("ice")) value += 1;
       if (type.includes("layer")) value += 1.2;
+      if (type.includes("orderserved") || type.includes("service")) value += 4;
       if (type.includes("fragile") || type.includes("break")) value += 4;
       if (type.includes("frog") && (event.reached || type.includes("goal"))) value += 4;
     }
@@ -283,6 +296,10 @@
     const afterFrog = finiteDistance(Mechanics.frogDistance(stage, result.runtime, result.board));
     const frogGain = beforeFrog - afterFrog;
     const openedCells = Math.max(0, blockedFeatureCount(beforeRuntime) - blockedFeatureCount(result.runtime));
+    const serviceGain = Math.max(
+      0,
+      (Number(result.runtime?.servedCount) || 0) - (Number(beforeRuntime?.servedCount) || 0),
+    );
     const fragileBreakGain = Math.max(
       0,
       (Number(result.runtime?.fragileBrokenCount) || 0) - (Number(beforeRuntime?.fragileBrokenCount) || 0),
@@ -297,9 +314,10 @@
       boardMetrics: metrics,
       frogGain,
       openedCells,
+      serviceGain,
       fragileBreakGain,
       specialValue,
-      plannerScore: clearBonus + progressGain * 100000 + frogGain * 5200 + openedCells * 4600 + specialValue * 1100 + metrics.quality,
+      plannerScore: clearBonus + progressGain * 100000 + frogGain * 5200 + openedCells * 4600 + serviceGain * 12000 + specialValue * 1100 + metrics.quality,
     };
   }
 
@@ -320,6 +338,7 @@
       visible.goalPieces * 390 +
       visible.matchingPieces * 150 +
       visible.coloredPlateFit * 300 +
+      visible.servicePlateFit * 520 +
       visible.fragilePlateFit * 520 +
       visible.mystery * 90 +
       metrics.quality;
@@ -334,6 +353,7 @@
       boardMetrics: metrics,
       frogGain: 0,
       openedCells: 0,
+      serviceGain: 0,
       fragileBreakGain: 0,
       specialValue: 0,
       plannerScore: heuristic,
@@ -363,7 +383,7 @@
 
   function scoreCandidate(candidate, style) {
     const clearBonus = candidate.clearsStage ? 1000000 : 0;
-    const mechanicScore = candidate.frogGain * 5600 + candidate.openedCells * 4200 + candidate.fragileBreakGain * 12000 + candidate.specialValue * 900;
+    const mechanicScore = candidate.frogGain * 5600 + candidate.openedCells * 4200 + candidate.serviceGain * 12000 + candidate.fragileBreakGain * 12000 + candidate.specialValue * 900;
     if (style === "goal") {
       return clearBonus +
         candidate.progressGain * 165000 +
@@ -372,6 +392,7 @@
         candidate.visible.goalPieces * 420 +
         candidate.visible.matchingPieces * 110 +
         candidate.visible.coloredPlateFit * 450 +
+        candidate.visible.servicePlateFit * 650 +
         candidate.visible.fragilePlateFit * 650 +
         mechanicScore +
         candidate.boardMetrics.quality * .2;
@@ -383,6 +404,7 @@
         candidate.boardMetrics.free * 900 +
         (candidate.result?.emptied?.length || 0) * 2600 +
         candidate.openedCells * 7200 +
+        candidate.serviceGain * 8500 +
         candidate.fragileBreakGain * 8500 +
         candidate.frogGain * 2600 -
         candidate.boardMetrics.mixedPenalty * 650;
@@ -395,6 +417,7 @@
         candidate.visible.matchingColors * 480 +
         candidate.visible.goalPieces * 170 +
         candidate.visible.coloredPlateFit * 600 +
+        candidate.visible.servicePlateFit * 700 +
         candidate.visible.fragilePlateFit * 700 +
         candidate.visible.occupiedNeighbors * 45 +
         candidate.frogGain * 1200 +

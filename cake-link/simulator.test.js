@@ -185,10 +185,10 @@ const layeredBoard = Simulator.createInitialBoard(Stages.getStage(17));
 assert.equal(layeredBoard[5].receiveOnly, true);
 assert.deepEqual(layeredBoard[5].layers[0].pieces, { lemon: 3 });
 
-const fragileStage = Stages.getStage(16);
-const fragileRuntime = { ...Mechanics.createRuntime(fragileStage), fragileBrokenCount: 2 };
-assert.equal(Simulator.goalProgress(fragileStage, {}, fragileRuntime), 2 / 3);
-assert.equal(Mechanics.isCellAvailable(fragileStage, fragileRuntime, 5, Array(16).fill(null)), true);
+const serviceStage = Stages.getStage(16);
+const serviceRuntime = { ...Mechanics.createRuntime(serviceStage), servedCells: { 5: true, 6: true }, servedCount: 2 };
+assert.equal(Simulator.goalProgress(serviceStage, {}, serviceRuntime), 2 / 3);
+assert.equal(Mechanics.isCellAvailable(serviceStage, serviceRuntime, 5, Array(16).fill(null)), true);
 
 // The destination is an ordinary usable cell whenever the frog itself is not
 // standing there. Reaching it removes the frog, so the same cell immediately

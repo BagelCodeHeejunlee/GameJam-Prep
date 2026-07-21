@@ -408,7 +408,7 @@
       seed: 16381,
       moveLimit: 18,
       goals: {},
-      objective: { type: "fragile", target: 3 },
+      objective: { type: "service", target: 3 },
       colors: ["berry", "lemon", "matcha", "choco"],
       boardMask: ["1111", "1111", "1111", "1111"],
       initialPlates: [
@@ -419,12 +419,12 @@
       openingRack: [{ berry: 3 }, { lemon: 3 }, { matcha: 3 }],
       colorWeights: { berry: 33, lemon: 31, matcha: 26, choco: 10 },
       platePatternWeights: { a3: 18, a2b1: 30, a2b2: 24, a1b1c1: 18, a2: 10 },
-      gimmick: { id: "fragile", label: "깨지는 판", icon: "💥" },
+      gimmick: { id: "service", label: "주문대", icon: "🔔" },
       mechanics: {
-        fragileCells: [
-          { index: 5, uses: 1 },
-          { index: 6, uses: 1 },
-          { index: 9, uses: 1 },
+        serviceCells: [
+          { index: 5 },
+          { index: 6 },
+          { index: 9 },
         ],
       },
       nextStageId: 17,
@@ -480,6 +480,17 @@
     if (stage.objective?.type === "ordered" && sequence?.length) {
       return Number(completedByType.orderIndex ?? completedByType._orderIndex ?? 0) >= sequence.length;
     }
+    if (stage.objective?.type === "service") {
+      const configured = Math.max(0, Math.floor(Number(stage.objective.target) || 0));
+      const target = configured || (stage.mechanics?.serviceCells || []).length;
+      const servedCells = completedByType.servedCells || completedByType._servedCells || {};
+      const progress = Number(
+        completedByType.servedCount ??
+        completedByType._servedCount ??
+        Object.values(servedCells).filter(Boolean).length
+      );
+      return target > 0 && progress >= target;
+    }
     if (stage.objective?.type === "fragile") {
       const target = Math.max(0, Math.floor(Number(stage.objective.target) || 0));
       const progress = Number(
@@ -499,6 +510,11 @@
     }
     if (stage.objective?.type === "ordered") {
       return stage.mechanics?.orderedGoal?.sequence?.length || 0;
+    }
+    if (stage.objective?.type === "service") {
+      const configured = Math.max(0, Math.floor(Number(stage.objective.target) || 0));
+      if (configured > 0) return configured;
+      return (stage.mechanics?.serviceCells || []).length;
     }
     if (stage.objective?.type === "fragile") {
       return Math.max(0, Math.floor(Number(stage.objective.target) || 0));
