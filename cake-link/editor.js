@@ -17,6 +17,7 @@
   let selectedId = 1;
   let selectedCell = 0;
   let lastResult = null;
+  let lastComparison = null;
   let toastTimer;
 
   const $ = (selector) => document.querySelector(selector);
@@ -30,13 +31,16 @@
     patternBody: $("#patternTableBody"), patternTotal: $("#patternWeightTotal"), addPattern: $("#addPatternButton"),
     json: $("#jsonEditor"), applyJson: $("#applyJsonButton"), copyStage: $("#copyStageButton"),
     reset: $("#resetStageButton"), save: $("#saveButton"), copyAll: $("#copyAllButton"), toast: $("#toast"),
-    skill: $("#skillInput"), runs: $("#runsInput"), runsValue: $("#runsValue"), simulate: $("#simulateButton"),
+    style: $("#styleInput"), skill: $("#skillInput"), styleDescription: $("#styleDescription"),
+    runs: $("#runsInput"), runsValue: $("#runsValue"), simulate: $("#simulateButton"),
     simEmpty: $("#simEmpty"), simResults: $("#simResults"), simDifficulty: $("#simDifficulty"),
+    simResultProfile: $("#simResultProfile"), simComparisonMeta: $("#simComparisonMeta"),
+    styleComparisonBody: $("#styleComparisonBody"), outcomeChart: $("#outcomeChart"),
     clearRate: $("#clearRateValue"), averageMoves: $("#averageMovesValue"), averageProgress: $("#averageProgressValue"),
     clearBar: $("#clearBar"), limitBar: $("#limitBar"), lockedBar: $("#lockedBar"),
     clearLegend: $("#clearLegend"), limitLegend: $("#limitLegend"), lockedLegend: $("#lockedLegend"),
     simInsight: $("#simInsight"), applyDifficulty: $("#applyDifficultyButton"), simulateAll: $("#simulateAllButton"),
-    curveBody: $("#curveTableBody"),
+    curveBody: $("#curveTableBody"), curveProfile: $("#curveProfile"),
   };
 
   function deepClone(value) {
@@ -61,6 +65,37 @@
 
   function percent(value) {
     return `${(value * 100).toFixed(1)}%`;
+  }
+
+  function styleIds() {
+    return Simulator.PLAYER_STYLE_IDS || Object.keys(Simulator.PLAYER_STYLES || {});
+  }
+
+  function styleInfo(styleId) {
+    return Simulator.PLAYER_STYLES?.[styleId] || { id: styleId, label: styleId, description: "" };
+  }
+
+  function skillInfo(skillId) {
+    return Simulator.SKILL_LEVELS?.[skillId] || { id: skillId, label: skillId, description: "" };
+  }
+
+  function profileLabel(styleId = elements.style.value, skillId = elements.skill.value) {
+    return `${styleInfo(styleId).label} · ${skillInfo(skillId).label}`;
+  }
+
+  function formatDelta(value) {
+    const percentagePoints = value * 100;
+    if (Math.abs(percentagePoints) < .05) return "0.0%p";
+    return `${percentagePoints > 0 ? "+" : ""}${percentagePoints.toFixed(1)}%p`;
+  }
+
+  function comparisonResults(comparison = lastComparison) {
+    if (!comparison) return {};
+    const results = comparison.results || comparison.styles || {};
+    if (Array.isArray(results)) {
+      return Object.fromEntries(results.map((result) => [result.style, result]));
+    }
+    return results;
   }
 
   function goalCount(data = stage()) {
@@ -154,11 +189,25 @@
     toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 1800);
   }
 
-  function markChanged() {
-    elements.savedState.textContent = "저장 안 됨";
+  function clearSelectedSimulation() {
     lastResult = null;
+    lastComparison = null;
     elements.simEmpty.classList.remove("hidden");
     elements.simResults.classList.add("hidden");
+    elements.styleComparisonBody.innerHTML = "";
+  }
+
+  function updateProfileCopy() {
+    const style = styleInfo(elements.style.value);
+    const skill = skillInfo(elements.skill.value);
+    const styleDescription = style.description || "선택한 플레이 방식으로 후보 수를 평가합니다.";
+    elements.styleDescription.textContent = `${styleDescription} ${skill.description || ""}`.trim();
+    elements.curveProfile.textContent = `${profileLabel()} 기준`;
+  }
+
+  function markChanged() {
+    elements.savedState.textContent = "저장 안 됨";
+    clearSelectedSimulation();
     syncSummary();
     syncJson();
     renderStageList();
@@ -174,7 +223,7 @@
       button.addEventListener("click", () => {
         selectedId = Number(button.dataset.stage);
         selectedCell = 0;
-        lastResult = null;
+        clearSelectedSimulation();
         renderAll();
       });
     });
@@ -393,6 +442,7 @@
     renderPatterns();
     syncSummary();
     syncJson();
+    updateProfileCopy();
     renderCurveTable();
     elements.simEmpty.classList.remove("hidden");
     elements.simResults.classList.add("hidden");
@@ -410,6 +460,9 @@
     lastResult = result;
     elements.simEmpty.classList.add("hidden");
     elements.simResults.classList.remove("hidden");
+    const resultStyle = result.style || elements.style.value;
+    const resultSkill = result.skill || elements.skill.value;
+    elements.simResultProfile.textContent = profileLabel(resultStyle, resultSkill);
     elements.simDifficulty.textContent = result.difficulty;
     elements.clearRate.textContent = percent(result.clearRate);
     elements.averageMoves.textContent = result.averageClearMoves === null ? "-" : `${result.averageClearMoves.toFixed(1)}회`;
@@ -420,6 +473,10 @@
     elements.clearLegend.textContent = percent(result.clearRate);
     elements.limitLegend.textContent = percent(result.limitRate);
     elements.lockedLegend.textContent = percent(result.lockedRate);
+    elements.outcomeChart.setAttribute(
+      "aria-label",
+      `${profileLabel(resultStyle, resultSkill)} 결과: 클리어 ${percent(result.clearRate)}, 횟수 소진 ${percent(result.limitRate)}, 보드 잠김 ${percent(result.lockedRate)}`,
+    );
     if (result.lockedRate >= .35) {
       elements.simInsight.textContent = "실패의 중심이 횟수보다 보드 잠김입니다. 보드 가득 참 처리 규칙에 따라 실제 난이도가 크게 달라질 수 있어요.";
     } else if (result.clearRate >= .85) {
@@ -431,6 +488,54 @@
     }
   }
 
+  function renderComparisonRows(activeStyle) {
+    const results = comparisonResults();
+    const plannerResult = results.planner;
+    const selectedResult = results[activeStyle];
+    const resultList = Object.values(results);
+    const totalRuns = Number(lastComparison?.runs) || resultList.reduce((total, result) => total + Number(result.runs || 0), 0);
+    elements.simComparisonMeta.textContent = selectedResult
+      ? `총 ${totalRuns.toLocaleString("ko-KR")}회 비교 · 선택 결과 ${Number(selectedResult.runs || 0).toLocaleString("ko-KR")}회`
+      : `총 ${totalRuns.toLocaleString("ko-KR")}회 비교`;
+    elements.styleComparisonBody.innerHTML = styleIds().filter((styleId) => results[styleId]).map((styleId) => {
+      const result = results[styleId];
+      const active = styleId === activeStyle;
+      const delta = plannerResult ? result.clearRate - plannerResult.clearRate : 0;
+      return `<tr class="${active ? "active" : ""}" data-style-result="${styleId}">
+        <th scope="row"><button type="button" aria-pressed="${active}" aria-label="${styleInfo(styleId).label} 상세 보기, 클리어율 ${percent(result.clearRate)}">${styleInfo(styleId).label}</button></th>
+        <td>${percent(result.clearRate)}</td>
+        <td class="compare-delta${delta > .0005 ? " positive" : delta < -.0005 ? " negative" : ""}">${formatDelta(delta)}</td>
+        <td>${percent(result.lockedRate)}</td>
+      </tr>`;
+    }).join("");
+    elements.styleComparisonBody.querySelectorAll("[data-style-result]").forEach((row) => {
+      row.addEventListener("click", () => selectComparisonStyle(row.dataset.styleResult));
+    });
+  }
+
+  function selectComparisonStyle(styleId) {
+    const result = comparisonResults()[styleId];
+    if (!result) return;
+    elements.style.value = styleId;
+    updateProfileCopy();
+    renderComparisonRows(styleId);
+    renderSimulation(result);
+  }
+
+  function renderComparison(comparison) {
+    lastComparison = comparison;
+    const results = comparisonResults(comparison);
+    const preferredStyle = results[elements.style.value]
+      ? elements.style.value
+      : (results.planner ? "planner" : Object.keys(results)[0]);
+    if (!preferredStyle) {
+      clearSelectedSimulation();
+      showToast("비교할 시뮬레이션 결과가 없습니다.");
+      return;
+    }
+    selectComparisonStyle(preferredStyle);
+  }
+
   async function simulateSelected() {
     const errors = validateStage(stage());
     if (errors.length) {
@@ -439,14 +544,20 @@
     }
     elements.simulate.disabled = true;
     elements.simulate.textContent = "분석 중…";
-    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
-    const result = Simulator.simulateStage(deepClone(stage()), {
-      runs: Number(elements.runs.value),
-      skill: elements.skill.value,
-    });
-    renderSimulation(result);
-    elements.simulate.disabled = false;
-    elements.simulate.textContent = "선택 스테이지 분석";
+    try {
+      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      const comparison = Simulator.simulateStyles(deepClone(stage()), {
+        runs: Number(elements.runs.value),
+        skill: elements.skill.value,
+      });
+      renderComparison(comparison);
+    } catch (error) {
+      console.error(error);
+      showToast("시뮬레이션 중 문제가 생겼어요.");
+    } finally {
+      elements.simulate.disabled = false;
+      elements.simulate.textContent = "선택 스테이지 4방식 비교";
+    }
   }
 
   async function simulateAll() {
@@ -457,19 +568,28 @@
     }
     elements.simulateAll.disabled = true;
     const originalText = elements.simulateAll.textContent;
+    const style = elements.style.value;
+    const skill = elements.skill.value;
     const results = {};
-    for (const data of Object.values(drafts)) {
-      elements.simulateAll.textContent = `${data.id}/7 분석 중…`;
-      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
-      results[data.id] = Simulator.simulateStage(deepClone(data), {
-        runs: Number(elements.runs.value),
-        skill: elements.skill.value,
-      });
-      renderCurveTable(results);
+    try {
+      for (const data of Object.values(drafts)) {
+        elements.simulateAll.textContent = `${data.id}/7 분석 중…`;
+        await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        results[data.id] = Simulator.simulateStage(deepClone(data), {
+          runs: Number(elements.runs.value),
+          skill,
+          style,
+        });
+        renderCurveTable(results);
+      }
+      showToast(`${profileLabel(style, skill)} 전체 분석이 끝났어요.`);
+    } catch (error) {
+      console.error(error);
+      showToast("전체 시뮬레이션 중 문제가 생겼어요.");
+    } finally {
+      elements.simulateAll.disabled = false;
+      elements.simulateAll.textContent = originalText;
     }
-    elements.simulateAll.disabled = false;
-    elements.simulateAll.textContent = originalText;
-    showToast("전체 난이도 곡선 분석이 끝났어요.");
   }
 
   bindBasicInput(elements.moveLimit, "moveLimit", (value) => Math.max(1, Number(value) || 1));
@@ -498,16 +618,33 @@
     markChanged();
     renderPatterns();
   });
-  elements.runs.addEventListener("input", () => { elements.runsValue.textContent = `${elements.runs.value}회`; });
+  elements.runs.addEventListener("input", () => {
+    elements.runsValue.textContent = `${Number(elements.runs.value).toLocaleString("ko-KR")}회`;
+    clearSelectedSimulation();
+    renderCurveTable();
+  });
+  elements.style.addEventListener("change", () => {
+    updateProfileCopy();
+    renderCurveTable();
+    if (lastComparison && comparisonResults()[elements.style.value]) {
+      selectComparisonStyle(elements.style.value);
+    }
+  });
+  elements.skill.addEventListener("change", () => {
+    updateProfileCopy();
+    clearSelectedSimulation();
+    renderCurveTable();
+  });
   elements.simulate.addEventListener("click", simulateSelected);
   elements.simulateAll.addEventListener("click", simulateAll);
   elements.applyDifficulty.addEventListener("click", () => {
     if (!lastResult) return;
+    const appliedProfile = profileLabel(lastResult.style || elements.style.value, lastResult.skill || elements.skill.value);
     stage().difficulty = lastResult.difficulty;
     elements.difficulty.value = lastResult.difficulty;
     markChanged();
     renderStageList();
-    showToast("추정 난이도를 적용했어요.");
+    showToast(`${appliedProfile} 추정 난이도를 적용했어요.`);
   });
   elements.reset.addEventListener("click", () => {
     drafts[selectedId] = deepClone(sourceStages[selectedId]);

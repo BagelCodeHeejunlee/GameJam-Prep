@@ -66,7 +66,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .editor-columns { display: grid; max-width: 1280px; margin: 0 auto; grid-template-columns: minmax(0, 1fr) 350px; align-items: start; gap: 18px; }
 .config-column { display: grid; min-width: 0; gap: 16px; }
 .simulation-column { position: sticky; top: 90px; display: grid; gap: 16px; }
-.panel { padding: 20px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.76); box-shadow: 0 10px 30px rgba(77,55,47,.07); }
+.panel { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.76); box-shadow: 0 10px 30px rgba(77,55,47,.07); }
 .panel-title { display: flex; min-height: 30px; margin-bottom: 15px; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-title > div { display: flex; align-items: center; gap: 9px; }
 .panel-title span { display: grid; min-width: 28px; height: 25px; padding: 0 5px; place-items: center; border-radius: 9px; color: var(--berry-dark); background: #f9e4e7; font-size: 9px; font-weight: 900; }
@@ -125,14 +125,34 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 
 .sim-description { margin: -4px 0 16px; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .sim-controls { display: grid; gap: 12px; }
+.sim-profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sim-profile-help { min-height: 31px; margin: -4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.55; }
 .range-line { display: flex; min-height: 40px; margin-top: 5px; align-items: center; gap: 10px; }
 .range-line input { accent-color: var(--berry); }
 .range-line b { min-width: 48px; color: var(--ink); font-size: 11px; text-align: right; }
 .sim-empty { margin-top: 16px; padding: 22px 12px; border-radius: 14px; color: var(--muted); background: #f8eddf; font-size: 11px; line-height: 1.5; text-align: center; }
 .hidden { display: none !important; }
 .sim-results { margin-top: 17px; }
+.sim-comparison-meta { margin: 0 0 7px; color: var(--muted); font-size: 9px; font-weight: 800; }
+.sim-compare-wrap { overflow: visible; }
+.style-compare-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+.style-compare-table th, .style-compare-table td { padding: 3px 4px; border-bottom: 1px solid #eee2d5; text-align: right; white-space: nowrap; }
+.style-compare-table th:first-child { width: 37%; text-align: left; }
+.style-compare-table thead th { padding-top: 4px; padding-bottom: 6px; color: var(--muted); font-size: 8px; }
+.style-compare-table tbody tr { cursor: pointer; transition: background-color .16s ease; }
+.style-compare-table tbody tr:hover, .style-compare-table tbody tr.active { background: #f8eddf; }
+.style-compare-table tbody tr:last-child th, .style-compare-table tbody tr:last-child td { border-bottom: 0; }
+.style-compare-table button { width: 100%; min-height: 30px; padding: 0 3px; border: 0; color: var(--ink); background: transparent; cursor: pointer; font-size: 9px; font-weight: 900; text-align: left; }
+.style-compare-table button[aria-pressed="true"] { color: var(--berry-dark); }
+.compare-delta.positive { color: var(--green); font-weight: 900; }
+.compare-delta.negative { color: var(--berry-dark); font-weight: 900; }
+.sim-detail-heading { display: flex; margin: 13px 0 9px; align-items: center; gap: 8px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.sim-detail-heading::after { height: 1px; flex: 1; background: #eee2d5; content: ""; }
 .sim-grade { display: flex; align-items: baseline; justify-content: space-between; }
 .sim-grade span { color: var(--muted); font-size: 10px; }
+.sim-grade span b, .sim-grade span small { display: block; }
+.sim-grade span b { color: var(--ink); font-size: 11px; }
+.sim-grade span small { margin-top: 2px; font-size: 8px; }
 .sim-grade strong { font-size: 24px; letter-spacing: -.05em; }
 .stat-grid { display: grid; margin-top: 12px; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .stat-grid > div { padding: 10px 7px; border-radius: 12px; background: #f8eddf; text-align: center; }
@@ -152,6 +172,7 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .curve-table { margin-top: 12px; }
 .curve-table th:not(:first-child), .curve-table td:not(:first-child) { text-align: right; }
 .curve-rate { font-weight: 900; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .editor-toast { position: fixed; z-index: 30; right: 22px; bottom: 22px; max-width: min(360px, calc(100vw - 44px)); padding: 12px 16px; border-radius: 13px; color: #fff; background: var(--ink); box-shadow: 0 10px 30px rgba(77,55,47,.24); opacity: 0; pointer-events: none; transform: translateY(10px); transition: .2s ease; font-size: 11px; font-weight: 800; }
 .editor-toast.show { opacity: 1; transform: translateY(0); }
@@ -183,4 +204,5 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
   .header-actions .secondary { display: none; }
   .panel { padding: 16px; border-radius: 18px; }
   .piece-inputs { grid-template-columns: 1fr; }
+  .sim-profile-grid { grid-template-columns: 1fr; }
 }

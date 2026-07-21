@@ -108,22 +108,35 @@
           <aside class="simulation-column" aria-labelledby="simTitle">
             <section class="panel simulation-panel">
               <div class="panel-title"><div><span>SIM</span><h2 id="simTitle">난이도 시뮬레이션</h2></div></div>
-              <p class="sim-description">현재 정렬 엔진으로 플레이를 반복합니다. 보드가 가득 차면 별도 결과로 집계합니다.</p>
+              <p class="sim-description">서로 다른 4가지 플레이 방식을 같은 조건에서 비교합니다. 총 반복 횟수는 각 방식에 나눠 적용됩니다.</p>
               <div class="sim-controls">
-                <label>가상 플레이어<select id="skillInput"><option value="novice">초보</option><option value="standard" selected>일반</option><option value="expert">숙련</option></select></label>
-                <label>반복 횟수<div class="range-line"><input id="runsInput" type="range" min="50" max="10000" step="50" value="500" /><b id="runsValue">500회</b></div></label>
-                <button id="simulateButton" class="button primary wide" type="button">선택 스테이지 분석</button>
+                <div class="sim-profile-grid">
+                  <label>기준 플레이 방식<select id="styleInput"><option value="planner" selected>꼼꼼 계산</option><option value="goal">완성 우선</option><option value="space">공간 관리</option><option value="instinct">빠른 직감</option></select></label>
+                  <label>유저 수준<select id="skillInput"><option value="novice">초보</option><option value="standard" selected>일반</option><option value="expert">숙련</option></select></label>
+                </div>
+                <p id="styleDescription" class="sim-profile-help">모든 판과 빈칸의 정렬 결과를 비교해 목표와 보드 상태를 함께 봅니다.</p>
+                <label>총 반복 횟수<div class="range-line"><input id="runsInput" type="range" min="100" max="10000" step="100" value="1000" /><b id="runsValue">1,000회</b></div></label>
+                <button id="simulateButton" class="button primary wide" type="button">선택 스테이지 4방식 비교</button>
               </div>
 
               <div id="simEmpty" class="sim-empty">데이터를 수정한 뒤 분석을 실행해보세요.</div>
               <div id="simResults" class="sim-results hidden" aria-live="polite">
-                <div class="sim-grade"><span>AI 추정 난이도</span><strong id="simDifficulty">-</strong></div>
+                <p id="simComparisonMeta" class="sim-comparison-meta"></p>
+                <div class="table-wrap sim-compare-wrap">
+                  <table class="style-compare-table">
+                    <caption class="sr-only">플레이 방식별 시뮬레이션 결과 비교</caption>
+                    <thead><tr><th scope="col">방식</th><th scope="col">클리어</th><th scope="col">기준차</th><th scope="col">잠김</th></tr></thead>
+                    <tbody id="styleComparisonBody"></tbody>
+                  </table>
+                </div>
+                <div class="sim-detail-heading"><span>선택 프로필 상세</span></div>
+                <div class="sim-grade"><span><b id="simResultProfile">-</b><small>추정 난이도</small></span><strong id="simDifficulty">-</strong></div>
                 <div class="stat-grid">
                   <div><span>클리어율</span><b id="clearRateValue">-</b></div>
                   <div><span>평균 클리어</span><b id="averageMovesValue">-</b></div>
                   <div><span>평균 목표 달성</span><b id="averageProgressValue">-</b></div>
                 </div>
-                <div class="outcome-chart" role="img" aria-label="시뮬레이션 결과 비율">
+                <div id="outcomeChart" class="outcome-chart" role="img" aria-label="시뮬레이션 결과 비율">
                   <div id="clearBar" class="outcome clear"></div><div id="limitBar" class="outcome limit"></div><div id="lockedBar" class="outcome locked"></div>
                 </div>
                 <div class="chart-legend">
@@ -137,8 +150,8 @@
             </section>
 
             <section class="panel all-stage-panel">
-              <div class="panel-title"><div><span>ALL</span><h2>전체 난이도 곡선</h2></div></div>
-              <button id="simulateAllButton" class="button secondary wide" type="button">1~7 전체 분석</button>
+              <div class="panel-title"><div><span>ALL</span><h2>전체 난이도 곡선</h2></div><small id="curveProfile">꼼꼼 계산 · 일반 기준</small></div>
+              <button id="simulateAllButton" class="button secondary wide" type="button">선택 프로필로 1~7 분석</button>
               <div class="table-wrap"><table class="curve-table"><thead><tr><th>ST</th><th>제한</th><th>판당</th><th>클리어</th><th>잠김</th></tr></thead><tbody id="curveTableBody"></tbody></table></div>
             </section>
           </aside>
